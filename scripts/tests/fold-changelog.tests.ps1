@@ -46,6 +46,8 @@ $NativeCaptureSrc = Join-Path $RepoRoot 'scripts\lib\native-capture-lib.ps1'
 # rank from, and the ranked insert offset. A $PSScriptRoot-relative sibling of the fold script, so the
 # fixture has to carry it.
 $EntryScaffoldSrc = Join-Path $RepoRoot 'scripts\lib\entry-scaffold-lib.ps1'
+# And entry-scaffold-lib.ps1's own sibling, since #1650: it dot-sources this one for Get-DisplayRef.
+$RefPrintLibSrc   = Join-Path $RepoRoot 'scripts\lib\ref-print-lib.ps1'
 # The plugin tree: Get-TouchedPlugins and the roots it reads, for the 'Plugins:' line. Also a
 # $PSScriptRoot-relative sibling of the fold script, so the fixture carries it for the same reason.
 $PluginTreeSrc    = Join-Path $RepoRoot 'scripts\lib\plugin-tree-lib.ps1'
@@ -159,6 +161,9 @@ function New-FoldFixture {
     Copy-Item -LiteralPath $FoldSrc          -Destination (Join-Path $dir 'scripts\release\fold-changelog-entry.ps1') -Force
     Copy-Item -LiteralPath $NativeCaptureSrc -Destination (Join-Path $dir 'scripts\lib\native-capture-lib.ps1')       -Force
     Copy-Item -LiteralPath $EntryScaffoldSrc -Destination (Join-Path $dir 'scripts\lib\entry-scaffold-lib.ps1')       -Force
+    # A sibling of a sibling since #1650: entry-scaffold-lib.ps1 dot-sources ref-print-lib.ps1 for
+    # Get-DisplayRef, so a fixture carrying the one and not the other loads a lib that throws.
+    Copy-Item -LiteralPath $RefPrintLibSrc   -Destination (Join-Path $dir 'scripts\lib\ref-print-lib.ps1')            -Force
     Copy-Item -LiteralPath $PluginTreeSrc    -Destination (Join-Path $dir 'scripts\lib\plugin-tree-lib.ps1')          -Force
     Copy-Item -LiteralPath $SeamLibSrc       -Destination (Join-Path $dir 'scripts\lib\seam-lib.ps1')                 -Force
     Copy-Item -LiteralPath $RepoConfigSrc    -Destination (Join-Path $dir 'scripts\repo-config.ps1')                  -Force

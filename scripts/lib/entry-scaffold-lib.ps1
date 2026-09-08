@@ -7149,10 +7149,10 @@ function Test-DevelopmentEntryMissing {
         a pre-split root entry -- answers for that legacy shape too. Refusing on it would refuse a file
         that is a perfectly good entry.
 
-        THE GUIDANCE ARM IS ANCHORED TO THE TITLE, not merely 'somewhere before the second heading'. An
-        entry BODY may legitimately quote something, and a blockquote in a legacy entry's prose must not
-        read as guidance. The scaffolder writes the block directly under the document's own heading, so
-        that is where this looks: blank lines are skipped, anything else ends the region.
+        THE PLAN TEST ITSELF LIVES NEXT DOOR, in Test-DevelopmentHasPlan, since September 8, 2026 (#1650):
+        the shape rules need the same question, and asking it twice in two spellings is the drift this file
+        exists to prevent. Its header carries the anchoring, the fence-awareness and what the extraction
+        was measured against.
 
         AND IT ERRS TOWARD UNDER-REFUSAL. A document whose guidance AND phases have both gone along with
         its DEPLOY section is not recognised here, and that is the safe direction for a gate: a missed
@@ -7161,6 +7161,43 @@ function Test-DevelopmentEntryMissing {
     param([Parameter(Mandatory)][AllowEmptyString()][string]$Text)
 
     if ((Split-Development -Text $Text).Found) { return $false }
+    return (Test-DevelopmentHasPlan -Text $Text)
+}
+
+function Test-DevelopmentHasPlan {
+    <#
+        Pure: does this text carry a development document's PLAN -- the scaffolder's guidance block under
+        the title, or the named phases that hold the step list, or both?
+
+        THE DISCRIMINATOR BETWEEN A DEVELOPMENT DOCUMENT AND A LEGACY ENTRY-ONLY FILE, and it was the arm
+        inside Test-DevelopmentEntryMissing until September 8, 2026. It came out because the shape rules
+        need exactly the same question (issue #1650): a legacy entry file IS an entry from its first line,
+        so it has no document AROUND the entry to judge -- its own sub-sections would read as phases and
+        its prose as a preamble stray. Asking that question twice, in two spellings, is the drift this file
+        exists to prevent, and the two answers disagreeing would mean one gate refusing a file the other
+        calls legitimate.
+
+        IT READS SHAPE RATHER THAN TEXT, which is what makes it survive translation. The guidance block is
+        BLOCKQUOTED in whatever language a consumer translated it into, and the phases come from the wording
+        seam the scaffolder writes them from. A byte comparison against StepsGuidance could not: it carries
+        a '{0}' seam the consumer answers themselves, and inbound #562 is the measured consumer who
+        translated the block around it.
+
+        THE GUIDANCE ARM IS ANCHORED TO THE TITLE, not merely 'somewhere before the second heading'. An
+        entry BODY may legitimately quote something, and a blockquote in a legacy entry's prose must not
+        read as guidance. The scaffolder writes the block directly under the document's own heading, so
+        that is where this looks: blank lines are skipped, anything else ends the region.
+
+        FENCE-AWARE, like every reader of this format: a document explaining this mechanism quotes the
+        guidance block, and a predicate that fired on the quote would answer for the file documenting it.
+
+        MEASURED THE DAY IT WAS EXTRACTED, and it is why this is a guard rather than a note. The shape
+        rules shipped without it for one run of the test gate: seven suites went red, because the open-pr
+        fixture in shared-scripts.tests.ps1 writes exactly this legacy shape -- '### <title> - Feat -
+        <date>' and a paragraph -- and the shape gate refused it. The lib header had already written that
+        misread down as a risk that had not bitten. It bit within the hour.
+    #>
+    param([Parameter(Mandatory)][AllowEmptyString()][string]$Text)
 
     $lines  = @($Text -split '\r?\n')
     $fenced = @(Get-FencedLineFlags -Lines $lines)
@@ -7246,14 +7283,15 @@ function Get-DevelopmentShapeFindings {
         off the document (below), and the phase names come from the same wording seam the scaffolder
         writes them from, so a repo that renamed a phase is judged by its own names.
 
-        THE ONE SHAPE IT MISREADS IS A LEGACY ENTRY-ONLY FILE, and it is written down here rather than
-        carved out. Such a file IS an entry from its first line, so the first heading it finds is the
-        entry's own: the entry's sub-sections then read as phases and its prose reads as preamble. Both
-        callers resolve that path only as a FALLBACK, for a branch cut before the August 2026 renames, and
-        CI has been reporting on this text since August 26, 2026 without meeting one -- so this is a risk
-        that has not bitten, which this house writes down instead of building against. If it ever does,
-        open-pr.ps1's refusal honours -Force and the shape of the repair is a guard at the caller's
-        resolution site, not a second discriminator in here.
+        A LEGACY ENTRY-ONLY FILE IS REFUSED ENTRY AT THE DOOR, by Test-DevelopmentHasPlan, and the first
+        draft of this function did not do that. It read the misread correctly -- such a file IS an entry
+        from its first line, so its own sub-sections read as phases and its prose as a preamble stray --
+        and then declined to guard against it, on the ground that CI had reported on this text since
+        August 26, 2026 without meeting one, which made it a risk that had not bitten. It bit on the first
+        run of the test gate: SEVEN suites red, because the open-pr fixture in shared-scripts.tests.ps1
+        writes exactly that shape. The lesson is not that the no-pre-emptive-fixes rule is wrong; it is
+        that "has not bitten" was a claim about CI, where the rule only ever REPORTED, and this branch was
+        turning it into a refusal. Widening what a check does resets its evidence.
 
         RETURNS the finding lines ready to print (empty when the document is sound), plus what was
         actually READ: PhaseCount, PhaseMark and SubMark. A caller reporting coverage quotes those rather
@@ -7267,6 +7305,23 @@ function Get-DevelopmentShapeFindings {
         [Parameter(Mandatory)][AllowEmptyString()][string]$Text,
         [switch]$EnforcePhaseArc
     )
+
+    # A DOCUMENT WITH NO PLAN HAS NO SHAPE TO JUDGE, and this is the first question rather than a special
+    # case. Both rules are about the document AROUND the entry; a legacy entry-only file IS an entry from
+    # its first line, so its own sub-sections would read as phases and its prose as a preamble stray. The
+    # predicate is Test-DevelopmentEntryMissing's own, shared rather than re-derived -- its header carries
+    # the measurement, including the seven suites that went red the one run this guard was missing.
+    if (-not (Test-DevelopmentHasPlan -Text $Text)) {
+        return [pscustomobject]@{
+            Findings       = @()
+            PhaseCount     = 0
+            PhaseMark      = '#' * ((Get-BranchCycleHeadingLevel) + 1)
+            SubMark        = '#' * ((Get-BranchCycleHeadingLevel) + 2)
+            PhaseHeadings  = @()
+            StrayHeadings  = @()
+            PreambleStrays = @()
+        }
+    }
 
     # THE LEVELS ARE READ OFF THE DOCUMENT, NOT PINNED, and a range would be wrong rather than merely loose
     # (August 26, 2026). Both levels shifted one down that day: the title went H1 -> H2 and the phases

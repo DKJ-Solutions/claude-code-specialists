@@ -2928,6 +2928,21 @@ Assert-Equal 0 @((Get-DevelopmentShapeFindings -Text $shapeFenced -EnforcePhaseA
 # AND EMPTY TEXT IS NOT A DEFECT, for the same reason it is not one for the predicate above.
 Assert-Equal 0 @((Get-DevelopmentShapeFindings -Text '' -EnforcePhaseArc).Findings).Count 'shape: empty text raises nothing'
 
+# A DOCUMENT WITH NO PLAN HAS NO SHAPE TO JUDGE, and these are the load-bearing asserts of this block:
+# every one of them is a file somebody's branch could be carrying, and refusing it stops work that was
+# fine yesterday. The first is not hypothetical -- it is the exact fixture shape shared-scripts.tests.ps1
+# writes for its open-pr scenarios, and the seven suites that went red the one run this guard was missing.
+$shapeLegacyEntry = "### Open-PR 101 test " + [char]0x00B7 + " Feat " + [char]0x00B7 + " 2026-07-21`n`nThis is the test description text.`n"
+Assert-Equal 0 @((Get-DevelopmentShapeFindings -Text $shapeLegacyEntry -EnforcePhaseArc).Findings).Count 'shape: a legacy entry-only file is not a document with a shape -- the fixture shape that measured this'
+Assert-Equal 0 @((Get-DevelopmentShapeFindings -Text ((Format-EntryBlock -Branch 'feat/thing' -Type 'Feat' -Description 'd' -Body 'b') -join "`n") -EnforcePhaseArc).Findings).Count 'shape: nor is an entry block on its own'
+Assert-Equal 0 @((Get-DevelopmentShapeFindings -Text "## Fix: something broke`n`n#### Description`n`nIt broke.`n" -EnforcePhaseArc).Findings).Count 'shape: nor a pre-split root entry, whose sub-sections would otherwise read as phases'
+Assert-Equal 0 @((Get-DevelopmentShapeFindings -Text "### Fix: x`n`n#### Description`n`n> quoted prose`n`nbody`n" -EnforcePhaseArc).Findings).Count 'shape: nor one quoting something in its body -- a blockquote there is a quotation, not guidance'
+# THE GUARD IS THE PREDICATE NEXT DOOR, not a second discriminator: two spellings of "is this a
+# development document" would be free to disagree, and then one gate refuses what the other allows.
+Assert-True (-not (Test-DevelopmentHasPlan -Text $shapeLegacyEntry)) 'shape: and Test-DevelopmentHasPlan is what says so, shared with the entry-missing predicate'
+Assert-True (Test-DevelopmentHasPlan -Text $shapeWhole) 'shape: while the document the scaffolder writes does carry a plan'
+Assert-True (Test-DevelopmentHasPlan -Text $shapeBroken) 'shape: and so does PR #1644''s -- its guidance block survived, which is why it is still judged'
+
 # THE QUOTED FRAGMENTS ARE STRIPPED, because they are the only text here that somebody else wrote and they
 # are printed to a console and to a public CI log. Same treatment, same one definition, as a commit subject
 # from another session (#1623) -- an ANSI escape repaints the terminal and a zero-width run makes the line

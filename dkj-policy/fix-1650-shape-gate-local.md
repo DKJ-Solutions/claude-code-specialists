@@ -115,6 +115,28 @@ so `open-pr`'s file I/O is slightly *cheaper* than before.
       region"* over a gate that now refuses on it. Nolan's measurement took ~215 B of narrative back off
       the always-on path; `CLAUDE.md` is +481 B against `main` rather than +696 B, and the story it used to
       carry is in the two path-scoped pages that already told it.
+- [x] The first full-suite run **found two real defects the four reviewers had not**, and both were mine:
+      **seven suites red**, and each cause is worth its own line.
+- [x] Cause one, the one that matters: the shape gate refused a **legacy entry-only file**. The lib header
+      had written that misread down as *"a risk that has not bitten"* and declined to guard it -- and the
+      open-pr fixture in `shared-scripts.tests.ps1` writes exactly that shape (`### <title> - Feat -
+      <date>` and a paragraph). The lesson is not that the no-pre-emptive-fixes rule is wrong: *"has not
+      bitten"* was a claim about **CI, where the rule only ever REPORTED**, and this branch turns it into a
+      refusal. **Widening what a check does resets its evidence.** Written into
+      `Get-DevelopmentShapeFindings`'s own header, where the declined guard used to be argued for.
+- [x] The repair is a shared predicate rather than a carve-out: `Test-DevelopmentHasPlan`, lifted out of
+      `Test-DevelopmentEntryMissing`, which was already asking the identical question. Both callers use it
+      now, so "is this a development document" has one answer instead of two free to disagree -- and 7
+      asserts pin the shapes that must never be refused.
+- [x] Cause two: three fixtures copy `entry-scaffold-lib.ps1` into a fake tree and did not copy the
+      `ref-print-lib.ps1` it now dot-sources, so the lib **threw on load** and the script died before
+      reporting anything -- 85 asserts red in one suite alone. Fixed in the three fixtures rather than by
+      guarding the dot-source, deliberately: `internal-note.tests.ps1`'s own comment already states the
+      principle -- *"a missing sibling must fail loudly here rather than in someone's release"* -- and a
+      guarded load would instead drop the control-character strip in silence. Five other fixtures already
+      carried it, which is why five of the eight passed.
+- [x] Second full run: all 80 suites, and the nine that had failed or that own this code re-run
+      individually first (796 / 41 / 608 / 254 / 111 / 141 / 97 / 69 / 85 asserts, all green).
 - [x] Full suite via `open-pr.ps1`'s own test gate.
 
 ### DEPLOY: fix/1650-shape-gate-local
