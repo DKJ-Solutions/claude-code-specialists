@@ -33,19 +33,98 @@
 
 ### PLAN
 
+Issue [#1612](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1612), filed by Dave. Two
+halves, and the second is the one worth repairing whatever is decided about the first.
+
+`Get-AuthoredFailureNote` (`scripts/lib/pr-issues-lib.ps1`) relays a sentence a **workflow author**
+wrote into the operator's console, under `ship-pr`'s own warning prefix and indent. It trims, cuts to the
+first line and caps at 500 -- so the newline tricks are gone and nothing else is: an in-line `ESC[`, an
+OSC string or an RTL override survives all three. The sibling relay `Get-RemoteAheadNote`
+(`scripts/lib/remote-ahead-lib.ps1`) faces the same class -- a commit subject somebody else wrote -- and
+strips it, with the reasoning stated at the line. Every word of that reasoning applies here.
+
+The second half: `plugins/dkj-policy/skills/new-branch/SKILL.md` said of that sanitiser that this "is the
+only place this workflow prints externally-authored text to one", which has been false since #1103 added
+the relay. That sentence is what stops a reader looking for a second site.
+
+#### Verified before it was repaired, all three claims plus one the report did not name
+
+- The relay really does not strip: read at the line, and reproduced -- an ESC, a BEL and an RTL override
+  all reached the composed note.
+- `Get-RemoteAheadNote` really does strip, and its comment really does state that reasoning.
+- The skill page's claim really is false and really is the only prose copy -- but **not** the only copy:
+  `scripts/tests/new-branch.tests.ps1` says the same thing in its own words ("which nothing else in this
+  repo does with externally-authored text"), and a repair that left it standing would leave the tree
+  contradicting itself in the file that asserts the behaviour.
+- One the report did not name: `Get-MissingCheckSuiteNote`'s comment ten lines below already contrasted
+  itself with "Get-AuthoredFailureNote ABOVE" as **bounded and escaped**. It was describing a property
+  that did not exist; the fix makes it true, and it now says so.
+
+#### What was NOT done, and why
+
+**No third lib.** The obvious DRY move -- lift the character class into a shared helper -- was priced and
+declined. `native-capture-lib.ps1` is the only lib both dependency chains already load and it carries a
+written request not to be widened again (`park-lib.ps1` and `gate-lib.ps1` both cite it); a new lib would
+cost a registry entry in `shared-scripts-lib.ps1`, a mirror, a dot-source line in four callers and a
+`Copy-Item` in four fixture suites. The two relays share nothing but the class: different bounds (120
+against 500, and #1116 measured the 500 twice), different source processes. So the class is written twice
+and the **drift** is pinned by an assert comparing the two patterns -- which is what a shared home would
+have bought, at the cost of the machinery.
+
+**The 500 is untouched**, as the report asks. Only the character class was in question.
+
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [x] `Format-AuthoredText` in `scripts/lib/pr-issues-lib.ps1`: control and format characters to spaces,
+      runs of spaces collapsed, ends trimmed -- one definition, used for both the title and the message.
+      Bounding stays at the call site, because the two relays' caps are separately measured numbers.
+- [x] The title goes through it **before** the emptiness test, so a "title" of nothing but format
+      characters falls through to the next annotation like any untitled one -- and so the `CheckName`
+      prefix match cannot be defeated by a leading escape.
+- [x] The message goes through it **after** the first-line cut and **before** the cap. Both ends of that
+      order are load-bearing: a newline is itself a control character, so stripping first would leave no
+      first line to take; capping first would count characters the reader never sees.
+- [x] `Get-MissingCheckSuiteNote`'s neighbouring comment now describes what the function does.
+- [x] The skill page's retired claim replaced by the two sites, their two bounds, and the assert that
+      keeps them from disagreeing -- and the same claim in `new-branch.tests.ps1` corrected with it.
+- [x] Plugin mirror rebuilt (`scripts/sync/build-shared-scripts.ps1`).
 
 ### TEST
 
+- [x] Six new asserts in `scripts/tests/pr-issues.tests.ps1`: no ESC, no BEL and no RTL override reaches
+      the note; the words on either side of the override survive in the order they were written; no
+      double space is left where an escape was; and a format-character-only title falls through rather
+      than winning. Fixtures carry `\u` escapes, so the suite stays pure ASCII.
+- [x] Plus the drift pin: both libs carry the same class, and this lib carries exactly **one** copy of it.
+- [x] `scripts/tests/pr-issues.tests.ps1` -- 759 asserts, all passing.
+- [x] Full lint + suite gate via `open-pr.ps1`.
+
 ### DEPLOY: fix/1612-relay-sanitise
 
-**Score:**
+`ship-pr` prints the sentence a failing workflow wrote about itself, and it now strips the control and
+format characters out of that sentence before it reaches your terminal -- the same guard the
+"N commits behind" line has always had on a commit subject. An ANSI or OSC escape in a workflow's own
+`::error title=...::` can no longer repaint the console it is relayed into, and an RTL override can no
+longer make the relayed line read as something other than what it says. The words are kept; only the
+characters that act rather than read are removed. The 500-character cap is unchanged.
+
+Small, because it prevents a failure that has not happened: the author of an annotation is whoever writes
+the repo's own workflows, which is a high-trust surface. It is worth more than a 1 in one specific shape
+that is ordinary practice -- a workflow echoing untrusted input into `::error title=...::`, such as a PR
+title, a branch name or a third-party action's output -- where the relayed text stops being the author's
+own.
+
+**Score:** 2
 
 #### What makes this deploy extra special
 
-**Score:**
+It closes a claim as well as a gap. A page in the tree told readers this workflow printed
+externally-authored text to a console in exactly one place, so nobody had reason to look for the second
+one -- and the comment beside the second one already described itself as guarded. The repair makes three
+statements agree with the code instead of one, and pins the two sanitisers to each other so the next
+reader inherits a checkable arrangement rather than a claim.
+
+**Score:** N/A
 
 #### Pull Request
 

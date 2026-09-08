@@ -241,7 +241,18 @@ is never pushed off the screen.
 **The neighbouring case points the other way, deliberately.** `new-branch` already takes adversarial free
 text -- a malicious `-Title` -- and its rule there is the opposite: land *fully and unchanged*, asserted
 on an exact compare. That text goes into a **file**, where truncation is the damage. A console is not a
-file, and this is the only place this workflow prints externally-authored text to one.
+file, and the rule flips with the destination rather than with the text.
+
+**It is NOT the only console this workflow writes somebody else's words to** -- that claim stood here
+and was false from the day `ship-pr` began relaying the sentence a failing workflow wrote about itself
+(`Get-AuthoredFailureNote`, `scripts/lib/pr-issues-lib.ps1`, #1103). Since
+[#1612](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1612) that relay strips the same
+character class, for the same reason, under a `ship-pr:` warning prefix instead of this one. The class is
+written down in **two** libs on purpose: the two functions share nothing else -- different bounds (120
+here, 500 there, each measured on its own), different source processes, and neither lib is loaded by the
+other's callers -- so what is guarded is that the two copies cannot DISAGREE, by an assert in
+`pr-issues.tests.ps1` comparing the patterns themselves. A reader who needs to know every place this
+workflow prints foreign text now has both, which is what the retired sentence was for.
 
 **It costs no network call.** The base measurement above already fetches *every* ref (that is what
 `-FetchAllRefs` is for, and #1139 is why), so the remote-tracking ref is on disk and as fresh as this run

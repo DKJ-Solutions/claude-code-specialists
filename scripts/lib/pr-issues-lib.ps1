@@ -1719,6 +1719,42 @@ function Get-LostWatchNote {
     return $note
 }
 
+function Format-AuthoredText {
+    <#
+    .SYNOPSIS
+        One line of somebody else's free text, made printable: control and format characters become
+        spaces, runs of spaces collapse, the ends are trimmed. BOUNDING IT IS THE CALLER'S JOB --
+        the two relays that handle this class of text cap it at different, separately measured
+        lengths, and neither number belongs in a shared helper.
+
+    .DESCRIPTION
+        Issue #1612. Get-AuthoredFailureNote below relays a sentence a WORKFLOW AUTHOR wrote, into
+        the operator's console, under ship-pr's own warning prefix and its two-space indent -- and it
+        is read by a terminal AND by an agent session. An ANSI or OSC escape repaints that terminal;
+        an RTL override or a zero-width run makes the printed line read as something other than what
+        it says, deceiving either reader by the very line that exists to explain the failure. So a
+        crafted note wearing this script's prefix is an injection surface rather than a display bug.
+        The relay's first-line cut removes the newline tricks and nothing else: an in-line ESC[ or an
+        RTL override survives Trim() and the length cap untouched.
+
+        THE WORDS STAY. The note only has to be READABLE; quoting the payload would keep it and add
+        noise. Same choice and same reasoning as the sibling site.
+
+        THE SIBLING SITE IS Get-RemoteAheadNote (remote-ahead-lib.ps1), which met this class first --
+        a commit's %an and %s, printed by new-branch and open-pr -- and whose comment states the
+        reasoning quoted above. The class is written in two libs rather than lifted into a third: the
+        two functions share nothing else, their bounds differ for measured reasons (120 against 500,
+        and #1116 measured the 500 twice), and neither lib is loaded by the other's callers, so a
+        shared home would cost a new mirror entry and a dot-source line in every caller and both
+        fixture suites. What the two copies must never do is DISAGREE -- so pr-issues.tests.ps1 pins
+        them to the same character class, guarding the drift instead of designing it away.
+    #>
+    param([string]$Text)
+
+    if (-not $Text) { return '' }
+    return ((($Text -replace '[\p{Cc}\p{Cf}]', ' ') -replace ' {2,}', ' ').Trim())
+}
+
 function Get-AuthoredFailureNote {
     <#
     .SYNOPSIS
@@ -1756,13 +1792,14 @@ function Get-AuthoredFailureNote {
         the order the job emitted them, and a workflow that diagnoses itself does so before the
         runner's exit noise.
 
-        BOUNDED, BECAUSE THIS IS FREE TEXT A WORKFLOW PRODUCED AND IT IS BEING PASTED INTO A CONSOLE:
-        the message is cut to its FIRST LINE and 500 characters. Not the 300 claude-code-review.yml
-        writes its own annotation under -- that bounds the REASON it appends, and the headline
-        explaining what the status means sits in front of it, so relaying at 300 would keep only the
-        headline, which is the part a reader could already guess from the check being red. The two
-        bounds overlap and #1116 measured the overlap rather than removing it; the arithmetic is in
-        the comment beside the cut itself.
+        BOUNDED AND STRIPPED, BECAUSE THIS IS FREE TEXT A WORKFLOW PRODUCED AND IT IS BEING PASTED
+        INTO A CONSOLE: the title and the message go through Format-AuthoredText above (issue #1612 --
+        control and format characters out, words in), and the message is cut to its FIRST LINE and 500
+        characters. Not the 300 claude-code-review.yml writes its own annotation under -- that bounds
+        the REASON it appends, and the headline explaining what the status means sits in front of it,
+        so relaying at 300 would keep only the headline, which is the part a reader could already
+        guess from the check being red. The two bounds overlap and #1116 measured the overlap rather
+        than removing it; the arithmetic is in the comment beside the cut itself.
 
     .PARAMETER AnnotationsJson
         `gh api repos/<owner>/<repo>/check-runs/<jobId>/annotations` output. Unreadable in, '' out: a
@@ -1787,13 +1824,22 @@ function Get-AuthoredFailureNote {
         if (-not $a.PSObject.Properties['annotation_level']) { continue }
         if (([string]$a.annotation_level).Trim().ToLowerInvariant() -ne 'failure') { continue }
 
+        # STRIPPED BEFORE IT IS JUDGED, not merely before it is printed. Two things turn on that
+        # order: a "title" of nothing but format characters is not a workflow diagnosing itself and
+        # must fall through to the next annotation like any untitled one, and the CheckName test
+        # below is a PREFIX match that a leading escape would defeat.
         $title = ''
-        if ($a.PSObject.Properties['title']) { $title = ([string]$a.title).Trim() }
+        if ($a.PSObject.Properties['title']) { $title = Format-AuthoredText -Text ([string]$a.title) }
         if (-not $title) { continue }
 
         $message = ''
         if ($a.PSObject.Properties['message']) { $message = ([string]$a.message).Trim() }
         $message = @($message -split "`r?`n")[0]
+        # AFTER THE CUT AND BEFORE THE CAP, and that order is load-bearing at both ends. A newline is
+        # itself a control character, so stripping first would turn every one of them into a space and
+        # leave no first line to take; capping first would count characters the reader never sees,
+        # since an escape run becomes spaces that the collapse then removes.
+        $message = Format-AuthoredText -Text $message
         # 500, NOT the 300 claude-code-review.yml writes its own annotation under, and measured
         # rather than guessed. That 300 bounds the REASON it appends; the headline explaining what
         # the status means sits in front of it, so relaying at 300 would cut the sentence in half and
@@ -1959,10 +2005,11 @@ function Get-MissingCheckSuiteNote {
     }
     # NEITHER BOUNDED NOR ESCAPED, UNLIKE Get-AuthoredFailureNote ABOVE, and that difference is the
     # point rather than an oversight. That function relays FREE TEXT a workflow author wrote, so it cuts
-    # to one line and 500 characters; a `slug` is a GitHub-assigned identifier -- lowercase, hyphenated,
-    # no newline -- validated by the side that issues it. Written down rather than defended against: no
-    # payload has yet produced a slug this could not print, and a bound built for one that has not
-    # arrived would be guessing at its shape.
+    # to one line and 500 characters and strips the control and format characters out of it -- which
+    # this comment said before it was so, and #1612 is where that was closed; a `slug` is a
+    # GitHub-assigned identifier -- lowercase, hyphenated, no newline -- validated by the side that
+    # issues it. Written down rather than defended against: no payload has yet produced a slug this
+    # could not print, and a bound built for one that has not arrived would be guessing at its shape.
     # THE ONE SLUG THAT MATTERS, and it is GitHub's own rather than a name this repo chose. Every other
     # app on the commit (netlify and claude on #1233, a consumer's own integration elsewhere) is a
     # different provider whose presence or absence says nothing about this repo's workflows -- which is
