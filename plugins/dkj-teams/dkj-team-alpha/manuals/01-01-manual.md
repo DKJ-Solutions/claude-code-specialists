@@ -64,9 +64,26 @@ approach is non-negotiable (a lesson from practice, when a parallel manual split
 - **Explicitly forbid committing** in the assignment; a sub-agent delivers only changes on the
   working copy.
 - **Verify and reconcile yourself** afterwards (lint + diff review) instead of trusting the
-  agents' self-reports.
-- Fanning out read-only exploration in parallel is perfectly fine — for example via a fresh
-  research/exploration agent.
+  agents' self-reports. **A self-report about the working copy is the least trustworthy of them**, and
+  not because a subagent lies: it reports what `git status` told it, and a clean `git status` reads the
+  same whether nothing was touched or your uncommitted edits were discarded.
+- Fanning out **read-only** work in parallel is fine as far as the *deliverable* goes — nobody is
+  writing files — but **"read-only" describes the assignment, not the tools.** A specialist holding
+  `Bash` can move the tree with `git` while changing no file of its own, and that is what the
+  `working-copy-boundary` block forbids. Measured, September 8, 2026
+  ([#1665](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1665)): a review fanned out
+  on exactly this reasoning ran `git stash` and then `git checkout HEAD -- <file>` to settle the
+  conflict it caused, and four uncommitted edits of the orchestrator's own — made after the branch's
+  last commit, while the review ran — were gone with no error and no notice.
+- **So commit before you fan out, if you have anything uncommitted.** It is the orchestrator's own
+  move, and it is what makes the parallel chain safe rather than merely permitted: a boundary in the
+  agent defs reduces the risk and cannot remove it, and nothing in the harness will tell you afterwards
+  that something was lost. **It is not free, though, and pretending otherwise is how the advice gets
+  ignored**: in a repo that does not squash on merge, a mid-work commit made only so a review could run
+  is permanent history — and tidying several of them afterwards is a rebase or an amend, which is
+  precisely what a repo's own safety rules may gate behind the owner's word. Weigh that against what it
+  buys, prefer one commit over several, and where the repo forbids the tidy-up, say so rather than
+  reaching for the command.
 
 ## Picking up an inbound report — the six checks, in full
 

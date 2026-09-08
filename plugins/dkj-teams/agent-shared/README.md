@@ -48,7 +48,7 @@ holding it — and it said `GENERATED, edit agent-shared/<name>.md`.
 
 **That path resolves in this repo and nowhere else.** This directory sits *outside* every plugin root,
 so it does not travel in the package: for a consumer the instruction pointed at a file they do not have.
-Inbound [#669](https://github.com/DaveKJohn/claude-code-specialists/issues/669) C2 reported it as a dead
+Inbound [#669](https://github.com/DKJ-Solutions/claude-code-specialists/issues/669) C2 reported it as a dead
 pointer, which understates it — three lines below, in the same agent def, the `inbound-behaviour` block
 says *"You do not modify the shared core locally"* and names the issue route. The pointer told a reader
 to do what the paragraph it introduces forbids.
@@ -84,6 +84,7 @@ copy editor's context.
 | `language-behavior` | everyone who writes anything |
 | `filecontent-boundary` · `lens-optional` | every agent def, all 26; no persona — see below |
 | `no-conversation-history` · `no-commit-push-pr` | the specialists who deliver material rather than land it |
+| `working-copy-boundary` | every agent def that holds `Bash`, and no persona — the circle is the capability, see below |
 | `browser-compatibility` · `webcontent-boundary` · `artifact-publishing-boundary` · `design-owner-boundary` · `changelog-entry-boundary` · `storefront-preview-boundary` | the narrow circles whose craft touches that surface |
 
 Run `build-agent-defs.ps1 -Check` for the exact carrier count per block; a table of numbers here would be
@@ -94,7 +95,7 @@ specialist joins a circle.
 
 It is the second-widest block, and the width was a decision rather than a default — the per-block rule
 above says so. Inbound
-[#668](https://github.com/DaveKJohn/claude-code-specialists/issues/668) offered the narrower option:
+[#668](https://github.com/DKJ-Solutions/claude-code-specialists/issues/668) offered the narrower option:
 insert it only into the specialists that *act* on file content, not the ones that merely locate it. That
 line was measured against the roster and does not hold. **All 26 agent defs carry `Read`, `Grep` and
 `Glob`**, and a specialist that greps a file and reports what it found has already relayed the content
@@ -115,7 +116,7 @@ has read.
 ### Why `lens-optional` has exactly the same 26 carriers
 
 Same scope, and for a reason that is the mirror image rather than a copy. Inbound
-[#669](https://github.com/DaveKJohn/claude-code-specialists/issues/669) C1 measured that **all four**
+[#669](https://github.com/DKJ-Solutions/claude-code-specialists/issues/669) C1 measured that **all four**
 specialists put on that assessment hit the same friction first and independently: look for the repo lens,
 fail to find it, continue on the plugin source. Every agent def names its lens in its opening sentence,
 so every agent def could produce that hunt — the width follows the pointer, and the pointer is in all 26.
@@ -128,6 +129,74 @@ The per-file half of the same repair sits in those opening sentences: they now s
 consuming repo **"if it has one"**. Both halves are needed, and neither is sufficient. The pointer alone
 would still leave a specialist deciding for itself what a missing file means; the block alone would sit
 under **Boundaries** contradicting a sentence twenty lines above it.
+
+### Why `working-copy-boundary`'s circle is a TOOL rather than a craft
+
+Every other block on this page is scoped by craft — who writes prose, who touches a storefront, who
+delivers material rather than landing it. This one is scoped by **capability**: the 11 agent defs whose
+`tools:` line names `Bash`, and no persona. A block is placed where the rule applies, and the rule here
+applies wherever `git` can be typed at all.
+
+**What it cost to have no such block, measured September 8, 2026
+([#1665](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1665)).** A code review needed
+to compare a branch against `main`, ran `git stash`, met stash entries left by other sessions, hit a
+conflict popping them, and settled it with `git checkout HEAD -- <file>` on three files. Those three
+files were the **orchestrating session's** uncommitted work — four edits made after the branch's last
+commit — and they went without an error, a notice or a refusal. The review's own report ended
+`No repo content was altered` and `the working tree is back to git status clean, matching this commit
+exactly`; both sentences were true of the committed tree and wrong about the work in front of it.
+
+**The reviewer was reading its boundary correctly.** `06-19-agent.md` said *"does not correct the code
+and does not land it"*, and a `git stash` corrects nothing and lands nothing — so the prohibition genuinely
+did not reach it. That is why the block's first bullet says out loud that this is *not* the editing
+boundary in another register: the gap was not carelessness but a rule whose subject was the wrong verb.
+
+**Why the circle is not "the reviewers", which is what the report proposed.** Two independent
+corrections, in opposite directions:
+
+- The report's table listed **five** reviewers holding `Bash` and named Marlowe #29 among them. He holds
+  `Read, Grep, Glob, WebSearch, WebFetch, Skill` — no `Bash` — so a block placed on that table would
+  have put the rule in a context that cannot break it and, worse, would have read as complete.
+- **Seven of the 11 carriers are not reviewers at all** — a majority, so "the reviewers" was not merely
+  an undercount but the wrong noun. The app developer, the test engineer, the systems administrator and
+  the refactoring specialist hold `Bash` beside `Edit`/`Write`, and so do all three of
+  `dkj-team-ecomm`'s specialists (SEO #26, CRO #27, performance/SEA #28), none of whom appears in any
+  review chain. A `git stash` from a test run or a pagespeed measurement discards exactly the same three
+  files as one from a review. Their legitimate editing is what makes the distinction the block draws
+  load-bearing rather than pedantic: **files in your scope, through your own tools, yes; the tree, the
+  index and any ref, never.**
+
+  This enumeration was itself wrong on its first draft — it said "four" and named only the
+  `dkj-team-alpha` half, which is the same miscount by craft that the bullet above corrects in the
+  original report. Recorded rather than quietly fixed, because it is evidence for the width decision
+  rather than an embarrassment: reasoning about this circle from the crafts one happens to have in mind
+  produced the wrong answer twice in one afternoon, and only `grep` over `tools:` got it right.
+
+**No persona carries it, and that is the mirror of the other two exclusions above rather than a copy.**
+The DevOps engineer and the release manager ship as personas and mutating the working copy *is* their
+craft — a checkout, a merge, the fold's step onto the trunk. Giving them this block would forbid the work
+they exist to do. The personas are also not the exposure: this hazard is a **dispatched** subagent
+sharing one checkout with a session that is still editing in it, and the parallel review chain in Chris's
+lens (six specialists on one diff while the orchestrator keeps working) is precisely that arrangement.
+
+**And because this circle is a capability, a check can keep it — which is the half that makes it
+durable.** Every other block's circle is a craft judgement, and lint check 7 has never had an opinion
+about a sentinel pair that is *absent*: it compares the inside of a pair against its source. That is
+right for a craft block and wrong here, because "holds `Bash`" is decidable. So `working-copy-boundary`
+is the subject of **lint check 36**, which reads `Get-ToolRequiredSharedBlocks` in
+[`agent-shared-lib.ps1`](../../../scripts/lib/agent-shared-lib.ps1) — a `tool -> block` table — and
+reports any agent def that names the tool and carries no block. Without it the circle held only as long
+as somebody remembered: a specialist gaining `Bash` later, or one edited `tools:` line, would sit
+silently outside the boundary with every gate green — the same enforced-by-memory shape as the defect
+itself, arriving through the maintenance door. The reverse direction is deliberately not checked:
+carrying a block you are not obliged to is a decision somebody can make, carrying none you are is the
+defect. It was reported by the red-team pass on this branch, before the block had shipped.
+
+**Whether a reviewer should instead be dispatched into a worktree of its own** — removing the hazard
+mechanically rather than by instruction — is a separate decision, filed as
+[#1667](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1667). It is not an alternative to
+this block: a reviewer sometimes reviews work that is not committed yet, which is exactly what a fresh
+worktree does not have.
 
 ## Personas carry blocks too
 
