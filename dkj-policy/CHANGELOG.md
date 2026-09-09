@@ -43,7 +43,45 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**36 / 89 minor entries** <!-- pending-tally -->
+**37 / 90 minor entries** <!-- pending-tally -->
+
+### DEPLOY: feat/1698-rename-to-dkj-subagents · 20260909-200051
+
+The four team plugins are renamed from `dkj-team-*` to `dkj-subagents-*`, their directory from
+`plugins/dkj-teams/` to `plugins/dkj-subagents/`, each team's payload directory from `agents/` to
+`subagents/` (declared by a new `"agents": "./subagents/"` key in each manifest), and
+`agent-shared/` to `subagent-shared/`. *Team* is this family's own word for a group of specialists;
+*subagent* is Claude Code's word for what those plugins actually ship, so the four now say what is in
+the box in the vocabulary of the thing that opens it. Every reader of that payload directory reads
+both leaf names, new first, so a machine holding a pre-rename version in its plugin cache keeps
+resolving, and the lint keeps `dkj-team-*` as an accepted retired shape. `dkj-policy` and
+`dkj-policy-bwj` are unchanged, and `skills/` is deliberately not renamed -- the plugin format always
+scans the default `skills/` directory in addition to any custom one, so a custom skills directory can
+only add, never move.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+**A plugin rename is not a `claude plugin update`.** Every consumer must uninstall the four
+`dkj-team-*` ids and install the `dkj-subagents-*` ones -- which rewrites their `enabledPlugins` for
+them, as this page already documents -- and then fix the two things the CLI leaves behind: the
+`@`-import in their `SPECIALISTS.md`, which carries the full marketplace path and both halves of it
+moved, and their `connectors/` register if they keep one, where an unresolvable id makes
+`check-connectors.ps1` skip that plugin's whole drift check silently. `INSTALL.md` carries the command
+sequence and both, as its third migration section.
+
+**Score:** 5
+
+#### Pull Request
+
+Rename the team side of the marketplace to dkj-subagents
+
+Plugins: dkj-policy, dkj-policy-bwj, dkj-subagents-alpha
+
+[PR #1747](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1747)
+
+---
 
 ### DEPLOY: docs/1744-handbook-enabled-plugins · 20260909-194757
 
