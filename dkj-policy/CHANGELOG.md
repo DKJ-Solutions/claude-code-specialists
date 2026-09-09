@@ -43,7 +43,33 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**36 / 86 minor entries** <!-- pending-tally -->
+**36 / 87 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1742-test-flattener · 20260909-192047
+
+The one flattener variant measured to drop wrapped phrases is out of the test tree. Two copies were
+found where the issue named one: the second, in `shared-scripts.tests.ps1`, was typed inline at a call
+site and was genuinely exposed -- its asserts read an `open-pr` `Write-Warning`, and the negative
+assert beside them would have reported "no warning on the ordinary path" for a warning that was
+printed and merely wrapped mid-word. Nothing was failing before this change, which is the point: the
+silence sat where the next assert anyone added would have inherited it.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+N/A -- a test-suite flattener reaches no consumer of this marketplace. The suites are green before and
+after; what changed is what a future assert inherits.
+
+**Score:** N/A
+
+#### Pull Request
+
+Match find-specialist-mentions.tests.ps1 to the flattener variant that measured zero failures
+
+[PR #1745](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1745)
+
+---
 
 ### DEPLOY: feat/1726-repo-settings-drift-check · 20260909-190954
 
