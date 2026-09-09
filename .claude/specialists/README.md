@@ -10,9 +10,12 @@ themselves**. It is **not a replacement** for the safety rules or the routing.
 > **This repo is an outlier.** claude-code-specialists is the marketplace repo of one product; the
 > specialists system lives here as the plugins under `plugins/` — a stack of teams plus an opt-in
 > workflow (see [`../../README.md`](../../README.md)) — and the repo also consumes that system here
-> **itself**, via the `dkj-team-alpha` plugin (the core team). The team here is therefore small and focused
-> on maintaining this product (agent defs, manuals, docs, tooling), not the broad team of a
-> content repo.
+> **itself** — and it enables **every** plugin in the marketplace, so that the repo which ships a
+> plugin is also a repo that loads it (Dave, September 8, 2026; the reasoning and what it costs are in
+> [the repo slot of `CLAUDE.md`](../../CLAUDE.md#specific-to-this-repo-claude-code-specialists)). Only
+> `dkj-team-alpha` (the core team) and `dkj-policy` carry real work here, so the team is small and
+> focused on maintaining this product (agent defs, manuals, docs, tooling), not the broad team of a
+> content repo. The other four are enabled for validation, not for routing.
 
 - The constitution remains [`../../CLAUDE.md#safety-rules`](../../CLAUDE.md#safety-rules).
 - **Chris still takes in and routes every assignment** — see his fixed ritual in
@@ -30,8 +33,9 @@ just like inline text.
   roster + routing. The single file `CLAUDE.md` names.
 - **`lenses/`** — the **repo layer** of the specialists system: one file per specialist,
   `<group>-<id>-extension.md`, flat (ids are unique family-wide). There are two kinds:
-  - **Subagent lens** — for the fifteen specialists that come out of the `dkj-team-alpha` plugin as
-    subagents (the full list is in the [index below](#index-of-the-extensions-present)): only the
+  - **Subagent lens** — for every specialist that arrives as a subagent from an enabled team plugin
+    (the core team's are in the [index below](#index-of-the-extensions-present); the add-on teams' are
+    listed per plugin in [`SPECIALISTS.md`](SPECIALISTS.md#the-team-roster--routing)): only the
     `## Specific to this repo` part, which
     supplements the portable playbook in the plugin with the context of this repo. The subagent
     reads the plugin playbook + this lens together; the agent def points to both.
@@ -50,13 +54,16 @@ just like inline text.
     extension itself is therefore **lens-only**: only the repo-specific `## Specific to this repo`
     part, no copy of the body — just like the subagent lens. That way every portable behavioral rule
     lives in one place (the plugin), not duplicated.
-- **Subagent definitions — from the repo's own `dkj-team-alpha` plugin, not local.** The compact,
+- **Subagent definitions — from this marketplace's own team plugins, not local.** The compact,
   executable form of a specialist (`<group>-<id>-agent.md`) is **not** kept by this repo in a local
-  `.claude/agents/` directory: they come from the `dkj-team-alpha` plugin of this very marketplace,
-  enabled via [`settings.json`](../settings.json) and invocable as `@dkj-team-alpha:<name>`.
+  `.claude/agents/` directory: they come from the team plugins of this very marketplace, enabled via
+  [`settings.json`](../settings.json) and invocable as `@<plugin>:<name>` —
+  `@dkj-team-alpha:<name>` for the core team, and the same shape for each add-on team.
 - **`settings.json`** — the harness config: `extraKnownMarketplaces` (the `github` source
-  `DKJ-Solutions/claude-code-specialists` — the repo points to itself) + `enabledPlugins`
-  (`dkj-team-alpha@claude-code-specialists`). [Sylvester #15](lenses/05-15-extension.md)'s domain.
+  `DKJ-Solutions/claude-code-specialists` — the repo points to itself) + `enabledPlugins`, which holds
+  **all six** of the marketplace's plugins rather than the core team alone — read the file for the
+  list, since a spelling of it here is one plugin away from going stale.
+  [Sylvester #15](lenses/05-15-extension.md)'s domain.
 
 ## How a specialist is structured
 
@@ -80,7 +87,7 @@ the executable abbreviation. The *principle* and the manuals belong to
 (portable body vs. repo lens) on every change here.
 
 **A persona may back a manual too, and that pairing is leading in neither direction**
-([#1017](https://github.com/DaveKJohn/claude-code-specialists/issues/1017), August 28, 2026). Until
+([#1017](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1017), August 28, 2026). Until
 that day the lint gate's check 6b required an agent def behind every manual, so the two sentences
 above read together as *"the leading half is the manual, and Chris may not have one"* — and Chris,
 uniquely, paid for it in tokens: he is loaded on **every** turn, so every rule the gate kept out of a
@@ -199,9 +206,10 @@ Small and maintenance-focused. Chris leads; the rest executes.
 └─ [group 06] Tessa 📜 #16 (technical writer) · Edith 🔍 #17 (copy editor) · Victor 🧐 #19 (code reviewer) · Sebastian 🛡️ #23 (security engineer) · Ravi ♻️ #24 (refactoring specialist) · Nolan ⚡ #25 (performance engineer) · Marlowe 🕵️ #29 (investigative journalist)
 ```
 
-**This tree is who has work here, not who is available.** Six more arrive with the plugin, whose
-crafts this maintenance repo rarely calls on. They are in the index below with their lenses — but
-they are not reachable the same way, and the difference is worth knowing before you type a name:
+**This tree is who has work here, not who is available.** Six more arrive with the **core team**
+plugin, whose crafts this maintenance repo rarely calls on. Those six are in the index below with
+their lenses — but they are not reachable the same way, and the difference is worth knowing before
+you type a name:
 
 - **Invocable today as subagents** — Paula 📅 #09, Vera 📊 #11, Gwen 🎨 #12, Cody 💻 #13 and
   Auden 🖋️ #30. Each ships an agent def, so `@dkj-team-alpha:<name>` reaches them.
@@ -216,7 +224,10 @@ The full roster + routing lives in [`SPECIALISTS.md`](SPECIALISTS.md#the-team-ro
 seam's inclusion file, which `../../CLAUDE.md` imports; the list below is purely navigation to the
 repo lenses themselves.
 
-**Every specialist the enabled plugin ships has a lens file**, so this table is complete. A lens marked
+**Every specialist an enabled plugin ships has a lens file, without exception** — so `lenses/` holds
+more files than this table has rows. **The table is the CORE TEAM's**, which is the roster this repo
+routes to; the eleven that arrive with the three add-on teams are listed per plugin in
+[`SPECIALISTS.md`](SPECIALISTS.md#the-team-roster--routing) rather than repeated here. A lens marked
 *scaffold* is an empty `VUL-IN` template waiting for that specialist's first work here — **the intended
 state, not a backlog item**, exactly as
 [`SPECIALISTS.md`](SPECIALISTS.md#the-team-roster--routing) states it.
@@ -247,8 +258,16 @@ The six scaffolds mark specialists who rarely have work in this maintenance repo
 interviews, Paula's timelines, Vera's dashboards, Gwen's visuals, Cody's application code, Auden's
 long-form writing. On the day one of them first has work here,
 [Tessa #16](lenses/06-16-extension.md) fills the lens in before that specialist is deployed.
-The add-on teams `dkj-team-lifehub` and `dkj-team-shopify` are **off** here — this repo is
-not a life-hub-like or Shopify repo.
+**The three add-on teams — `dkj-team-ecomm`, `dkj-team-lifehub` and `dkj-team-shopify` — are ON here,
+and their eleven lenses are empty for a different reason: they will stay empty.** The six scaffolds
+above are waiting; those eleven are not. Those plugins are enabled so that the repo which ships a
+plugin is also a repo that loads it — validation, not a roster — and this repo is not a webshop, a
+personal-life repo or a Shopify store, so [Chris does not route to
+them](lenses/01-01-extension.md#the-roster--routing-table--which-assignment-goes-to-whom) at all. **Do
+not treat those eleven as a backlog**: a filled-in lens for one of them would describe work this repo
+does not have. Same wording, same reasoning, in
+[`SPECIALISTS.md`](SPECIALISTS.md#the-team-roster--routing) and [the repo slot of
+`CLAUDE.md`](../../CLAUDE.md#specific-to-this-repo-claude-code-specialists).
 
 ## This organization changes with the team
 
@@ -284,7 +303,7 @@ it. The visible points looked complete, which is exactly the danger.
 
 **Stale — the same day, and again on August 4, 2026.** A briefing's *expectations* go stale as well as
 its facts: that July 29 prompt kept predicting the one `[INFO]` that
-[#257](https://github.com/DaveKJohn/claude-code-specialists/pull/257) had already removed. On August 4
+[#257](https://github.com/DKJ-Solutions/claude-code-specialists/pull/257) had already removed. On August 4
 a briefing *and* a memory note *and* every local command agreed the tree was clean while a
 fully-planned parked branch sat on the remote, overtaken hours earlier by work merged from a different
 branch — which is what put `git ls-remote --heads origin` in the checklist. Note which sources were
@@ -293,11 +312,11 @@ for reading the repo rather than for reading a *better* summary.
 
 **Transcribed — August 19, 2026.** A briefing that is complete, current, and states a **cause that does
 not exist**: a lock six minutes old, correct about its subject (inbound
-[#747](https://github.com/DaveKJohn/claude-code-specialists/issues/747)) and wrong about the mechanism,
+[#747](https://github.com/DKJ-Solutions/claude-code-specialists/issues/747)) and wrong about the mechanism,
 while the report it summarised had named the right line. Neither truncation nor staleness but
 *transcription*, and it survived every check in force at the time. Its rule lived in the `/handover`
 skill until that skill was removed
-([#957](https://github.com/DaveKJohn/claude-code-specialists/issues/957), Dave); the mode is a property
+([#957](https://github.com/DKJ-Solutions/claude-code-specialists/issues/957), Dave); the mode is a property
 of summaries rather than of any one command, so a recap Dave types, a `/loop` prompt, a branch
 document's PLAN section and a post-compaction summary are all the same artefact from this rule's point
 of view. What was repo-specific about it is that the report and the pickup were the same team an hour
