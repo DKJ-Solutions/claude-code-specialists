@@ -286,30 +286,69 @@ try {
     )
 
     # THE BOUND HAS TO COVER TWO COLD POWERSHELL 5.1 STARTUPS BEFORE THE GRANDCHILD CAN WRITE ITS
-    # MARKER, and on a loaded machine 3s does not (issue #1232). Measured here on 18 cores, launch to
+    # MARKER, and no FIXED number does (issues #1232 and #1700). Measured here on 18 cores, launch to
     # marker: 0.52s idle, 0.58s at half the cores busy, 2.67s with every core busy, 9.68s at twice
     # that -- so the failure arrives exactly when this suite is run the way it is meant to be run, in
-    # a 58-suite sweep. The two startups split it roughly in half, and the OUTER half alone (4.6s at
-    # twice the cores) already overruns 3s, so making only the grandchild cheaper would not settle it.
+    # a sweep of eighty-odd suites. The two startups split it roughly in half, and the OUTER half alone
+    # (4.6s at twice the cores) already overruns 3s, so making only the grandchild cheaper would not
+    # settle it.
     #
     # POLLING FOR THE MARKER AFTER THE RUN RETURNS CANNOT WORK, which is worth stating because it is
     # the obvious repair: Stop-NativeProcessTree kills with taskkill /T, the grandchild is inside that
     # tree, and whether it wrote its marker is therefore settled AT kill time and never changes after.
     #
-    # SO THE ATTEMPT IS REPEATED WITH A WIDER BOUND. An unloaded machine passes the first one and pays
-    # what this fixture always paid; a loaded one re-runs the fixture instead of reporting a failure
-    # of the code under test. A run where even the wide bound cannot get the grandchild up still
-    # FAILS -- the gate keeps a verdict that means something, and by then the machine is the finding.
+    # SO THE BOUND IS MEASURED HERE, NOW, INSTEAD OF BEING GUESSED ONCE. #1232 answered this with a
+    # ladder of 3s then 12s, sized AGAINST the table above rather than above it -- 9.68s against a 12s
+    # bound is 2.3s of margin for two cold startups -- and #1700 measured both rungs losing inside one
+    # gate run, then losing twice more standalone while the machine was still settling. A third fixed
+    # rung would repeat the same mistake at a bigger number: the quantity is a property of the machine
+    # AT THIS MOMENT, and the one thing this fixture can do that a constant cannot is ask it.
+    #
+    # THE CALIBRATION IS THE SAME LAUNCH, UNBOUNDED AND UNKILLED. It runs the same outer script with
+    # nothing to stall for, then polls for the marker with a stopwatch, so what it times is exactly the
+    # quantity the bound must cover -- two cold PowerShell 5.1 startups under whatever load is running
+    # right now. It costs about half a second on an idle machine, which is less than the 3s rung it
+    # replaces, and about ten seconds on a machine that would have failed both old rungs anyway.
+    #
+    # THE MARGIN IS 4x, FLOORED AT THE OLD FIRST RUNG AND CAPPED. A floor of 6s keeps an idle machine
+    # paying roughly what this fixture always paid; a cap of 60s stops a pathological reading from
+    # hanging the gate behind one suite. And the ladder SURVIVES, with one derived rung above the
+    # calibrated one, because a calibration is itself a sample: the machine can be busier during the
+    # attempt than it was during the measurement.
+    #
+    # A RUN WHERE EVEN THE WIDE BOUND CANNOT GET THE GRANDCHILD UP STILL FAILS -- the gate keeps a
+    # verdict that means something, and by then the machine is the finding. What is different is that
+    # the failure now names the calibrated figure, so the reader can tell a slow machine from a broken
+    # launch instead of inferring it.
     #
     # The two derived numbers, per attempt. The grandchild must outlive the kill, so it sleeps
     # bound + 3. A SURVIVOR must have had time to write its second marker before that marker is
-    # checked, so the wait after the run is bound + 6. At the first bound those are 6 and 9 -- the
-    # numbers this fixture has used since it was written.
+    # checked, so the wait after the run is bound + 6.
+    $calStarted  = Join-Path $sandbox 'grandchild-started-calibration.txt'
+    $calSurvived = Join-Path $sandbox 'grandchild-survived-calibration.txt'
+    $calWatch    = [System.Diagnostics.Stopwatch]::StartNew()
+    [void](Invoke-NativeCapture -FilePath 'powershell' -Arguments @(
+        '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $outerScript,
+        $gcScript, $calStarted, $calSurvived, '0', '0'
+    ) -TimeoutSeconds 120)
+    # The outer exits as soon as it has called Start-Process, which does NOT wait -- so the marker can
+    # still be seconds away when the capture returns, and the poll is what actually times the launch.
+    while (-not (Test-Path -LiteralPath $calStarted) -and $calWatch.Elapsed.TotalSeconds -lt 120) {
+        Start-Sleep -Milliseconds 100
+    }
+    $calWatch.Stop()
+    $calSeconds = [Math]::Round($calWatch.Elapsed.TotalSeconds, 2)
+    $calLaunched = Test-Path -LiteralPath $calStarted
+    Assert-True $calLaunched "the calibration launch reached the grandchild at all (${calSeconds}s) -- without this the bounds below would be derived from a failure"
+    $boundFirst  = [int][Math]::Min(60, [Math]::Max(6, [Math]::Ceiling($calWatch.Elapsed.TotalSeconds * 4)))
+    $boundSecond = [int][Math]::Min(90, $boundFirst * 3)
+    Write-Host "  launch to marker measured at ${calSeconds}s on this machine right now -- bounds ${boundFirst}s then ${boundSecond}s" -ForegroundColor DarkGray
+
     $tree     = $null
     $started  = $null
     $survived = $null
     $afterRun = 0
-    foreach ($bound in 3, 12) {
+    foreach ($bound in $boundFirst, $boundSecond) {
         $started  = Join-Path $sandbox "grandchild-started-$bound.txt"
         $survived = Join-Path $sandbox "grandchild-survived-$bound.txt"
         $afterRun = $bound + 6
@@ -324,7 +363,7 @@ try {
     }
 
     Assert-True $tree.TimedOut 'the fixture stalled as intended, so the kill under test actually ran'
-    Assert-True (Test-Path -LiteralPath $started) 'the grandchild really launched -- without this the next assert could not fail'
+    Assert-True (Test-Path -LiteralPath $started) "the grandchild really launched -- without this the next assert could not fail. Calibrated at ${calSeconds}s, attempted at ${boundFirst}s then ${boundSecond}s: a miss at both is the MACHINE, not this code (#1700)"
 
     # Long enough that a SURVIVING grandchild would have written its second marker (it sleeps from a
     # start that precedes the bound), with margin for a loaded machine.

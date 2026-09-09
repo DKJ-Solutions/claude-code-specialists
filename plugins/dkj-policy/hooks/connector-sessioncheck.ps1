@@ -136,11 +136,26 @@
 
 .PARAMETER SkipVersions
     Passed to check-connectors.ps1 (for tests/CI without plugin administration).
+
+.PARAMETER VersionTimeoutSeconds
+    (Optional) how long the version engine gets before this hook degrades to one honest line.
+    Default 30, which is the production answer; the parameter exists so this hook's own suite can
+    raise it, and so a scenario can lower it to force the degraded branch. See the param block.
 #>
 param(
     [string]$WorkshopPathOverride = '',
     [switch]$SkipDrift,
-    [switch]$SkipVersions
+    [switch]$SkipVersions,
+    # HOW LONG THE VERSION ENGINE GETS BEFORE THIS HOOK DEGRADES, in seconds. 30 is the production
+    # answer and the default, so a real session start behaves exactly as before; the parameter exists
+    # because the bound was previously a literal at its call site, where the one caller that must
+    # raise it -- this hook's own test suite -- could not (#1701). That suite runs INSIDE the test
+    # gate's parallel lanes, which is the one condition under which 30s for a cold PowerShell 5.1
+    # startup is reachable, so it asserted the un-degraded output of a race it could lose: measured
+    # September 9, 2026, six assertions failing on a branch that reads nothing this hook touches, and
+    # 43/43 green standalone minutes later. Named the same way -WorkshopPathOverride is, and for the
+    # same reason: a seam a test can set beats a suite written around a number it cannot.
+    [int]$VersionTimeoutSeconds = 30
 )
 
 Set-StrictMode -Version Latest
@@ -340,15 +355,20 @@ try {
         } else {
             # BOUNDED, because a hook's try/catch cannot save it from a hang: a blocking call never
             # throws, it just blocks. The work is local and read-only -- two JSON reads and git inside a
-            # clone -- and measured at roughly 1.1-1.8s, so 30s sits far outside the normal range while still
-            # bounding a stalled filesystem, an fsmonitor daemon or an antivirus interception.
+            # clone -- and measured at roughly 1.1-1.8s, so the 30s default sits far outside the normal
+            # range while still bounding a stalled filesystem, an fsmonitor daemon or an antivirus
+            # interception.
+            # THE FIGURE IS -VersionTimeoutSeconds NOW rather than a literal here (#1701): 30s is
+            # reachable for a cold PowerShell 5.1 startup under the test gate's own parallel lanes, and
+            # the suite that drives this branch runs exactly there -- see that parameter for the
+            # measurement. Production is unchanged; what moved is who can say the number.
             # hooks.json's own 120s timeout is the harness's backstop, not something this code arranged;
             # Invoke-NativeCapture is what this repo already uses to arrange it (Victor, on #1591), and
             # the fallback keeps an older mirror that lacks the lib working exactly as before.
             $capture = Join-Path $PSScriptRoot '..\scripts\lib\native-capture-lib.ps1'
             if (Test-Path -LiteralPath $capture -PathType Leaf) {
                 . $capture
-                $cap = Invoke-NativeCapture -FilePath 'powershell' -Arguments @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $engine, '-Brief') -DiscardStderr -TimeoutSeconds 30
+                $cap = Invoke-NativeCapture -FilePath 'powershell' -Arguments @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $engine, '-Brief') -DiscardStderr -TimeoutSeconds $VersionTimeoutSeconds
                 $vout = @($cap.Output)
                 $vcode = $cap.ExitCode
             } else {
