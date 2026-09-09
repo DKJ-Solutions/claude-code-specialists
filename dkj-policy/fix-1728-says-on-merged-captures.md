@@ -93,7 +93,7 @@ separates them and it cannot be read off a suite: it lives in the script under t
       file** rather than the other suites' `($Text, $Phrase)`. Both parameters are strings, so a
       mismatch between neighbours is a silent swap rather than an error, and the neighbour is what a
       reader copies from. The deviation is stated at the function.
-- [x] The classification written into [Tycho's lens](.claude/specialists/lenses/04-18-extension.md),
+- [x] The classification written into [Tycho's lens](../.claude/specialists/lenses/04-18-extension.md),
       beside the capture rule it completes. Before this the mechanism was recorded seven times -- once
       in each suite already repaired -- and nowhere a person writing an eighth suite would look, which
       is the actual reason the class kept recurring.
