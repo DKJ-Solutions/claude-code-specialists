@@ -43,7 +43,48 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**35 / 80 minor entries** <!-- pending-tally -->
+**36 / 81 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1729-seam-probe-wildcard · 20260909-173557
+
+The optional-seam probe stops going through PowerShell's command searcher. `Test-FunctionDefined`
+(`scripts/lib/command-probe-lib.ps1`) reads the function table directly, and 93 of the 102 call sites
+that used `Get-Command <name> -ErrorAction SilentlyContinue` now call it instead. #1729 counted 68 of
+those, having counted one of the three spellings; the other 9 keep `Get-Command` with a reason each.
+
+The reason is the **miss**, which is what an optional seam normally is: `Get-Command` answers one by
+scanning every `PATH` directory for an executable of that name, measured at **32.5 ms** against
+**0.084 ms** for the replacement, with nothing caching the negative. `sync-main.ps1` makes 10 such
+probes in a row and `build-release-notes-page.ps1` 8, so a consumer that has configured no seams was
+paying roughly a third of a second per run to be told "no" -- a cost that fell hardest on the repos
+that had answered the least. The same call is also the frame that faulted in #1723, and it parses the
+name it is given as a wildcard pattern rather than as a literal; neither of those is what the change
+rests on, and both are recorded with the evidence in the lib's own docstring.
+
+Probes for an EXTERNAL command (`gh`, `git`) deliberately keep `Get-Command` -- it is the only call
+that answers about `PATH` -- and a tree-wide AST gate in the new suite holds the line, with each
+exception named and reasoned rather than listed.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+A consumer gets this through the plugin mirrors, and the saving lands hardest on them: the miss path
+is the default state of a repo that has answered no optional seams, which is every fresh adoption.
+Nothing they run changes shape -- same output, same exit codes, same seams -- so there is nothing to
+migrate and nothing to re-read.
+
+**Score:** 2
+
+#### Pull Request
+
+Probe the function table directly, off the command searcher's wildcard path
+
+Plugins: dkj-policy, dkj-team-alpha, dkj-team-shopify
+
+[PR #1735](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1735)
+
+---
 
 ### DEPLOY: fix/1723-gate-crash-vs-verdict · 20260909-170742
 
