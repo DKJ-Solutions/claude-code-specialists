@@ -36,11 +36,36 @@
 
 ### PLAN
 
+#### One class, twice reopened
+
+[#1232](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1232) is closed and its title
+is what happened twice more: *"the test gate refuses a push for a race the branch had no part in."*
+[#1700](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1700) measured both rungs of
+its retry ladder losing inside one gate run;
+[#1701](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1701) measured six assertions
+failing because a 30-second bound in the hook a suite drives was reached under sixteen lanes. Both
+branches read nothing either suite touches. Both cost a 33-minute re-run and a hand-lowered
+`-MaxParallel`.
+
+#### The shape of the answer, since neither issue chose one
+
+Neither is repaired by a wider number. A bound sized against a measurement rather than above it is
+what #1232 shipped, and #1700's own table is the receipt. So in both cases the RACE is removed rather
+than the margin widened, and in both cases the assertion is left exactly as strong as it was.
+
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [ ] #1700: derive the ladder's rungs from a calibration launch taken on this machine at this moment,
+      instead of the fixed 3s/12s
+- [ ] #1701: give the hook's bound a parameter defaulted to today's 30s, and raise it once in the
+      helper that runs the real engine -- production behaviour unchanged
+- [ ] A scenario that forces the degraded branch deterministically, so the parameter is proved read
+      and the exit-124 line stays pinned
 
 ### TEST
+
+- [ ] Both suites green standalone, and the whole gate green
+- [ ] The calibration prints what it measured, so a future failure names the machine
 
 ### DEPLOY: fix/1700-1701-load-sensitive-suites
 
