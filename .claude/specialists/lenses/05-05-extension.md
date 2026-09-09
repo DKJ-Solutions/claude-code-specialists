@@ -427,6 +427,149 @@ the trap is the shell's, not this repo's. What stays here is the local evidence:
   merge and a green gate to say so. **Two sides editing the same list usually both belong** — read what
   each was for before choosing, and keep both unless they actually contradict.
 
+### Issue labels — every issue carries a priority
+
+**Every issue in this tracker carries exactly one of `prio-1` … `prio-4`, and 4 is the highest**
+(Dave, September 9, 2026, [#1685](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1685)).
+The four exist in the repo since that day:
+
+| Label | Colour | What the rung means |
+|---|---|---|
+| `prio-4` | `B60205` | Highest — takes precedence over other work. A broken gate, or a wrong answer a gate reports as authority. |
+| `prio-3` | `D93F0B` | Ahead of the ordinary backlog. Real, and it costs something every time it is met. |
+| `prio-2` | `FBCA04` | Worth doing, no pressure. The ordinary backlog, and the common answer. |
+| `prio-1` | `0E8A16` | Lowest — nobody is waiting for it. A question parked for the owner, or a tidy-up. |
+
+**Exactly one, which is a property the obvious command does not give you.** Set it with `--label` on
+the `gh issue create` that files the finding. On an issue that already carries a rung, `--add-label`
+alone leaves **both** on it — `gh` adds, it does not replace — so a re-rank names the one it displaces:
+
+```sh
+gh issue edit <n> --add-label prio-4 --remove-label prio-2   # a re-rank, both halves in one call
+gh issue edit <n> --add-label prio-2                         # only for one that arrived without a rung
+```
+
+That is the same rule `dkj-policy-bwj` states for its own four buckets, where the Asana sweep removes
+the other three as it sets one — and it is worth knowing that set exists: `very low`/`low`/`high`/`very
+high`, on three of the same colour codes, in the BWJ store repos. **Different vocabulary, different
+motor** — that one is derived from an Asana `Prio-Score`, this one is a judgement typed by whoever
+files — so a session moving between the two repo families reaches for a label the other does not have,
+and `gh` fails outright on a label that does not exist.
+
+**The two stay apart, and the different names are load-bearing** (decided September 9, 2026,
+[#1686](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1686), by Dave's standing
+instruction to follow the specialist's advice on a question raised while he was away). Three things
+decided it, and the first two are measurements rather than preferences:
+
+1. **The BWJ names are not a convention, they are code.**
+   `plugins/dkj-policy/dkj-policy-bwj/templates/asana-mirror.ps1` holds them as a literal
+   (`$script:PrioLabels = @('very low', 'low', 'high', 'very high')`), `Get-PrioLabelForScore` returns
+   those exact strings from a score band, and `scripts/tests/dkj-policy-bwj.tests.ps1` asserts every
+   boundary from both sides. So unifying is not a rename: it is an edit to a shipped CI mechanism that
+   runs daily against two live stores, a re-pinning of its suite, and a label rename on two live
+   trackers — none of which this repo owns.
+2. **The collision cannot mis-file anything, because the two sets are disjoint in both directions.**
+   Measured on all three trackers in the family on the day of the decision, with `gh label list`: this
+   one carries `prio-1`…`prio-4` and **none** of the four words, while both
+   `BWJ-Development/smartwatchbanden` and `BWJ-ecommerce/xoxowildhearts` carry the four words and **no**
+   `prio-N` at all. A session that reaches for the wrong one is refused by `gh` rather than filing an
+   issue at the wrong rung — the same shape as the **label gate** in `scripts/release/open-pr.ps1`,
+   which exists because `gh` judges an unknown label at the create and refuses the whole command. That
+   gate is cited to the script rather than linked into this page on purpose: the behaviour is recorded
+   in its own comment block (inbound #1221), and the toolbox entry further down names `open-pr.ps1`
+   without describing the gate, so a link there would send a reader to verify a claim the destination
+   does not make. The whole symptom is one failed command that names the label it would not accept, and
+   one re-run.
+3. **And the names are the only thing that says which motor owns the rung.** A single vocabulary would
+   read as a single mechanism, which is the more expensive mistake: a rung typed by hand in a BWJ repo
+   is answering to a score nobody typed, and one derived from a score is meaningless here, where there
+   is no Asana to derive it from. Two names for two motors is information; one name for two motors is a
+   session assuming the sweep applies where it does not.
+
+**What was NOT weighed: how recently either set was created — and the gap is 32 MINUTES, not the day
+the first draft of this claimed.** `feat/1685-prio-labels` merged at 07:57 and this decision was
+committed at 08:29, the same morning; the BWJ set is a week old. Neither fact is an argument, and that
+matters more here than usual rather than less: half an hour is exactly the interval at which *"this was
+just settled"* feels like a reason. It is not one. The case above is the mechanism or it is nothing.
+
+**And the rule stays repo-local rather than moving into `dkj-policy`** (same decision, the issue's
+second half). **Nothing in the workflow reads a priority**: searched across `scripts/`, `plugins/` and
+`.github/` on the day of the decision, `prio-` appears in no gate, no script and no runner here — only
+on the BWJ side, where a shipped script owns it. A portable version would therefore prescribe to every
+consumer a convention no gate enforces and nothing reads, which is the enforced-by-memory shape
+[#1665](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1665) was filed against, and it
+would owe `adopt-dkj-policy` a label-creation step for four labels the consumer never asked for. That
+is worse than the prescription-a-consumer-cannot-follow trap of
+[#1540](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1540): here they *could* follow
+it and would gain nothing for it.
+
+**The seam is the shape if that ever changes.** The day something needs to read the axis, the portable
+half is one `scripts/repo-config.ps1` function stating this repo's own scheme — or that it has none —
+exactly like `Get-ReleaseAudienceTier` and `Get-ShopifyRepoHasNoStore`. Nothing reads it today, so
+nothing is built today.
+
+**WHAT THE DECISION DOES NOT CLOSE, AND IT IS NOT THE NAMES: THE COLOURS DISAGREE ON THE BOTTOM HALF.**
+Raised by the conclusion red-team on the deciding branch, and measured with `gh label list --json
+name,color` on all three trackers rather than read off the table above:
+
+| Colour | Here | In a BWJ repo | Same rung? |
+|---|---|---|---|
+| `B60205` | `prio-4` — top of four | `very high` — top of four | yes |
+| `D93F0B` | `prio-3` — third of four | `high` — third of four | yes |
+| `0E8A16` | `prio-1` — **the floor** | `low` — **second of four** | **no** |
+| `FBCA04` | `prio-2` — second of four | *(no counterpart)* | — |
+| `c2e0c6` | *(no counterpart)* | `very low` — the floor | — |
+
+So the two agree on the top two colours and disagree on the bottom two, and the green a reader trained
+here knows as *"nobody is waiting for it"* is one rung **above** the floor over there — where the actual
+floor wears a pale mint this repo does not use at all. **Nothing refuses a colour.** The whole safety
+argument above is about a label's NAME, which `gh` judges; a badge colour is read by a person scanning
+an issue list, and there is no command in it to fail. That is the same *goes-wrong-silently* shape
+[#1686](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1686) was filed to name, moved
+from the text onto an axis the decision's own reasoning does not reach.
+
+**It is left open deliberately, and it is not left unrecorded.** The cheap repair — re-colouring BWJ's
+`low` away from `0E8A16` — is one `gh label edit --color` per store and touches neither `asana-mirror.ps1`
+(which matches by name) nor its suite. But it is an edit to **live labels in two repos this one does not
+own**, and doing only the half that lives here (the hex codes
+`adopt-dkj-policy-bwj`'s step 4 prescribes) would leave the fleet in a third state, since that skill is
+additive and never rewrites an existing label. Both halves therefore belong to one change and to Dave:
+filed as [#1691](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1691). **Until then, do
+not read a rung off a badge colour across the two families** — read the name.
+
+**It is a separate axis from the prefix→label mapping in
+[step 2](#classifying-naming-and-creating-a-branch), which is about a PULL REQUEST.** `enhancement`,
+`bug` and `documentation` say what *kind* of change a branch carries and are written by `open-pr.ps1`
+from the branch prefix; a `prio-N` says how much an *issue* weighs and is written by whoever files it.
+An issue therefore normally carries both, and neither can be derived from the other: a `documentation`
+issue can be the one that has to be repaired first, and a `bug` can be the one nobody is waiting for.
+
+**The one route that lands without a rung is the inbound template**, and that is correct rather than a
+gap: `.github/ISSUE_TEMPLATE/inbound-improvement.md` can only set a fixed `labels:` line, and the
+reporter is a session in *another* repo, which is not the party who can rank this backlog. It asks for
+urgency in prose instead, and the rung is set here when the item is picked up — the same moment the
+[`triage-inbound`](../../skills/triage-inbound/SKILL.md) checks are run.
+
+**Nothing enforces any of it, deliberately — the same shape as the `inbound` label.** A gate would have
+to ask GitHub on every run, which puts the tracker on the critical path of a local check for a field
+only a person can fill in. So this is prose, exactly like the `inbound` route in
+[`CLAUDE.md`](../../../CLAUDE.md#never-without-daves-explicit-permission), and the always-on half of it
+lives in [Chris's lens](01-01-extension.md#the-dave-rules) so a session filing a finding reads it
+without loading this page. **What that costs is measured elsewhere in this very file**: the `chore/`
+prefix rule also held only in someone's head and was broken twelve times before anybody counted.
+
+**Reading the tracker by priority** — the one command worth knowing, since the label is only useful if
+it is what somebody sorts on:
+
+```sh
+gh issue list --state open --label prio-4 --label prio-3   # what actually comes first
+```
+
+**The ten issues open on the day the labels were introduced were labelled in the same movement**, which
+is the half of #1685 that had a deadline: a taxonomy applied only to new issues splits the tracker in
+two, and the older half is where the backlog actually is. Two came out at `prio-4` (#1678, #1679), three
+at `prio-3` (#1685 itself among them), four at `prio-2` and one at `prio-1`.
+
 ### Tooling & account
 
 - **GitHub CLI (`gh`)** is used for PRs. This repo lives under the **`DKJ-Solutions`** org and is

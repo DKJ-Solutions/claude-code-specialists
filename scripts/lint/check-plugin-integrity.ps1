@@ -5,6 +5,7 @@
 .DESCRIPTION
     This repo's lint gate (invoked by scripts/release/open-pr.ps1). Read-only -- changes nothing.
     Checks the following; every finding is an error:
+    <!-- checks:list -->
 
       1. .claude-plugin/marketplace.json: valid JSON; every plugins[].source points to an
          existing folder with a .claude-plugin/plugin.json.
@@ -40,10 +41,12 @@
       8. shared workflow scripts: every plugin mirror of a repo-agnostic script (issue #81) is
          still LF-identical to its root source -- a hand-edit in the mirror or a forgotten
          scripts/sync/build-shared-scripts.ps1 is thus caught at the gate.
-      9. RELEASE.md per plugin (Model A, plugin-carried): every plugin folder has a RELEASE.md, and
-         the 'vX.Y.Z' it contains equals the 'version' in that plugin's plugin.json. Only
-         cut-release.ps1 changes both files together, so an ordinary feature PR can never trip this
-         -- a mismatch/missing file means the card was not (re)generated.
+      9. RETIRED, August 8, 2026 ("RELEASE.md present per plugin + version match"). The number is kept
+         and never reused: reusing it would silently repoint every older citation, which is the defect
+         check 34 was built against arriving by the other door. It held each plugin-carried RELEASE.md
+         card against its plugin.json version; the cards are gone, so a plugin's version has one
+         statement again and there is no second copy left to compare. The retirement note sits in the
+         code where the check stood.
      10. marked "all skills" enumerations: an opt-in <!-- skills:all --> ... <!-- /skills:all -->
          span (character-based, so it also wraps inline running prose, not just a bullet list on
          its own lines; scanned in every file from check 4's $linkFiles, with fenced ```-code blocks
@@ -93,6 +96,14 @@
          entry-scaffold-lib.ps1 rather than being written out here. Judged in every unfolded root entry
          file (line 1 skipped, so a pre-format H3 entry still passes) and in CHANGELOG.md below its intro,
          where the intro/entries boundary is derived structurally exactly as Split-Changelog derives it.
+    13b. no branch document is left behind between branches. The document exists for the lifetime of a
+         branch -- new-branch creates it, the fold removes it -- so absent is the trunk's normal state, a
+         file naming the CURRENT branch is work in progress, and a file naming the TRUNK is a leftover
+         the fold should have taken. Inverted on August 23, 2026 (Dave): it used to hold the trunk's
+         copy to the formatter byte-for-byte, which was two sources of one format, and there is no trunk
+         copy to hold any more. No shape is asserted, deliberately -- a branch's file holds somebody's
+         work and can never be compared to the formatter; the scaffold and step-list gates read its
+         CONTENT on the way to the PR, so what was lost is the byte-comparison, not the coverage.
      14. encoding: scripts/maintenance/fix-mojibake.ps1 -Check is run as the gate. WHICH files it walks
          is repo-owned since issue #413 -- Get-MojibakePaths in scripts/repo-config.ps1 names them, here
          every *.md in the root, every *.md under plugins/, and every note under releases/. A UTF-8
@@ -107,13 +118,12 @@
      16. measured figures in prose: check 15's subject one step outside a fence -- a byte count or file
          size in the consumer-facing docs is a measurement of somebody's machine, and the surrounding
          paragraphs must say whose (round v12 filed exactly this as #374).
-     17. per-plugin CHANGELOG intro: the header above each plugins/<plugin>/CHANGELOG.md's first
-         '## vX.Y.Z' heading must still match what Build-PluginChangelogIntro (scripts/lib/release-lib.ps1)
-         generates, with the marketplace name read from marketplace.json. cut-release.ps1 writes that
-         header ONLY for a CHANGELOG that does not exist yet, so it is never refreshed -- which is how all
-         four files kept naming the retired marketplace after the rename swept it out of 59 others.
-         Compared whitespace-normalized (content, not line wrapping); everything below the first version
-         heading is history and deliberately not examined, as in checks 11 and 12.
+     17. RETIRED, August 8, 2026 ("the per-plugin CHANGELOG intro still matches its template"), and the
+         number is kept for the reason given at 9. It existed because that intro was write-once, which is
+         how all four per-plugin CHANGELOGs kept naming the retired marketplace long after the rename had
+         swept it out of 59 files. The files it guarded are gone, and with them the write-once text; the
+         LESSON survives in scripts/lib/release-lib.ps1's header, because it is about the next template
+         rather than about those files.
      18. shared-script parameters vs. their skill: every parameter of a mirrored entry point must be named
          in the skill that documents it (the mapping lives in the shared-scripts registry, beside the
          registration). A consumer has only the mirror and its page, so a parameter the page never names
@@ -186,7 +196,37 @@
          reason check 10 is: measured over all four plugins, a generic version yields 8 findings on two
          documents that never claimed to enumerate anything.
 
-     30. printed instructions naming a model-barred skill: a printed message must not tell its reader to
+     30. a plugin-shipped relative link must resolve INSIDE its own plugin. Check 4 resolves every link
+         against the tree it runs in, and for plugin payload that tree is this repo -- the one place the
+         link is guaranteed to work -- so the single class of link defect that reaches a consumer is the
+         one it is structurally blind to. A consumer reads the file under
+         ~/.claude/plugins/cache/<marketplace>/<plugin>/<version>/, where the 'plugins/' level, the
+         family level and every sibling plugin are gone, so a link that walks out of the plugin root
+         lands nowhere -- or worse, on something else. THE BOUNDARY IS THE PLUGIN ROOT, not 'plugins/':
+         the weaker rule inbound #1066 proposed passes a link that had ALREADY shipped dead. 17 escapes
+         across 5 files at introduction, every one passing check 4 and all 17 dead in the installed
+         copies. Personas are excluded for check 4's reason: a persona template is destined for a
+         consuming repo, so its links are MEANT to resolve outside the plugin root.
+     31. the Shopify CLI is never invoked bare. Under $ErrorActionPreference = 'Stop' -- which every
+         script here sets -- a bare '& shopify ...' dies on the line AFTER the call the moment the CLI
+         writes anything to stderr, so the exit-code check below it never runs. The repair is
+         scripts/lib/shopify-cli-lib.ps1, which lowers the preference for the duration of the call, and
+         the reason it needs a gate is that THE DANGEROUS FORM IS THE ABSENCE OF A WRAPPER: there is no
+         redirect to grep for and no suspicious flag -- the wrong spelling is the shorter, more obvious
+         one. Read through the PARSER, not by line matching, so a comment about the rule and a printed
+         hint telling a reader to run the CLI are not subjects. Two exemptions, both by file name: the
+         wrapper itself, and the suite whose probe invokes the stub bare on purpose.
+     32. a mirror table's rows against the shared-scripts registry: an opt-in
+         <!-- shared-scripts:mirror --> ... <!-- /shared-scripts:mirror --> span whose rows are held to
+         Get-SharedScriptPairs. Check 8 proves the file on disk is the right file and has never asked
+         whether the page that TELLS a consumer which files exist still names them all -- so a script can
+         be registered, generated, mirrored byte-perfect and pass every gate while being invisible on the
+         one page a consumer reads. That happened three times before this. The claim is the first
+         backticked token of each row's first cell (the table's own 'Script' column), and the scope is
+         the marked document's OWN directory. Opt-in like 10 and 29, because the root scripts/README.md
+         is a deliberate SUBSET of the same registry and a filename-keyed rule would false-positive on
+         every lib and hook-only script there.
+     33. printed instructions naming a model-barred skill: a printed message must not tell its reader to
          "run the X skill" when X's frontmatter carries 'disable-model-invocation: true'. That flag removes
          the page from the model's context entirely, so a session cannot follow the instruction -- and the
          reader who CAN, the person at the keyboard, is never told the line is theirs to type. The correct
@@ -206,6 +246,53 @@
          month apart with nothing connecting them (#731 -> #734, then #1093/#1096 rediscovered from scratch
          when a consumer adoption stopped on it), which is what turned it from a risk into the finding
          filed as #1104.
+     34. a numbered section header is unique, ascending, and in one form. Every check here announces
+         itself with a column-0 '# --- <n>. <what it does>' header, and that number is how a finding is
+         cited in a lens, a hook, a test name and two published release notes -- read back by nothing
+         until #1494, when two unrelated checks both carried 30 and two released documents meant
+         different ones by it. ASCENDING is the property that prevents the collision, not uniqueness:
+         it leaves a new section exactly one legal number, the one after the last header, so the
+         renumbering that follows a move is forced rather than remembered. Gaps are legal (a retired
+         number is never reused) and lettered sub-sections are legal. COLUMN 0 ONLY: the same marker is
+         used indented inside the suites to separate scenarios under their own numbering, and those are
+         not file sections. Both spellings are subjects; only '# --- <n>. ' is legal.
+     35. a test fixture's own git command is judged. A suite that builds its fixture with a git call
+         whose output AND exit code are both thrown away produces a repo that is PLAUSIBLE -- it exists,
+         it has a HEAD, it just does not hold what the case assumed -- so every assert below it measures
+         the wrong thing and attributes the failure to the script under test, which is the one place it
+         certainly is not. The idiom was the HOUSE STYLE, copied from suite to suite, which is why the
+         #1635 sweep could not hold it: it converted the neighbours and left nothing refusing the next
+         copy. Measured before it was written -- 27 findings in 4 files the sweep had missed, 182 over
+         the pre-sweep tree, and ZERO probe false positives. A call is cleared when $LASTEXITCODE or
+         Assert-FixtureGitOk is read in the same statement or the next: a question's exit code is read
+         immediately, a discarded one never is. No verb is special-cased and no file is exempt.
+     36. a tool that obliges a shared block, against the defs that hold it. Check 7 compares the inside
+         of a sentinel pair against its source, so it answers "has this block drifted" and has never had
+         an opinion about a pair that is ABSENT -- right for a block placed by CRAFT, wrong for one
+         placed by CAPABILITY. Get-ToolRequiredSharedBlocks maps tool -> block name, and that table is
+         the subject: a list of expected carriers here would be the memory this check replaces. Without
+         it, an agent def gaining Bash later sits silently outside the boundary with every gate green.
+         The reverse is deliberately not checked -- a wider circle is a decision, a narrower one is the
+         defect -- and the personas need no exclusion, carrying no 'tools:' line to be obliged by.
+     37. THIS LIST, against the headers it claims to enumerate: an opt-in 'checks:list' span whose
+         entries are held to the same column-0 headers check 34 reads. Check 34 holds those headers to
+         each other; nothing read the prose that summarises them for a reader who has not opened the
+         file -- the list a lens, a hook or a release note quotes a number from. Measured (#1680): the
+         list stopped at 30 while the code ran to 36, 13b was missing too and no report had noticed,
+         its own item 30 described the check #1494 had renumbered to 33, and 9 and 17 still read as
+         live checks a month after they were retired. ONE DIRECTION, which is what makes it born green:
+         every header needs an entry, an entry needs no header -- the reverse is where the exemptions
+         would live, being a retired check's tombstone (9 and 17) and the consumer-doc guard the suites
+         call check 19. An entry is read at the LIST'S OWN INDENT, so a number opening a line deeper
+         than that -- a nested enumeration inside an entry's prose -- is not a claim; counting one
+         would silence the check exactly where the missing entry sits below it. That shape is absent
+         from this list today and was found by PROBING the check rather than by measuring the tree,
+         which is check 35's lesson applied. Two spans in one file are unioned and counted once. NOT
+         held, deliberately: a STALE entry keeps satisfying its number, which is this list's second
+         drift and needs an entry's text read against a header's -- see the code for why that is left
+         open. A script that must SHOW the marker composes it from a variable; there is no fence to
+         hide it behind in a .ps1.
+    <!-- /checks:list -->
 
     Exit code: 0 = no errors. 1 = at least one error (usable as a gate in open-pr.ps1).
 .PARAMETER SkipCheck
@@ -4138,6 +4225,181 @@ Write-Coverage -Category 'tool-block' -Checked $toolBlockObliged `
         "no agent def names a tool in Get-ToolRequiredSharedBlocks ($($toolBlockMap.Count) mapping(s)), so no obligation could be missed"
     } else {
         "obligation(s) from $($toolBlockMap.Count) tool -> block mapping(s) in Get-ToolRequiredSharedBlocks, held against the defs that declare the tool -- $toolBlockFindings finding(s). Check 7 is the sibling and cannot serve this: it compares the INSIDE of a sentinel pair against its source and is silent on a pair that is absent, which is correct for a block placed by craft and wrong for one placed by capability. The personas are unaffected without an exemption -- a persona carries no 'tools:' line, so it names no tool. The reverse direction is deliberately not checked: carrying a block you are not obliged to is a decision, carrying none you are is the defect"
+    })
+# --- 37. this file's own check list, against the headers it claims to enumerate ---------------------
+# THE FILE WHOSE JOB IS REFUSING HAND-MAINTAINED LISTS KEPT A SECOND ONE, and check 34 reaches only half
+# of it. Check 34 reads the column-0 '# --- <n>.' headers back and holds them to each other; the prose
+# list in this script's own .DESCRIPTION -- the one a reader who has not opened the file consults, and
+# the one a lens, a hook, a test name or a release note quotes a number from -- was read by nothing.
+#
+# THE MEASURED DEFECT (issue #1680, September 9, 2026), and it had drifted in three directions at once.
+# The list stopped at 30 while the code ran to 36, so six real checks had no line in it -- and a
+# SEVENTH, 13b, was missing that no report had noticed: the check reported it on its first run. Item 30
+# described the barred-skill check, which #1494 renumbered to 33 a month after the list was written --
+# so a reader who grepped the list for "check 30" was told about a check answering to a different
+# number, which is exactly the confusion #1494 was filed to end, one layer up. And items 9 and 17 still
+# described checks RETIRED on August 8, 2026, reading as live ones; those are now tombstones keeping
+# their number, for the reason the code keeps the gap -- reusing a number silently repoints every older
+# citation.
+#
+# ONE DIRECTION ONLY, AND THAT IS WHAT MAKES IT BORN GREEN. Every header must have an entry; an entry
+# need not have a header. The reverse direction is where the exemptions would live, and there are two
+# legitimate kinds of entry with no header of its own: a retired check's tombstone (9 and 17), and the
+# consumer-doc guard that the suites already call check 19. A rule reporting those would arrive needing
+# an exemption list on the day it was written -- the shape this repo declined at 124 findings all false
+# (the stale-path check, in the system-administration lens) and has refused since.
+#
+# OPT-IN, like checks 10, 29 and 32, and through the same Invoke-MarkedSpanWalk rather than a second
+# span reader. A blanket rule keyed on "a script carrying numbered headers" would be born with a finding
+# for each of the 19 files check 34 measured, none of which claims to enumerate anything. The marker is
+# what turns a list into a claim, and it is the only thing that does.
+#
+# THE HEADER PATTERN IS CHECK 34'S, DELIBERATELY THE SAME LITERAL. Two readers disagreeing about what a
+# section header is would let a header satisfy one and not the other, which is the divergence this file
+# has extracted libs to prevent elsewhere. If that pattern ever moves, both move together.
+#
+# RAW TEXT ON BOTH ARGUMENTS OF THE WALK. The mask exists for markdown, where a fenced block inside a
+# span would otherwise make claims; a PowerShell header comment has no fences to mask, and the walk's
+# offsets then address the same bytes this check reads.
+#
+# AN ENTRY IS READ AT THE LIST'S OWN INDENT, and that bound came from PROBING this check rather than from
+# measuring the tree -- which is check 35's own lesson ("a measurement tells you what a check catches
+# here, and only a probe tells you what it would wave through") applied to its neighbour. The shape is a
+# nested enumeration inside an entry's prose: a line opening with '1. ' indented under a paragraph. This
+# list contains none today, so no amount of measuring it would have surfaced this; run past the check,
+# such a line registered a claim. Counting one silences the check exactly where it matters -- drop
+# entries 1 and 2 from the list and the nested pair keeps satisfying headers 1 and 2 forever, gate green,
+# which is the drift this check exists to refuse. The level is taken from the shallowest candidate in
+# each span, by DOT column rather than by leading spaces, because this list is right-aligned on the
+# period (4, 5 and 6 spaces all occur).
+#
+# COUNTED ONCE PER FILE, over the union of its spans. Inside the callback each header was counted per
+# SPAN, so a file carrying two spans reported its header count doubled and named one missing entry twice
+# -- one defect, two owners, which is what the first-occurrence rule for headers above avoids. Two spans
+# is the tolerant reading rather than an error of its own: a list legitimately split in two still
+# enumerates one file.
+#
+# WHAT THIS DOES NOT HOLD, said here rather than left for a reader to discover. A STALE entry still
+# satisfies its number: renumber check 33 to 38, add a '38.' entry, and the abandoned '33.' line -- still
+# describing what is now 38 -- keeps header 33 satisfied. That is #1680's SECOND drift recurring, and it
+# is not reachable from this side without reading an entry's text against a header's text. It is left
+# open deliberately: a keyword-overlap rule is fuzzy, and a fuzzy rule on a gate arrives with an
+# exemption list. Check 34's ascending rule is what limits the blast radius -- a renumber has to move the
+# section and take the last free number -- so the shape is a lingering line, not a wrong live one.
+#
+# THERE IS NO FENCE TO HIDE THE MARKER BEHIND, unlike checks 10, 29 and 32, whose subjects are markdown.
+# A script that must SHOW the marker -- a scaffolder emitting one, or a suite building a fixture that
+# carries one -- composes it from a variable instead ("<!-- $tag -->"), which no marker regex matches.
+# scripts/tests/check-plugin-integrity-commands.tests.ps1 does exactly that, and says why: it is a .ps1
+# in the set this check walks, so a literal marker there would open a span in the SUITE.
+#
+# THE TWO ZERO STATES ARE SAID SEPARATELY, AND THAT BRANCH IS NOT REACHABLE FROM THE SUITE -- stated here
+# rather than left as unexplained coverage. The note below distinguishes "no marker anywhere" (a clean
+# opt-out) from "markers present, not one of them formed a span" (a broken gate), because keying on the
+# span count alone printed the reassuring sentence over a run that had just raised an error about that
+# very file: a true statement reading as a different, false one, which is what Write-Coverage's own
+# docstring exists to prevent. It cannot be asserted in scripts/tests/: every fixture run invokes a COPY
+# of this script inside the fixture, and that copy carries this list -- so one valid span always exists
+# there and both zero states are unreachable. The suite covers the error itself (an unpaired marker) and
+# the opt-out (a file with headers and no marker); the wording of the two zero notes is read, not tested.
+#
+# BORN GREEN: 1 span, 37 header(s), 37 claimed, 0 findings -- once the seven missing entries were
+# written back on the branch that added this.
+$clSpans    = 0
+$clMarked   = 0
+$clChecked  = 0
+$clFindings = 0
+foreach ($psFile in (Get-PsScriptFiles)) {
+    $clText = [System.IO.File]::ReadAllText($psFile.FullName, [System.Text.Encoding]::UTF8)
+    # The cheap raw test first, as in checks 10, 28, 29 and 32.
+    if ($clText -notmatch '<!--\s*/?checks:list\s*-->') { continue }
+    $clMarked++
+    $clRel   = $psFile.FullName.Replace($RepoRoot, '.')
+    $clLines = $clText -split "`r?`n"
+    # Every column-0 numbered header in this file, first occurrence wins. A duplicate is check 34's
+    # finding and not this one's -- reporting it twice would give one defect two owners.
+    $clHeaderKeys  = New-Object System.Collections.Generic.List[string]
+    $clHeaderLines = @{}
+    for ($i = 0; $i -lt $clLines.Count; $i++) {
+        if ($clLines[$i] -notmatch '^# --- (\d+)([a-z]?)\. ') { continue }
+        $clKey = "$($Matches[1])$($Matches[2])"
+        if ($clHeaderLines.ContainsKey($clKey)) { continue }
+        $clHeaderLines[$clKey] = $i + 1
+        $clHeaderKeys.Add($clKey)
+    }
+    # THE CLAIMS OF EVERY SPAN IN THE FILE, UNIONED, AND THE COMPARISON MADE ONCE AFTERWARDS. Run inside
+    # the callback it counted each header once PER SPAN, so a file carrying two spans reported its header
+    # count doubled and named one missing entry twice -- one defect, two owners, which is exactly what the
+    # first-occurrence rule above avoids for headers. Two spans is also the tolerant reading rather than an
+    # error of its own: a list legitimately split in two still enumerates one file.
+    $clClaimed   = @{}
+    $clSpanLines = New-Object System.Collections.Generic.List[int]
+    Invoke-MarkedSpanWalk -MaskedText $clText -RawText $clText -Marker 'checks:list' `
+        -Category 'check-list' -Rel $clRel -OnSpan {
+        param($span)
+        $script:clSpans++
+        $clSpanLines.Add($span.BeginLineNo)
+        # A span in a file with no headers is a claim about nothing, and silence would read as a pass.
+        if ($clHeaderKeys.Count -eq 0) {
+            $script:clFindings++
+            Add-Error ("[check-list] ${clRel}: the 'checks:list' span at line $($span.BeginLineNo) claims to" +
+                " enumerate this file's numbered checks, and the file carries no column-0" +
+                " '# --- <n>. ' header at all. Either the headers were renamed out of the convention" +
+                " check 34 holds, or the marker is on the wrong file.")
+            return
+        }
+        $clRows = @($clText.Substring($span.SpanStart, $span.SpanEnd - $span.SpanStart) -split "`r?`n")
+        # AN ENTRY MUST START INSIDE THE LIST'S GUTTER, and that bound came from probing this check rather
+        # than from measuring the tree -- check 35's lesson, applied to its neighbour. A number opening a
+        # line is not rare inside an entry's PROSE (a nested enumeration under a paragraph), and counting
+        # one silences the check exactly where it matters: drop entries 1 and 2 from the list and the
+        # nested pair keeps satisfying headers 1 and 2 forever, gate green, which is the drift this check
+        # exists to refuse.
+        #
+        # THE GUTTER IS DERIVED, NOT ASSUMED, and it is a WIDTH rather than a column -- which is the
+        # difference between this and the first attempt. The narrowest '<spaces><n><letter>' prefix in the
+        # span is the gutter: a list right-aligned on the period puts wider keys further left, so the
+        # leading spaces vary (4, 5 and 6 all occur here) while the prefix does not. But the alignment is
+        # not perfect in practice -- 3b and 3c sit one column out -- and requiring the exact prefix width
+        # dropped both, reporting two real entries as missing. So the rule is the weaker and truer one: an
+        # entry's number must BEGIN no deeper than the gutter is wide. Every entry does, however ragged
+        # the alignment; a line indented past the gutter is prose, and that is the whole discriminator.
+        $clPrefixes = @()
+        foreach ($clRow in $clRows) {
+            if ($clRow -match '^(\s+\d+[a-z]?)\. ') { $clPrefixes += $Matches[1].Length }
+        }
+        if ($clPrefixes.Count -eq 0) { return }
+        $clGutter = ($clPrefixes | Measure-Object -Minimum).Minimum
+        foreach ($clRow in $clRows) {
+            if ($clRow -notmatch '^(\s+)(\d+)([a-z]?)\. ') { continue }
+            if ($Matches[1].Length -gt $clGutter) { continue }
+            $clClaimed["$($Matches[2])$($Matches[3])"] = $true
+        }
+    }
+    # ONCE PER FILE, over the union above. $clSpanLines is empty only when every marker in the file was
+    # malformed, and the walk has already reported that.
+    if ($clHeaderKeys.Count -eq 0 -or $clSpanLines.Count -eq 0) { continue }
+    $clWhere = if ($clSpanLines.Count -eq 1) { "the 'checks:list' span at line $($clSpanLines[0])" }
+               else { "any of this file's $($clSpanLines.Count) 'checks:list' spans (lines $($clSpanLines -join ', '))" }
+    foreach ($clKey in $clHeaderKeys) {
+        $clChecked++
+        if ($clClaimed.ContainsKey($clKey)) { continue }
+        $clFindings++
+        Add-Error ("[check-list] ${clRel}:$($clHeaderLines[$clKey]): check $clKey has a section header but" +
+            " no entry in $clWhere. That list is what a reader who has not opened this file consults, and" +
+            " what a lens, a hook, a test name or a release note quotes a number from -- so a check missing" +
+            " from it is one they cannot cite at all, and the neighbouring numbers then read as covering" +
+            " ground they do not (#1680). Add a '$clKey.' entry saying what it does, at the list's own" +
+            " indent -- a line indented deeper belongs to the entry above it and is not read as a claim.")
+    }
+}
+Write-Coverage -Category 'check-list' -Checked $clChecked `
+    -Note $(if ($clMarked -eq 0) {
+        "no 'checks:list' marker anywhere in this repo's script set. The marker is opt-in, so zero is a pass and not a gap -- but no script's own summary of its numbered checks is being held to those checks by this run"
+    } elseif ($clSpans -eq 0) {
+        "$clMarked file(s) carry a 'checks:list' marker and NOT ONE FORMED A SPAN -- every marker in them is unpaired, and the errors above say which. Nothing was compared: read this as a broken gate rather than as a clean one. Said separately from the zero-marker case deliberately, because the two produce the same count and mean opposite things"
+    } else {
+        "column-0 numbered header(s) held to the list that claims to enumerate them, over $clSpans marked span(s) in $clMarked file(s) -- $clFindings finding(s). Counted ONCE PER FILE over the union of its spans, so two spans cannot double the figure or name one gap twice. AN ENTRY MUST START INSIDE THE LIST'S GUTTER, whose width is the narrowest number prefix in the span: a line indented past it is an entry's prose, and counting a nested enumeration there would silence the check where the missing entry sits below it. ONE DIRECTION: an entry with no header is deliberately not reported, because a retired check keeps its number as a tombstone and the consumer-doc guard the suites call check 19 carries no header of its own, so the reverse rule would be born needing exactly those exemptions -- the cost is that a STALE entry still satisfies its number, which is #1680's second drift and is NOT held here. Check 34 is the sibling and cannot serve this: it holds the headers to EACH OTHER and has no opinion about the prose that summarises them"
     })
 # --- Report ---------------------------------------------------------------------------------------------
 if ($errors.Count -eq 0) {

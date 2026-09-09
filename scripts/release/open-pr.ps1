@@ -711,10 +711,21 @@ Both are honest answers; the gate only refuses to guess.
         $otherPrsJson = ''
         $prSearchTerms = (($targetIssues | ForEach-Object { "$_" }) -join ' OR ') + ' in:body'
         $prSearch = Invoke-NativeCapture -Utf8 -FilePath 'gh' -Arguments @('pr', 'list', '--repo', $repo, '--state', 'all', '--search', $prSearchTerms, '--json', 'number,state,headRefName,body', '--limit', '60') -DiscardStderr
-        if ($prSearch.ExitCode -eq 0) {
+        # A SHORT READ IS NOT AN EMPTY RESULT SET (issue #1679). The -Utf8 arm can return an empty or
+        # truncated Output with ExitCode 0, and an empty $otherPrsJson reads downstream as "no rival PR"
+        # -- so the already-done warning #1409 exists to raise would silently not fire, on exactly the
+        # loaded machine where the search matters. Nothing else here could tell the two apart: gh prints
+        # '[]' when it finds nothing, so at THIS call an empty capture has no legitimate reading at all.
+        $searchUnread = ''
+        if ($prSearch.ExitCode -ne 0) {
+            $searchUnread = "exit $($prSearch.ExitCode)"
+        } elseif ($prSearch.ShortRead) {
+            $searchUnread = 'gh exited 0 but its capture was still being written when it was read, so the result may be truncated'
+        }
+        if (-not $searchUnread) {
             $otherPrsJson = ($prSearch.Output -join "`n")
         } else {
-            Write-Warning ("could not ask gh whether another PR already resolves " + (($targetIssues | ForEach-Object { "#$_" }) -join ', ') + " (exit $($prSearch.ExitCode)) -- the already-done check is skipped.")
+            Write-Warning ("could not ask gh whether another PR already resolves " + (($targetIssues | ForEach-Object { "#$_" }) -join ', ') + " ($searchUnread) -- the already-done check is skipped.")
         }
 
         foreach ($w in @(Get-TargetIssueWarnings -TargetIssues $targetIssues -OpenIssues $openAll -OtherPrsJson $otherPrsJson -CurrentBranch $branch)) {

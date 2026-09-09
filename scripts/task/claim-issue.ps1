@@ -172,13 +172,27 @@ $facts = $null
 try {
     $facts = $viewJson | ConvertFrom-Json
 } catch {
-    Write-Host "[ERROR] gh returned something that is not JSON for issue #$number -- nothing was claimed." -ForegroundColor Red
+    # THE REASON, NOT JUST THE SYMPTOM (issue #1679). This branch is also where a SHORT READ lands: the
+    # -Utf8 arm can answer 0 with a capture still being written, and a truncated JSON document does not
+    # parse -- so the verdict here is right (refuse, nothing claimed) while "gh returned something that
+    # is not JSON" sends the reader after gh instead of after their own machine. Named separately, and
+    # the re-run is only offered on the arm where it is the actual remedy.
+    if ($view.ShortRead) {
+        Write-Host "[ERROR] the read of issue #$number came back truncated -- nothing was claimed." -ForegroundColor Red
+        Write-Host '        gh exited 0, but its capture was still being written when this run read it, so what' -ForegroundColor Red
+        Write-Host '        arrived was not a whole JSON document. That is a fact about this run rather than' -ForegroundColor Red
+        Write-Host '        anything about the issue -- run this again and it normally settles.' -ForegroundColor Red
+    } else {
+        Write-Host "[ERROR] gh returned something that is not JSON for issue #$number -- nothing was claimed." -ForegroundColor Red
+    }
     exit 1
 }
 
 # The logins come out of the JSON TEXT rather than off $facts, because the reading is where the 5.1
-# traps are and a lib function is the half a suite can hold. gh's exit code was checked above, so an
-# empty list here means unassigned rather than unanswered.
+# traps are and a lib function is the half a suite can hold. gh's exit code was checked above AND the
+# parse above succeeded, so an empty list here means unassigned rather than unanswered -- the second
+# half matters since #1679: a short read is what an exit code alone cannot rule out, and what rules it
+# out here is that a truncated document would not have parsed.
 $assignees = @(Get-AssigneeLogins -Json $viewJson)
 
 $title = Format-ForConsole -Text ([string]$facts.title)
@@ -287,7 +301,19 @@ if (-not $edit -or $edit.ExitCode -ne 0) {
 # Output is parsed as JSON here, and stderr mixed into it would break the parse to improve a message.
 $after = Invoke-NativeCapture -FilePath 'gh' -Arguments (@('issue', 'view', $number) + $repoArgs + @('--json', 'assignees')) -Utf8 -DiscardStderr `
                               -TimeoutSeconds $NativeCaptureNetworkTimeoutSeconds
-$readOk = [bool]($after -and $after.ExitCode -eq 0)
+# A SHORT READ IS NOT gh DISAGREEING (issue #1679). $readOk asked the exit code alone, and the -Utf8 arm
+# can answer 0 with an empty or truncated capture -- in which case $landed is false and the run took the
+# REFUSED branch below, printing "gh accepted the claim but '<account>' is not on #N ... Treat the issue
+# as UNCLAIMED" and exiting 1. That is a confident false negative on the step that OPENS every
+# issue-driven assignment (#1485), and its own comment says why it is wrong: it claims gh answered and
+# the account was not in the list it returned, when on a short read gh's answer never reached us.
+#
+# THE RIGHT BRANCH ALREADY EXISTS AND IS TWO BLOCKS DOWN. "Could not verify" is exactly this state, and
+# it deliberately does not block -- so folding ShortRead into $readOk needs no new verdict, no new
+# message and no new policy. #1679 filed this site in its group C on the ground that "the read-back
+# fails, which is the safe direction"; the read-back does not fail, it succeeds with nothing, which is
+# the whole reason the field had to exist.
+$readOk = [bool]($after -and $after.ExitCode -eq 0 -and -not $after.ShortRead)
 $landed = $readOk -and ((Get-AssigneeLogins -Json (@($after.Output) -join "`n")) -contains $identity.Account)
 
 if ($readOk -and -not $landed) {
@@ -316,8 +342,16 @@ if (-not $readOk) {
     # worth naming separately here, because a stall and an exit code point the reader at different
     # things: an exit code means gh answered and disagreed, a timeout means the read never happened at
     # all, and only the second says nothing whatever about the tracker's state.
+    #
+    # AND THE SHORT READ IS THE THIRD SUCH REASON (issue #1679), for the same argument one paragraph up
+    # rather than a new one: it is a read that did not happen, so it says nothing about the tracker
+    # either -- and unlike a stall it arrives at exit 0, so naming the exit code here would print
+    # "exited 0" as the reason the read-back failed. That is the misleading half; it must be named
+    # before the exit-code arm or it can never print.
     $why = if ($after -and $after.TimedOut) {
         "did not answer within $NativeCaptureNetworkTimeoutSeconds seconds"
+    } elseif ($after -and $after.ShortRead) {
+        'exited 0 with its capture still being written, so what came back may be truncated'
     } elseif ($after) {
         "exited $($after.ExitCode)"
     } else {
