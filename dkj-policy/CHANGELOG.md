@@ -43,7 +43,84 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**27 / 57 minor entries** <!-- pending-tally -->
+**28 / 59 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1679-utf8-short-read-class · 20260909-062511
+
+`Invoke-NativeCapture` now says when a capture was read while a writer still held it, so a caller can
+tell "the child said nothing" from "we read before the flush". Both are an empty `Output` at exit `0`,
+and until now nothing separated them -- so six callers in the shipping scripts resolved the ambiguity
+toward a substantive answer: "no PR", "no issue declared", "the body does not carry the section",
+"the claim was refused". The sharpest refused the merge over a section that had not changed, in a
+gate with no `-Force`. The quietest reported the resolves verification as a clean pass having checked
+nothing. And the one that reaches furthest is the claim step, which told an operator to treat an
+issue as UNCLAIMED on a claim that had in fact landed -- the first move of every issue-driven
+assignment. The read itself is unchanged: `FileShare.ReadWrite` still returns whatever was flushed
+(#1252), it simply no longer does so in silence, and on a clean exit it now waits briefly for the
+handle to release rather than reporting a short read it could have avoided.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+These are the scripts a consumer runs through the workflow plugin, so the wrong verdicts were theirs
+to meet: a merge refused by a gate with no way past it, an already-done check that quietly stopped
+warning, and a claim step that refused a claim it had itself just written. Nothing to do on adoption
+-- the field is additive and every existing caller keeps working -- but the refusals a consumer does
+hit now name the read that failed instead of accusing their document, and the one skipped check that
+cannot be recovered says so in a warning rather than in a dim grey line.
+
+**Score:** 3
+
+#### Pull Request
+
+A short capture on exit 0 is reported as a short read instead of as a substantive answer
+
+Plugins: dkj-policy, dkj-team-shopify
+
+[PR #1690](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1690)
+
+---
+
+### DEPLOY: docs/1678-nested-worktree-refusal · 20260909-060959
+
+The lint gate's tree walks are filesystem walks, so a worktree registered inside the repo is a second
+complete copy of the tree it is standing in: every recursive count from the root doubles exactly
+(`*-agent.md` 26 to 52, `*.ps1` 233 to 466) and the gate fails with 26 duplicate-id errors, each one
+accusing the **real** file. #1673 repairs what an operator reads. What it deliberately left open, and
+what this branch answers, is whether the gate should instead be made to work *through* such a worktree
+-- roughly twenty `Get-ChildItem -Recurse` sites plus the suites that walk the root, behind a shared
+predicate and a meta-check of its own.
+
+It should not, and the exclusion is now recorded as DECLINED beside the gate's other measured-and-
+declined rules, so the option is priced rather than re-argued the next time somebody meets the 26
+errors. Four grounds, each measured on this tree: the lint half of `Invoke-WorkflowGates` returns
+before the test gate is ever reached, so on the documented route the doubling suites never run and
+excluding the path from them buys a caller nothing; the report's price was one suite too high --
+`template-selfcontained.tests.ps1` walks `plugins/`, not the root, and its count is unmoved by a probe
+worktree, leaving two rather than three; a predicate every future walk must remember to call is the
+enforced-by-memory shape #1665 was filed against, in a file already carrying 36 numbered checks; and
+`worktree-lane.ps1` has already decided where a worktree belongs, placing lanes outside the tree for
+exactly this reason. The residual is stated rather than left to be found: under `-SkipLint` those two
+suites still take a doubled set in silence, which is what that switch means everywhere here.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+N/A. One repo lens changes and nothing else -- no script, no manifest, no plugin payload. The gate it
+describes is `check-plugin-integrity.ps1`, which is not mirrored into any plugin, so a consumer
+receives nothing from this and their own gate's answer to the same fork stays theirs.
+
+**Score:** N/A
+
+#### Pull Request
+
+The lint gate refuses a nested worktree rather than walking through one
+
+[PR #1688](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1688)
+
+---
 
 ### DEPLOY: feat/1685-prio-labels · 20260909-055712
 

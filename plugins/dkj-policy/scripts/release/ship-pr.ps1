@@ -1923,6 +1923,17 @@ certificate anyway.
                     # fixed; the alternative was a comment explaining why this one call is the odd one out.
                     $diffRead = Invoke-NativeCapture -Utf8 -FilePath 'git' -DiscardStderr -Arguments @('show', '--name-status', '--format=', $sha)
                     if ($diffRead.ExitCode -ne 0) { continue }
+                    # NO ShortRead BRANCH HERE, AND THAT IS A MEASUREMENT RATHER THAN AN OMISSION
+                    # (issue #1679). This call was listed with the five sites that read an empty capture
+                    # on exit 0 as a substantive answer -- "this commit changed no files" -- and it does.
+                    # But Test-IsFoldOnlyCommit FAILS CLOSED on exactly that: an unreadable diff returns
+                    # $false, the commit is not exempted, and it stays counted in the staleness verdict.
+                    # A ShortRead guard would `continue`, which leaves it counted too, so the two are
+                    # behaviourally identical and the guard would be a no-op wearing a citation. What a
+                    # short read costs here is one spurious stale-CI refusal, never a merge that should
+                    # have been refused -- and an empty capture is LEGITIMATE at this call anyway (`git
+                    # show --name-status --format=` on a commit that changed no files: measured, 0 bytes
+                    # at exit 0), which is the other reason not to treat empty as failure.
                     if (Test-IsFoldOnlyCommit -NameStatusLines @($diffRead.Output) -ChangelogPath $changelogForFold `
                             -EntryDirectory $entryDirForFold -ReservedNames $reservedForFold) {
                         $foldExemptCommits += $sha
@@ -2117,7 +2128,27 @@ if ($null -ne $shipCycleText) {
     # lock refused a PR whose body was intact.
     $lockView = Invoke-NativeCapture -Utf8 -FilePath 'gh' -Arguments @(
         'pr', 'view', "$pr", '--json', 'body', '--repo', $repo)
-    if ($lockView.ExitCode -eq 0) {
+    # A SHORT READ IS NOT AN ANSWER EITHER (issue #1679), and this is the sharpest site in that class.
+    # The -Utf8 arm can return an EMPTY Output with ExitCode 0 -- see the lib's ShortRead field for what
+    # produces it -- and until now that fell straight through here: ConvertFrom-Json throws on '', the
+    # catch below sets $lockBody = '', and Test-DeployLock against an empty body reports drift. So on a
+    # loaded machine this refused a merge naming a section that had not changed, in a gate with no
+    # -Force -- the same failure #1446 was filed for, arriving through the read instead of the decode.
+    #
+    # THE TWO REASONS ARE NAMED SEPARATELY, because the reader's next move differs: a non-zero gh is a
+    # network or token problem, while a short read is this run's own read and resolves on a re-run. Same
+    # shape as remote-ahead-lib.ps1's three reasons (#1676). Both land in the branch the comment above
+    # already settled -- an unreadable body is NOT a finding -- so this widens what counts as
+    # unreadable rather than adding a verdict.
+    $lockUnread = ''
+    $lockShortRead = $false
+    if ($lockView.ExitCode -ne 0) {
+        $lockUnread = "gh exited $($lockView.ExitCode)"
+    } elseif ($lockView.ShortRead) {
+        $lockUnread = 'gh exited 0 but its capture was still being written when it was read, so the body this run holds may be truncated'
+        $lockShortRead = $true
+    }
+    if (-not $lockUnread) {
         $lockBody = ''
         try {
             $lockBody = [string](($lockView.Output -join "`n") | ConvertFrom-Json).body
@@ -2148,8 +2179,29 @@ CI has already passed, so a re-run picks up from here. There is no -Force for th
 "@
             exit 1
         }
+    } elseif ($lockShortRead) {
+        # LOUDER THAN THE NEIGHBOURING LINE, ON PURPOSE. Both reasons end in the same place -- the
+        # section was not compared -- but only this one is fixable by the person reading it, and a
+        # skipped check in a gate with no -Force does not belong in a dim grey line. Raised on
+        # Sebastian's review of this branch: widening "unreadable" to cover a short read trades a
+        # FALSE REFUSAL for a check that did not run, and the second is only defensible while it is
+        # visible.
+        #
+        # AND REFUSING IS DELIBERATELY NOT THE ALTERNATIVE. A short read means this run does not hold
+        # the body, so there is no evidence in either direction -- and the comment above this block
+        # already settles what such a gate does with that: it does not refuse on no evidence. The old
+        # behaviour was not the safe version of this, it was #1446 -- Test-DeployLock against an empty
+        # body reports drift, so every short read produced a refusal naming a section that had not
+        # changed. What is genuinely given up is the rare coincidence of real drift AND a lost read on
+        # one run; what is bought is that the common case stops accusing the document.
+        #
+        # A LONGER SETTLE BUDGET WOULD NOT CHANGE THIS, which is why the answer is a louder line rather
+        # than a bigger number. A capture that is merely being flushed settles on the first probe
+        # (measured: 2-8 ms over five gh calls), and one held by a grandchild that is still RUNNING
+        # never releases inside any budget worth waiting for -- so raising it buys stalls, not reads.
+        Write-Warning "DEPLOY lock: PR #$pr's body could not be read ($lockUnread) -- the section was NOT compared against what the PR published, and the merge is proceeding without that check. This is this run's own read rather than a fact about the PR, so a re-run normally settles it."
     } else {
-        Write-Host "  DEPLOY lock: PR #$pr's body could not be read -- not checked (this is not a finding)." -ForegroundColor DarkGray
+        Write-Host "  DEPLOY lock: PR #$pr's body could not be read ($lockUnread) -- not checked (this is not a finding)." -ForegroundColor DarkGray
     }
 }
 

@@ -170,7 +170,14 @@ Assert-True ((([regex]::Matches($body, "'issue',\s*'view'")).Count) -ge 2) 'the 
 # a WRONG MESSAGE on a path no behavioural test here reaches, so the shape is what a suite can hold:
 # the refusal must be gated on the read having succeeded, and the unverified path must exist and must
 # not exit. A later edit collapsing them back would restore a false stop on a claim that landed.
-Assert-True ($body -match '\$readOk\s*=\s*\[bool\]\(\$after\s+-and\s+\$after\.ExitCode\s+-eq\s+0\)') 'whether the read-back answered is its own value, separate from what it said'
+#
+# THE PATTERN NO LONGER PINS THE CLOSING BRACKET (#1679), and the loosening is deliberate rather than
+# convenient: #1628's subject is that $readOk is its OWN value, computed from whether gh answered, and
+# separate from what gh said. It was never that the expression has exactly two terms. #1679 added a
+# third -- a capture that came back short is also gh not having answered -- and the old regex refused
+# it by requiring `0)` immediately, which would have made this suite argue for the defect. The
+# ShortRead half is pinned exactly, in its own block further down, so nothing is left unasserted.
+Assert-True ($body -match '\$readOk\s*=\s*\[bool\]\(\$after\s+-and\s+\$after\.ExitCode\s+-eq\s+0') 'whether the read-back answered is its own value, separate from what it said'
 Assert-True ($body -match 'if\s*\(\$readOk\s+-and\s+-not\s+\$landed\)') 'the "not on the issue" refusal fires only where the read actually answered'
 Assert-True ($body -notmatch 'if\s*\(-not\s+\$landed\)\s*\{') 'no branch keys the refusal off $landed alone -- that is the collapse itself'
 Assert-True ($body -match 'if\s*\(-not\s+\$readOk\)') 'a read that did not answer has its own branch'
@@ -197,6 +204,23 @@ Assert-True ((Get-CodeOnly -Block $unverified) -notmatch '\bexit\b') 'the unveri
 Assert-True ($unverified -match '\[WARNING\]') 'it reports as a warning, not as the refusal it is not'
 Assert-True ($unverified -match 'exited \$\(\$after\.ExitCode\)') 'it names the exit code it actually measured'
 Assert-True ($unverified -match [regex]::Escape('$after.TimedOut')) 'and it names a TIMEOUT as its own reason, which #1639 made reachable -- a stall says nothing about the tracker, where an exit code says gh answered and disagreed'
+
+# --- a short read is not gh disagreeing (#1679) ---------------------------------------------------
+# THE READ-BACK'S OWN GUARD, and the one assert that pins WHY. $readOk used to ask the exit code alone,
+# so a -Utf8 capture that came back empty at exit 0 made $landed false and sent the run down the
+# REFUSED branch -- "Treat the issue as UNCLAIMED", exit 1 -- on a claim that had in fact landed. The
+# fix is that the short read joins the could-not-verify state, which already exists and does not block.
+Write-Host ''
+Write-Host 'A short read is not a refusal (#1679)' -ForegroundColor Cyan
+
+Assert-True ($body -match [regex]::Escape('$readOk = [bool]($after -and $after.ExitCode -eq 0 -and -not $after.ShortRead)')) `
+    'the read-back folds ShortRead into $readOk, so a truncated capture cannot reach the REFUSED branch'
+Assert-True ($unverified -match [regex]::Escape('$after.ShortRead')) `
+    'and the could-not-verify branch names it as its own reason -- the exit code is 0 there, so "exited 0" would be the misleading half'
+Assert-True ($unverified.IndexOf('$after.ShortRead') -lt $unverified.IndexOf('exited $($after.ExitCode)')) `
+    'named BEFORE the exit-code arm, or it could never print'
+Assert-True ($body -match [regex]::Escape('if ($view.ShortRead)')) `
+    'the pre-write read separates a truncated capture from gh returning non-JSON -- same verdict, different thing to go and check'
 
 # --- the network bound on every gh call (#1639) ---------------------------------------------------
 # ALL THREE CALLS WERE UNBOUNDED while every sibling script bounded its own, and the reason was a stale

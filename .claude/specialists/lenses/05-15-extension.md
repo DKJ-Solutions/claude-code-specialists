@@ -2211,6 +2211,59 @@ the pass whose whole job was deciding whether the false-positive rate was accept
 form is now in the check with a comment saying why, and it belongs beside the other traps that produce
 well-formed wrong output.
 
+#### The nested-worktree exclusion, measured and DECLINED (September 9, 2026, [#1678](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1678))
+
+**The tree walks in this gate are FILESYSTEM walks, not git walks**, so a worktree registered inside the
+repo is a second complete copy of the tree the gate is standing in. Measured here with one probe at
+`.claude/worktrees/probe-1678`: every recursive count from the root doubles exactly — `*-agent.md` 26 to
+52, `plugin.json` 6 to 12, `*.ps1` 233 to 466 — and the gate then fails with **26 errors, one per
+specialist id, each naming the REAL file as the offender** and the worktree's copy as the legitimate
+claimant, because that path sorts first. The coverage lines report the doubled sets as normal
+(`checked 52`), so nothing in the run says the *set* is wrong rather than the files. That symptom is
+[#1673](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1673)'s, and its named finding is
+the accurate sentence an operator now reads instead of the 26.
+
+**What #1678 left open was the fork after that, and this is the answer: the gate REFUSES, and is not made
+to work through a nested worktree.** The alternative was real — roughly twenty `Get-ChildItem -Recurse`
+sites here plus the suites that walk the root, behind one shared predicate — and it is declined on four
+grounds, each measured rather than argued:
+
+1. **The gate is the only chokepoint anyone passes, so the walks below it never run.**
+   `Invoke-WorkflowGates` ([`gate-lib.ps1`](../../../scripts/lib/gate-lib.ps1)) runs the lint half
+   **first** and `return $false`s on its failure, several dozen lines above the test gate. So on the
+   documented route a nested worktree is named once and the two suites that would double never execute.
+   Excluding the path from them buys nothing a caller can reach — and what is past the refusal is
+   `-SkipLint`, the switch that already means *this run did not measure*.
+2. **The price was quoted one suite too high.** #1678 names three root-walking suites; measured, there are
+   two. `agent-shared.tests.ps1` (the `*-agent.md` and `*-persona.md` walks) and `shared-scripts.tests.ps1`
+   (the `*.ps1` scan) do walk `$RepoRoot` and do double. `template-selfcontained.tests.ps1` walks
+   `Join-Path $RepoRoot 'plugins'`, and a worktree under `.claude/` is not inside that subtree: its
+   templates count stayed at 1 with the probe standing. This does not change the verdict, but a declined
+   option should be declined at its real price.
+3. **The exclusion is the enforced-by-memory shape [#1665](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1665) was filed against.**
+   A predicate every walk must remember to call, in a four-thousand-line file that has grown to 36
+   numbered checks, is reintroduced silently by the next walk somebody adds — so it needs a meta-check
+   policing the whole file, forever, to hold. That is a permanent cost bought for an arrangement this repo
+   steers away from anyway, which is ground 4.
+4. **The repo has already decided where a worktree belongs.**
+   [`worktree-lane.ps1`](../../../scripts/task/worktree-lane.ps1) places lanes **outside** the tree and
+   says why in as many words — *"a worktree inside the tree would be walked by the lint gate's link scan
+   and by the test suites."* Both halves of that sentence are correct, and the lane is the supported route
+   for a session that wants isolation. Making the gate work through a nested worktree would endorse the
+   one arrangement the lane exists to avoid. The harness's own `isolation: "worktree"` does not get that
+   choice — the path is `.claude/worktrees/agent-<id>` and nothing here selects it — but
+   [#1667](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1667) has already decided the
+   review chain is not dispatched that way, so what remains is a caller who opted in and is one
+   `git worktree remove` from the gate, or one lane from never meeting it.
+
+**The residual is stated rather than left to be discovered.** With `-SkipLint` a standing nested worktree
+still hands those two suites a doubled set in silence. That is not a hole this decision opens — it is what
+`-SkipLint` means everywhere in this repo — and it is one more reason the refusal lives in the gate rather
+than being spread across the walks: one place to state it, one place that can go stale. Worth keeping
+beside it: `git worktree remove` leaves the empty `.claude/worktrees/` parent behind, so the directory
+outlives the worktree it held and the next `git worktree list` is the honest check, not the directory's
+existence.
+
 In short: the **how** (managing the harness, scripts, config, safety guards) is portable; the **what**
 (the plugin lint + drift lint, `branch-info.ps1`, `.claude/settings.json` with the github source, and
 the marketplace/plugin manifests) belongs to this repo.

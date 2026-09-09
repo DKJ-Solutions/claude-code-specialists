@@ -1,8 +1,9 @@
 <#
 .SYNOPSIS
     Regression tests for scripts/lib/native-capture-lib.ps1 -- the -Utf8 capture path (issue #907),
-    the non-interactive environment + bounded wait (inbound #1179), and the shared read of the capture
-    files while a killed grandchild still holds a handle (#1252).
+    the non-interactive environment + bounded wait (inbound #1179), the shared read of the capture
+    files while a killed grandchild still holds a handle (#1252), and that this read REPORTS that
+    hold instead of leaving a caller to guess what an empty capture on exit 0 meant (#1679).
 
 .DESCRIPTION
     Dependency-free: no Pester needed, only PowerShell. Exit code 0 if everything passes, 1 on a
@@ -331,7 +332,7 @@ try {
     Assert-True (-not (Test-Path -LiteralPath $survived)) 'the grandchild was killed with its parent -- taskkill /T, not Stop-Process'
 
     # ---------------------------------------------------------------------------------------------
-    Write-Host 'Read-NativeCaptureFileText -- a lingering write handle is not an IO error (#1252)' -ForegroundColor Cyan
+    Write-Host 'Read-NativeCaptureFile -- a lingering write handle is not an IO error (#1252), and it is now REPORTED (#1679)' -ForegroundColor Cyan
 
     # THE OTHER HALF OF THE KILL ABOVE. The grandchild dies, but not synchronously: the bounded wait
     # after Stop-NativeProcessTree is on the DIRECT child only, so a grandchild that inherited the
@@ -341,8 +342,13 @@ try {
     # FileShare.Read, which cannot coexist with the writer handle still open, so it throws
     # "being used by another process". The fixture holds that handle for real rather than simulating
     # the window with a sleep.
+    #
+    # AND THE HANDLE IS WHAT MAKES THE FIXTURE DETERMINISTIC, which is why #1679's asserts live here
+    # rather than against a real child. A grandchild race cannot be scheduled; a FileStream can, so
+    # WriterHeld is pinned on a writer this suite owns.
+    $utf8NoBom = New-Object System.Text.UTF8Encoding $false
     $held = Join-Path $sandbox 'held-open.txt'
-    [System.IO.File]::WriteAllText($held, "flushed output`n", (New-Object System.Text.UTF8Encoding $false))
+    [System.IO.File]::WriteAllText($held, "flushed output`n", $utf8NoBom)
     $writer = New-Object System.IO.FileStream(
         $held, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Write, [System.IO.FileShare]::Read)
     try {
@@ -350,11 +356,73 @@ try {
         try { [void][System.IO.File]::ReadAllText($held) } catch { $threw = $true }
         Assert-True $threw 'the plain ReadAllText throws while the handle is held -- this is the bug the CI red was'
 
-        $got = Read-NativeCaptureFileText -Path $held -Encoding (New-Object System.Text.UTF8Encoding $false)
-        Assert-Equal "flushed output`n" $got 'the shared read returns what was flushed instead of throwing'
+        $gotHeld = Read-NativeCaptureFile -Path $held -Encoding $utf8NoBom
+        Assert-Equal "flushed output`n" $gotHeld.Text 'the shared read returns what was flushed instead of throwing'
+        Assert-True $gotHeld.WriterHeld 'and it SAYS the writer still held the file -- the fact five callers used to have to guess (#1679)'
+
+        # THE PROBE IS NOT SATISFIED BY A WAIT IT CANNOT WIN. The writer above is held for the whole
+        # block, so the budget is spent in full and the verdict still comes back true -- which is the
+        # correct answer for a holder that is alive rather than being reaped, and the reason the budget
+        # is short. Asserted on elapsed as well as on the flag: a WriterHeld that arrived without
+        # waiting would mean the settle parameter is being ignored.
+        $waitClock = [System.Diagnostics.Stopwatch]::StartNew()
+        $gotWaited = Read-NativeCaptureFile -Path $held -Encoding $utf8NoBom -SettleMilliseconds 300
+        $waitClock.Stop()
+        Assert-True $gotWaited.WriterHeld 'a holder that never releases is still reported as a short read after the budget'
+        Assert-True ($waitClock.ElapsedMilliseconds -ge 300) "the settle budget was actually spent (waited $($waitClock.ElapsedMilliseconds)ms of 300)"
+        Assert-Equal "flushed output`n" $gotWaited.Text 'and what was flushed still comes back -- #1252 is not weakened by #1679'
     } finally {
         $writer.Dispose()
     }
+
+    # A SETTLED FILE IS THE OTHER HALF OF THE VERDICT, and without it WriterHeld could be hard-coded
+    # true and every assert above would still pass.
+    $settledFile = Join-Path $sandbox 'settled.txt'
+    [System.IO.File]::WriteAllText($settledFile, "complete output`n", $utf8NoBom)
+    $gotSettled = Read-NativeCaptureFile -Path $settledFile -Encoding $utf8NoBom
+    Assert-Equal "complete output`n" $gotSettled.Text 'a file nobody holds reads whole'
+    Assert-True (-not $gotSettled.WriterHeld) 'and reports no writer -- so WriterHeld discriminates rather than always answering yes'
+
+    # AN EMPTY FILE NOBODY HOLDS IS THE CASE THE WHOLE ISSUE TURNS ON: empty AND settled means the
+    # child genuinely wrote nothing, which is a legitimate answer at two of this repo's own call sites
+    # (`git show --name-status --format=` on a commit that changed no files, and `gh --json body -q
+    # .body` on a PR with an empty body). A caller may only treat empty as a failure when WriterHeld
+    # says so, and this is the assert that keeps the two distinguishable.
+    $emptyFile = Join-Path $sandbox 'empty-settled.txt'
+    [System.IO.File]::WriteAllText($emptyFile, '', $utf8NoBom)
+    $gotEmpty = Read-NativeCaptureFile -Path $emptyFile -Encoding $utf8NoBom
+    Assert-Equal '' $gotEmpty.Text 'an empty capture reads as empty'
+    Assert-True (-not $gotEmpty.WriterHeld) 'and as SETTLED -- "the child said nothing" is a different answer from "we read too early"'
+
+    # A MISSING FILE IS NOT A SHARING VIOLATION AND IS NOT WAITED ON. FileNotFoundException derives
+    # from IOException, so a retry loop that catches the base type would spend the entire budget before
+    # failing with the error it started with. Pinned on elapsed, because the throw alone cannot tell a
+    # prompt rethrow from a patient one.
+    $missingClock = [System.Diagnostics.Stopwatch]::StartNew()
+    $missingThrew = $false
+    try {
+        $null = Read-NativeCaptureFile -Path (Join-Path $sandbox 'not-there.txt') -Encoding $utf8NoBom -SettleMilliseconds 3000
+    } catch {
+        $missingThrew = $true
+    }
+    $missingClock.Stop()
+    Assert-True $missingThrew 'a missing capture file still throws rather than returning an empty document'
+    Assert-True ($missingClock.ElapsedMilliseconds -lt 1500) "and it throws at once rather than spending the settle budget (took $($missingClock.ElapsedMilliseconds)ms of a 3000ms budget)"
+
+    # ---------------------------------------------------------------------------------------------
+    Write-Host 'Invoke-NativeCapture -- ShortRead is present on BOTH arms (#1679)' -ForegroundColor Cyan
+
+    # THE PROMISE IS THE ONE TimedOut ALREADY MAKES: a caller reads one field without knowing which
+    # arm answered it. The & arm has no capture file at all, so its $false is a fact rather than a
+    # default -- and a caller that has to test for the field's existence is back to guessing.
+    $ampRun = Invoke-NativeCapture -FilePath 'git' -Arguments @('--version')
+    Assert-True ($null -ne $ampRun.PSObject.Properties['ShortRead']) 'the & arm returns a ShortRead field'
+    Assert-True (-not $ampRun.ShortRead) 'and it is false -- the & operator reads the pipeline directly, so there is no capture file to truncate'
+
+    $utf8Run = Invoke-NativeCapture -FilePath 'git' -Arguments @('--version') -Utf8
+    Assert-True ($null -ne $utf8Run.PSObject.Properties['ShortRead']) 'the -Utf8 arm returns a ShortRead field'
+    Assert-True (-not $utf8Run.ShortRead) 'and an ordinary clean child is not a short read -- the probe must not cry wolf on the normal case'
+    Assert-Equal 0 $utf8Run.ExitCode 'the fixture command really did succeed, so the assert above is about the read and not about a failure'
 
     # ---------------------------------------------------------------------------------------------
     Write-Host 'Invoke-NativeCapture -Utf8 -- the code page cannot reach the answer (issue #907)' -ForegroundColor Cyan
