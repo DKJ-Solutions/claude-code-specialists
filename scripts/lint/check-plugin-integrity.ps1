@@ -440,6 +440,79 @@ function Test-JsonFile {
 
 Write-Host "== check-plugin-integrity -- $RepoRoot ==" -ForegroundColor Cyan
 
+# THE ONE FINDING THAT EXPLAINS EVERY OTHER ONE, so it is the FIRST ERROR REPORTED -- deliberately
+# placed before check 1. Errors are buffered and printed as a block at the END of the run, in the order
+# they were added, so being added ahead of check 1 is precisely what puts this above the findings it
+# explains; it is not the first thing on screen, since the [COVERAGE] lines print as each check runs.
+# not given a '# --- N.' header of its own (issue #1673, September 8, 2026), for the same reason
+# $publishedPlugins below has none: it is infrastructure that every walking check needs to be told about
+# rather than a numbered check of its own, and check 34 holds every such header to strict ascending order
+# across every script in the repo, which a header placed here, ahead of check 1, could never satisfy.
+#
+# THE HARNESS PLACES ITS OWN WORKTREE INSIDE THE REPO, at .claude/worktrees/agent-<id>, and nothing
+# ignores that path -- see .gitignore's own entry for why it cannot be closed there either. Every check
+# below that walks $RepoRoot -Recurse with Get-ChildItem then sees a SECOND, complete copy of the tree it
+# is standing inside. Measured (issue #1673) with a probe worktree standing: plugin.json 6->12,
+# *-agent.md 26->52, SKILL.md 27->54, *.ps1 236->472 -- and the specialist check (6) then reported 26
+# duplicate-id findings, every one of them accusing the REAL file and naming the WORKTREE'S COPY as the
+# claimant. An operator reading THAT has no way back to the actual cause, which is what this finding is
+# for: read this one first, and the duplicate-id findings further down are a CONSEQUENCE of it, not real.
+#
+# NOT AT A DIRTY-TREE REFUSAL, DELIBERATELY. Once the .gitignore entry landed alongside this, a nested
+# worktree no longer makes `git status` report anything at all, so naming it at a dirty-tree refusal would
+# buy nothing -- the place it still bites is exactly this walk, which is where this finding is.
+#
+# GUARDED ON '.git' EXISTING, the same technique checks 14 and 21 use for their own git-dependent reads.
+# The fixture the four check-plugin-integrity-*.tests.ps1 suites share is a plain directory with no
+# '.git', and asking a non-repository about its worktrees is a question with no meaning -- so the guard
+# is what keeps a pointless `git` invocation, and the stderr it would produce, out of every one of those
+# runs.
+#
+# WHAT THE GUARD DOES NOT DO, stated because the first draft of this comment claimed it did: it is NOT
+# what keeps those fixtures from having to copy native-capture-lib.ps1 and worktree-lib.ps1 into their
+# copy lists. $ErrorActionPreference = 'Stop' is set script-wide at the top of this file, so a missing
+# dot-source is a TERMINATING error -- which the catch below would swallow with or without this guard.
+# The copy lists are safe either way; the guard's job is the wasted call, not the crash.
+if (Test-Path -LiteralPath (Join-Path $RepoRoot '.git')) {
+    try {
+        . (Join-Path $PSScriptRoot '..\lib\native-capture-lib.ps1')
+        . (Join-Path $PSScriptRoot '..\lib\worktree-lib.ps1')
+        $nwWtList = Invoke-NativeCapture -FilePath 'git' -Arguments @('-C', $RepoRoot, 'worktree', 'list', '--porcelain')
+        if ($nwWtList.ExitCode -eq 0) {
+            foreach ($nestedPath in (Get-NestedWorktreePath -PorcelainLines $nwWtList.Output -PrimaryRoot $RepoRoot)) {
+                # THE PATH IS EXTERNALLY-AUTHORED TEXT, AND IT APPEARS TWICE IN ONE FINDING (issues #1637
+                # and #1638, whose answer this reuses rather than re-deriving) -- once as the location and
+                # once inside a remedy the reader is invited to copy and run. `git worktree add` is NOT
+                # held to check-ref-format the way a branch name is, so the string it registers may carry
+                # spaces, shell metacharacters, and the \p{Cf} runs that make a printed line read as
+                # something other than what it says. Judged ONCE and answered as a pair, exactly as
+                # sync-main.ps1 answers this same shape: both halves carry the real path or both read
+                # '<path>', never one of each. Quoting is NOT the guard and must not be mistaken for one --
+                # ref-print-lib is explicit that command substitution runs inside double quotes in bash and
+                # in PowerShell alike, so a quoted hostile value closes nothing while reading as protection.
+                #
+                # THE LOCATION IS PROSE AND SO TAKES THE OTHER FUNCTION. Get-DisplayPath, not Get-DisplayRef:
+                # a path may legitimately contain a space, a doubled one included, so the collapse-and-trim
+                # that is safe for a ref name would report a path that is not the path (#1638).
+                $nwPaste = Get-PasteableRef -Ref $nestedPath -Placeholder '<path>' -Kind Path
+                $nwNote  = if ($nwPaste.Note) { ' ' + $nwPaste.Note } else { '' }
+                Add-Error ("[nested-worktree] a worktree is standing INSIDE this repo, at " +
+                    "'$(Get-DisplayPath $nestedPath)'." +
+                    " Every check below that walks the tree with Get-ChildItem -Recurse is therefore" +
+                    " seeing a SECOND, complete copy of it -- every count doubles, and any" +
+                    " '[specialist] duplicate id' finding further down is a CONSEQUENCE of that rather" +
+                    " than a real duplicate: it accuses the real file and names THIS worktree's copy as" +
+                    " the claimant. Remove it ('git worktree remove $($nwPaste.Token)') before trusting" +
+                    " anything else this gate reports." + $nwNote)
+            }
+        }
+        # AN UNSUCCESSFUL 'git worktree list' DEGRADES QUIETLY, exactly like Get-RepoPluginRoots below:
+        # git being unavailable or the call failing says something about the environment, not about a
+        # worktree standing, and a lint gate must not manufacture a finding out of a question it could
+        # not actually ask.
+    } catch { }
+}
+
 # --- 1. marketplace.json + the plugins it references ------------------------------------------------
 $marketplacePath = Join-Path $RepoRoot '.claude-plugin\marketplace.json'
 if (-not (Test-Path -LiteralPath $marketplacePath)) {
