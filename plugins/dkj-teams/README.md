@@ -74,7 +74,7 @@ match.
 - **`skills/`, `hooks/`, `scripts/`, `personas/`** — optional, and only where a team genuinely needs
   them. In practice `dkj-team-alpha` is the one carrying all four, because the adoption path, the roster
   and workflow session checks and the sync scripts belong to the core rather than to any domain team;
-  `dkj-team-shopify` ships one domain skill, and the other two teams are specialists and manuals only.
+  `dkj-team-shopify` ships four domain skills, and the other two teams are specialists and manuals only.
 
 ## `agent-shared/` — in this directory, and not a team
 

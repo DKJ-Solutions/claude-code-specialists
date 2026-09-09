@@ -321,7 +321,7 @@ a plugin named `team-something`, which is the one case the rule is there for.
 |---|---|---|
 | [`dkj-team-alpha/`](plugins/dkj-teams/dkj-team-alpha/) | **The core team.** Fifteen repo-neutral specialists who work the same way in *every* repo (research, systems administration, technical writing, copy editing, code review, security review, and testing, among others). Also carries the persona templates of the main loop (Chris/Bianca/Derek/Rendall) and the bootstrap skill `specialists-init`. | **Every** consuming repo — this is the foundation, always enable it. |
 | [`dkj-team-lifehub/`](plugins/dkj-teams/dkj-team-lifehub/) | **An add-on team.** Five specialists for a personal information hub / brain-based knowledge repo (Astrid, Fiona, Hugo, Ian, Onyx). Deliberately domain-flavored: they know their repo and teammates by name. | Only a life-hub-style repo. |
-| [`dkj-team-shopify/`](plugins/dkj-teams/dkj-team-shopify/) | **An add-on team.** Three specialists for a Shopify store repo (Liam · Liquid, Sandra · store management, Steven · configuration) plus the domain skill `start-task`. Also deliberately domain-flavored. | Only a Shopify repo (e.g. smartwatchbanden). |
+| [`dkj-team-shopify/`](plugins/dkj-teams/dkj-team-shopify/) | **An add-on team.** Three specialists for a Shopify store repo (Liam · Liquid, Sandra · store management, Steven · configuration) plus four domain skills of its own (`adopt-shopify-floor`, `push-preview`, `start-task`, `sync-main`). Also deliberately domain-flavored. | Only a Shopify repo (e.g. smartwatchbanden). |
 | [`dkj-team-ecomm/`](plugins/dkj-teams/dkj-team-ecomm/) | **An add-on team.** E-commerce specialists for a commercial webshop repo of any platform (Sergio · SEO, Craig · CRO, Sean · performance/SEA). Platform-agnostic, and complementary to a platform team rather than exclusive. | Any commercial webshop repo — including a Shopify repo alongside `dkj-team-shopify`. |
 | [`dkj-policy/`](plugins/dkj-policy/) | **The workflow — a way of working, not a team.** DaveKJohn's own branch-and-entry model, packaged so a repo can *choose* it: the workflow skills (`new-branch`, `open-pr`, `ship-pr`, `fold-changelog`, `cut-release`, `park`, `fix-mojibake`, `adopt-dkj-policy` and the rest — the plugin's own README carries the full list), their shared scripts, the session hooks that belong to running this across several repos, and one Stop hook that keeps a branch's development document on `origin` (#900). Also ships a **config blueprint** — the source's own answers to the repo-owned seam, with the reasoning behind each — which `adopt-dkj-policy`'s Part 2 places or proposes (see below). Carries **no specialists** — it changes how the existing ones work, not who they are. | Only a repo that deliberately wants *this* way of working on top of its own. |
 | [`dkj-policy-bwj/`](plugins/dkj-policy/dkj-policy-bwj/) | **A narrow, additive workflow.** BWJ's codex — the binding rules its two Shopify store repos operate under. Two chapters: **ticket handling** — a discovered issue is filed on GitHub first, mirrored to Asana as a colleague-friendly variant, and closing the GitHub issue only makes a CI workflow (shipped as a template) post that the work is ready to test and move the card to `ReadyToTest` — it never resolves the task itself; and **the sync log** — a `sync/` branch is exempt from the changelog by design and owes `dkj-policy-bwj/SYNC-LOG.md` instead, written by `dkj-team-shopify`'s `sync-main.ps1`. Two skills (`report-issue`, `adopt-dkj-policy-bwj`), no specialists, no hooks. Extends only the ticket-work step of `dkj-policy` and what a sync branch owes; contradicts nothing it decides. | Only BWJ's two store repos; requires `dkj-team-alpha` **and** `dkj-policy` — the sync chapter also expects `dkj-team-shopify`. |
@@ -394,13 +394,20 @@ read-only — but it is still not a *guardrail*: it blocks nothing, refuses noth
 outcome. What earns it a place beside the read-only set above is that it is repo-neutral and touches exactly one
 document, whose path the shared resolver decides; the four bounds that keep it that narrow are in the
 `park` skill.
-The add-on teams `dkj-team-lifehub` and `dkj-team-shopify` may carry domain skills that a repo shares.
 
 **Those last two moved out of the core on August 8, 2026, and the reason is the doctrine rather than
 tidiness.** `connector-sessioncheck` reads a register of *Dave's own* repos, and
 `script-contract-sessioncheck` demands that a repo supply functions for scripts that now ship in the
 opt-in workflow. Both ran in every consuming session, so a repo that had only enabled the specialists
 was being audited against somebody else's way of working at every session start.
+
+**The "no repo-specific skills" rule has one more named exception, and it sits with the add-on teams:
+a team may ship domain skills of its own, shared by every repo that enables it.**
+`dkj-team-shopify` is the only one that does, so a reader hunting a domain skill has one plugin to
+open rather than a guess among three. This sentence said `dkj-team-lifehub` and `dkj-team-shopify` until
+September 9, 2026 — a two-of-three list from before `dkj-team-ecomm` existed, pointing at the one of
+the two that has never shipped a skill
+([#1749](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1749)).
 
 ### Repo layout
 

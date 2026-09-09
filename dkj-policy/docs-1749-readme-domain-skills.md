@@ -36,21 +36,78 @@
 
 ### PLAN
 
+Repairs [#1749](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1749): the root
+`README.md` sentence naming which add-on teams may carry domain skills enumerated two of three teams
+and pointed at one that ships none.
+
+Verified before repairing, rather than taken from the report: `plugins/dkj-teams/*/skills/` holds
+nothing under `dkj-team-ecomm` and `dkj-team-lifehub`, and four skills under `dkj-team-shopify`
+(`adopt-shopify-floor`, `push-preview`, `start-task`, `sync-main`). The symptom, the reason and the
+proposed repair all still stand.
+
+#### The call the issue left open
+
+It offered two honest versions — keep the possibility and fix the enumeration to three, or name the
+one team that does. Named the one: the second defect *is* a stale enumeration, so re-enumerating
+invites the same failure a third time. A statement about the single team that ships skills goes stale
+only when a second one starts to.
+
+#### And it moved, because in place it broke the sentence after it
+
+The sentence sat welded to the end of the `cycle-autopark` paragraph with no blank line, between that
+paragraph and **"Those last two moved out of the core"** — whose referent is the two *hooks* named
+further up. Read in order, "those last two" landed on the two add-on teams the intruding sentence had
+just named. Repairing the sentence in place would have shipped a correct sentence that still misleads
+the reader of the next one, so the new paragraph closes the thread instead, after the hooks are done
+with.
+
+#### Two more statements of the same fact, both stale, both in scope
+
+Not swept in from elsewhere — the same claim, in the file being edited and in the plugin-source README
+one level down, and leaving either would have made the repaired sentence contradict its own neighbours:
+
+- `README.md`'s plugin table said `dkj-team-shopify` carries "the domain skill `start-task`" — one,
+  where it ships four.
+- `plugins/dkj-teams/README.md` said it "ships one domain skill".
+
+#### Deliberately not touched
+
+- `README.md`'s line about which teams describe *what kind* of repo it is. It names the same two teams
+  and is correct — `dkj-team-ecomm` is orthogonal, which its own next clause states. #1749 says so too.
+- The 43 `DaveKJohn/claude-code-specialists` citations in `README.md`. `CLAUDE.md` says these are
+  corrected when a file is edited for other reasons and **not swept**; 43 rewrites under a one-sentence
+  prio-1 repair is the sweep that rule refuses, and it would bury the diff a reviewer has to read.
+
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [x] Rewrite the sentence and move it below the hooks thread (`README.md`)
+- [x] Correct the plugin table's skill count (`README.md`)
+- [x] Correct the same count in `plugins/dkj-teams/README.md`
 
 ### TEST
 
+- [ ] Lint gate + all suites via `open-pr.ps1`
+- [x] Copy edit on the diff (Edith) -- referent tightened, the duplicated "only team" claim kept to one place
+
 ### DEPLOY: docs/1749-readme-domain-skills
 
-**Score:**
+The root `README.md` no longer points a reader at the wrong plugin when they go looking for a domain
+skill. The sentence about which add-on teams may carry one named two of the three teams — from before
+`dkj-team-ecomm` existed — and attributed skills to `dkj-team-lifehub`, which ships none. It now names
+`dkj-team-shopify`, the only add-on team that ships any, and sits below the session-hook thread instead
+of wedged inside it, where it had been stealing the referent of the sentence after it. The same stale
+count is corrected in the plugin table and in `plugins/dkj-teams/README.md`.
+
+**Score:** 2
 
 #### What makes this deploy extra special
 
-**Score:**
+N/A — a documentation correction in this repo's own README. No consumer behaviour, no plugin payload
+and no script changes; a reader of the marketplace README gets a correct pointer, which is not a
+release note for a subscriber.
+
+**Score:** N/A
 
 #### Pull Request
 
 Name the add-on team that actually ships domain skills
-
