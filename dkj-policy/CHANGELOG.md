@@ -43,7 +43,36 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**27 / 56 minor entries** <!-- pending-tally -->
+**27 / 57 minor entries** <!-- pending-tally -->
+
+### DEPLOY: feat/1685-prio-labels · 20260909-055712
+
+Every issue in this repo's tracker now carries exactly one priority, `prio-1` (lowest) to `prio-4`
+(highest). The four labels exist on GitHub, the ten issues open on the day were labelled in the same
+movement — a taxonomy applied only to new issues splits the tracker in two, and the older half is
+where the backlog is — and the rule that a finding is filed *with* its priority is written down in
+the always-on layer, so the next session does it without being reminded. It is a separate axis from
+the prefix→label mapping that classifies a pull request — `enhancement`, `bug` and `documentation` are
+the labels this repo already had, written from the branch prefix; a `prio-N` is the new one, written by
+whoever files. Derek's lens says so, and says which command re-ranks an issue without leaving two
+rungs on it.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A — nothing here reaches a consumer of the plugins. The labels are this tracker's own state and
+both documents are repo-local lenses, which travel to nobody.
+
+**Score:** N/A
+
+#### Pull Request
+
+Priority labels prio-1..prio-4 on every issue
+
+[PR #1687](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1687)
+
+---
 
 ### DEPLOY: feat/1670-fanout-shrinkage-detection · 20260908-222347
 
