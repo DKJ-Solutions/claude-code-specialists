@@ -43,7 +43,38 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**34 / 78 minor entries** <!-- pending-tally -->
+**35 / 79 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1718-mentions-skip-guidance · 20260909-162729
+
+open-pr's mention scan reads the branch's own content now -- everything from the first phase heading down --
+instead of the whole development document. The scaffold's guidance block is where this workflow records why
+its shape rules exist, so every issue it cites was being read as a mention of whatever branch happened to be
+open: the already-done check reported `#1650 is already CLOSED, and it is already resolved by PR #1661` on a
+branch with no connection to it, unconditionally, in this repo and in every consumer. That warning could not
+be told apart from a real one in the same run, and it would have grown by one line every time a new rule was
+cited. The new `Get-DevelopmentBranchText` reuses the heading walk `Get-DevelopmentShapeFindings` already
+does, so the levels and the fence-awareness keep one definition; the region it drops is the one that gate
+already refuses branch content in, which is what makes it safe to drop. No ignore-list of numbers.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+Every repo running this workflow gets its ship output back: the already-done check goes quiet unless it has
+something to say, so the next warning it prints is worth reading.
+
+**Score:** 3
+
+#### Pull Request
+
+The mention scan reads the branch's own content, not the scaffold's guidance block
+
+Plugins: dkj-policy
+
+[PR #1727](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1727)
+
+---
 
 ### DEPLOY: docs/1720-merge-queue-off-main-ci-gate · 20260909-161642
 
