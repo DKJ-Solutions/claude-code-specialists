@@ -37,7 +37,7 @@
 ### PLAN
 
 Resolve the colour collision from **this** side: `prio-1` moves off `0E8A16`, which BWJ uses for `low`
-and `sync`.
+in both stores and for `sync` in one of them.
 
 #### The repair is not the one #1691 proposed, and the reason is access
 
@@ -60,21 +60,29 @@ The colour was not guessed: `006B75` was verified unused across all three tracke
 ### CREATE
 
 - [x] Re-measured the filing before repairing it. It holds exactly — and it was **one label worse than
-      reported**: `0E8A16` carries *two* BWJ labels, `low` and `sync`, not one. Both BWJ repos are
-      byte-identical on all four rungs, as #1691 claimed.
+      reported**: in `xoxowildhearts`, `0E8A16` carries `sync` as well as `low`. Only there; in
+      `smartwatchbanden` that label is grey (`6e7781`). Both BWJ repos are byte-identical on all four
+      *rungs*, as #1691 claimed.
 - [x] `gh label edit prio-1 --color 006B75` on this tracker, read back. GitHub edits in place, so
       #1654 — the one open issue carrying the label — keeps it.
 - [x] Derek's lens: the rung table's colour cell, and the collision block rewritten from *"left open
       deliberately"* to what was actually done, with the two deliberate agreements marked as such.
 - [x] The **stale count one screen above it**, which this branch created and which was mine from
       #1685: *"on three of the same colour codes"* is two now, and the sentence says which two and why.
-- [~] Changing `FBCA04` as well — dropped, with the reason recorded rather than left silent. It is
-      `prio-2` here and `tier-1` in a BWJ repo, which is a **reach** label and not a rung, so the two
-      are not answers to the same question and no reader compares them as rungs. Changing it would also
-      break this repo's own ramp, which is now teal → yellow → orange → red.
+- [~] Changing `FBCA04` as well — dropped, and the reason is **weaker than the one the green moved
+      for**, which the lens now says out loud rather than declaring it harmless. It is `prio-2` here and
+      `tier-1` in a BWJ repo — a **reach** label, not a rung — so a misread there gets the *kind* wrong
+      and not the rung. What it does not buy is safety by this branch's own argument: *"a badge has no
+      command in it to fail"* says nothing about axes, and `tier-1` can sit on a BWJ issue beside any of
+      its four prio labels. Changing it would also break this repo's own ramp, now teal → yellow →
+      orange → red. No instance of either misread has been observed.
 - [~] Touching the BWJ trackers or `adopt-dkj-policy-bwj` — dropped deliberately: that is #1691's own
       Dave-gated half, and the whole point of repairing from this side is that it becomes unnecessary
-      rather than pending. BWJ keeps `0E8A16` for `low`, and that is now unambiguous in the family.
+      rather than pending. BWJ keeps `0E8A16` for `low`, and **that green no longer means two different
+      rungs across the two families** — which is not the same as unambiguous, and the first draft of
+      this line claimed the stronger thing while the CREATE step two items up refuted it. Inside
+      `xoxowildhearts` the same green still carries `sync` as well; that is a BWJ-internal question this
+      branch does not reach and does not claim to have closed.
 
 ### TEST
 
@@ -82,26 +90,73 @@ The colour was not guessed: `006B75` was verified unused across all three tracke
       `#D93F0B`, `prio-4` `#B60205`.
 - [x] `006B75` confirmed absent from all three trackers before the edit — so the collision moved
       nowhere.
-- [x] Every `0E8A16` left in the tree checked: three in Derek's lens, all now describing what BWJ
-      still uses or what this repo used to, plus the one in `adopt-dkj-policy-bwj` step 4, which is
-      BWJ's own prescription and correctly untouched.
+- [x] Every `0E8A16` left in the tree checked — **at the second attempt.** The first sweep excluded
+      `dkj-policy/CHANGELOG.md` and reported four sites; the red-team found a fifth there, pending and
+      wrong. The five are: three in Derek's lens (all now describing what BWJ still uses or what this
+      repo used to), the one in `adopt-dkj-policy-bwj` step 4 (BWJ's own prescription, correctly
+      untouched), and #1686's still-unreleased changelog entry, corrected.
 - [x] The lint gate: 0 errors — the dead-link scan covers the new issue links in the rewritten block.
 - [x] The lint gate and every suite, via `open-pr.ps1`.
+- [x] Copy edit (Edith) and conclusion red-team (Marlowe) on the diff. Edith found nothing and
+      re-verified every colour claim against all three live trackers. Marlowe returned **WOBBLES** on
+      four points, two of them hard; all four are repaired below rather than argued with.
+
+#### What the red-team caught, and the two that were hard
+
+1. **A stale line that would have SHIPPED.** `dkj-policy/CHANGELOG.md` still carried #1686's pending
+   entry saying, present tense, *"`0E8A16` is the floor here"* — false the moment `prio-1` moved, and
+   under `## [Unreleased]`, so the next cut would have published it. This branch's own TEST step had
+   claimed *"every `0E8A16` left in the tree checked"* and that claim was **false**: the sweep behind it
+   excluded `dkj-policy/CHANGELOG.md` from its grep. Corrected in place — the tense, plus a sentence
+   saying which way the repair actually went — because the entry is still pending and an entry that has
+   not shipped is an ordinary edit.
+2. **A self-contradiction inside this document.** It said BWJ's green *"is now unambiguous in the
+   family"* while the CREATE step two items above recorded `0E8A16` carrying two labels in
+   `xoxowildhearts`. Corrected to the claim that actually holds: the green no longer means two different
+   **rungs** across the families, which is what this branch closed and all it closed.
+3. **The `FBCA04` dismissal used an argument the branch itself had refuted.** *"Nobody compares them as
+   rungs"* assumes the reader checks the label's name — which is precisely the failure mode
+   *"a badge has no command in it to fail"* says does not happen. Softened in the lens to name the
+   residual risk and to say plainly that the reason for leaving it is weaker than the reason the green
+   moved: a misread there gets the *kind* wrong, not the rung.
+4. **`006B75` was checked for exact-hex uniqueness, not perceptual distinctness.** It sits ~14 degrees
+   of hue from `help wanted`'s `008672`, so two dark teals now mean opposite things in one picker.
+   Accepted rather than churned, and **measured first**: `help wanted` has been used once in this
+   repo's whole history (the closed #1215) and never on a pull request, while a third colour inside one
+   day would re-stale this document, the lens block and the changelog entry above. Recorded in the lens
+   with that number, together with the cost that is not free — the floor no longer wears green, so the
+   traffic-light reading is one rung off here.
+
+#### The colour choice, stated as an assumption rather than left implicit
+
+#1691 named two gated things: touching a repo this one does not own, **and** which colour replaces the
+green. Repairing from this side answers the first and does **not** answer the second — the pick is
+this session's, made while Dave is away under his standing *"I follow the specialist's advice here."*
+So it is recorded as an assumption, not as a settled decision: `006B75` was verified unused across all
+three trackers, and overriding it is one `gh label edit`. That is a fact in the record rather than a
+question at a close-out, which is why it sits here and not in a reply.
 
 ### DEPLOY: fix/1691-prio-1-colour-collision
 
 A `prio-1` badge no longer means two different rungs in one family. It was `0E8A16` — the green a
-reader trained in this repo knows as *"nobody is waiting for it"* — which in a BWJ store repo is `low`,
-one rung **above** the floor, and also `sync`. It is now `006B75`, verified unused across all three
-trackers. Nothing refuses a colour, so this was the one part of the priority-axis decision that could
-still go wrong silently: `gh` judges a label's name, and a badge is read by a person with no command in
-it to fail.
+reader trained in this repo knows as *"nobody is waiting for it"* — which in both BWJ store repos is
+`low`, one rung **above** the floor, and in one of them `sync` as well. It is now `006B75`, verified
+unused across all three trackers. Nothing refuses a colour, so this was the one part of the
+priority-axis decision that could still go wrong silently: `gh` judges a label's name, and a badge is
+read by a person with no command in it to fail.
 
 **It was repaired from this side rather than the one #1691 proposed, and that is the substance.** The
 issue's own repair edits live labels in two repos this one does not own and would have left future
 adopters in a third state, so it was correctly gated on Dave. Moving `prio-1` instead is one command in
 the repo in front of you, needs no access outside, leaves `adopt-dkj-policy-bwj`'s prescribed hexes
 alone, and keeps the two rows that agree on the rung on purpose.
+
+**What it does not settle, and says so rather than implying otherwise.** #1691 gated two things — the
+outside access *and* the colour itself. Repairing from this side answers the first; `006B75` is this
+session's pick, verified unused before it was taken, and one `gh label edit` to override. Inside a BWJ
+repo the same green still carries two labels, which is a BWJ-internal question this branch does not
+reach. And `FBCA04` stays `prio-2` here and `tier-1` there on a weaker argument than the one the green
+moved for: a misread there gets the *kind* wrong, not the rung.
 
 **Score:** 2
 

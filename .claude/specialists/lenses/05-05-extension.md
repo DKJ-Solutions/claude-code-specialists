@@ -523,13 +523,14 @@ and turned out to be one label worse than filed:
 | `D93F0B` | `prio-3` — third of four | `high` — third of four | yes, deliberately |
 | `FBCA04` | `prio-2` — second of four | `tier-1` — **a different axis entirely** | n/a — see below |
 | `006B75` | `prio-1` — the floor | *(unused in the family)* | — |
-| `0E8A16` | *(no counterpart any more)* | `low` — second of four, **and `sync`** | — |
+| `0E8A16` | *(no counterpart any more)* | `low` — second of four; in xoxowildhearts **also `sync`** | — |
 | `c2e0c6` | *(no counterpart)* | `very low` — the floor | — |
 
 **`prio-1` was `0E8A16` and is now `006B75`.** The green a reader trained here knew as *"nobody is
 waiting for it"* was one rung **above** the floor over there, where the floor wears a pale mint this
-repo does not use — and `0E8A16` turned out to carry **two** BWJ labels, `low` and `sync`, which the
-filing had not caught. **Nothing refuses a colour**: the whole safety argument above is about a label's
+repo does not use. And in **one** of the two BWJ repos — `xoxowildhearts` — `0E8A16` turned out to
+carry a second label as well, `sync`, which the filing had not caught; in `smartwatchbanden` that same
+label is grey (`6e7781`), so the doubling is that one store's alone. **Nothing refuses a colour**: the whole safety argument above is about a label's
 NAME, which `gh` judges, and a badge is read by a person scanning an issue list with no command in it to
 fail. That is [#1686](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1686)'s own
 *goes-wrong-silently* shape, moved onto an axis its reasoning does not reach.
@@ -543,11 +544,27 @@ needs no access outside, it leaves that skill's prescribed hexes untouched so no
 third answer, and it keeps the two rows that agree on purpose. `006B75` was verified unused across all
 three trackers before it was taken.
 
-**`FBCA04` is left alone, and that is a decision rather than an oversight.** It is `prio-2` here and
-`tier-1` in a BWJ repo — a **reach** label, not a rung — so the two are not answers to the same
-question and a reader is never comparing them as rungs. Changing it would also break this repo's own
-readable ramp, which is now teal → yellow → orange → red. **Read the name, not the badge**, remains the
-standing rule for anything but the two rows marked deliberate.
+**`FBCA04` is left alone, and the residual risk is named rather than dismissed** — the conclusion
+red-team on this branch is why that sentence is not the one first written. It is `prio-2` here and
+`tier-1` in a BWJ repo, a **reach** label rather than a rung, so the two are not answers to the same
+question. What that does **not** buy is safety by the argument used to repair the green: *"a badge is
+read by a person with no command in it to fail"* says nothing about axes, and a reader scanning yellow
+does not stop to check whether the label under it is a rung before reacting — `tier-1` sits on a BWJ
+issue independently of that issue's prio label, so both can be on one row. So the reason it is left is
+weaker than the reason the green was moved: the misread cannot make a *rung* wrong, only a *kind*, and
+changing it would break this repo's own readable ramp, which is now teal → yellow → orange → red. No
+instance of either misread has been observed.
+
+**And `006B75` was chosen on exact-hex uniqueness, which is not perceptual distinctness** — the same
+red-team's other catch. It sits 14 degrees of hue and 0.03 of lightness from `help wanted`'s `008672`,
+so at badge size the two dark teals are close, and one means *"nobody is waiting for it"* while the
+other means the opposite. Accepted rather than churned, and measured first: `help wanted` has been used
+**once** in this repo's whole history, on the closed #1215, and never on a pull request. The costs of
+moving again are real — a third colour for `prio-1` inside one day would re-stale this block, the
+changelog entry above it and the badge on every issue already labelled. What is also given up, and is
+worth stating because it was not free: the floor no longer wears green, so the traffic-light reading
+every sighted reader brings to a badge is one rung off in this repo. **Read the name, not the badge**,
+remains the standing rule for anything but the two rows marked deliberate.
 
 **It is a separate axis from the prefix→label mapping in
 [step 2](#classifying-naming-and-creating-a-branch), which is about a PULL REQUEST.** `enhancement`,

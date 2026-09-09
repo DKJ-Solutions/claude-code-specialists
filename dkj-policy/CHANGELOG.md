@@ -184,10 +184,14 @@ version would prescribe a convention no gate enforces and hand consumers four la
 for.
 
 **One thing the decision deliberately does not close, and it is now named rather than implied.** The
-same measurement that clears the names indicts the **colours**: `0E8A16` is the floor here and one rung
-above the floor in a BWJ repo, and nothing refuses a colour the way `gh` refuses a name. The lens
+same measurement that clears the names indicts the **colours**: `0E8A16` was the floor here and is one
+rung above the floor in a BWJ repo, and nothing refuses a colour the way `gh` refuses a name. The lens
 carries that table and the instruction not to read a rung off a badge across the two families; the
 repair itself is #1691, because its cheap half edits live labels in two repos this one does not own.
+**That repair has since landed the other way round** — `prio-1` moved off `0E8A16` rather than BWJ's
+`low` moving off it — so this paragraph is the state as this entry was written, and the entry below it
+is what actually happened. The tense is corrected here because this entry is still pending and would
+otherwise ship a sentence that reads as present.
 
 **Score:** 2
 
