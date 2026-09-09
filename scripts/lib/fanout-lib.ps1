@@ -97,6 +97,13 @@ if (Test-Path -LiteralPath $captureLib -PathType Leaf) { . $captureLib }
 # ownership is the whole point of the file. Guarded on the same grounds as the line above.
 $porcelainLib = Join-Path $PSScriptRoot 'git-porcelain-lib.ps1'
 if (Test-Path -LiteralPath $porcelainLib -PathType Leaf) { . $porcelainLib }
+# AND THE PRINT GUARD (#1689), WHICH THE LINE ABOVE IS THE REASON FOR. Since the porcelain lib decodes
+# a C-quoted path instead of handing back git's escape, a path reaching this report can carry a live ESC
+# byte (git writes one as '\033') or a U+202E override -- correct for comparing, an ANSI/OSC repaint
+# surface if printed raw. sync-main.ps1 states that in those words at its own call site of the same
+# decoder and routes every printed path through Get-DisplayPath; this file is the second such consumer.
+$refPrintLib = Join-Path $PSScriptRoot 'ref-print-lib.ps1'
+if (Test-Path -LiteralPath $refPrintLib -PathType Leaf) { . $refPrintLib }
 
 function Get-WorkingCopySnapshot {
     <#
@@ -368,7 +375,16 @@ function Compare-WorkingCopySnapshot {
         $findings += [pscustomobject]@{
             Kind   = 'BranchChanged'
             Path   = ''
-            Detail = "the baseline was taken on '$($Before.Branch)' and this reading on '$($After.Branch)'; a changed-path list is relative to HEAD, so the two are not comparable"
+            # Get-DisplayRef, NOT Get-DisplayPath: these are ref names, and git forbids a space in one,
+            # so collapsing and trimming lose nothing (#1638's distinction, the other way round).
+            #
+            # THIS ONE IS OLDER THAN #1689 AND IS REPAIRED WITH IT ANYWAY. The two branch names come from
+            # `rev-parse --abbrev-ref`, and a ref may legally carry a control or format character -- which
+            # is the whole reason ref-print-lib.ps1 exists. It was never reached by the decode change, so
+            # it is not this branch's doing; leaving one printed path hardened and one printed ref raw in
+            # the same function would be a half-closed class, and the helper is now dot-sourced two lines
+            # above regardless.
+            Detail = "the baseline was taken on '$(Get-DisplayRef -Ref $Before.Branch)' and this reading on '$(Get-DisplayRef -Ref $After.Branch)'; a changed-path list is relative to HEAD, so the two are not comparable"
         }
         return $findings
     }
@@ -442,8 +458,12 @@ function Compare-WorkingCopySnapshot {
                     # NO BACKTICKS IN A DOUBLE-QUOTED STRING: PowerShell reads one as an escape, so a
                     # markdown-style quote around the command name would be swallowed silently and the
                     # reader would never know the sentence had been edited by the parser.
+                    # THE OLD PATH IS STRIPPED HERE AND NOT AT THE FORMATTER, because it is baked into
+                    # prose rather than carried as a field (#1689). Detail is display text by
+                    # definition -- nothing compares it -- so stripping at composition changes no
+                    # judgement. The comparison above still uses $path itself, unstripped.
                     Detail = ("its worktree change ('$($was.Worktree)') is gone while the path is still listed -- what a 'git checkout -- <path>' leaves behind" +
-                              $(if ($nowPath -ne $path) { " (renamed from '$path' inside the window, and the loss is on this side of the rename)" } else { '' }))
+                              $(if ($nowPath -ne $path) { " (renamed from '$(Get-DisplayPath -Path $path)' inside the window, and the loss is on this side of the rename)" } else { '' }))
                 }
             }
         }
@@ -490,7 +510,11 @@ function Format-WorkingCopyShrinkage {
     $lines = @()
     foreach ($kind in @('Vanished', 'WorktreeCleared', 'StashGone')) {
         foreach ($item in @($f | Where-Object { $_.Kind -eq $kind })) {
-            $subject = if ($item.Path) { $item.Path } else { '(working copy)' }
+            # Get-DisplayPath, NOT Get-DisplayRef (#1638's distinction): a path may legitimately hold a
+            # space, a doubled or trailing one included, and this is the name a reader has to type back.
+            # The STRIP HAPPENS HERE AND NOT IN THE COMPARISON, so $item.Path stays the exact string a
+            # caller could act on programmatically while only the printed line is made safe to print.
+            $subject = if ($item.Path) { Get-DisplayPath -Path $item.Path } else { '(working copy)' }
             $lines += "[ALARM] $subject -- $($item.Detail)"
         }
     }

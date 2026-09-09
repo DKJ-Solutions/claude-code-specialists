@@ -97,7 +97,16 @@ the issue and the branch do not disagree.
       one thing `build-shared-scripts -Check` structurally cannot catch, since a missing entry is a
       pair it never looks at. Plus: the dot-source is present, it is **unguarded**, and
       `sync-rules.ps1` neither defines the function nor dot-sources the lib. 141 asserts.
-- [x] Green: `git-porcelain-lib` 54, `sync-rules` 152, `sync-main` 141, `fanout-lib` 86,
+- [x] Code review (Victor) and security review (Sebastian) on the diff. Victor found nothing: the
+      moved function is byte-identical, the two arms are exclusive and exhaustive, the format bump is
+      honoured by `ConvertFrom-WorkingCopySnapshotJson`, the load order is right, and both
+      `Get-GitParkBacking -Paths` callers pass an ASCII branch-dossier path -- verified against the
+      tree rather than taken from this branch's own docstrings.
+- [x] Sebastian found one **blocking** defect, which this branch had introduced: the decode means a
+      path can now carry a live ESC byte (git writes one as `\033`) or a U+202E override, and
+      `fanout-lib`'s `[ALARM]` line went to `Write-Host` raw. Repaired -- see below.
+
+- [x] Green: `git-porcelain-lib` 54, `sync-rules` 152, `sync-main` 141, `fanout-lib` 91,
       `park-cycle` 91, `shared-scripts` 636. Lint gate 0 errors.
 - [x] No fixture needed the #1693 treatment this time, and that was checked rather than assumed:
       `sync-main.tests.ps1` runs the script **in place** from the repo root, so its dot-sources resolve
@@ -105,6 +114,30 @@ the issue and the branch do not disagree.
       fixture tree.
 - [x] The lint gate and every suite, via `open-pr.ps1`.
 
+#### The print guard, which is the half a decode obliges you to add
+
+`sync-main.ps1` already states the hazard in exactly these words at its own call site of this decoder:
+*"correct for comparing, an ANSI/OSC repaint surface if printed raw"* -- and routes every printed path
+through `Get-DisplayPath`. `fanout-lib` became the second consumer of that decoder in this branch and
+had no such guard, so a crafted filename in the working copy could repaint the terminal of the session
+reading a loss report, or use an RTL override to make an `[ALARM]` line say something else.
+
+Three sites, and they are not one fix:
+
+1. **`Format-WorkingCopyShrinkage`'s `$subject`** -- stripped at the FORMATTER, so the finding object
+   keeps the exact path a caller could act on and only the printed line is made safe.
+2. **The rename's old path inside `Detail`** -- Sebastian did not name this one; it is baked into prose
+   rather than carried as a field, so the formatter cannot reach it and it is stripped at composition.
+   `Detail` is display text by definition, so nothing compares it and no judgement changes.
+3. **The two branch names in the not-comparable `Detail`** -- `Get-DisplayRef` rather than
+   `Get-DisplayPath`, per #1638's distinction (git forbids a space in a ref, so collapsing loses
+   nothing there and would lose a real filename here). **This one is older than this branch** and the
+   decode never reached it -- repaired anyway, because one hardened path and one raw ref in the same
+   function is a half-closed class and the helper is dot-sourced two lines above regardless.
+
+Pinned by five new asserts in `fanout-lib.tests.ps1` (86 -> 91): no ESC and no U+202E survive into a
+printed line, the control character becomes a space so the name stays recognisable, the FINDING still
+carries the exact path, and the rename's old path is covered separately from the formatter's.
 ### DEPLOY: fix/1689-porcelain-path-decode-once
 
 Reading a git path now happens in one place. `Convert-GitQuotedPath` — which decodes git's C-quoted
@@ -118,6 +151,11 @@ change.** `sync-rules.ps1` is dependency-free on purpose — the live-theme guar
 command inside a catch that returns no live theme id — so making it dot-source anything is a way to
 disarm that guard silently. It never called the function it defined, so it could lose it instead, and
 `sync-main.ps1` takes the lib directly, unguarded, exactly as it already takes two others.
+
+**And a decode obliges a print guard**, which is the second half of the change. Since a decoded
+path can carry a live ESC byte or an RTL override, `fanout-lib`'s loss report now routes every printed
+path through `Get-DisplayPath` and every printed ref through `Get-DisplayRef` -- three sites, one of
+them older than this branch. The strip is at the report, so a finding still carries the exact path.
 
 **Score:** 3
 
