@@ -43,7 +43,41 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**36 / 84 minor entries** <!-- pending-tally -->
+**36 / 85 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1736-says-classification-swept · 20260909-184930
+
+The `Test-Says` classification is now measured across every suite that captures a child's error stream,
+and the reader is applied where an assert actually reads a formatter-emitted phrase. Four suites gained
+it; the four #1736 nominated that read only `Write-Host` were measured and deliberately left alone, as
+were all thirteen it left unresolved.
+
+The classification is the durable half. It is recorded in Tycho's lens as two conditions that fail
+independently, with the correction that matters: condition 2 is a property of the **assert**, not of the
+script under test -- a script carrying twenty `Write-Error` calls says nothing about a suite whose
+asserts all read its report. That distinction is what took the queue from 8 candidates to 1 real defect,
+and it is what stops the next sweep from converting `Write-Host` asserts into weaker ones.
+
+The three flatteners in the tree are now ranked by measurement rather than by argument, so the next
+suite to be written can copy the one that measured 0 instead of the one whose docstring sounded most
+confident.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A -- test-suite internals. No consumer of this marketplace runs these suites or sees their output;
+the scripts under test are unchanged.
+
+**Score:** N/A
+
+#### Pull Request
+
+The whitespace-stripping reader reaches the four suites whose asserts read a formatter-emitted phrase
+
+[PR #1740](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1740)
+
+---
 
 ### DEPLOY: feat/1717-gate-progress-index · 20260909-181938
 
