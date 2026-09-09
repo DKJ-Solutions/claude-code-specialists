@@ -43,7 +43,40 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**31 / 70 minor entries** <!-- pending-tally -->
+**31 / 71 minor entries** <!-- pending-tally -->
+
+### DEPLOY: docs/1705-findings-block-granularity · 20260909-123952
+
+Ravi's lens now records that a **universal shared block does not cost uniformly**. Of
+`findings-become-issues`'s thirty carriers exactly one sits on the always-on path — Chris's persona
+body, imported on every turn — while the other twenty-nine are paid per invocation, since the agent
+defs carry these blocks in the body rather than in the frontmatter description. A bullet appended to a
+universal block is therefore paid once per session in every consuming repo, and the word *universal*
+hides that.
+
+So the lens carries the test that follows from it: **would you put this bullet in Chris's body on its
+own?** If not, it belongs in a narrower circle, which the generator already supports. And there is no
+cheap middle — the source file is copied whole, so nothing written into it stays behind.
+
+**The question #1705 actually asked was answered by measuring and declining.** Seven of the eight
+bullets are universal on their face; the eighth reads narrow and generalises. The block stays as it is.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+N/A — a repo-local lens, read on demand, and nothing in any plugin changed. A consumer receives no
+byte of this.
+
+**Score:** N/A
+
+#### Pull Request
+
+What earns a place in the findings block, measured per bullet
+
+[PR #1711](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1711)
+
+---
 
 ### DEPLOY: docs/1699-policy-is-adopted-craft-adapts · 20260909-122141
 
