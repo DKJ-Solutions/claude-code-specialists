@@ -72,6 +72,14 @@
     honoured -- native-capture-lib is not widened. The move is a clean follow-up on its own.
 #>
 
+# THE PROSE SANITISER FOR EXTERNALLY-AUTHORED NAMES, loaded here rather than asked of the caller
+# (issue #1715). Get-CiTestCertificate below prints check names read out of a `gh` payload, and a
+# check's displayed name is chosen by whoever produced it. remote-ahead-lib.ps1 and
+# entry-scaffold-lib.ps1 both load this the same way, for the reason their own notes give:
+# ref-print-lib.ps1 is a leaf with no dependencies of its own, which is what makes it safe to load
+# first -- so this is not the class of dependency the header above asks the caller to supply.
+. (Join-Path $PSScriptRoot 'ref-print-lib.ps1')
+
 # How long a recorded pass is allowed to stand in for a fresh run. Not a content property -- the
 # fingerprint already covers content exactly -- but a bound on the environment drifting underneath
 # it. Four hours comfortably covers the measured case (open-pr and ship-pr minutes apart) while
@@ -499,19 +507,48 @@ function Get-CiTestCertificate {
         and it is the certificate the MERGE is gated on -- `main`'s ruleset blocks the merge until the
         required context passes. A local re-run cannot change the merge decision; it can only delay it.
 
+        IT CERTIFIES ON A NAMED CHECK AND NEVER ON "WHATEVER WAS REQUIRED", which is the whole safety
+        of the skip. The first draft of this function trusted every record `gh pr checks --required`
+        returned, and two independent reviews found the same hole from opposite sides:
+
+          - A consumer whose trunk requires an UNRELATED check -- a CLA bot, a PR-title linter, a
+            theme-check -- would have its local test gate skipped the moment that check went green,
+            with the suites never having run anywhere for that commit.
+          - Where a trunk requires TWO contexts, the unrelated one registers and goes green first
+            while the test check has not registered at all; the payload is then non-empty, every
+            record in it is `pass`, and the certificate is granted. That is the registration race
+            Get-RequiredCheckContexts documents in pr-issues-lib -- in its PARTIAL shape rather than
+            its empty one, which is the shape a `Count -eq 0` guard cannot see.
+
+        So the caller passes the check its repo has NAMED (Get-CiTestCheckName), and the named check
+        must be PRESENT in the required set and green. Absent is a refusal, which is what closes the
+        race: a check that has not registered cannot be found, so it cannot certify.
+
         WHAT IT REFUSES, and every one of these runs the gate exactly as before:
 
+          - No check name. A repo that has not said which check proves its suites gets no certificate
+            -- the pre-seam behaviour, and the reason the seam is optional.
           - No PR head to compare against (the first open-pr of a branch, before any push).
           - PR head != local HEAD. The certificate is about a commit; anything else is about a
             different tree. This is what makes an unpushed local commit safe.
-          - Nothing readable, or ZERO required checks. An empty answer is the ambiguous one --
-            `gh pr checks --required` reports the required checks that have REGISTERED, so a workflow
-            that has not created its check run yet is indistinguishable from a trunk requiring
-            nothing (the race Get-RequiredCheckContexts documents at length in pr-issues-lib). Here
-            that ambiguity is harmless because it is resolved toward RUNNING the gate: no names, no
-            skip.
-          - Any required check not in the `pass` bucket. All of them or none -- a green subset is not
-            a certificate.
+          - Nothing readable, or an empty required set.
+          - The named check missing from the payload -- not required by this trunk, or not registered
+            yet. Both are "no certificate", deliberately: a check the merge does not depend on is not
+            a bar this gate may stand down for.
+          - The named check not in the `pass` bucket.
+
+        THE CHECK NAMES IT PRINTS COME FROM OUTSIDE, so they go through Get-DisplayRef before they
+        reach a console -- the same rule, and the same single source, that new-branch.ps1's remote-tip
+        line follows. A check's displayed name is chosen by whoever produced it, and a third-party
+        integration can build one out of branch- or PR-derived text; an ANSI or OSC escape in it
+        repaints the terminal it lands in, and a zero-width run makes the printed line read as
+        something other than what it says -- in the one line whose job is to say what stood down a
+        gate. ref-print-lib.ps1 is dot-sourced at the top of THIS file rather than asked of the
+        caller, which is what remote-ahead-lib and entry-scaffold-lib do with the same function and
+        for the reason their notes give: it is a leaf with no dependencies, so loading it here cannot
+        produce the two-answers problem the header's caller contract exists to avoid. Not degraded
+        gracefully if it were ever absent, deliberately -- a sanitiser that silently switches itself
+        off is worse than none.
 
         THE DIRTY-TREE CASE IS THE CALLER'S, deliberately, and this function never asks. What lands is
         HEAD, so a certificate on HEAD is exactly as true on a dirty tree as on a clean one; what
@@ -528,27 +565,34 @@ function Get-CiTestCertificate {
     .PARAMETER RequiredChecksJson
         `gh pr checks <n> --required --json name,bucket` output. Empty or unparseable -> not certified.
 
+    .PARAMETER CheckName
+        The check context whose green proves the suites, from the repo's own Get-CiTestCheckName seam.
+        Empty or absent -> not certified, which is the pre-seam behaviour.
+
     .OUTPUTS
         [pscustomobject] Certified (bool), Note (string).
     #>
     param(
         [string]$HeadSha,
         [string]$PrHeadSha,
-        [string]$RequiredChecksJson
+        [string]$RequiredChecksJson,
+        [string]$CheckName
     )
 
     $refuse = { param([string]$Why) [pscustomobject]@{ Certified = $false; Note = $Why } }
+    # Eight characters is what git itself abbreviates to here, and a reader asked to compare two
+    # 40-character hashes by eye is being asked to do the job this line exists to have done for them.
+    $short = { param([string]$Sha) $Sha.Substring(0, [Math]::Min(8, $Sha.Length)) }
+
+    $wanted = Get-DisplayRef -Ref $CheckName
+    if (-not $wanted) { return (& $refuse 'this repo has not named the check that proves its test suites (Get-CiTestCheckName)') }
 
     $head = ([string]$HeadSha).Trim()
     $prHead = ([string]$PrHeadSha).Trim()
     if (-not $head)   { return (& $refuse 'no local HEAD to compare') }
     if (-not $prHead) { return (& $refuse 'no PR head to compare -- nothing has been certified yet') }
     if ($head -ne $prHead) {
-        # Short forms in the message: a reader comparing two 40-character hashes by eye is being asked
-        # to do the thing this line exists to have done for them.
-        $h = $head.Substring(0, [Math]::Min(8, $head.Length))
-        $p = $prHead.Substring(0, [Math]::Min(8, $prHead.Length))
-        return (& $refuse "the PR head ($p) is not this HEAD ($h) -- the certificate is about a different commit")
+        return (& $refuse ("the PR head ({0}) is not this HEAD ({1}) -- the certificate is about a different commit" -f (& $short $prHead), (& $short $head)))
     }
 
     if (-not $RequiredChecksJson -or -not $RequiredChecksJson.Trim()) {
@@ -562,22 +606,29 @@ function Get-CiTestCertificate {
     # same trap Get-RequiredCheckContexts and Get-MergeQueueVerdict each document beside their parse.
     $records = @(@($parsed) | Where-Object { $_ -and $_.PSObject.Properties['name'] })
     if ($records.Count -eq 0) {
-        return (& $refuse 'no required check has registered on this commit yet')
+        return (& $refuse ("'{0}' has not registered on this commit yet -- no required check has" -f $wanted))
     }
 
-    $notPassing = @()
-    foreach ($r in $records) {
-        $bucket = if ($r.PSObject.Properties['bucket']) { ([string]$r.bucket).Trim().ToLowerInvariant() } else { '' }
-        if ($bucket -ne 'pass') { $notPassing += ([string]$r.name).Trim() }
+    # SANITISED BEFORE IT IS COMPARED, not only before it is printed. The comparison has to be made on
+    # the same string the reader is shown, or a name carrying a zero-width character could match here
+    # and print as something else -- or, worse, fail to match while the printed line says it should.
+    $named = @($records | Where-Object { (Get-DisplayRef -Ref ([string]$_.name)) -eq $wanted })
+    if ($named.Count -eq 0) {
+        $present = @(@($records | ForEach-Object { Get-DisplayRef -Ref ([string]$_.name) }) | Sort-Object -Unique)
+        return (& $refuse ("'{0}' is not among this trunk's required checks on this commit (found: {1})" -f $wanted, ($present -join ', ')))
     }
+
+    $notPassing = @($named | Where-Object {
+        $bucket = if ($_.PSObject.Properties['bucket']) { ([string]$_.bucket).Trim().ToLowerInvariant() } else { '' }
+        $bucket -ne 'pass'
+    })
     if ($notPassing.Count -gt 0) {
-        return (& $refuse ("required check(s) not green: " + (($notPassing | Sort-Object -Unique) -join ', ')))
+        return (& $refuse ("'{0}' is not green on this commit" -f $wanted))
     }
 
-    $names = @(@($records | ForEach-Object { ([string]$_.name).Trim() }) | Sort-Object -Unique)
     return [pscustomobject]@{
         Certified = $true
-        Note      = ("{0} green on this exact commit ({1})" -f ($names -join ', '), $head.Substring(0, [Math]::Min(8, $head.Length)))
+        Note      = ("{0} green on this exact commit ({1})" -f $wanted, (& $short $head))
     }
 }
 

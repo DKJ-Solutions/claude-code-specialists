@@ -111,6 +111,33 @@ function Get-LintScript {
     return $script:LintScript
 }
 
+# WHICH CHECK'S GREEN PROVES THIS REPO'S TEST SUITES (issue #1715). open-pr skips its local test gate
+# when this check is green on the exact commit it would ship -- see Get-CiTestCertificate in
+# scripts/lib/gate-lib.ps1. Here that is 'lint-en-tests', the one context `main-ci-gate` requires,
+# whose four `suites (1)`-`(4)` shards run the very same suites the local gate does.
+#
+# IT NAMES A CHECK RATHER THAN SAYING "ANY REQUIRED CHECK", and the difference is the whole safety of
+# the skip. Two independent reviews of the first draft found the same hole from opposite sides: trusting
+# whatever `gh pr checks --required` returns means a consumer whose trunk requires a CLA bot, a
+# PR-title linter or a theme-check has its local test gate skipped the moment THAT goes green -- and,
+# where a trunk requires two contexts, a green on the unrelated one certifies while the test check has
+# not even registered yet (the registration race Get-RequiredCheckContexts documents in
+# pr-issues-lib.ps1, in its partial-payload shape rather than its empty one).
+#
+# UNSTATED IS THE SAFE ANSWER: no name, no certificate, and the gate runs exactly as it did before this
+# seam existed. That is why it is optional -- a consumer adopting the plugin gets today's behaviour
+# until it deliberately says which of its checks carries this weight.
+#
+# NAME A CHECK THE TRUNK ACTUALLY REQUIRES. The certificate is read from the REQUIRED set, so a check
+# this trunk does not require never certifies -- deliberately: skipping local proof on a check the merge
+# does not depend on would lower the bar rather than move it.
+$script:CiTestCheckName = 'lint-en-tests'
+
+function Get-CiTestCheckName {
+    <# The check context whose green proves this repo's test suites. Empty/absent = no certificate. #>
+    return $script:CiTestCheckName
+}
+
 # The file that holds the roster (the specialists table/list). check-roster-sync.ps1 reads this to
 # decide which agent ids are "present in the roster". Repo-root-relative; 'CLAUDE.md' by default.
 # There is deliberately NO Get-RosterFormat: the check is format-agnostic (it scans the text for each

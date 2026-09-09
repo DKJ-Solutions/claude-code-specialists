@@ -1500,14 +1500,21 @@ Fast-forward it and read what is there before trying again:
 #
 # ONLY ASKED WHERE THERE IS SOMETHING TO ASK ABOUT: a PR must already exist, and -SkipTests already
 # says the suites are not running. On the first open-pr of a branch there is no PR and no certificate,
-# so this costs nothing and changes nothing -- which is also why the -GatesOnly route six hundred lines
-# above does not carry it.
+# so this costs nothing and changes nothing -- which is also why the -GatesOnly short-circuit, handled
+# up with the pre-flights, never reaches this block.
 #
-# TWO READS, BOTH CHEAP, BOTH FAIL TOWARD RUNNING THE GATE. A failed or unreadable answer is not "no
-# required checks"; Get-CiTestCertificate refuses on every ambiguity and the suites then run exactly as
-# they always did. `--required` is what makes the second read the trunk's own bar rather than this
-# script's opinion of it -- and its known race (a required workflow that has not registered yet reads
-# as nothing required) resolves here toward the gate, not past it.
+# TWO READS, BOTH CHEAP, BOTH FAIL TOWARD RUNNING THE GATE. A failed or unreadable answer is not a
+# certificate; Get-CiTestCertificate refuses on every ambiguity and the suites then run exactly as they
+# always did. `--required` makes the second read the trunk's own bar rather than this script's opinion
+# of it, and the check the repo NAMED (Get-CiTestCheckName) has to be in that answer -- which is what
+# makes the registration race harmless in its partial shape as well as its empty one: a check that has
+# not registered is simply not found, and not found is a refusal.
+#
+# THE REMOTE-AHEAD GATE ABOVE IS WHAT MAKES TWO SEPARATE READS SAFE. A push landing between them could
+# in principle pair a stale head comparison with newer check data -- but a remote that is ahead of this
+# checkout has already been refused a few lines up, before either read, and the merge itself remains
+# gated on the required check regardless. So the residual window is sub-second and costs at worst one
+# unnecessary skip of a gate the merge does not depend on; it is named here rather than mechanised.
 $testsProvedByCi = ''
 if ($existingPr -and -not $SkipTests) {
     $headSha = (Invoke-NativeCapture -FilePath 'git' -Arguments @('-C', $repoRoot, 'rev-parse', 'HEAD') -DiscardStderr)
@@ -1516,9 +1523,13 @@ if ($existingPr -and -not $SkipTests) {
     # `gh pr checks` EXITS NON-ZERO WHEN ANY CHECK IS FAILING OR STILL PENDING -- that is documented
     # behaviour and not an error, so the payload is judged on its own rather than on the exit code.
     # A red required check simply lands in the not-passing list below and refuses the skip.
+    # The seam is read defensively: a consumer whose repo-config predates it has no such function, and
+    # a missing name is the safe answer (no certificate, the gate runs) rather than an error.
+    $ciCheckName = if (Get-Command -Name 'Get-CiTestCheckName' -ErrorAction SilentlyContinue) { Get-CiTestCheckName } else { '' }
     $cert = Get-CiTestCertificate -HeadSha ($headSha.Output -join '') `
                                   -PrHeadSha ($prHead.Output -join '') `
-                                  -RequiredChecksJson ($reqJson.Output -join "`n")
+                                  -RequiredChecksJson ($reqJson.Output -join "`n") `
+                                  -CheckName $ciCheckName
     if ($cert.Certified) {
         $testsProvedByCi = $cert.Note
     } else {
