@@ -405,17 +405,40 @@ function Get-SharedScriptPairs {
             # whose header records what learning these exemptions the hard way cost it, and #1669's
             # point is that the second guard must not pay that price again.
             #
-            # NO SECOND MIRROR YET, and the absence is deliberate rather than an oversight. The route
-            # for guard-live-theme to dot-source this instead of carrying its own copy is exactly the
-            # second entry check-report-lib-workflow demonstrates. It is not taken in the branch that
-            # introduces the lib: that guard protects a live customer-facing theme, so its refactor is
-            # its own change with its own review -- #1734.
+            # THE SECOND MIRROR IS TAKEN, and the entry for it sits directly below (issue #1734). #1669
+            # introduced this lib and deliberately left guard-live-theme.ps1 carrying its own copy of
+            # the same logic: that guard protects a live customer-facing theme, so putting its refactor
+            # in the branch that introduced a brand-new hook would have doubled the review surface of
+            # both, and the half with money behind it would have got the less careful attention.
             #
             # NO CONTRACT ROW FOLLOWS: nothing in it is repo-owned. It reads a payload it is handed and
             # takes its exempt-command set from its caller, so there is no seam a consumer answers.
             Name    = 'command-guard-lib'
             Source  = 'scripts\lib\command-guard-lib.ps1'
             Plugin  = 'dkj-policy'
+            LibOnly = $true
+        },
+        @{
+            # THE SECOND MIRROR OF THE SAME SOURCE (issue #1734), on check-report-lib-workflow's
+            # precedent -- read its two banners for why a second entry rather than a list of mirrors,
+            # and why the name carries the plugin. Nothing here needs restating.
+            #
+            # WHY dkj-subagents-shopify NEEDS ITS OWN COPY: hooks/guard-live-theme.ps1 dot-sources this
+            # lib instead of carrying the heredoc stripping, the here-string stripping, the
+            # leading-command reader and the segment split itself -- which is where all of it was
+            # learned, and which is why #1669 extracted it from that file in the first place. A plugin
+            # must not reach into another plugin's tree: dkj-policy and dkj-subagents-shopify are
+            # separately versioned and separately installed, and a Shopify consumer may run this team
+            # without the workflow plugin, so a cross-plugin dot-source is a dependency a version
+            # mismatch breaks silently.
+            #
+            # THAT DOT-SOURCE IS GUARDED, unlike sync-main.ps1's on native-capture-lib, and the two
+            # are right for opposite reasons. A payload missing THAT file must fail at load rather than
+            # push unbounded; a payload missing THIS one must not brick every shell command in a
+            # consumer, so the hook degrades to matching the whole payload and says so on stderr.
+            Name    = 'command-guard-lib-shopify'
+            Source  = 'scripts\lib\command-guard-lib.ps1'
+            Plugin  = 'dkj-subagents-shopify'
             LibOnly = $true
         },
         @{

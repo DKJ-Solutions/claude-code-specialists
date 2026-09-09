@@ -470,6 +470,58 @@ function Get-ShopifyThemeDeleteMarker { return 'XOXO-THEME-DELETE-AUTHORIZED' }
         $refusal = Get-GuardRefusal -Command $case.c -Root $both
         Assert-True ($refusal -match 'AUTHORING, NOT RUNNING') "the $($case.n) refusal says a marker authorises a command, not a file write"
     }
+
+    # ----------------------------------------------------------------------------------------------
+    Write-Host ""
+    Write-Host "group 8 -- the machinery is command-guard-lib's now (#1734)" -ForegroundColor Cyan
+
+    # THE ONE BEHAVIOUR THAT CHANGED WHEN THE LIB WAS ADOPTED, pinned so it is a decision rather than a
+    # discovery. The lib expands an interpreter wrapper into a command in its own right BEFORE any
+    # exemption is considered; this file used to reach the same wrapper only by matching the words
+    # ANYWHERE in the segment. Every wrapper below lands where it always did -- except the last.
+    Assert-Equal 2 (Invoke-Guard -Command 'bash -c "shopify theme publish --theme 1"' -Root $both)      'wrapper: bash -c is caught, as it always was'
+    Assert-Equal 2 (Invoke-Guard -Command 'pwsh -Command "shopify theme publish --theme 1"' -Root $both) 'wrapper: and the PowerShell spelling'
+
+    # THE ONE NEW REFUSAL, AND IT IS A FALSE POSITIVE. 'perl' is in $TEXT_TOOLS and is an interpreter,
+    # and perl's own -c means SYNTAX CHECK -- nothing in that body runs. It is pinned rather than
+    # exempted: carving perl out here would put a second opinion about wrappers back in the caller,
+    # which is the duplication #1734 removed. The counter-case below is what keeps that honest.
+    Assert-Equal 2 (Invoke-Guard -Command "perl -c 'shopify theme publish --theme 1'" -Root $both) 'wrapper: perl -c now blocks -- a NEW false positive, accepted with the lib and pinned here'
+    Assert-Equal 0 (Invoke-Guard -Command "perl -e 'system(qq{shopify theme publish --theme 1})'" -Root $both) "wrapper: and 'perl -e' is UNCHANGED -- the residual limit this hook's header states, not a hole the swap opened"
+
+    # ----------------------------------------------------------------------------------------------
+    # A MISSING LIB DEGRADES TOWARDS CHECKING, which is where this guard parts company with its sibling
+    # guard-working-copy.ps1: that one exits 0 and says the guard is off, because a working copy can be
+    # restored from origin and a published theme cannot be un-published. Run from a directory with no
+    # scripts\lib beside it, which is exactly what a broken or half-updated install looks like.
+    $noLibDir = Join-Path $Fixture 'nolib\hooks'
+    New-Item -ItemType Directory -Force -Path $noLibDir | Out-Null
+    $noLibGuard = Join-Path $noLibDir 'guard-live-theme.ps1'
+    Copy-Item -LiteralPath $Guard -Destination $noLibGuard -Force
+
+    function Invoke-DegradedGuard {
+        param([string]$Command)
+        $payload = @{ tool_name = 'Bash'; tool_input = @{ command = $Command } } | ConvertTo-Json -Compress -Depth 5
+        $prev = $env:CLAUDE_PROJECT_DIR
+        $env:CLAUDE_PROJECT_DIR = $both
+        try {
+            $err = ($payload | & powershell -NoProfile -ExecutionPolicy Bypass -File $noLibGuard 2>&1 | Out-String)
+            return @{ Code = $LASTEXITCODE; Out = $err }
+        } finally {
+            if ($null -eq $prev) { Remove-Item Env:\CLAUDE_PROJECT_DIR -ErrorAction SilentlyContinue }
+            else { $env:CLAUDE_PROJECT_DIR = $prev }
+        }
+    }
+
+    $degraded = Invoke-DegradedGuard -Command 'shopify theme publish --theme 1'
+    Assert-Equal 2 $degraded.Code                             'no lib: a publish is STILL blocked -- the guard degrades, it does not switch off'
+    Assert-True ($degraded.Out -match 'DEGRADED')             'no lib: and it says on stderr that it is running degraded'
+    Assert-True ($degraded.Out -match 'command-guard-lib')    'no lib: naming the file to reinstall, so the report is actionable'
+
+    # THE COST OF THAT CHOICE, ASSERTED RATHER THAN LEFT TO BE DISCOVERED. Without the lib there are no
+    # exemptions, so writing the rule down is blocked too -- the pre-#769 behaviour. This case passes
+    # (exit 0) in every normal install, and group 2 above is what proves it.
+    Assert-Equal 2 (Invoke-DegradedGuard -Command "cat > notes.md <<'EOF'${LF}shopify theme publish --theme 1${LF}EOF").Code 'no lib: and the cost is real -- authoring the rule is blocked too, which is why this is a broken-install path and not a mode anybody runs in'
 } finally {
     Remove-Item -Recurse -Force -LiteralPath $Fixture -ErrorAction SilentlyContinue
 }

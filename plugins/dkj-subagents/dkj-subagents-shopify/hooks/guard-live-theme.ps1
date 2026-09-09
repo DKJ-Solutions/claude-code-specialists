@@ -70,6 +70,14 @@
     system() call, say -- is exempted by the rule above and is not caught. That is a deliberate trade:
     the vector needs somebody to go out of their way, while the false positives it would otherwise
     cause happen in ordinary work every time a repo documents its own safety rules.
+
+    AND THE MACHINERY ABOVE NO LONGER LIVES IN THIS FILE (issue #1734). Every exemption described in
+    this block is now command-guard-lib.ps1's, dot-sourced from beside this hook and mirrored into this
+    plugin as its own registry entry. It was extracted FROM here by #1669 so a second guard could reuse
+    it, and for one release this file went on carrying its own copy of what it had taught -- two copies
+    of one behaviour, free to drift, with the copy that drifts being whichever nobody looks at. The
+    rules and their counter-cases are unchanged; where they are written down moved. The exempt set
+    itself stays HERE, because the two guards disagree about 'git' and the lib therefore has no default.
     ------------------------------------------------------------------------------------------------
 
     WHAT IT NEEDS FROM THE REPO, AND WHAT IT DOES WITHOUT IT. Two optional functions in the consuming
@@ -181,129 +189,78 @@ $TEXT_TOOLS = @(
     'write-output', 'write-host', 'out-string'
 )
 
-# Interpreters: a heredoc they read is a script, and a pipe into them executes what came before.
-$INTERPRETERS = 'bash|sh|zsh|dash|ksh|pwsh|powershell|python|python3|node|ruby|perl'
+# --- The false-positive machinery, dot-sourced rather than carried --------------------------------
+# WHY THIS IS A DOT-SOURCE AND NOT A COPY (issue #1734). Everything that used to sit here -- the
+# heredoc and here-string stripping, the leading-command reader, the segment split and the
+# execution-vector override -- was extracted into command-guard-lib.ps1 by #1669, so the working-copy
+# guard could reuse it instead of learning the same false-positive lesson at the same price. This file
+# is where that lesson was learned, and until #1734 it was also the one caller still carrying its own
+# copy: two copies of one behaviour, free to drift, with the copy that drifts being whichever nobody
+# looks at.
+#
+# THE LIB IS MIRRORED INTO THIS PLUGIN rather than reached for in another one. dkj-policy and
+# dkj-subagents-shopify are separately versioned and separately installed, and a Shopify consumer may
+# run this team without the workflow plugin -- so the registry carries a SECOND mirror of one source,
+# 'command-guard-lib-shopify' in Get-SharedScriptPairs, on native-capture-lib-shopify's precedent.
+#
+# $PSScriptRoot-relative, so it resolves the same in the source tree, in the plugin mirror and in a
+# consumer's plugin cache -- the same rule guard-working-copy.ps1 states for its own lib.
+$libPath = Join-Path $PSScriptRoot '..\scripts\lib\command-guard-lib.ps1'
+$libLoaded = $false
+if (Test-Path -LiteralPath $libPath -PathType Leaf) {
+    try { . $libPath; $libLoaded = $true } catch { }
+}
 
 $raw = [Console]::In.ReadToEnd()
-$cmd = ''
-try {
-    $j = $raw | ConvertFrom-Json
-    if ($j.tool_input -and $j.tool_input.command) { $cmd = [string]$j.tool_input.command }
-} catch { }
-# AN UNPARSEABLE PAYLOAD FALLS BACK TO THE RAW TEXT rather than to an empty string, so a hook contract
-# that changes shape fails towards CHECKING instead of towards allowing. Asserted in the suite.
-if (-not $cmd) { $cmd = [string]$raw }
 
-function Remove-HeredocBodies([string]$text) {
-    if ($text -notmatch '<<') { return $text }
+# A MISSING OR UNLOADABLE LIB DEGRADES TOWARDS CHECKING, NOT TOWARDS ALLOWING -- and this is where
+# this hook parts company with guard-working-copy.ps1, which exits 0 in the same situation and says
+# so. The asymmetry is the subject, not a disagreement about style: that guard protects a working copy
+# a person can restore from origin, this one protects a live customer-facing theme, and a publish
+# cannot be un-published. So the whole payload becomes the single segment to match -- the pre-#769
+# behaviour, which costs the exemptions and therefore blocks some authoring -- and it says on stderr
+# that it is doing so. It is the same direction the unparseable-payload fallback takes, for the reason
+# that fallback already gives: fail towards CHECKING.
+if (-not $libLoaded) {
+    [Console]::Error.WriteLine('guard-live-theme: command-guard-lib.ps1 not found beside this hook -- running DEGRADED, matching the whole payload without the heredoc, here-string and text-tool exemptions. Reinstall or update the dkj-subagents-shopify plugin.')
+    $cmd = [string]$raw
+    $scan = $cmd
+    $segments = @($cmd)
+} else {
+    # AN UNPARSEABLE PAYLOAD FALLS BACK TO THE RAW TEXT rather than to an empty string, so a hook
+    # contract that changes shape fails towards CHECKING instead of towards allowing. Asserted in the
+    # suite; the fallback itself now lives in Get-HookCommandPayload rather than here.
+    $cmd = [string](Get-HookCommandPayload $raw).Command
 
-    $lines = $text -split "`r?`n"
-    $out = New-Object System.Collections.Generic.List[string]
-    $terminator = $null
+    # $scan IS THE COMMAND WITH THE DATA STRIPPED OUT OF IT, and the two marker tests below read it
+    # rather than the raw string: a marker sitting inside a heredoc body is text somebody wrote down,
+    # not an authorisation. It is rebuilt from the lib's own two primitives rather than re-implemented
+    # here -- and rather than widened into Get-GuardSegments's return, whose other caller has no
+    # markers and no use for it.
+    $scan = Remove-HeredocBodies $cmd
+    if (-not (Test-CommandExecutesText $scan)) { $scan = Remove-HereStringBodies $scan }
 
-    foreach ($line in $lines) {
-        if ($null -ne $terminator) {
-            if ($line.Trim() -eq $terminator) { $terminator = $null }
-            continue
-        }
-
-        $out.Add($line)
-
-        # An opener looks like:  <<EOF | <<-EOF | <<'EOF' | <<"EOF"
-        $m = [regex]::Match($line, '<<-?\s*(?:''([^'']+)''|"([^"]+)"|([A-Za-z_][A-Za-z0-9_]*))')
-        if (-not $m.Success) { continue }
-
-        # An interpreter consuming the heredoc means the body IS a script: keep it and match it.
-        $before = $line.Substring(0, $m.Index)
-        if ($before -match "(^|[;&|]|\s)($INTERPRETERS|eval)\b") { return $text }
-
-        $terminator = ($m.Groups[1].Value + $m.Groups[2].Value + $m.Groups[3].Value)
-    }
-
-    return ($out -join "`n")
+    # THE EXEMPT SET IS THIS CALLER'S AND STAYS THIS CALLER'S. -TextTools is mandatory in the lib with
+    # no default precisely because the two guards disagree about 'git': here a segment led by it is
+    # handling text, and in the working-copy guard it is the subject. Do not give the lib a default --
+    # command-guard-lib.tests.ps1 asserts the absence of one.
+    #
+    # AND THE LIB EXPANDS AN INTERPRETER WRAPPER, which this file used to reach only by accident. A
+    # 'bash -c "shopify theme publish"' was caught here because the words were matched ANYWHERE in the
+    # segment; now the -c body is split and matched as a command in its own right. Every wrapper case
+    # in the suite lands the same way it did before -- the vector is simply explicit instead of
+    # incidental.
+    #
+    # IT COSTS EXACTLY ONE NEW REFUSAL, MEASURED RATHER THAN ARGUED, and it is a false positive:
+    # 'perl -c "..."' now blocks where it used to pass. 'perl' is both a $TEXT_TOOLS entry above and an
+    # interpreter in the lib, and the lib expands a wrapper BEFORE any exemption is considered -- but
+    # perl's own -c means SYNTAX CHECK, so nothing in that body runs. It is pinned in the suite rather
+    # than exempted: the shape is the lib's, the same shape guard-working-copy.ps1 has, and carving perl
+    # out here would put a second opinion about wrappers in the caller, which is what #1734 exists to
+    # remove. 'perl -e' -- the residual limit this file's header already states -- is unchanged and
+    # still passes.
+    $segments = Get-GuardSegments -Command $cmd -TextTools $TEXT_TOOLS
 }
-
-function Remove-HereStringBodies([string]$text) {
-    <#
-        THE POWERSHELL TWIN OF Remove-HeredocBodies, AND THE REPAIR FOR INBOUND #1032. A here-string
-        body is data for exactly the reason a heredoc body is: it is assigned or piped somewhere, and
-        nothing in it runs. Only the POSIX syntax was known here, so the same file written by the same
-        session was permitted through Bash and refused through PowerShell -- and whether authoring was
-        allowed is not something a consumer's platform should decide.
-
-        THE SEGMENT SPLIT BELOW IS ON NEWLINES, which is why adding the write cmdlets to $TEXT_TOOLS
-        was not enough on its own: an unstripped body turns every one of its lines into a segment, so
-        the segment that matches is the body line itself and the cmdlet consuming it is a segment away.
-
-        THE CALLER GATES THIS ON -not $executesText, and that is what keeps it from becoming a hole. A
-        body handed to Invoke-Expression, iex or [scriptblock]::Create IS a script, and then nothing is
-        stripped -- the same override 'bash <<EOF' gets one function up.
-    #>
-    if ($text -notmatch '@[''"]') { return $text }
-
-    $lines = $text -split "`r?`n"
-    $out = New-Object System.Collections.Generic.List[string]
-    # AN UNCLOSED BODY IS PUT BACK RATHER THAN DROPPED, which is the counter-case this function needed
-    # and did not have on its first draft: without the buffer, an opener with no closer strips every
-    # line after it to the end of the command, so a real invocation could hide behind one. PowerShell
-    # would refuse to PARSE that command, so nothing would have run either way -- and that is exactly
-    # the argument not to rely on: the exemption would rest on a claim about somebody else's parser
-    # instead of on what this file can see. Held is what an unparseable payload already gets a few
-    # lines down, for the same reason.
-    $held = New-Object System.Collections.Generic.List[string]
-    $terminator = $null
-
-    foreach ($line in $lines) {
-        if ($null -ne $terminator) {
-            # The language requires the closer at the START of a line. Leading whitespace is tolerated
-            # anyway, because tolerating it can only end a body EARLY -- which scans MORE text, never
-            # less, and therefore fails towards checking.
-            if ($line -match ('^\s*' + $terminator + '@')) { $terminator = $null; $held.Clear() }
-            else { $held.Add($line) }
-            continue
-        }
-
-        $out.Add($line)
-
-        # An opener is @' or @" with nothing after it but whitespace. That end-of-line rule is the
-        # language's own, and requiring it here means a quote-at-sign inside an expression is not
-        # mistaken for one.
-        $m = [regex]::Match($line, '@([''"])\s*$')
-        if (-not $m.Success) { continue }
-        $terminator = [regex]::Escape($m.Groups[1].Value)
-    }
-
-    if ($null -ne $terminator) { $out.AddRange($held) }
-    return ($out -join "`n")
-}
-
-function Get-LeadingCommand([string]$segment) {
-    $s = $segment.Trim()
-    # Drop leading env assignments (FOO=bar cmd ...) and a leading subshell/brace opener.
-    while ($s -match '^\(?\{?\s*[A-Za-z_][A-Za-z0-9_]*=[^\s]*\s+(.*)$') { $s = $Matches[1].Trim() }
-    $s = $s -replace '^[\(\{\s]+', ''
-    if ($s -match '^([^\s]+)') { return ($Matches[1] -replace '.*[\\/]', '').ToLower() }
-    return ''
-}
-
-$scan = Remove-HeredocBodies $cmd
-
-# A pipe into an interpreter, an eval or an xargs means text somewhere in this command is about to be
-# executed. When that is in play, no segment gets the text-tool exemption.
-#
-# Invoke-Expression, its 'iex' alias and [scriptblock]::Create are the POWERSHELL members of that set,
-# named here with inbound #1032. They earn their place twice over: they disable the text-tool exemption
-# like the rest, and they are what makes stripping a here-string body safe to do at all -- a body is
-# data only for as long as nothing executes it, and this line is where that is decided.
-$executesText = ($scan -match "\|\s*($INTERPRETERS)\b") -or ($scan -match '\beval\b') -or ($scan -match '\bxargs\b') -or
-                ($scan -match '\b(invoke-expression|iex)\b') -or ($scan -match '\[scriptblock\]::create')
-
-# Stripped only once the line above has ruled out execution, so this exemption carries its own
-# override rather than borrowing one from elsewhere in the file.
-if (-not $executesText) { $scan = Remove-HereStringBodies $scan }
-
-# Split into shell segments so that a real command next to a harmless one is still seen.
-$segments = [regex]::Split($scan, '(?:\|\||&&|[;|\r\n])')
 
 $authorised = $scan.ToLower().Contains($MARKER.ToLower())
 # Computed on the whole command rather than per segment, exactly like $authorised above: a marker is a
@@ -339,11 +296,6 @@ function Deny([string]$msg) {
 
 foreach ($segment in $segments) {
     if (-not $segment.Trim()) { continue }
-
-    if (-not $executesText) {
-        $lead = Get-LeadingCommand $segment
-        if ($TEXT_TOOLS -contains $lead) { continue }
-    }
 
     $lc = $segment.ToLower()
 
