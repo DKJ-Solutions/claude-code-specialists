@@ -158,7 +158,7 @@ function New-FoldFixture {
         and Get-Changelog is given that path.
     #>
     param([Parameter(Mandatory = $true)][string]$Label, [switch]$CoLocated)
-    $dir = Join-Path ([System.IO.Path]::GetTempPath()) ("fold-test-$PID-$Label")
+    $dir = Join-Path ([System.IO.Path]::GetTempPath()) ("fold-test-$PID-$Label-$([guid]::NewGuid().ToString('n'))")
     if (Test-Path -LiteralPath $dir) { Remove-Item -Recurse -Force -LiteralPath $dir }
     New-Item -ItemType Directory -Path (Join-Path $dir 'scripts\release') -Force | Out-Null
     New-Item -ItemType Directory -Path (Join-Path $dir 'scripts\lib')     -Force | Out-Null
@@ -1324,7 +1324,7 @@ Invoke-Git -Dir $dirWT -GitArgs @('commit', '--quiet', '-m', 'branch work')     
 $wipText = "UNCOMMITTED, and it has to survive the fold`n"
 [System.IO.File]::WriteAllText($wipPath, $wipText, $Utf8NoBom)
 
-$wtTree = Join-Path ([System.IO.Path]::GetTempPath()) "fold-test-$PID-worktree-tree"
+$wtTree = Join-Path ([System.IO.Path]::GetTempPath()) "fold-test-$PID-worktree-tree-$([guid]::NewGuid().ToString('n'))"
 if (Test-Path -LiteralPath $wtTree) { Remove-Item -Recurse -Force -LiteralPath $wtTree }
 $script:fixtures += $wtTree
 Invoke-Git -Dir $dirWT -GitArgs @('worktree', 'add', $wtTree, 'main')              | Out-Null
@@ -1475,7 +1475,7 @@ $bareS = New-RemoteFoldFixture -Dir $dirS
 # The other device moves the trunk on. This checkout's refs/remotes/origin/main still points at the old
 # commit, so the gap only becomes visible once the fold FETCHES -- which is the first of the three things
 # the report asked for, and it is under test here rather than assumed.
-$devS = Join-Path ([System.IO.Path]::GetTempPath()) "fold-test-$PID-staletrunk-dev2"
+$devS = Join-Path ([System.IO.Path]::GetTempPath()) "fold-test-$PID-staletrunk-dev2-$([guid]::NewGuid().ToString('n'))"
 Initialize-SecondDevice -Bare $bareS -Dir $devS
 [System.IO.File]::WriteAllText((Join-Path $devS 'OTHER.md'), "the other device moved main on`n", $Utf8NoBom)
 Invoke-Git -Dir $devS -GitArgs @('add', 'OTHER.md')                       | Out-Null
@@ -1553,7 +1553,7 @@ New-EntryFile -Dir $dirR -Name 'feat-raced-thing-v1.md' -Title 'DEPLOY: `feat/ra
 $bareR = New-RemoteFoldFixture -Dir $dirR
 
 # The other device folds the SAME branch first and gets its push in.
-$devR = Join-Path ([System.IO.Path]::GetTempPath()) "fold-test-$PID-racedfold-dev2"
+$devR = Join-Path ([System.IO.Path]::GetTempPath()) "fold-test-$PID-racedfold-dev2-$([guid]::NewGuid().ToString('n'))"
 Initialize-SecondDevice -Bare $bareR -Dir $devR
 $rOther = Invoke-Fold -Dir $devR -Branch 'feat/raced-thing-v1' -ExtraArgs @('-Push')
 Assert-Equal 0 $rOther.ExitCode                                         'raced fold: (fixture) the other device folds and pushes cleanly'
@@ -1587,7 +1587,7 @@ $dirV = New-FoldFixture -Label 'divergedfold'
 # never have matched.
 New-EntryFile -Dir $dirV -Name 'feat-diverged-thing-v1.md' -Title 'DEPLOY: `feat/diverged-thing-v1`'
 $bareV = New-RemoteFoldFixture -Dir $dirV
-$devV = Join-Path ([System.IO.Path]::GetTempPath()) "fold-test-$PID-divergedfold-dev2"
+$devV = Join-Path ([System.IO.Path]::GetTempPath()) "fold-test-$PID-divergedfold-dev2-$([guid]::NewGuid().ToString('n'))"
 Initialize-SecondDevice -Bare $bareV -Dir $devV
 [System.IO.File]::WriteAllText((Join-Path $devV 'UNRELATED.md'), "nothing to do with the fold`n", $Utf8NoBom)
 Invoke-Git -Dir $devV -GitArgs @('add', 'UNRELATED.md')                       | Out-Null

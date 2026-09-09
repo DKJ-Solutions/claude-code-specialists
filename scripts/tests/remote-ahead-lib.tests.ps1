@@ -43,7 +43,7 @@ Assert-True (Test-Path -LiteralPath $LibPath) 'remote-ahead-lib.ps1 exists at it
 . (Join-Path $RepoRoot 'scripts\lib\native-capture-lib.ps1')
 . $LibPath
 
-$FixtureRoot = Join-Path ([System.IO.Path]::GetTempPath()) "remote-ahead-lib-tests-$PID"
+$FixtureRoot = Join-Path ([System.IO.Path]::GetTempPath()) "remote-ahead-lib-tests-$PID-$([guid]::NewGuid().ToString('n'))"
 $Utf8NoBom   = New-Object System.Text.UTF8Encoding $false
 $script:seq  = 0
 

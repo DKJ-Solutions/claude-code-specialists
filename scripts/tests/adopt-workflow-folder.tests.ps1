@@ -20,7 +20,7 @@ $ErrorActionPreference = 'Stop'
 
 $RepoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
 $Script   = Join-Path $RepoRoot 'scripts\task\adopt-workflow-folder.ps1'
-$Fixture  = Join-Path ([System.IO.Path]::GetTempPath()) "adopt-workflow-folder-test-fixture-$PID"
+$Fixture  = Join-Path ([System.IO.Path]::GetTempPath()) "adopt-workflow-folder-test-fixture-$PID-$([guid]::NewGuid().ToString('n'))"
 
 # Dot-sourced for the constants the scaffolded CHANGELOG is asserted against rather than against literals
 # (inbound #1098, issue #1518): Get-EntryHeadingLevel, Get-ChangelogUnreleasedHeading, and the shared

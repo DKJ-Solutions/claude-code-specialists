@@ -27,7 +27,7 @@ $RepoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
 $Script   = Join-Path $RepoRoot 'scripts\task\adopt-shopify-floor.ps1'
 # Fixture paths carry $PID: the test gate is a throttled PARALLEL scheduler, so two runs at one fixed
 # temp path tear down each other's tree mid-assert.
-$Fixture  = Join-Path ([System.IO.Path]::GetTempPath()) "adopt-shopify-floor-fixture-$PID"
+$Fixture  = Join-Path ([System.IO.Path]::GetTempPath()) "adopt-shopify-floor-fixture-$PID-$([guid]::NewGuid().ToString('n'))"
 
 $Utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 $script:pass = 0

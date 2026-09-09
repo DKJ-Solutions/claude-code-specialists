@@ -78,7 +78,7 @@ function New-Fixture {
         the next product gets its own marketplace and consumes this workflow.
     #>
     param([Parameter(Mandatory)][string]$Label, [switch]$Source, [switch]$PublishesOther)
-    $dir = Join-Path ([System.IO.Path]::GetTempPath()) "seam-lib-test-$PID-$Label"
+    $dir = Join-Path ([System.IO.Path]::GetTempPath()) "seam-lib-test-$PID-$Label-$([guid]::NewGuid().ToString('n'))"
     if (Test-Path -LiteralPath $dir) { Remove-Item -Recurse -Force -LiteralPath $dir }
     New-Item -ItemType Directory -Path $dir -Force | Out-Null
     if ($Source -or $PublishesOther) {
@@ -163,7 +163,7 @@ Assert-True (Test-ReturnsNormally $consumerDir 'releases/internal' 'Get-ReleaseI
 # --- 2. The refusing case -- child process, since it calls exit 1 and would abort this runner --------
 Write-Host "seam-lib.ps1 -- Assert-WorkflowIsolatedSeamPath: the refusal path (child process)" -ForegroundColor Cyan
 
-$wrapperPath = Join-Path ([System.IO.Path]::GetTempPath()) "seam-lib-test-$PID-wrapper.ps1"
+$wrapperPath = Join-Path ([System.IO.Path]::GetTempPath()) "seam-lib-test-$PID-wrapper-$([guid]::NewGuid().ToString('n')).ps1"
 $wrapperContent = @"
 param(
     [Parameter(Mandatory)][string]`$RepoRoot,

@@ -102,7 +102,7 @@ Write-Host "Invoke-CapturedScript -- a child's stderr arrives uninterrupted" -Fo
 # record; a redirect file receives what the child wrote and nothing else. Its ABSENCE is therefore proof
 # of which capture ran, at every width and every path length. Asserted in both directions, or an empty
 # capture would pass the negative half on its own.
-$probeChild = Join-Path ([System.IO.Path]::GetTempPath()) ("shared-scripts-capture-probe-$PID.ps1")
+$probeChild = Join-Path ([System.IO.Path]::GetTempPath()) ("shared-scripts-capture-probe-$PID-$([guid]::NewGuid().ToString('n')).ps1")
 try {
     $probeBody = "Write-Error 'capture probe: the marker #332 must survive whole'" + [Environment]::NewLine + "exit 3"
     [System.IO.File]::WriteAllText($probeChild, $probeBody, (New-Object System.Text.UTF8Encoding $false))
@@ -170,7 +170,7 @@ Assert-True ($reportLibSrc -match 'function Resolve-CheckRoot') 'check-report-li
 Assert-True ($reportLibSrc -match '\$env:CLAUDE_PROJECT_DIR') 'check-report-lib really reads $env:CLAUDE_PROJECT_DIR (not only the delegating callers)'
 
 Write-Host "Get-NormalizedScriptContent" -ForegroundColor Cyan
-$tmp = Join-Path ([System.IO.Path]::GetTempPath()) ("shared-scripts-test-$PID.ps1")
+$tmp = Join-Path ([System.IO.Path]::GetTempPath()) ("shared-scripts-test-$PID-$([guid]::NewGuid().ToString('n')).ps1")
 [System.IO.File]::WriteAllText($tmp, "line1`r`nline2`r`n", (New-Object System.Text.UTF8Encoding $false))
 try {
     $norm = Get-NormalizedScriptContent -Path $tmp
@@ -188,7 +188,7 @@ Write-Host "Pre-flight (#86): missing repo-config stops with a clear pointer" -F
 # Run every source against an EMPTY repo root (via CLAUDE_PROJECT_DIR) -- without repo-config/branch-info
 # the pre-flight should stop with a pointer instead of a raw dot-source error. Child process, because
 # the scripts call 'exit' themselves.
-$pfDir = Join-Path ([System.IO.Path]::GetTempPath()) ("shared-scripts-preflight-$PID")
+$pfDir = Join-Path ([System.IO.Path]::GetTempPath()) ("shared-scripts-preflight-$PID-$([guid]::NewGuid().ToString('n'))")
 New-Item -ItemType Directory -Path $pfDir -Force | Out-Null
 $prevPd = $env:CLAUDE_PROJECT_DIR
 $prevEap = $ErrorActionPreference
@@ -248,7 +248,7 @@ try {
     # Second scenario: scaffolds PRESENT but not yet filled in (VUL-IN) -> also stops with a pointer.
     # Minimal scaffolds (repo-config with VUL-IN + an empty branch-info so open-pr's existence check
     # succeeds and the placeholder check is reached).
-    $vfDir = Join-Path ([System.IO.Path]::GetTempPath()) ("shared-scripts-vulin-$PID")
+    $vfDir = Join-Path ([System.IO.Path]::GetTempPath()) ("shared-scripts-vulin-$PID-$([guid]::NewGuid().ToString('n'))")
     New-Item -ItemType Directory -Path (Join-Path $vfDir 'scripts\lib') -Force | Out-Null
     $Utf8 = New-Object System.Text.UTF8Encoding $false
     $rcVulin = @'
@@ -453,7 +453,7 @@ foreach ($u in $unprotected) { Write-Host "         $u" -ForegroundColor Red }
 # A guard that can no longer find anything is not a guard. Run the same scan over a fixture holding
 # all four shapes side by side, so an over-eager try/catch exemption turns this red instead of
 # silently exonerating the whole repo.
-$guardFixture = Join-Path ([System.IO.Path]::GetTempPath()) "native-guard-fixture-$PID"
+$guardFixture = Join-Path ([System.IO.Path]::GetTempPath()) "native-guard-fixture-$PID-$([guid]::NewGuid().ToString('n'))"
 New-Item -ItemType Directory -Force -Path $guardFixture | Out-Null
 try {
     $badSrc = @'
@@ -532,14 +532,14 @@ Write-Host "open-pr + fold-changelog-entry: repo-config-driven overrides (#101)"
 # remote), so both the open-pr and fold-RepoRoot scenarios below run for real (real git repo,
 # real script invocation) but fully offline and deterministically -- no dependency on a real `gh`
 # being installed/authenticated on the machine running the suite.
-$fakeBin = Join-Path ([System.IO.Path]::GetTempPath()) ("shared-scripts-fakegh-$PID")
-$prArgsCapture = Join-Path ([System.IO.Path]::GetTempPath()) ("shared-scripts-gh-args-$PID.txt")
-$prBodyCapture = Join-Path ([System.IO.Path]::GetTempPath()) ("shared-scripts-gh-body-$PID.md")
-$prFixtureRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("openpr-fixture-$PID")
-$prBareRemote  = Join-Path ([System.IO.Path]::GetTempPath()) ("openpr-remote-$PID.git")
-$foldTarget  = Join-Path ([System.IO.Path]::GetTempPath()) ("fold-reporoot-target-$PID")
-$foldDecoy   = Join-Path ([System.IO.Path]::GetTempPath()) ("fold-reporoot-decoy-$PID")
-$foldDefault = Join-Path ([System.IO.Path]::GetTempPath()) ("fold-reporoot-default-$PID")
+$fakeBin = Join-Path ([System.IO.Path]::GetTempPath()) ("shared-scripts-fakegh-$PID-$([guid]::NewGuid().ToString('n'))")
+$prArgsCapture = Join-Path ([System.IO.Path]::GetTempPath()) ("shared-scripts-gh-args-$PID-$([guid]::NewGuid().ToString('n')).txt")
+$prBodyCapture = Join-Path ([System.IO.Path]::GetTempPath()) ("shared-scripts-gh-body-$PID-$([guid]::NewGuid().ToString('n')).md")
+$prFixtureRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("openpr-fixture-$PID-$([guid]::NewGuid().ToString('n'))")
+$prBareRemote  = Join-Path ([System.IO.Path]::GetTempPath()) ("openpr-remote-$PID-$([guid]::NewGuid().ToString('n')).git")
+$foldTarget  = Join-Path ([System.IO.Path]::GetTempPath()) ("fold-reporoot-target-$PID-$([guid]::NewGuid().ToString('n'))")
+$foldDecoy   = Join-Path ([System.IO.Path]::GetTempPath()) ("fold-reporoot-decoy-$PID-$([guid]::NewGuid().ToString('n'))")
+$foldDefault = Join-Path ([System.IO.Path]::GetTempPath()) ("fold-reporoot-default-$PID-$([guid]::NewGuid().ToString('n'))")
 $prBranch = 'feat/openpr-101-test'
 $foldBranch = 'chore/fold-reporoot-test'
 $Utf8NoBomTest = New-Object System.Text.UTF8Encoding $false

@@ -43,7 +43,64 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**30 / 66 minor entries** <!-- pending-tally -->
+**30 / 67 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1664-fixture-temp-path-guid · 20260909-112851
+
+Every temp fixture path in `scripts/tests/` now carries a fresh guid as well as `$PID`, and the rule in
+`test-suite-gate.tests.ps1` requires it — `$PID` alone no longer passes. 96 statements across 53 suites
+were rewritten to `<label>-$PID-<guid>` (98 with the two that arrived from `main` mid-branch), which is
+exactly how `New-ScratchPath` composes a path one layer up: the pid stays in front because it is what
+attributes a leftover to a run that is still alive, and the guid is what nobody can name in advance.
+
+Both of those two are the same shape, and worth naming because it is the one this branch cannot close
+by itself: a suite written on `main` while the rule lived only here arrives green by its own lights and
+guid-less by ours. The second, `fanout-lib.tests.ps1`, composed `fanout-lib-test-$PID` and stood at it
+with both `New-Item -ItemType Directory -Force` and `Remove-Item -Recurse -Force` — the write half and
+the teardown half of exactly the failure above. The gate is what caught each of them on the merge, which
+is the argument for the gate rather than against the branch: once this lands, `main` carries the rule and
+the next such suite is refused where it is written instead of here.
+
+This is the half [#1659](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1659) did not
+close. `$PID` is neither secret nor large, so a composed leaf was a name a local actor could reach
+first — and `New-Item -ItemType Directory -Force` and `Remove-Item -Recurse -Force` both follow a
+reparse point, so a symlink or junction pre-planted there redirected the write *and* the teardown.
+Measured before the repair, this guard excluded from both counts: 100 guid-less paths, with 114
+recursive deletes standing at one of them across 49 files. #1659 covered seven sites in the shipping
+layer and only one of those deleted recursively, so the delete half of the class was almost entirely
+here.
+
+Two guards were also hardened rather than merely satisfied. The by-name allowance for `$tag` and
+`$Guid` — which four sites legitimately need, where one path per *child invocation* is required and
+`$PID` is the same for all of them — is now pinned to a fresh guid **of usable width**, read from the
+parsed syntax rather than the line text. That second half is the review's doing: a start-of-line regex
+was the first shape, and a parameter default, an assignment inside a one-line block and one after a
+semicolon all walked past it while the outer rule went on calling the resulting path safe. And the
+`#1326` continuation-fold cases now match on the live pattern instead of a second copy of it: they were
+still asserting the old alternation, which would have left the file proving a rule it no longer enforced.
+
+The guard costs about 1.5s. Parsing all 84 suites would cost 5.5s, so the parse is gated on the fold the
+scan already performs — only three files name either variable, and a file naming neither cannot hold an
+assignment to one.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A — this reaches no subscriber. It is a hardening of this repo's own test fixtures; nothing in the
+plugins a consumer installs changes, and no consumer-facing behaviour moves. The one thing a consumer
+could notice is second-order: `scripts/README.md`'s fixture convention is the page a consumer writing
+their own suite reads, and it now asks for the guid.
+
+**Score:** N/A
+
+#### Pull Request
+
+Test fixture temp paths carry a guid, so a pre-planted link cannot redirect the write or the recursive delete
+
+[PR #1677](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1677)
+
+---
 
 ### DEPLOY: fix/1691-prio-1-colour-collision · 20260909-112411
 
