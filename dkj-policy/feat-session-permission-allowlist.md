@@ -36,19 +36,35 @@
 
 ### PLAN
 
+The routine git, `gh` and `scripts/` calls every session here makes were prompting one by one, while
+the five release-script entries that were already allowed had been dropped from the working copy.
+Both halves are one edit to the same file.
+
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [x] Add the git, `gh` and `scripts/` allowlist entries to `.claude/settings.json`
+- [x] Restore the five `cut-release.ps1` / `publish-to-business.ps1` entries that were dropped
 
 ### TEST
 
+- [x] `ConvertFrom-Json` parses the file -- valid JSON
+- [x] `git diff` against `origin/main` is additive only (55 insertions, 0 deletions), so the
+      `enabledPlugins` rename from #1698 is untouched
+
 ### DEPLOY: feat/session-permission-allowlist
 
-**Score:**
+The session harness stops asking for permission on the calls this repo's own workflow makes on every
+branch -- read-only git, the `gh` verbs the chain uses, and the scripts under `scripts/`. The five
+release-script entries are back beside them, so a cut no longer prompts either.
+
+**Score:** 3
 
 #### What makes this deploy extra special
 
-**Score:**
+N/A -- `.claude/settings.json` is this repo's own harness configuration. It ships in no plugin, so a
+consumer's session is unaffected; they hold their own file.
+
+**Score:** N/A
 
 #### Pull Request
 
