@@ -216,7 +216,7 @@ infrastructure.
   was missing: it says *when* a block stopped being current, which is precisely what the `merge_queue`
   removal above has no answer for. Its own bullet is further down, under
   [what Sylvester owns here](#what-sylvester-owns-here); the three-rule list above is one of the seven
-  facts it now compares, so a fifth entry appearing is reported rather than discovered.
+  facts it now compares, so a fourth entry appearing is reported rather than discovered.
 
   **AND THE BYPASS THAT ANSWERS BOTH CANNOT BE GRANTED TO THE ACTOR THAT NEEDS IT** (September 6, 2026,
   [#1506](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1506)). The paragraph above is
@@ -832,7 +832,8 @@ infrastructure.
   the answer is had on the day a setting is changed on purpose, and the one trigger that survives
   GitHub suspending a schedule after 60 days of repo inactivity.
 
-  **NOT in `main-ci-gate`**, like the two runners above and for a sharper version of their reason: a
+  **NOT in `main-ci-gate`**, like `unfolded-entry.yml` and `branch-entry.yml` — the two that state that
+  reasoning for themselves — and for a sharper version of it: a
   check whose subject *is* the ruleset, required *by* that ruleset, would be self-referential — and it
   would stop the trunk over a switch only Dave can flip, so a drift would block every merge instead of
   reporting one. **And it writes nothing to GitHub**, ever: repo settings are Dave's surface, the same

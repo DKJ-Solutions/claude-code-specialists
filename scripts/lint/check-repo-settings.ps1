@@ -60,6 +60,18 @@
     consequences, so it is a distinct third verdict and it does not fail the run. Everything else
     comes from `/rules/branches/<trunk>` and the repo object, both of which read without admin.
 
+    -RequireRead, AND WHY THE THIRD VERDICT NEEDED A FLOOR UNDER IT. Tolerating an unreadable field is
+    right per field and wrong for ALL of them at once: if the job's token turns out not to read those
+    two endpoints, every field reports as not-read, the run exits 0, and a job that checked nothing is
+    green. That is worse than no detector, because it is a detector reporting success. Raised in
+    Sebastian's security review of this change, with the advice to confirm it empirically on the first
+    run; the flag is preferred because an empirical check only covers the day somebody looks, while
+    this covers every run afterwards. So the scheduled workflow passes it and refuses a total blackout,
+    while a local run without `gh` -- or a consumer that declares settings but cannot reach GitHub --
+    stays the legitimate skip it always was. It says nothing about a PARTIAL read: one field short is
+    the expected CI state, and gating on that would re-create the noise the third verdict exists to
+    avoid.
+
     WHY /rules/branches/<trunk> AND NOT /rulesets/<id> FOR THE REST. The branch endpoint needs no
     admin, needs no ruleset id (so a re-created ruleset does not silently stop being read), and
     reports the rules EFFECTIVE on the trunk -- which is the question every document here is actually
@@ -96,6 +108,10 @@
 .PARAMETER Trunk
     The branch whose effective rules are read. Defaults to 'main'.
 
+.PARAMETER RequireRead
+    Fail when NOT ONE declared setting could be read. Passed by the scheduled workflow and by nothing
+    else -- see the block on it below the verdict table.
+
 .EXAMPLE
     powershell -NoProfile -File scripts/lint/check-repo-settings.ps1
 #>
@@ -105,7 +121,8 @@ param(
     [string]$BranchRulesJsonOverride = '',
     [string]$RepoJsonOverride = '',
     [string]$RulesetJsonOverride = '',
-    [string]$Trunk = 'main'
+    [string]$Trunk = 'main',
+    [switch]$RequireRead
 )
 
 Set-StrictMode -Version Latest
@@ -120,6 +137,25 @@ $ErrorActionPreference = 'Stop'
 # rather than dying on .Trim() against $null.
 $checkLib = Join-Path $PSScriptRoot '..\lib\consumer-check-lib.ps1'
 if (Test-Path -LiteralPath $checkLib -PathType Leaf) { . $checkLib }
+
+# TWO LIBS, AND BOTH REPLACE SOMETHING THIS SCRIPT HAD HAND-ROLLED. Same pair, and the same order, as
+# adopt-merge-queue.ps1 -- which reads the very endpoint this script reads.
+#
+#   native-capture-lib  -> Invoke-NativeCapture, which centralises the save-EAP / Continue / run /
+#     record $LASTEXITCODE / restore dance its own docstring exists to keep in one tested place. The
+#     first draft here repeated that guard inline and was one gate away from being refused for it
+#     (shared-scripts.tests.ps1, 'no unprotected native stderr redirect') -- but the guard was never
+#     the point. -Utf8 is: Windows PowerShell 5.1 decodes a native child's stdout with the CONSOLE
+#     code page, so the same `gh api` returns different strings on cp65001 and cp850, and this output
+#     is PARSED. The hand-rolled read had no answer to that at all, which is inbound #821's class
+#     (.claude/rules/language-layers.md states the rule) arriving in a brand-new script.
+#
+#   pr-issues-lib       -> Get-RequiredCheckContexts, which already answers 'ruleset.required_checks'
+#     off this exact payload and is what ship-pr reads, so this check cannot disagree with the gate it
+#     is describing. The local version was a near-line-for-line copy of it, minus its case-insensitive
+#     compare on `type`.
+. (Join-Path $PSScriptRoot '..\lib\pr-issues-lib.ps1')
+. (Join-Path $PSScriptRoot '..\lib\native-capture-lib.ps1')
 
 $repoRoot = ''
 if (Get-Command Resolve-CheckRepoRoot -ErrorAction SilentlyContinue) {
@@ -175,40 +211,40 @@ Write-Host "== repo settings vs. what the tree declares -- $targetRepo (trunk: $
 function Read-Payload {
     param([string]$Override, [string[]]$GhArgs, [string]$What)
 
+    # THE RAW TEXT IS KEPT BESIDE THE PARSED OBJECT, and that is not belt-and-braces: the lib
+    # functions that already answer parts of this payload take the JSON STRING, not the object, so
+    # discarding it is what forced the first draft to re-parse and re-implement them.
+    $fail = { param($note) [pscustomobject]@{ Ok = $false; Data = $null; Raw = ''; Note = $note } }
+
     if ($Override) {
-        if ($Override -eq 'NONE') { return [pscustomobject]@{ Ok = $false; Data = $null; Note = 'the read was refused (override)' } }
+        if ($Override -eq 'NONE') { return (& $fail 'the read was refused (override)') }
         if (-not (Test-Path -LiteralPath $Override -PathType Leaf)) {
-            return [pscustomobject]@{ Ok = $false; Data = $null; Note = "override file not found: $Override" }
+            return (& $fail "override file not found: $Override")
         }
         $raw = Get-Content -LiteralPath $Override -Raw
     } else {
         if (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
-            return [pscustomobject]@{ Ok = $false; Data = $null; Note = 'gh is not installed' }
+            return (& $fail 'gh is not installed')
         }
-        # THE 'Continue' IS NOT DECORATION, and this repo has a gate that refuses the redirect without
-        # it (shared-scripts.tests.ps1, 'no unprotected native stderr redirect'). Redirecting a NATIVE
-        # command's stderr inside Windows PowerShell 5.1 wraps each line in a NativeCommandError
-        # ErrorRecord -- so under $ErrorActionPreference = 'Stop' a single diagnostic line from gh
-        # aborts the whole run, even where gh itself exited 0. A 403 on one field must leave the other
-        # six comparable, which is the entire reason each read is independently optional.
-        $prevEap = $ErrorActionPreference
-        try {
-            $ErrorActionPreference = 'Continue'
-            $raw = & gh @GhArgs 2>$null | Out-String
-            $code = $LASTEXITCODE
-        } finally { $ErrorActionPreference = $prevEap }
-        if ($code -ne 0) {
-            return [pscustomobject]@{ Ok = $false; Data = $null; Note = "gh refused the read (exit $code) -- no access, or no such $What" }
+        # -DiscardStderr BECAUSE THIS OUTPUT IS PARSED -- a gh warning merged into it would break the
+        # ConvertFrom-Json and cost the read; and -Utf8 because it is DATA rather than progress, so it
+        # must not be decoded with whatever console code page the run inherited. Same two flags, and
+        # the same reasoning, as adopt-merge-queue.ps1's read of this endpoint.
+        $read = Invoke-NativeCapture -FilePath 'gh' -DiscardStderr -Utf8 -Arguments $GhArgs
+        if ($read.ExitCode -ne 0) {
+            return (& $fail "gh refused the read (exit $($read.ExitCode)) -- no access, or no such $What")
         }
+        # ShortRead MUST BE READ BY A CALLER THAT PARSES, per the lib's own contract: it separates
+        # "the child said nothing" from "we read before the flush". Both are unreadable here, and only
+        # one of them is worth a distinct sentence -- an empty payload from gh is a real answer to
+        # report, a truncated capture is a retryable accident and says so.
+        if ($read.ShortRead) { return (& $fail 'the capture was still being written when it was read -- the payload may be truncated; run again') }
+        $raw = ($read.Output -join "`n")
     }
 
-    if (-not $raw -or -not $raw.Trim()) {
-        return [pscustomobject]@{ Ok = $false; Data = $null; Note = 'empty payload' }
-    }
-    try { $parsed = $raw | ConvertFrom-Json } catch {
-        return [pscustomobject]@{ Ok = $false; Data = $null; Note = 'payload did not parse as JSON' }
-    }
-    return [pscustomobject]@{ Ok = $true; Data = $parsed; Note = '' }
+    if (-not $raw -or -not $raw.Trim()) { return (& $fail 'empty payload') }
+    try { $parsed = $raw | ConvertFrom-Json } catch { return (& $fail 'payload did not parse as JSON') }
+    return [pscustomobject]@{ Ok = $true; Data = $parsed; Raw = $raw; Note = '' }
 }
 
 $branchRules = Read-Payload -Override $BranchRulesJsonOverride -What 'branch' -GhArgs @(
@@ -220,6 +256,32 @@ $repoObject = Read-Payload -Override $RepoJsonOverride -What 'repo' -GhArgs @(
 # bypass_actors, so answering that field costs one call per ruleset -- work no run should do for a
 # field nobody watches. Resolved on first use and cached in this variable.
 $script:BypassTypes = $null
+
+function ConvertTo-BypassVerdict {
+    param([object[]]$Payloads)
+
+    $types = @()
+    $sawField = $false
+    foreach ($p in @($Payloads)) {
+        if (-not $p -or -not $p.PSObject.Properties['bypass_actors']) { continue }
+        $sawField = $true
+        foreach ($a in @($p.bypass_actors)) {
+            if ($a -and $a.PSObject.Properties['actor_type']) { $types += [string]$a.actor_type }
+        }
+    }
+    if (-not $sawField) {
+        return [pscustomobject]@{ Readable = $false; Value = $null
+            Why = 'no ruleset reported a bypass_actors field -- it is returned to repo administrators only' }
+    }
+    # AN EMPTY LIST IS READABLE AND IS THE #1244 STATE EXACTLY -- nobody can push to the trunk, every
+    # direct-on-main exception dead. It has to reach the comparison as a value, never as "not read".
+    # THE OUTER @() IS LOAD-BEARING, and this is the field it matters most on. `Sort-Object` on an
+    # empty collection emits NOTHING, which lands in the property as $null -- so without the wrap the
+    # emptied bypass list, the #1244 state itself, would print as '(none)' and read as "unset" rather
+    # than as "empty". The comparison failed correctly either way; the REPORT was the wrong one, on
+    # the one field where the reader most needs to see that the list is there and has nothing in it.
+    return [pscustomobject]@{ Readable = $true; Value = @(@($types) | Sort-Object -Unique); Why = '' }
+}
 
 function Get-BypassActorTypes {
     if ($null -ne $script:BypassTypes) { return $script:BypassTypes }
@@ -267,32 +329,6 @@ function Get-BypassActorTypes {
     return $script:BypassTypes
 }
 
-function ConvertTo-BypassVerdict {
-    param([object[]]$Payloads)
-
-    $types = @()
-    $sawField = $false
-    foreach ($p in @($Payloads)) {
-        if (-not $p -or -not $p.PSObject.Properties['bypass_actors']) { continue }
-        $sawField = $true
-        foreach ($a in @($p.bypass_actors)) {
-            if ($a -and $a.PSObject.Properties['actor_type']) { $types += [string]$a.actor_type }
-        }
-    }
-    if (-not $sawField) {
-        return [pscustomobject]@{ Readable = $false; Value = $null
-            Why = 'no ruleset reported a bypass_actors field -- it is returned to repo administrators only' }
-    }
-    # AN EMPTY LIST IS READABLE AND IS THE #1244 STATE EXACTLY -- nobody can push to the trunk, every
-    # direct-on-main exception dead. It has to reach the comparison as a value, never as "not read".
-    # THE OUTER @() IS LOAD-BEARING, and this is the field it matters most on. `Sort-Object` on an
-    # empty collection emits NOTHING, which lands in the property as $null -- so without the wrap the
-    # emptied bypass list, the #1244 state itself, would print as '(none)' and read as "unset" rather
-    # than as "empty". The comparison failed correctly either way; the REPORT was the wrong one, on
-    # the one field where the reader most needs to see that the list is there and has nothing in it.
-    return [pscustomobject]@{ Readable = $true; Value = @(@($types) | Sort-Object -Unique); Why = '' }
-}
-
 # --- what each declared field resolves to live -----------------------------------------------------
 #
 # One arm per Field string, so the seam's names are the contract between the declaration and the
@@ -322,16 +358,13 @@ function Get-LiveValue {
         }
         'ruleset.required_checks' {
             if (-not $branchRules.Ok) { return (& $unreadable $branchRules.Note) }
-            $names = @()
-            foreach ($r in $ruleRecords) {
-                if (([string]$r.type) -ne 'required_status_checks') { continue }
-                if (-not $r.PSObject.Properties['parameters'] -or -not $r.parameters) { continue }
-                if (-not $r.parameters.PSObject.Properties['required_status_checks']) { continue }
-                foreach ($c in @($r.parameters.required_status_checks)) {
-                    if ($c -and $c.PSObject.Properties['context']) { $names += [string]$c.context }
-                }
-            }
-            return (& $readable @(@($names) | Sort-Object -Unique))
+            # THE LIB ANSWERS THIS, AND THAT MATTERS BEYOND SAVING TWELVE LINES: Get-RequiredCheckContexts
+            # is what ship-pr reads to decide what to wait for, so asking it here means this check cannot
+            # disagree with the gate it is describing. A second implementation could only drift from it --
+            # and the local one already had, missing the case-insensitive compare on `type`.
+            $ctx = Get-RequiredCheckContexts -BranchRulesJson $branchRules.Raw
+            if (-not $ctx.Readable) { return (& $unreadable 'the branch-rules payload did not parse for the required-check reader') }
+            return (& $readable @($ctx.Names))
         }
         'ruleset.strict_required_status_checks_policy' {
             if (-not $branchRules.Ok) { return (& $unreadable $branchRules.Note) }
@@ -358,6 +391,16 @@ function Get-LiveValue {
                 $prop = $Field.Substring(5)
                 if (-not $repoObject.Data.PSObject.Properties[$prop]) {
                     return (& $unreadable "the repo object carries no '$prop' field")
+                }
+                # A PRESENT-BUT-NULL VALUE IS UNREADABLE, NOT A MATCH -- and without this line it was
+                # the latter, silently. `[bool]$null` casts to `$false`, so a JSON null on any of the
+                # boolean fields declared here would have compared EQUAL to a declared `$false` and
+                # printed as a passing '[OK] ... = (none)': a field GitHub never answered, reported as
+                # agreeing. Not reachable today (GitHub does not return null for these), which is
+                # exactly why it needed writing down rather than leaving to be discovered on the day
+                # it is. Same class as the empty-list collapse further up this file.
+                if ($null -eq $repoObject.Data.$prop) {
+                    return (& $unreadable "the repo object answered null for '$prop' -- present, but not a value to compare")
                 }
                 return (& $readable $repoObject.Data.$prop)
             }
@@ -429,6 +472,19 @@ foreach ($u in $notRead) {
 }
 
 Write-Host ''
+
+# THE BLACKOUT FLOOR, and it is checked before the drift verdict on purpose: with nothing read there is
+# no drift to report either, so the ordinary pass line would be the ONLY thing printed.
+if ($RequireRead -and $agreed -eq 0 -and $drift.Count -eq 0) {
+    Write-Host ('[ERROR] not one of the {0} declared settings could be read -- this run checked nothing.' -f $declared.Count) -ForegroundColor Red
+    Write-Host '        -RequireRead was given, so that is a failure rather than a pass: a detector that' -ForegroundColor Red
+    Write-Host '        reports success while seeing nothing is worse than no detector at all.' -ForegroundColor Red
+    Write-Host '        In CI the likely cause is the token: the two non-admin endpoints need read access to' -ForegroundColor Red
+    Write-Host '        the repo, so check the job permissions and that GH_TOKEN is set. The reasons above' -ForegroundColor Red
+    Write-Host '        say which read failed and why.' -ForegroundColor Red
+    exit 1
+}
+
 if ($drift.Count -eq 0) {
     # THE COUNTS ARE PRINTED EVEN ON A PASS, so a run that read nothing is never mistaken for a run
     # that compared everything and agreed -- the failure a bare green line would hide.

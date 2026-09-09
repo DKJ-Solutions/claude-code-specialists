@@ -1044,9 +1044,10 @@ function Get-ReleasePageTheme {
 #              (#1730) -- found by the first run of the check this seam serves.
 #
 # EACH RECORD CARRIES ITS OWN PROVENANCE, and that is the part worth copying rather than the values.
-# `Where` names the file and line in this tree that states the fact, so a report says which document
-# to repair when the drift turns out to be the intended change; `Recorded` is the date that statement
-# was last measured, so a stale declaration is visible as a stale declaration. Without those two a
+# `Where` names the document in this tree that states the fact -- a path plus the section, not a line
+# number, which would go stale on the next edit to a file this one does not gate -- so a report says
+# which document to repair when the drift turns out to be the intended change; `Recorded` is the date
+# that statement was last measured, so a stale declaration is visible as a stale declaration. Without those two a
 # red run would say only "these differ" and leave the reader to work out which side is wrong.
 #
 # WHAT IT DOES *NOT* DO: nothing here changes a setting, and the checker never writes to GitHub.

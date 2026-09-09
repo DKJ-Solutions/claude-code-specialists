@@ -114,13 +114,15 @@ function Invoke-Check {
         [string]$BranchRules = 'NONE',
         [string]$Repo = 'NONE',
         [string]$Ruleset = 'NONE',
-        [string]$Trunk = ''
+        [string]$Trunk = '',
+        [switch]$RequireRead
     )
     $a = @('-RootOverride', $Root,
            '-BranchRulesJsonOverride', $BranchRules,
            '-RepoJsonOverride', $Repo,
            '-RulesetJsonOverride', $Ruleset)
     if ($Trunk) { $a += @('-Trunk', $Trunk) }
+    if ($RequireRead) { $a += '-RequireRead' }
     $prevEap = $ErrorActionPreference
     try {
         $ErrorActionPreference = 'Continue'
@@ -193,6 +195,23 @@ try {
     # JSON `false` and PowerShell $false must be one answer rather than two, or the check reports drift
     # on a setting nobody touched.
     Assert-True ($r.Out -match '\[OK\]\s+repo\.allow_auto_merge = false') 'a JSON boolean compares against a PowerShell boolean'
+    # PRESENT BUT NULL MUST NOT PASS FOR `false`, and before Victor's review it did: `[bool]$null` casts
+    # to $false, so a field GitHub never answered compared EQUAL to a declared $false and printed as a
+    # matching '[OK] ... = (none)'. Not reachable against the real API, which is why only an assert
+    # keeps it closed.
+    $pNull = New-Payload -Dir $dir -Name 'repo-null' -Json '{"allow_auto_merge":null,"visibility":"public"}'
+    $r = Invoke-Check -Root $dir -Repo $pNull
+    Assert-True ($r.Code -eq 0 -and $r.Out -match 'answered null for .allow_auto_merge.') `
+        'a JSON null on a declared boolean -- unreadable, NOT a match against $false'
+    Assert-True ($r.Out -notmatch '\[OK\]\s+repo\.allow_auto_merge') 'and it is never reported as an [OK] for that field'
+    # A declared STRING field, through the same generic repo.* path.
+    $declareVis = "@(@{ Field = 'repo.visibility'; Expected = 'public'; Recorded = '2026-09-09'; Where = 'CLAUDE.md'; Why = 'the marketplace source must be readable without gh auth' })"
+    $dirVis = New-Fixture -Label 'visibility' -Declared $declareVis
+    $r = Invoke-Check -Root $dirVis -Repo (New-Payload -Dir $dirVis -Name 'pub' -Json '{"visibility":"public"}')
+    Assert-True ($r.Code -eq 0 -and $r.Out -match 'repo\.visibility = public') 'public, as declared -- exit 0'
+    $r = Invoke-Check -Root $dirVis -Repo (New-Payload -Dir $dirVis -Name 'priv' -Json '{"visibility":"private"}')
+    Assert-True ($r.Code -eq 1 -and $r.Out -match 'live\s+private') `
+        'gone private -- exit 1, the change that would break every consumer install silently'
 
     Write-Host ''
     Write-Host 'unreadable is a THIRD verdict -- never green, never a mismatch'
@@ -206,6 +225,26 @@ try {
         'the pass line says so in words, because exit 0 on its own would imply otherwise'
 
     Write-Host ''
+    Write-Host '-RequireRead -- the floor under that third verdict, so a run that checked NOTHING is not green'
+    # The hole this closes: if the CI token cannot read those endpoints, every field reports as not-read
+    # and the job exits 0 -- a detector reporting success. Raised in Sebastian's security review.
+    $r = Invoke-Check -Root $dir -RequireRead
+    Assert-True ($r.Code -eq 1) 'nothing read at all, with the flag -- exit 1'
+    Assert-True ($r.Out -match 'this run checked nothing') 'and it says so in those words'
+    Assert-True ($r.Out -match 'check the job permissions') 'naming the likely CI cause, which is the token'
+    # It must NOT fire on a partial read: one field short is the EXPECTED CI state (bypass_actors is
+    # admin-only), and gating on that would re-create the noise the third verdict exists to avoid.
+    $dirPartial = New-Fixture -Label 'partial' -Declared ($DeclareRules.TrimEnd(')') + ", @{ Field = 'ruleset.bypass_actor_types'; Expected = @('OrganizationAdmin'); Recorded = 'x'; Where = 'x'; Why = 'y' })")
+    $pRules = New-Payload -Dir $dirPartial -Name 'rules' -Json $RulesOk
+    $r = Invoke-Check -Root $dirPartial -BranchRules $pRules -RequireRead
+    Assert-True ($r.Code -eq 0 -and $r.Out -match '1 of 2 declared settings match; 1 could not be read') `
+        'one field read and one refused, with the flag -- still exit 0, because a partial read is the expected CI state'
+    # And with the flag absent, a total blackout stays the legitimate skip it always was -- a local run
+    # without gh, or a consumer that declares settings and cannot reach GitHub.
+    $r = Invoke-Check -Root $dir
+    Assert-True ($r.Code -eq 0) 'nothing read, WITHOUT the flag -- exit 0, unchanged'
+
+    Write-Host ''
     Write-Host 'the #1244 state -- an EMPTY bypass list is readable, and must FAIL'
     $declareBypass = "@(@{ Field = 'ruleset.bypass_actor_types'; Expected = @('OrganizationAdmin','RepositoryRole'); Recorded = '2026-09-09'; Where = 'the lens'; Why = 'the only thing between a green gate and three dead exceptions' })"
     $dir = New-Fixture -Label 'bypass' -Declared $declareBypass
@@ -216,6 +255,12 @@ try {
     $pFull = New-Payload -Dir $dir -Name 'rs-full' -Json '{"id":1,"bypass_actors":[{"actor_type":"OrganizationAdmin"},{"actor_type":"RepositoryRole","actor_id":5}]}'
     $r = Invoke-Check -Root $dir -Ruleset $pFull
     Assert-True ($r.Code -eq 0) 'the restored pair -- exit 0'
+    # EXACTLY ONE ACTOR is the PS 5.1 single-element collapse this file tests for on the rule lists and
+    # had no case for here (Victor's review). It must compare as a one-item list, not as a scalar.
+    $pOne = New-Payload -Dir $dir -Name 'rs-one' -Json '{"id":1,"bypass_actors":[{"actor_type":"OrganizationAdmin"}]}'
+    $r = Invoke-Check -Root $dir -Ruleset $pOne
+    Assert-True ($r.Code -eq 1 -and $r.Out -match 'live\s+OrganizationAdmin') `
+        'a single remaining actor -- a drift against the declared pair, reported as the one name it still has'
     # The admin-only refusal is the ordinary state of a CI run: it must not be a finding there either.
     $r = Invoke-Check -Root $dir -Ruleset 'NONE'
     Assert-True ($r.Code -eq 0 -and $r.Out -match 'repo administrators only') `
@@ -302,18 +347,37 @@ try {
     # The real seam is exercised for SHAPE only -- never for its values, which are the moving target
     # this whole suite avoids. What must hold is that every declared Field is one the check can read,
     # because a Field the check does not know is a fact that has silently stopped being watched.
-    . $RealCfg
-    $declaredHere = @(Get-ExpectedRepoSettings)
+    # A CHILD SCOPE, not a dot-source into this one: `$script:RepoName` would land here, and the
+    # collision this file's synopsis is about is the reason that is worth avoiding in a test too.
+    $declaredHere = @(& { param($p) . $p; Get-ExpectedRepoSettings } $RealCfg)
     Assert-True ($declaredHere.Count -gt 0) 'this repo declares at least one setting to watch'
-    $known = @('ruleset.rules', 'ruleset.required_checks', 'ruleset.strict_required_status_checks_policy',
-               'ruleset.bypass_actor_types')
-    $bad = @($declaredHere | Where-Object { $known -notcontains $_.Field -and $_.Field -notlike 'repo.*' })
+
+    # ASKED OF THE REAL SCRIPT, NOT OF A HAND-COPIED LIST OF ITS CASES. The first version of this
+    # assert compared each declared Field against a hardcoded array of the four `ruleset.*` names plus
+    # a `repo.*` wildcard -- a proxy for Get-LiveValue's switch that could pass while the script
+    # reported UNKNOWN FIELD at runtime, or fail while the script handled the field fine, the moment
+    # either side was edited alone. Raised in Victor's review of this change. So each declared Field
+    # now goes through the script itself with every payload refused: the UNKNOWN FIELD arm does not
+    # depend on a payload, so an unknown Field still reaches it, while a known one reports the refusal.
+    $unknownFields = @()
+    foreach ($rec in $declaredHere) {
+        $one = "@(@{ Field = '$([string]$rec.Field)'; Expected = 'x'; Recorded = 'x'; Where = 'x'; Why = 'x' })"
+        $d = New-Fixture -Label 'realfield' -Declared $one
+        if ((Invoke-Check -Root $d).Out -match 'UNKNOWN FIELD') { $unknownFields += [string]$rec.Field }
+    }
     # Composed before the assert rather than inline: a parenthesised `if` does parse here, but reading
     # it as an expression is a habit that breaks the moment it is copied somewhere with 5.1's stricter
     # parsing of the same shape.
     $badNote = ''
-    if ($bad.Count -gt 0) { $badNote = ' -- unknown: ' + (($bad | ForEach-Object { $_.Field }) -join ', ') }
-    Assert-True ($bad.Count -eq 0) ('every declared Field is one the check knows how to read' + $badNote)
+    if ($unknownFields.Count -gt 0) { $badNote = ' -- unknown: ' + ($unknownFields -join ', ') }
+    Assert-True ($unknownFields.Count -eq 0) `
+        ('every declared Field is one the check ITSELF knows how to read' + $badNote)
+
+    # And the probe is proved still able to find something -- a guard that can no longer fail is not a
+    # guard, which is the shape the hardcoded list could have decayed into silently.
+    $sentinel = New-Fixture -Label 'sentinel' -Declared "@(@{ Field = 'nosuchprefix.nosuchfield'; Expected = 'x'; Recorded = 'x'; Where = 'x'; Why = 'x' })"
+    Assert-True ((Invoke-Check -Root $sentinel).Out -match 'UNKNOWN FIELD') `
+        'and that probe still detects an unknown Field, so the green above means something'
     $incomplete = @($declaredHere | Where-Object { -not $_.Recorded -or -not $_.Where -or -not $_.Why })
     Assert-True ($incomplete.Count -eq 0) 'every declared setting carries Recorded, Where and Why -- the three that make a red run actionable'
 
@@ -324,6 +388,10 @@ try {
     Assert-True ($wf -match 'contents:\s*read') 'least privilege: it reads, and nothing here writes to GitHub'
     Assert-True ($wf -notmatch 'FOLD_PUSH_TOKEN|secrets\.') 'it borrows no standing credential, unlike fold-on-merge.yml'
     Assert-True ($wf -match 'check-repo-settings\.ps1') 'and it runs the check this suite covers'
+    Assert-True ($wf -match 'persist-credentials:\s*false') `
+        'the checkout keeps no credential in the workspace -- this job never pushes (verify-resolved.yml states the reasoning)'
+    Assert-True ($wf -match '-RequireRead') `
+        'and the run passes -RequireRead, so a token that cannot read reports a failure instead of a green nothing'
 }
 finally {
     foreach ($t in $script:trees) {

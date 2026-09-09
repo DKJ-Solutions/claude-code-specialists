@@ -41,6 +41,13 @@
 # whose emptying was #1244 -- run the script locally to compare that one. Everything else comes from
 # /rules/branches/main and the repo object, both readable with `contents: read`.
 #
+# WHICH IS WHY THE RUN PASSES -RequireRead. Tolerating an unreadable field is right per field and
+# wrong for all of them at once: if this token turned out not to read those two endpoints, every field
+# would report as not-read, the run would exit 0, and a job that checked nothing would be green --
+# a detector reporting success. The flag makes a TOTAL blackout a failure while leaving the expected
+# one-field gap alone. Raised in this change's security review, which advised confirming the token
+# empirically on the first run; the flag is better because it holds on every run afterwards too.
+#
 # LEAST PRIVILEGE, AND THE READ IS THE WHOLE JOB. `contents: read` is all it holds: the script never
 # writes to GitHub, because repo settings are the owner's surface under this repo's constitution --
 # the same rule adopt-merge-queue.ps1 follows when it composes its ruleset command and stops. No
@@ -71,7 +78,19 @@ jobs:
   repo-settings:
     runs-on: windows-latest
     steps:
+      # UNPINNED @v5 IS THE RIGHT CHOICE HERE, and it is a choice rather than an oversight. This repo
+      # pins `uses:` by commit SHA where the job's token can DO something -- fold-on-merge.yml holds a
+      # standing PAT, verify-resolved.yml holds `issues: write`, and a retagged action there reaches a
+      # credential or a write scope. unfolded-entry.yml is the same read-only class as this job and is
+      # deliberately unpinned. Confirmed against that stated rule in review rather than assumed.
+      #
+      # persist-credentials: false BECAUSE THIS JOB NEVER PUSHES -- the same reasoning verify-resolved.yml
+      # writes out for itself. gh reads its token from the environment, not from the workspace git
+      # config, so nothing here needs the credential actions/checkout would otherwise leave in the tree
+      # for every later step.
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
 
       - name: GitHub-side settings still match what the tree declares
         shell: powershell
@@ -79,5 +98,5 @@ jobs:
           # gh reads GH_TOKEN; `contents: read` is what the two non-admin endpoints need.
           GH_TOKEN: ${{ github.token }}
         run: |
-          powershell -NoProfile -ExecutionPolicy Bypass -File scripts/lint/check-repo-settings.ps1
+          powershell -NoProfile -ExecutionPolicy Bypass -File scripts/lint/check-repo-settings.ps1 -RequireRead
           exit $LASTEXITCODE

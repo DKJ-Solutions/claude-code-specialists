@@ -102,9 +102,39 @@ rather than the rule list #1726's title names.
 - [x] Verified against the live repo: six declared facts match, one drift reported -- `allow_auto_merge`,
       i.e. #1730, found by the check rather than by a person.
 - [x] Lint gate + all suites green.
+- [x] Reviewed in parallel by Victor (code), Edith (copy) and Sebastian (security). Nine findings, all
+      nine acted on; the four that changed behaviour are worth naming because each was a defect an
+      assert would not have found on its own:
+      - **`Read-Payload` hand-rolled what `Invoke-NativeCapture` exists to centralise** (Victor). The
+        EAP guard was the visible half; the one that mattered was **`-Utf8`** -- 5.1 decodes a native
+        child's stdout with the *console* code page, and this output is parsed, so the same `gh api`
+        returned different strings on cp65001 and cp850. Inbound #821's class, in a brand-new script.
+        Now the same two flags `adopt-merge-queue.ps1` passes against this very endpoint.
+      - **`ruleset.required_checks` duplicated `Get-RequiredCheckContexts`** (Victor), minus its
+        case-insensitive compare on `type`. Reusing it means this check cannot disagree with the gate
+        it describes; `Read-Payload` keeps the raw JSON so the lib can be called at all.
+      - **A JSON `null` on a declared boolean silently passed as a match** (Victor). `[bool]$null` is
+        `$false`, so a field GitHub never answered compared equal to a declared `false` and printed as
+        `[OK] ... = (none)`. Not reachable against the real API, which is exactly why it needed the
+        assert rather than the discovery.
+      - **A total blackout was green** (Sebastian). If the CI token cannot read those endpoints, every
+        field reports not-read and the run exits 0 -- a detector reporting success. His advice was to
+        confirm the token empirically on the first run; `-RequireRead` was preferred because that
+        covers only the day somebody looks, while the flag holds on every run after it. It stays silent
+        on a *partial* read, which is the expected CI state.
+      Also: `persist-credentials: false` (Sebastian), and three prose corrections from Edith -- a
+      "fifth entry" that should have been fourth, `Where` described as naming a line it does not, and
+      a cross-reference to "the two runners above" that pointed at the two bullets which do *not* state
+      that reasoning. Sebastian confirmed the unpinned `actions/checkout@v5` is **correct** here rather
+      than a gap: this repo pins by SHA where a job's token can *do* something, and `unfolded-entry.yml`
+      -- the same `contents: read` class -- is deliberately unpinned too.
+- [x] The suite's own strongest assert was the weakest thing in it (Victor): "every declared Field is
+      one the check knows how to read" compared against a **hardcoded copy** of `Get-LiveValue`'s
+      switch, so it could pass while the script reported `UNKNOWN FIELD` at runtime. It now puts every
+      declared Field through the real script, plus a sentinel proving the probe can still fail.
 - [~] No assert on the scheduled trigger actually firing. It needs a cron GitHub controls, so the suite
       asserts the workflow's *shape* -- schedule present, dispatch present, `contents: read`, no
-      `secrets.`, and that it runs this check. Named here rather than papered over.
+      `secrets.`, `-RequireRead` passed, and that it runs this check. Named here rather than papered over.
 
 ### DEPLOY: feat/1726-repo-settings-drift-check
 
