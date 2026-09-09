@@ -43,7 +43,61 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**35 / 79 minor entries** <!-- pending-tally -->
+**35 / 80 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1723-gate-crash-vs-verdict · 20260909-170742
+
+The 30-lane test gate stops reporting two things that were never failures as failures.
+
+**A crashed suite is no longer called a failed one.** The gate judged a suite on its exit code
+alone, so a child killed by an unhandled `AccessViolationException` inside the PowerShell engine
+came back as `FAILED (exit -1073741819)` -- which reads as a suite that ran and said no. It did
+not run: it wrote no `[FAIL]` line and no summary, so every minute spent looking for the failing
+assert was spent on an assert that does not exist. The discriminator is NTSTATUS's own error
+window, `0xC0000000..0xCFFFFFFF`, which is exact without being a list of known codes: every
+unhandled structured exception exits with a status in that window -- access violation, stack
+overflow, heap corruption, stack buffer overrun -- and nothing inside the family has to be
+enumerated. It is deliberately narrower than "any negative exit code", which was the first
+version and was forgeable by the very content the gate judges: `exit -1` arrives as `0xFFFFFFFF`
+and would have bought that suite the free re-run the promise below exists to deny it. Such a
+suite is now reported as CRASHED with the code as hex, and re-run ALONE once after the pool
+empties -- which
+is what the gate's own docstring already told a reader to do by hand. Green on the re-run leaves
+the gate green and still names the crash on the verdict line; a second crash, or a real failure
+the crash was hiding, is red. **An ordinary failure is never retried**: an `exit 1` has measured
+the tree and said no, and re-running that would mask a verdict instead of obtaining one.
+
+**And a refusal assert stops reading the console's layout instead of the message.** A `throw` and
+a `Write-Warning` reach a capture through PowerShell's error formatter, which hard-wraps at the
+host's buffer column *inside a word* -- so at width 120 `-InitToken for a fresh path` arrives as
+`-InitToken fo` + newline + `r a fresh path` and the phrase is absent from the message body. The
+assert had been passing on a `FullyQualifiedErrorId` echo further down the same rendering, a
+coincidence of arithmetic between the width and the length of a temp path -- and that is measured
+rather than argued: sweeping the interpolated path's length over 130 values, 9 of them fail the old
+assert, in one contiguous band, which is what a wrap boundary sliding through a 27-character phrase
+looks like. What was NOT identified is which length the one failing run hit, so this is a latent
+defect removed rather than a mystery closed. Fifteen asserts in that
+suite now go through the `Test-Says` helper seven other suites have carried since #1512, and the
+ordering assert requires both phrases to be found rather than accepting `-1` for either.
+
+**Score:** 4
+
+#### What makes this deploy extra special
+
+N/A. This is the test gate and one of its suites -- no consumer of the released plugin sees
+either, and nothing about a published release document changes.
+
+**Score:** N/A
+
+#### Pull Request
+
+The test gate tells a crashed suite from a failed one, and a refusal assert stops reading console wrapping
+
+Plugins: dkj-policy, dkj-team-shopify
+
+[PR #1732](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1732)
+
+---
 
 ### DEPLOY: fix/1718-mentions-skip-guidance · 20260909-162729
 
