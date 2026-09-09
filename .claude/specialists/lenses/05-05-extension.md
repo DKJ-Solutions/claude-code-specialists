@@ -427,6 +427,47 @@ the trap is the shell's, not this repo's. What stays here is the local evidence:
   merge and a green gate to say so. **Two sides editing the same list usually both belong** — read what
   each was for before choosing, and keep both unless they actually contradict.
 
+### Issue labels — every issue carries a priority
+
+**Every issue in this tracker carries exactly one of `prio-1` … `prio-4`, and 4 is the highest**
+(Dave, September 9, 2026, [#1685](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1685)).
+The four exist in the repo since that day and are set with `--label` on the `gh issue create` that
+files the finding, or with `gh issue edit <n> --add-label prio-<n>` on one that arrived without:
+
+| Label | Colour | What the rung means |
+|---|---|---|
+| `prio-4` | `B60205` | Highest — takes precedence over other work. A broken gate, or a wrong answer a gate reports as authority. |
+| `prio-3` | `D93F0B` | Ahead of the ordinary backlog. Real, and it costs something every time it is met. |
+| `prio-2` | `FBCA04` | Worth doing, no pressure. The ordinary backlog, and the common answer. |
+| `prio-1` | `0E8A16` | Lowest — nobody is waiting for it. A question parked for the owner, or a tidy-up. |
+
+**It is a separate axis from the prefix→label mapping in
+[step 2](#classifying-naming-and-creating-a-branch), which is about a PULL REQUEST.** `enhancement`,
+`bug` and `documentation` say what *kind* of change a branch carries and are written by `open-pr.ps1`
+from the branch prefix; a `prio-N` says how much an *issue* weighs and is written by whoever files it.
+An issue therefore normally carries both, and neither can be derived from the other — the same
+argument the branch table makes for not deriving the changelog tier from the prefix.
+
+**Nothing enforces it, deliberately — the same shape as the `inbound` label.** A gate would have to
+ask GitHub on every run, which puts the tracker on the critical path of a local check for a field only
+a person can fill in. So this is prose, exactly like the `inbound` route in
+[`CLAUDE.md`](../../../CLAUDE.md#never-without-daves-explicit-permission), and the always-on half of it
+lives in [Chris's lens](01-01-extension.md#the-dave-rules) so a session filing a finding reads it
+without loading this page. **What that costs is measured elsewhere in this very file**: the `chore/`
+prefix rule also held only in someone's head and was broken twelve times before anybody counted.
+
+**Reading the tracker by priority** — the one command worth knowing, since the label is only useful if
+it is what somebody sorts on:
+
+```sh
+gh issue list --state open --label prio-4 --label prio-3   # what actually comes first
+```
+
+**The ten issues open on the day the labels were introduced were labelled in the same movement**, which
+is the half of #1685 that had a deadline: a taxonomy applied only to new issues splits the tracker in
+two, and the older half is where the backlog actually is. Two came out at `prio-4` (#1678, #1679),
+three at `prio-3`, four at `prio-2` and one at `prio-1`.
+
 ### Tooling & account
 
 - **GitHub CLI (`gh`)** is used for PRs. This repo lives under the **`DKJ-Solutions`** org and is

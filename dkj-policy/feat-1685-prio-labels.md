@@ -36,23 +36,55 @@
 
 ### PLAN
 
-Create the four labels, apply one to every open issue, and record the convention in the always-on layer plus Derek's label lens.
+Create the four labels, apply one to every open issue, and record the convention in the always-on
+layer plus Derek's label lens.
+
+#### Why the labels are created outside a gate
+
+The four labels are repo state on GitHub, not files, so nothing in this branch can carry them: they
+were created with `gh label create` and read back with `gh label list`. The same holds for the ten
+open issues. What the branch carries is the **rule** — so that the next session filing a finding sets
+a `prio-N` without being told, which is the half a tracker cannot enforce.
 
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [x] Create `prio-1` … `prio-4` on the tracker, colours escalating green → dark red, each with a
+      description saying which rung it is.
+- [x] Label all ten open issues, and read the labels back to prove none was missed.
+- [x] Record the always-on half in Chris's lens under **The Dave rules** — five lines, because every
+      session pays for them.
+- [x] Record the detail in Derek's lens as its own section: the rung table, why it is a separate axis
+      from the prefix→label mapping for a pull request, and why nothing enforces it.
+- [~] A gate or session check that reports an open issue without a `prio-N` — dropped: it would put a
+      network call to the tracker on the critical path of a local check, for a field only a person can
+      fill in. Stated as a deliberate decline in Derek's lens instead, beside the `inbound` precedent.
 
 ### TEST
 
+- [x] `gh issue list --state open` read back with a template that prints `MISSING` for any issue
+      without a `prio-N`: ten issues, zero missing.
+- [x] The lint gate and every suite, via `open-pr.ps1` — the two lenses are always-on prose and the
+      new anchors have to resolve.
+
 ### DEPLOY: feat/1685-prio-labels
 
-**Score:**
+Every issue in this repo's tracker now carries exactly one priority, `prio-1` (lowest) to `prio-4`
+(highest). The four labels exist on GitHub, the ten issues open on the day were labelled in the same
+movement — a taxonomy applied only to new issues splits the tracker in two, and the older half is
+where the backlog is — and the rule that a finding is filed *with* its priority is written down in
+the always-on layer, so the next session does it without being reminded. It is a separate axis from
+the prefix→label mapping that classifies a pull request, and Derek's lens says so, because those are
+the labels this repo already had.
+
+**Score:** 3
 
 #### What makes this deploy extra special
 
-**Score:**
+N/A — nothing here reaches a consumer of the plugins. The labels are this tracker's own state and
+both documents are repo-local lenses, which travel to nobody.
+
+**Score:** N/A
 
 #### Pull Request
 
 Priority labels prio-1..prio-4 on every issue
-
