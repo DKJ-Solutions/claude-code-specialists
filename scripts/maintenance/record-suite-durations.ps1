@@ -5,11 +5,20 @@
 .DESCRIPTION
     WHY IT EXISTS. Invoke-TestSuiteGate packs its shards and orders its queue from that file (issue
     #1358), and the file is committed rather than written by the gate itself for one reason: the only
-    durations worth packing a hosted runner from are a hosted runner's. The same suites run 3.6-4.0x
-    faster on a developer machine and THE RATIO IS NOT UNIFORM -- entry-scaffold.tests.ps1 is ~11x -- so
-    a gate that refreshed the file from whatever machine last ran it would pack CI off workstation
-    figures and land worse than no data at all. That is not a hypothetical: reading a local figure as a
-    CI one is exactly how #1358 came to name a five-file plateau that has four.
+    durations worth packing a hosted runner from are a hosted runner's. A local reading does not convert
+    into a CI one -- THERE IS NO RATIO TO DIVIDE OUT, and the sign is not even fixed -- so a gate that
+    refreshed the file from whatever machine last ran it would pack CI off workstation figures and land
+    worse than no data at all. That is not a hypothetical: reading a local figure as a CI one is exactly
+    how #1358 came to name a five-file plateau that has four.
+
+    THIS DOCSTRING STATED THAT BACKWARDS UNTIL SEPTEMBER 9, 2026 (issue #1713). It said the same suites
+    run "3.6-4.0x faster on a developer machine", which was measured the other way round on the machine
+    that checked it: check-plugin-integrity-links.tests.ps1 took 759.1s SOLO on an 18-thread workstation
+    against a 290.9s mean over three 4-lane CI runs. A third configuration disagrees with both -- the
+    whole 85-suite pool runs in about 255s of wall clock on a 32-thread machine at 30 lanes. The
+    conclusion above is unaffected and in fact stronger for it: CI is a different machine, not a scaled
+    one. No replacement constant is published here on purpose, because three readings on three
+    configurations is what "not a constant" looks like.
 
     AND WHY IT IS A SCRIPT RATHER THAN A PROCEDURE. This was done by hand twice on September 4, 2026 --
     `gh run view --log`, a grep, and an average across two runs -- which is this house's own trigger for
@@ -149,9 +158,11 @@ $doc = [ordered]@{
         'the largest recorded value, so a new suite starts early and can never be the one left last.',
         'Every suite in the directory runs exactly once whether or not it appears below; delete this',
         'file and the gate falls back to the stride, unchanged.',
-        'MEASURED ON CI, NOT ON A WORKSTATION. These suites run 3.6-4.0x faster on a developer machine',
-        'and the ratio is NOT uniform (entry-scaffold is ~11x), so a local reading would pack worse',
-        'than no reading at all. Refresh with scripts/maintenance/record-suite-durations.ps1.'
+        'MEASURED ON CI, NOT ON A WORKSTATION, and a local reading does NOT convert into a CI one: there',
+        'is no ratio to divide out and the sign is not even fixed. One suite ran 2.6x SLOWER solo on an',
+        '18-thread workstation than on a 4-lane runner, where this note claimed 3.6-4.0x faster until',
+        'issue #1713. So a local reading would pack worse than no reading at all. Refresh with',
+        'scripts/maintenance/record-suite-durations.ps1.'
     )
     recordedFrom = [ordered]@{
         runs    = @($runIds)

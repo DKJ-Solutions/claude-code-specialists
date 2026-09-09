@@ -752,11 +752,22 @@ function Get-TestSuiteCostHints {
         would otherwise have to give up.
 
         WHY THE FILE IS COMMITTED RATHER THAN WRITTEN BY THE GATE. The numbers that matter are CI's, and
-        only CI produces them: the same suites run 3.6-4.0x faster on a developer machine and the ratio is
-        NOT uniform across them -- entry-scaffold.tests.ps1 is ~11x -- so a gate that refreshed this file
-        from whatever machine last ran it would pack a hosted runner off workstation figures and do worse
-        than no data at all. It is regenerated deliberately from a CI run's own tables by
+        only CI produces them: a local reading does not convert into a CI one, so a gate that refreshed
+        this file from whatever machine last ran it would pack a hosted runner off workstation figures and
+        do worse than no data at all. It is regenerated deliberately from a CI run's own tables by
         scripts/maintenance/record-suite-durations.ps1, which names the runs it read in the file.
+
+        AND THE REASON IS STRONGER THAN THE ONE THIS DOCSTRING GAVE UNTIL SEPTEMBER 9, 2026 (issue #1713).
+        It said the same suites run "3.6-4.0x faster on a developer machine". That is not a constant, and
+        its SIGN is not fixed either -- so there is no divisor, and a reader who trusted the old sentence
+        would convert a local figure by ~3.8 and land about ten times out. Two readings that disagree, on
+        two machines: check-plugin-integrity-links.tests.ps1 ran 759.1s SOLO on an 18-thread workstation
+        against a 290.9s mean over three 4-lane CI runs -- 2.6x SLOWER locally, not faster -- while the
+        whole 85-suite pool finishes in about 255s of wall clock on a 32-thread machine at 30 lanes,
+        against CI's four shards of four to six minutes each. What the old number was doing here was
+        supporting a conclusion the correction does not weaken but reinforces: CI is a DIFFERENT machine,
+        not a scaled one, so its durations cannot be derived at all. Any figure quoted for either side
+        states its machine and its lane count or it means nothing.
 
         A BAD FILE IS A WARNING AND A FALLBACK, NOT A THROW. The gate refuses to guess at a nonsensical
         (Shard, ShardCount) because every wrong reading of those is silent and runs the wrong SET of
@@ -1112,9 +1123,11 @@ function Invoke-TestSuiteGate {
         timestamp is a FINISH time. Subtracting the shard's start yields a duration only for a suite that
         started at t0 -- queue positions 1..MaxParallel. Do it further down the queue and you are reading
         lane wait as runtime; that error put two files on a five-file "plateau" that has four, one of them
-        reconstructed at 189s against 17.0s standalone. Local figures also do not transfer: the same suites
-        run 3.6-4.0x faster on a workstation than on a four-core hosted runner, so a standalone reading is
-        corroboration only once the machine is stated.
+        reconstructed at 189s against 17.0s standalone. Local figures also do not transfer, and NOT by a
+        ratio one could divide out: the direction itself changes with the machine -- one suite measured
+        2.6x SLOWER solo on an 18-thread workstation than on a four-lane hosted runner, where this
+        docstring claimed 3.6-4.0x faster until issue #1713. So a standalone reading is corroboration only
+        once the machine AND the lane count are stated, and it is never a conversion.
         WHY THE FUNCTION PARTITIONS RATHER THAN THE CALLER -- and why a STRIDE: both at the partition
         itself, below the suite glob. WHY THIS DOES NOT PAY #714's BILL TWICE: the four
         check-plugin-integrity suites build a fixture EACH, in a per-process directory (that file's own
