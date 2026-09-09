@@ -43,7 +43,47 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**30 / 65 minor entries** <!-- pending-tally -->
+**30 / 66 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1691-prio-1-colour-collision · 20260909-112411
+
+A `prio-1` badge no longer means two different rungs in one family. It was `0E8A16` — the green a
+reader trained in this repo knows as *"nobody is waiting for it"* — which in both BWJ store repos is
+`low`, one rung **above** the floor, and in one of them `sync` as well. It is now `006B75`, verified
+unused across all three trackers. Nothing refuses a colour, so this was the one part of the
+priority-axis decision that could still go wrong silently: `gh` judges a label's name, and a badge is
+read by a person with no command in it to fail.
+
+**It was repaired from this side rather than the one #1691 proposed, and that is the substance.** The
+issue's own repair edits live labels in two repos this one does not own and would have left future
+adopters in a third state, so it was correctly gated on Dave. Moving `prio-1` instead is one command in
+the repo in front of you, needs no access outside, leaves `adopt-dkj-policy-bwj`'s prescribed hexes
+alone, and keeps the two rows that agree on the rung on purpose.
+
+**What it does not settle, and says so rather than implying otherwise.** #1691 gated two things — the
+outside access *and* the colour itself. Repairing from this side answers the first; `006B75` is this
+session's pick, verified unused before it was taken, and one `gh label edit` to override. Inside a BWJ
+repo the same green still carries two labels, which is a BWJ-internal question this branch does not
+reach. And `FBCA04` stays `prio-2` here and `tier-1` there on a weaker argument than the one the green
+moved for: a misread there gets the *kind* wrong, not the rung.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+N/A — a consumer of the plugins notices nothing. The label lives on this repo's own tracker and the
+prose is a repo-local lens; `adopt-dkj-policy-bwj`, which is what a consumer actually receives, is
+deliberately untouched.
+
+**Score:** N/A
+
+#### Pull Request
+
+The prio-1 badge stops meaning two different rungs in one family
+
+[PR #1702](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1702)
+
+---
 
 ### DEPLOY: docs/1653-1654-entry-gate-and-plan-string · 20260909-092020
 
