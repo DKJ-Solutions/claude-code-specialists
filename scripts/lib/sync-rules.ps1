@@ -360,96 +360,19 @@ function Test-MainTouchedSince {
 # provenance is the right question; it was being asked against a base that was not per path.
 # ----------------------------------------------------------------------------------------------------
 
-function Convert-GitQuotedPath {
-    <#
-    .SYNOPSIS
-        A path exactly as git printed it -- C-quoted when it carries a byte above 0x7F -- as the correct
-        .NET string, decided by the bytes on the wire rather than by the console code page.
-
-    .DESCRIPTION
-        WHY THIS EXISTS, AND WHY THE PREVIOUS FIX WAS ONLY HALF OF ONE (inbound #821, August 21, 2026).
-        git quotes a path containing a high byte by default: 'sections/cafe.liquid' with an accent comes
-        out as '"sections/caf\303\251.liquid"'. The repair that shipped for that was
-        'core.quotePath=false', which makes git emit the RAW UTF-8 bytes instead -- and PowerShell then
-        decodes those bytes with [Console]::OutputEncoding, i.e. with whatever console code page the run
-        happened to inherit. Measured on git 2.54:
-
-            core.quotePath=true   ->  "sections/caf\303\251.liquid"   (pure ASCII on the wire)
-            core.quotePath=false  ->  sections/caf<C3><A9>.liquid     (raw bytes, decoder-dependent)
-
-        On cp850 -- the default OEM console on a Dutch Windows box -- the second form decodes to two
-        wrong characters, the path then matches nothing the mirror walk produced, and the sync reaches
-        the exact failure the flag was added to prevent: the trunk's copy reads as a path live does not
-        have while live's IDENTICAL file reads as content the trunk has never held. Foreign, taken, the
-        trunk's version overwritten. The flag fixed the quoting half and left the decoding half.
-
-        SO THE WIRE IS HELD TO ASCII INSTEAD, and this function does the decoding, where no environment
-        can reach it: every candidate code page agrees on bytes below 0x80, so the string arrives intact
-        however the console is configured, and the escapes are unpacked into bytes here and read as UTF-8
-        once. Quoting is FORCED ON at the call site ('-c core.quotePath=true') rather than left to git's
-        default, because a repo is free to set core.quotepath in its own config and would otherwise put
-        the answer back at the mercy of the decoder.
-
-        THE UNQUOTED FORM PASSES THROUGH UNTOUCHED, which is what makes this safe to apply to every line:
-        git quotes only when it must, so an ordinary ASCII path is not wrapped in quotes and is returned
-        as it came. A path that is not quoted needs no decoding by definition -- there is nothing above
-        0x7F in it.
-
-        Escapes handled: the octal '\NNN' form git uses for high bytes, plus the C escapes it uses for a
-        quote, a backslash and the control characters (\a \b \f \n \r \t \v). A backslash before anything
-        else is kept as a literal backslash -- git would have escaped it if it meant one, and swallowing
-        it would silently shorten a Windows-shaped path.
-    #>
-    param([Parameter(Mandatory = $true)][AllowEmptyString()][string]$Path)
-
-    if ($Path.Length -lt 2 -or $Path[0] -ne '"' -or $Path[$Path.Length - 1] -ne '"') { return $Path }
-
-    $inner = $Path.Substring(1, $Path.Length - 2)
-    $bytes = New-Object System.Collections.Generic.List[byte]
-    $i = 0
-    while ($i -lt $inner.Length) {
-        $c = $inner[$i]
-        if ($c -ne '\') {
-            # A quoted path is ASCII by construction, so this cast is the whole story for every real
-            # line. The UTF-8 fallback is for a character that cannot be one byte -- unreachable from
-            # git and cheap to be right about, rather than a silent truncation if it ever is.
-            if ([int][char]$c -lt 0x80) { $bytes.Add([byte][char]$c) }
-            else { foreach ($b in [System.Text.Encoding]::UTF8.GetBytes([string]$c)) { $bytes.Add($b) } }
-            $i++
-            continue
-        }
-        $i++
-        if ($i -ge $inner.Length) { $bytes.Add(0x5C); break }
-        $e = $inner[$i]
-        if ($e -ge '0' -and $e -le '7') {
-            # Exactly three octal digits, which is the only form git writes. Fewer than three left means
-            # this is not one of git's escapes, so the backslash is kept literally rather than guessed at.
-            if (($i + 2) -lt $inner.Length -and
-                $inner[$i + 1] -ge '0' -and $inner[$i + 1] -le '7' -and
-                $inner[$i + 2] -ge '0' -and $inner[$i + 2] -le '7') {
-                $bytes.Add([byte][Convert]::ToInt32($inner.Substring($i, 3), 8))
-                $i += 3
-            } else {
-                $bytes.Add(0x5C)
-            }
-            continue
-        }
-        switch ($e) {
-            '"'     { $bytes.Add(0x22); $i++ }
-            '\'     { $bytes.Add(0x5C); $i++ }
-            'a'     { $bytes.Add(0x07); $i++ }
-            'b'     { $bytes.Add(0x08); $i++ }
-            'f'     { $bytes.Add(0x0C); $i++ }
-            'n'     { $bytes.Add(0x0A); $i++ }
-            'r'     { $bytes.Add(0x0D); $i++ }
-            't'     { $bytes.Add(0x09); $i++ }
-            'v'     { $bytes.Add(0x0B); $i++ }
-            default { $bytes.Add(0x5C) }
-        }
-    }
-
-    return [System.Text.Encoding]::UTF8.GetString($bytes.ToArray())
-}
+# Convert-GitQuotedPath USED TO LIVE HERE, and it moved to git-porcelain-lib.ps1 on September 9, 2026
+# (issue #1689). It was written for inbound #821 and this file was never its caller -- sync-main.ps1 is,
+# at three sites -- so what sat here was a definition the file itself did not use, while a second, poorer
+# handling of the same quoting grew up in git-porcelain-lib.ps1 (#1682). One owner now, and it is the file
+# that already owns core.quotePath.
+#
+# DO NOT DOT-SOURCE IT BACK IN. This file is DEPENDENCY-FREE ON PURPOSE, and the reason is in its registry
+# entry: the live-theme guard dot-sources it on every command inside a catch that returns no live theme id,
+# so anything this file pulls in is a way to silently disarm a guard over a revenue-serving theme. It would
+# also be a CROSS-PLUGIN dependency -- this file ships in dkj-team-shopify, git-porcelain-lib in dkj-policy
+# and, since #1689, in dkj-team-shopify too -- which sync-main.ps1 rules out by name for merged-pr-lib:
+# separately versioned, separately installed, so a cross-plugin path breaks silently on a version mismatch.
+# sync-main.ps1 takes the lib directly and unguarded instead, exactly as it takes merged-pr-lib.ps1.
 
 function Get-GitRawBlobId {
     <#

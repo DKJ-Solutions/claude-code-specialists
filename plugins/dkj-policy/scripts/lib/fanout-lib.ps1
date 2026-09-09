@@ -60,13 +60,17 @@
          to stay quiet: the worktree-half rule then still reaches a real loss that happens on the far
          side of the rename, which a simple exemption would have hidden.
 
-    THE RESIDUAL LIMIT, STATED RATHER THAN HIDDEN. `core.quotePath=true` is what makes the two
-    readings comparable whatever console code page each ran under, and it is never undone -- so a path
-    holding a non-ASCII character is reported in git's own C-quoted form rather than as the readable
-    filename. That is correct for the comparison and poor for the reader, and the trade is deliberate:
-    a mis-decoded path compares wrong (a silent miss, or a false alarm), while an escaped one is
-    merely ugly to read. park-lib.ps1 makes the same trade and never feels it, because its figure is a
-    count that is never displayed.
+    THAT RESIDUAL LIMIT IS GONE SINCE #1689, and it is worth saying which of its two claims was the
+    load-bearing one. `core.quotePath=true` is still forced on and still never undone -- that is what
+    makes the two readings comparable whatever console code page each ran under. What used to follow
+    from it was that a path holding a non-ASCII character got REPORTED in git's own C-quoted form,
+    accepted as "correct for the comparison and poor for the reader" on the ground that a mis-decoded
+    path compares wrong while an escaped one is merely ugly. That trade was between escaped and
+    CONSOLE-decoded, which are the only two options inbound #821 had in front of it. git-porcelain-lib.ps1
+    now decodes the escape ITSELF, byte by byte, downstream of the wire and out of reach of the code
+    page -- a third option, so the reader gets the real filename and the comparison keeps everything it
+    had. Get-WorkingCopySnapshotFormat is bumped for it, because the entry keys change even though the
+    shape does not.
 
     A READ THAT FAILED REPORTS UNKNOWN, NEVER ZERO -- park-lib.ps1's Get-GitParkBacking states the
     same rule for the same reason: zero is an answer ("nothing was lost", the reassuring one), and
@@ -204,8 +208,16 @@ function Get-WorkingCopySnapshotFormat {
     <# The baseline file's own shape version. Bumped when the serialised shape changes, so a baseline
        written by an older copy is REFUSED rather than half-read -- a snapshot whose Entries arrive
        empty because the shape moved would report every changed path as vanished, which is the
-       false-alarm end of this detector and the one that gets it switched off. #>
-    return 1
+       false-alarm end of this detector and the one that gets it switched off.
+
+       BUMPED TO 2 ON SEPTEMBER 9, 2026 (issue #1689) FOR A CHANGE OF VALUES, NOT OF SHAPE, and that is
+       the one case this counter's own wording did not anticipate. git-porcelain-lib.ps1 now DECODES a
+       C-quoted path instead of handing back git's escape, so an entry key for a path holding a
+       non-ASCII character is the real filename where it used to be 'caf/303/251.txt' -- same fields,
+       same nesting, different string. Across the two versions the old key reads as vanished and the new
+       one as growth, and growth is silent by design: that is precisely the false alarm a refusal is
+       cheaper than. #>
+    return 2
 }
 
 function ConvertTo-WorkingCopySnapshotJson {

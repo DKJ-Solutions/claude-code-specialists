@@ -65,17 +65,30 @@
          matches because both readings mangle it the same way -- and the first thing that goes looking
          for the actual FILE would have found nothing. See ConvertTo-GitPorcelainPath.
 
-    WHAT THIS FILE DELIBERATELY DOES NOT DO: DECODE THE ESCAPE. Lesson 4 stops at not destroying it. The
-    correct .NET string for '"caf\303\251.txt"' is 'cafe.txt' with an accent, and the function that
-    produces it ALREADY EXISTS -- Convert-GitQuotedPath in sync-rules.ps1, written for inbound #821,
-    which unpacks the octal form and git's C escapes and reads the bytes as UTF-8. It is not called from
-    here because the dependency would run the wrong way: a porcelain parse would then dot-source the
-    Shopify sync rules. Unifying the two -- moving that decoder in here, where the quoting concern
-    belongs, and having sync-rules dot-source it -- is issue #1689, and it is a different subject from
-    this extraction: it touches sync-main's three call sites and three suites, and it changes what a live
-    Shopify theme sync compares paths against. Neither caller here needs the decoded form: park-lib
-    counts, and fanout-lib compares two readings that escape identically. The escape is preserved rather
-    than mangled precisely so that unification stays possible; mangling destroyed the information.
+    AND IT DECODES THE ESCAPE, SINCE #1689 -- one owner for reading a git path, not two. #1682 shipped
+    this file stopping one step short: it stripped the quotes and left '\303\251' standing, because the
+    decoder existed in sync-rules.ps1 and a porcelain parse must not dot-source the Shopify sync rules.
+    #1689 moved the decoder in here instead, which is the direction that works, and the reason it works
+    is that sync-rules.ps1 never CALLED the function it defined -- so it lost it outright and kept the
+    dependency-free property its own registry entry demands. sync-main.ps1 takes this file directly and
+    unguarded, exactly as it already takes merged-pr-lib.ps1 and native-capture-lib.ps1, with its own
+    comment saying why neither went into sync-rules.ps1.
+
+    SO THIS FILE IS MIRRORED TWICE -- into dkj-policy for park-lib and fanout-lib, and into
+    dkj-team-shopify for sync-main -- on native-capture-lib's and merged-pr-lib's precedent. One file
+    mirrored into both plugins rather than reached across from one to the other: they are separately
+    versioned and separately installed, so a cross-plugin path is a dependency a version mismatch
+    breaks silently.
+
+    WHAT THE DECODE CHANGED FOR THE TWO ORIGINAL CALLERS. park-lib is unaffected in practice: it counts,
+    and its exclusion is compared against caller-supplied paths that are ASCII in every current caller.
+    fanout-lib gains the readable filename and LOSES A DOCUMENTED LIMIT -- its header used to state the
+    escaped form as a deliberate trade ("correct for the comparison and poor for the reader"), and that
+    trade was between escaped and CONSOLE-DECODED, which is the choice inbound #821 was filed about. A
+    byte-level decode is a third option that was not on the table then, and it is not exposed to the code
+    page the trade guards against. Get-WorkingCopySnapshotFormat is bumped for it: the shape is
+    unchanged, the entry KEYS are not, and a baseline written on either side of this must be refused
+    rather than differenced.
 
     THE STATUS HALVES ARE KEPT APART, for fanout-lib's reason: porcelain reports 'XY path', X is the
     index and Y is the worktree, and only one of them is a loss. `git reset` moves a change from X to Y
@@ -101,12 +114,115 @@
 $gpCaptureLib = Join-Path $PSScriptRoot 'native-capture-lib.ps1'
 if (Test-Path -LiteralPath $gpCaptureLib -PathType Leaf) { . $gpCaptureLib }
 
+# THE DECODER, MOVED HERE FROM sync-rules.ps1 ON SEPTEMBER 9, 2026 (issue #1689). It was written for
+# inbound #821 and mirrored into dkj-team-shopify; sync-main.ps1 is its caller, at three sites, and now
+# dot-sources this file directly and unguarded, the same way it takes merged-pr-lib.ps1. It did NOT move
+# by having sync-rules.ps1 dot-source this file, which is what #1689 originally proposed: that file is
+# dependency-free on purpose, because the live-theme guard dot-sources it on every command inside a catch
+# that returns no live theme id -- so anything it pulls in is a way to silently disarm that guard. It never
+# called the function it defined, so it could simply lose it.
+function Convert-GitQuotedPath {
+    <#
+    .SYNOPSIS
+        A path exactly as git printed it -- C-quoted when it carries a byte above 0x7F -- as the correct
+        .NET string, decided by the bytes on the wire rather than by the console code page.
+
+    .DESCRIPTION
+        WHY THIS EXISTS, AND WHY THE PREVIOUS FIX WAS ONLY HALF OF ONE (inbound #821, August 21, 2026).
+        git quotes a path containing a high byte by default: 'sections/cafe.liquid' with an accent comes
+        out as '"sections/caf\303\251.liquid"'. The repair that shipped for that was
+        'core.quotePath=false', which makes git emit the RAW UTF-8 bytes instead -- and PowerShell then
+        decodes those bytes with [Console]::OutputEncoding, i.e. with whatever console code page the run
+        happened to inherit. Measured on git 2.54:
+
+            core.quotePath=true   ->  "sections/caf\303\251.liquid"   (pure ASCII on the wire)
+            core.quotePath=false  ->  sections/caf<C3><A9>.liquid     (raw bytes, decoder-dependent)
+
+        On cp850 -- the default OEM console on a Dutch Windows box -- the second form decodes to two
+        wrong characters, the path then matches nothing the mirror walk produced, and the sync reaches
+        the exact failure the flag was added to prevent: the trunk's copy reads as a path live does not
+        have while live's IDENTICAL file reads as content the trunk has never held. Foreign, taken, the
+        trunk's version overwritten. The flag fixed the quoting half and left the decoding half.
+
+        SO THE WIRE IS HELD TO ASCII INSTEAD, and this function does the decoding, where no environment
+        can reach it: every candidate code page agrees on bytes below 0x80, so the string arrives intact
+        however the console is configured, and the escapes are unpacked into bytes here and read as UTF-8
+        once. Quoting is FORCED ON at the call site ('-c core.quotePath=true') rather than left to git's
+        default, because a repo is free to set core.quotepath in its own config and would otherwise put
+        the answer back at the mercy of the decoder.
+
+        THE UNQUOTED FORM PASSES THROUGH UNTOUCHED, which is what makes this safe to apply to every line:
+        git quotes only when it must, so an ordinary ASCII path is not wrapped in quotes and is returned
+        as it came. A path that is not quoted needs no decoding by definition -- there is nothing above
+        0x7F in it.
+
+        Escapes handled: the octal '\NNN' form git uses for high bytes, plus the C escapes it uses for a
+        quote, a backslash and the control characters (\a \b \f \n \r \t \v). A backslash before anything
+        else is kept as a literal backslash -- git would have escaped it if it meant one, and swallowing
+        it would silently shorten a Windows-shaped path.
+    #>
+    param([Parameter(Mandatory = $true)][AllowEmptyString()][string]$Path)
+
+    if ($Path.Length -lt 2 -or $Path[0] -ne '"' -or $Path[$Path.Length - 1] -ne '"') { return $Path }
+
+    $inner = $Path.Substring(1, $Path.Length - 2)
+    $bytes = New-Object System.Collections.Generic.List[byte]
+    $i = 0
+    while ($i -lt $inner.Length) {
+        $c = $inner[$i]
+        if ($c -ne '\') {
+            # A quoted path is ASCII by construction, so this cast is the whole story for every real
+            # line. The UTF-8 fallback is for a character that cannot be one byte -- unreachable from
+            # git and cheap to be right about, rather than a silent truncation if it ever is.
+            if ([int][char]$c -lt 0x80) { $bytes.Add([byte][char]$c) }
+            else { foreach ($b in [System.Text.Encoding]::UTF8.GetBytes([string]$c)) { $bytes.Add($b) } }
+            $i++
+            continue
+        }
+        $i++
+        if ($i -ge $inner.Length) { $bytes.Add(0x5C); break }
+        $e = $inner[$i]
+        if ($e -ge '0' -and $e -le '7') {
+            # Exactly three octal digits, which is the only form git writes. Fewer than three left means
+            # this is not one of git's escapes, so the backslash is kept literally rather than guessed at.
+            if (($i + 2) -lt $inner.Length -and
+                $inner[$i + 1] -ge '0' -and $inner[$i + 1] -le '7' -and
+                $inner[$i + 2] -ge '0' -and $inner[$i + 2] -le '7') {
+                $bytes.Add([byte][Convert]::ToInt32($inner.Substring($i, 3), 8))
+                $i += 3
+            } else {
+                $bytes.Add(0x5C)
+            }
+            continue
+        }
+        switch ($e) {
+            '"'     { $bytes.Add(0x22); $i++ }
+            '\'     { $bytes.Add(0x5C); $i++ }
+            'a'     { $bytes.Add(0x07); $i++ }
+            'b'     { $bytes.Add(0x08); $i++ }
+            'f'     { $bytes.Add(0x0C); $i++ }
+            'n'     { $bytes.Add(0x0A); $i++ }
+            'r'     { $bytes.Add(0x0D); $i++ }
+            't'     { $bytes.Add(0x09); $i++ }
+            'v'     { $bytes.Add(0x0B); $i++ }
+            default { $bytes.Add(0x5C) }
+        }
+    }
+
+    return [System.Text.Encoding]::UTF8.GetString($bytes.ToArray())
+}
+
 function ConvertTo-GitPorcelainPath {
     <#
         One path half of a porcelain line -- the whole path, or one side of a rename's arrow -- with its
         quotes off and its separators settled. Empty string where there is no path.
 
-        A QUOTED PATH IS RETURNED BYTE FOR BYTE, MINUS THE QUOTES, AND THAT IS LESSON 4 (found by this
+        A QUOTED PATH IS DECODED, by Convert-GitQuotedPath above -- so what comes back is the real
+        filename and not git's escape of it. Since #1689 that decoder lives in this file, which is what
+        makes this one line possible; before it, this function stripped the quotes and left the escape
+        standing, on the ground that the decoder was in a file this one must not depend on.
+
+        WHAT IT MUST NOT DO IS NORMALISE SEPARATORS OVER IT, AND THAT IS LESSON 4 (found by this
         extraction, September 9, 2026). Both original copies ran `-replace '\\', '/'` over every path
         unconditionally, and that is wrong for exactly the paths core.quotePath exists to produce: git
         quotes a path precisely WHEN it has to escape something in it, and inside those quotes a byte
@@ -125,19 +241,24 @@ function ConvertTo-GitPorcelainPath {
         repairing git's side; it exists so a CALLER holding a Windows-shaped path can compare against
         what comes back without remembering to normalise first. park-lib's exclusion map depends on it.
 
-        THE ESCAPE IS PRESERVED, NOT DECODED, and the file header says why: Convert-GitQuotedPath in
-        sync-rules.ps1 already decodes it, calling it from here would point the dependency the wrong
-        way, and unifying the two is issue #1689. Preserving it is what keeps that possible.
+        THE TWO ARMS ARE MUTUALLY EXCLUSIVE, WHICH IS WHY NEITHER RULE FIGHTS THE OTHER. git quotes a
+        path exactly when it has to escape something in it, so a quoted path is the decoder's business
+        and an unquoted one is the separator rule's -- and no path is ever both. Running the
+        normalisation after the decode would put lesson 4 straight back, because the decode's output can
+        legitimately contain a backslash: git escapes a real one as '\\', and Convert-GitQuotedPath
+        unpacks it to a literal backslash that IS part of the filename.
     #>
     param([string]$Raw)
 
     if ($null -eq $Raw) { return '' }
     $t = $Raw.Trim()
     if (-not $t) { return '' }
-    # Both ends, because git quotes a path by wrapping the whole of it. A lone quote at one end is not
-    # git's quoting and is left where it is rather than guessed at.
+    # Convert-GitQuotedPath decides for itself whether this is quoted -- it returns an unquoted string
+    # untouched -- but the separator rule must NOT run over a decoded path, so the two arms are split
+    # here rather than chained. Both ends checked, because git quotes a path by wrapping the whole of
+    # it; a lone quote at one end is not git's quoting and is left where it is rather than guessed at.
     if ($t.Length -ge 2 -and $t.StartsWith('"') -and $t.EndsWith('"')) {
-        return $t.Substring(1, $t.Length - 2)
+        return (Convert-GitQuotedPath -Path $t)
     }
     return ($t -replace '\\', '/')
 }
