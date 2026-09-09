@@ -106,9 +106,23 @@ function Invoke-Gate {
     # -1 (the default) means "let the real Get-Process answer" -- OS-wide process state is not
     # something this suite controls, so a case that cares about the count stubs it explicitly instead.
     if ($ResidentCount -ge 0) { $psArgs += @('-ResidentCount', "$ResidentCount") }
+    # THE CHILD RUNS AT THE TOP LEVEL, WHATEVER THIS SUITE IS RUNNING UNDER -- issue #1717. The gate
+    # sets DKJ_TEST_GATE_DEPTH for its children, and THIS SUITE IS ONE OF THEM whenever it runs under
+    # the pool: without this, every driver run inherits depth 1 and reports depth 2, while the gate a
+    # fixture suite drives reports 3. Measured on #1717's own branch -- nine asserts holding a literal
+    # depth passed standalone twice and failed under the 30-lane pool, which is the same class the
+    # SetConsoleOutputCP case (inbound #821) is written up for: shared state a fixture must own rather
+    # than inherit. Removed rather than pinned to a value, so the driver's depth is the one an operator
+    # actually sees on their own gate run.
+    $depthHeldByCaller = [Environment]::GetEnvironmentVariable('DKJ_TEST_GATE_DEPTH', 'Process')
+    [Environment]::SetEnvironmentVariable('DKJ_TEST_GATE_DEPTH', $null, 'Process')
     $sw = [System.Diagnostics.Stopwatch]::StartNew()
-    $out = & powershell @psArgs 2>&1
-    $sw.Stop()
+    try {
+        $out = & powershell @psArgs 2>&1
+    } finally {
+        $sw.Stop()
+        [Environment]::SetEnvironmentVariable('DKJ_TEST_GATE_DEPTH', $depthHeldByCaller, 'Process')
+    }
     $lines = @($out | ForEach-Object { "$_" })
     $text  = ($lines -join "`n")
     return [pscustomobject]@{
