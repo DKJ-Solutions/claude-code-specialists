@@ -341,6 +341,8 @@ function Format-GateProgressLine {
     # depends on the machine's regional settings is the same defect as an untranslated string (#1159).
     return ("test gate: progress [depth {0}] {1}/{2} started, {3} done, {4} running (+{5}s) -- {6} {7}" -f `
         $Depth, $Started, $Total, $Done, $Running, (Format-GateSeconds $Elapsed -Decimals 1), $Action, $Suite)
+}
+
 function Write-GateCaptureBlock {
     <#
         ONE reaped suite's out.txt/err.txt, printed under the header the caller already wrote -- and a
