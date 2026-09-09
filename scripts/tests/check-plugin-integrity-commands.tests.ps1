@@ -4,7 +4,8 @@
     check 12 (printed install-record queries name the disambiguating fields), scenario 33 -- a root
     document nobody named is still scanned by both -- and the three script-reading checks that joined them
     since: check 31 (the Shopify CLI is never invoked bare), check 33 (printed instructions naming a
-    model-barred skill) and check 34 (a numbered section header is unique, ascending, and in one form).
+    model-barred skill), check 34 (a numbered section header is unique, ascending, and in one form) and
+    check 37 (this file's own check list, against the headers it claims to enumerate).
 
 .DESCRIPTION
     The fixture, the assert helpers and Invoke-Integrity live in check-plugin-integrity-fixture.ps1,
@@ -679,6 +680,235 @@ try {
     Assert-True ($rC57.Out -match '\[section-number\] checked \d+') 'scenario 57: and the check still reports its coverage, so passing over is not the same as not running'
     Remove-Item -LiteralPath $s57Path -Force
 
+
+    # --- check 37: this file's own check list, against the headers it claims to enumerate ------------
+    #     Issue #1680. Check 34 holds the column-0 headers to EACH OTHER; nothing read the prose list in
+    #     check-plugin-integrity.ps1's own .DESCRIPTION -- the summary a reader who has not opened the
+    #     file consults, and the one a lens, a hook, a test name or a release note quotes a number from.
+    #     It had stopped at 30 while the code ran to 36, its item 30 described the check #1494 had
+    #     renumbered to 33, 13b was missing with no report having noticed, and 9 and 17 still read as
+    #     live checks a month after they were retired.
+    #
+    #     THE MARKER IS COMPOSED, NEVER WRITTEN OUT, and that is not style. This suite is a .ps1 in the
+    #     script set check 37 walks, so a literal marker in these fixture lines would open a span in the
+    #     SUITE -- a file with no numbered headers of its own -- and the real gate run would report this
+    #     file. Same self-fixturing trap scenario 57 documents for check 34's indented headers, arriving
+    #     through the other door: there the suite has to prove the bound, here it has to stay outside it.
+    $clTag   = 'checks:list'
+    $clOpen  = "<!-- $clTag -->"
+    $clClose = "<!-- /$clTag -->"
+    #     Matched on the finding's PATH rather than on a phrase, and that is not a shortcut: this check's
+    #     own coverage line -- present on every run -- contains the words "claims to enumerate them", so a
+    #     phrase pattern counts the coverage line as a second finding. It did, on the first run of
+    #     scenario 58. A finding opens with the repo-relative path; the coverage line opens with 'checked'.
+    $ClFindingPattern = '\[check-list\] \.'
+    $s58Dir = Join-Path $Fixture 'scripts\lint'
+    New-Item -ItemType Directory -Path $s58Dir -Force | Out-Null
+
+    # --- Scenario 58: a header with no entry in the list is a finding, naming both lines -------------
+    #     The measured defect. Naming only the header would leave a reader to find the list; naming only
+    #     the list would leave them to find which check is missing.
+    Write-Host "check 37 -- a header absent from the marked list is a finding" -ForegroundColor Cyan
+    $s58Path  = Join-Path $s58Dir 'listed-gap.ps1'
+    $s58Lines = @(
+        '<#'
+        '.SYNOPSIS'
+        '    A gate that says what it checks.'
+        '.DESCRIPTION'
+        "    $clOpen"
+        '      1. the first thing.'
+        '      2. the second thing.'
+        "    $clClose"
+        '#>'
+        '# --- 1. the first thing -------------------------------------------------'
+        '$a = 1'
+        ''
+        '# --- 2. the second thing ------------------------------------------------'
+        '$b = 2'
+        ''
+        '# --- 3. the one nobody wrote down ---------------------------------------'
+        '$c = 3'
+    )
+    [System.IO.File]::WriteAllText($s58Path, (($s58Lines -join "`n") + "`n"), $Utf8NoBom)
+    $rC58 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True ($rC58.Out -match 'listed-gap\.ps1:16:.*check 3 has a section header but no entry') 'scenario 58: the unlisted check is a finding, at the line its header sits on'
+    Assert-True ($rC58.Out -match 'span at line 5') 'scenario 58: and it names the line the list opens on, so the reader has both ends'
+    Assert-Equal 1 ([regex]::Matches($rC58.Out, $ClFindingPattern).Count) 'scenario 58: the two checks that ARE listed are not reported -- exactly one finding'
+    Remove-Item -LiteralPath $s58Path -Force
+
+    # --- Scenario 59: an entry with NO header is deliberately not a finding --------------------------
+    #     The bound the whole check rests on, and the reason it could be born green. A retired check
+    #     keeps its number as a tombstone (9 and 17 in the real gate), and the consumer-doc guard the
+    #     suites call check 19 carries no header of its own. Asserting the reverse direction would have
+    #     needed exactly those three as exemptions on the day it was written -- the shape this repo
+    #     declined at 124 findings all false.
+    Write-Host "check 37 -- an entry with no header of its own is not a finding" -ForegroundColor Cyan
+    $s59Path  = Join-Path $s58Dir 'listed-tombstone.ps1'
+    $s59Lines = @(
+        '<#'
+        '.DESCRIPTION'
+        "    $clOpen"
+        '      1. the first thing.'
+        '      2. RETIRED, and its number is kept so older citations still mean this.'
+        '      3. a guard the suites name but that carries no header of its own.'
+        '      4. the last thing.'
+        "    $clClose"
+        '#>'
+        '# --- 1. the first thing -------------------------------------------------'
+        '$a = 1'
+        ''
+        '# --- 4. after a gap where a retired check stood --------------------------'
+        '$b = 2'
+    )
+    [System.IO.File]::WriteAllText($s59Path, (($s59Lines -join "`n") + "`n"), $Utf8NoBom)
+    $rC59 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True (-not ($rC59.Out -match 'listed-tombstone\.ps1')) 'scenario 59: two entries with no header -- a tombstone and a headerless guard -- are both legal'
+    Remove-Item -LiteralPath $s59Path -Force
+
+    # --- Scenario 60: a lettered sub-section needs its own entry -------------------------------------
+    #     13b was the seventh missing entry and the one no report had noticed: it is a real check with a
+    #     real header, and reading '13' as covering it would let a whole sub-section vanish from the
+    #     summary. The key is the number AND the letter, exactly as check 34 reads it.
+    Write-Host "check 37 -- a lettered sub-section is a header of its own" -ForegroundColor Cyan
+    $s60Path  = Join-Path $s58Dir 'listed-lettered.ps1'
+    $s60Lines = @(
+        '<#'
+        '.DESCRIPTION'
+        "    $clOpen"
+        '      1. the first thing.'
+        "    $clClose"
+        '#>'
+        '# --- 1. the first thing -------------------------------------------------'
+        '$a = 1'
+        ''
+        '# --- 1b. a sub-section of it ---------------------------------------------'
+        '$b = 2'
+    )
+    [System.IO.File]::WriteAllText($s60Path, (($s60Lines -join "`n") + "`n"), $Utf8NoBom)
+    $rC60 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True ($rC60.Out -match 'listed-lettered\.ps1:10:.*check 1b has a section header but no entry') 'scenario 60: the sub-section is a subject of its own, not covered by the number above it'
+    Remove-Item -LiteralPath $s60Path -Force
+
+    # --- Scenario 61: a list in a file with no headers at all is a finding ---------------------------
+    #     Silence there would read as a pass. Either the headers were renamed out of the convention check
+    #     34 holds, or the marker is on the wrong file; both are worth a sentence rather than a green run.
+    Write-Host "check 37 -- a marked list in a file carrying no headers is a finding" -ForegroundColor Cyan
+    $s61Path  = Join-Path $s58Dir 'listed-headerless.ps1'
+    $s61Lines = @(
+        '<#'
+        '.DESCRIPTION'
+        "    $clOpen"
+        '      1. something this file has no header for.'
+        "    $clClose"
+        '#>'
+        '$a = 1'
+    )
+    [System.IO.File]::WriteAllText($s61Path, (($s61Lines -join "`n") + "`n"), $Utf8NoBom)
+    $rC61 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True ($rC61.Out -match 'listed-headerless\.ps1:.*claims to') 'scenario 61: a list claiming to enumerate nothing is reported rather than passed over'
+    Remove-Item -LiteralPath $s61Path -Force
+
+    # --- Scenario 62: an unpaired marker is a hard error, and no marker at all is not a subject ------
+    #     The first half is Invoke-MarkedSpanWalk's rule, asserted here for this category too: a typo'd
+    #     sentinel must never read as "no list here", which is the one failure that turns a gate green by
+    #     silencing it. The second half is what makes the check opt-in -- the 19 files check 34 measured
+    #     carry numbered headers and claim to enumerate nothing, and none of them may be a finding.
+    Write-Host "check 37 -- an unpaired marker is an error; no marker is not a subject" -ForegroundColor Cyan
+    $s62Path  = Join-Path $s58Dir 'listed-unpaired.ps1'
+    $s62Lines = @(
+        '<#'
+        '.DESCRIPTION'
+        "    $clOpen"
+        '      1. the first thing.'
+        '#>'
+        '# --- 1. the first thing -------------------------------------------------'
+        '$a = 1'
+    )
+    [System.IO.File]::WriteAllText($s62Path, (($s62Lines -join "`n") + "`n"), $Utf8NoBom)
+    $rC62 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True ($rC62.Out -match 'listed-unpaired\.ps1:.*has no matching') 'scenario 62: the opener without a closer is a hard error, not a silent skip'
+    Remove-Item -LiteralPath $s62Path -Force
+
+    $s62bPath  = Join-Path $s58Dir 'listed-unmarked.ps1'
+    $s62bLines = @(
+        '# --- 1. the first thing -------------------------------------------------'
+        '$a = 1'
+        ''
+        '# --- 2. the second thing ------------------------------------------------'
+        '$b = 2'
+    )
+    [System.IO.File]::WriteAllText($s62bPath, (($s62bLines -join "`n") + "`n"), $Utf8NoBom)
+    $rC62b = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True (-not ($rC62b.Out -match 'listed-unmarked\.ps1')) 'scenario 62: a file with headers and no marker claims nothing, so it is not a subject'
+    Assert-True ($rC62b.Out -match '\[check-list\] checked \d+') 'scenario 62: and the check still reports its coverage, so opting out is not the same as not running'
+    Remove-Item -LiteralPath $s62bPath -Force
+
+    # --- Scenario 63: a nested enumeration inside an entry's prose is not a claim --------------------
+    #     Found by PROBING the check rather than by measuring the tree -- the real list contains no such
+    #     shape, so no measurement of it would have surfaced this (check 35's lesson, applied to its
+    #     neighbour). A number opening a line is ordinary inside an entry's prose, and counting one as a
+    #     claim silences the check exactly where it matters: the nested pair below would keep satisfying
+    #     headers that had been dropped from the list, with the gate green.
+    Write-Host "check 37 -- a number opening a line inside an entry's prose is not a claim" -ForegroundColor Cyan
+    $s63Path  = Join-Path $s58Dir 'listed-nested.ps1'
+    $s63Lines = @(
+        '<#'
+        '.DESCRIPTION'
+        "    $clOpen"
+        '      1. the first thing.'
+        '      2. the second thing, which documents two cases of its own:'
+        '         3. the first case -- indented past the gutter, so it is prose, not an entry.'
+        '         4. the second case.'
+        "    $clClose"
+        '#>'
+        '# --- 1. the first thing -------------------------------------------------'
+        '$a = 1'
+        ''
+        '# --- 2. the second thing ------------------------------------------------'
+        '$b = 2'
+        ''
+        '# --- 3. the one the nested list would have covered for -------------------'
+        '$c = 3'
+    )
+    [System.IO.File]::WriteAllText($s63Path, (($s63Lines -join "`n") + "`n"), $Utf8NoBom)
+    $rC63 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True ($rC63.Out -match 'listed-nested\.ps1:16:.*check 3 has a section header but no entry') 'scenario 63: the nested 3. does not satisfy header 3 -- the gap is still reported'
+    Assert-Equal 1 ([regex]::Matches($rC63.Out, $ClFindingPattern).Count) 'scenario 63: and the nested 4., which matches no header, adds nothing -- exactly one finding'
+    Remove-Item -LiteralPath $s63Path -Force
+
+    # --- Scenario 64: two spans in one file are unioned and counted once -----------------------------
+    #     Run inside the span callback this counted each header once PER SPAN, so a second span doubled
+    #     the coverage figure and named one missing entry twice -- one defect, two owners, which is what
+    #     the first-occurrence rule for headers already avoids. A split list still enumerates one file,
+    #     so the union is the tolerant reading rather than an error of its own.
+    Write-Host "check 37 -- two spans are read as one list, and a gap is named once" -ForegroundColor Cyan
+    $s64Path  = Join-Path $s58Dir 'listed-twospans.ps1'
+    $s64Lines = @(
+        '<#'
+        '.DESCRIPTION'
+        '    The early checks:'
+        "    $clOpen"
+        '      1. the first thing.'
+        "    $clClose"
+        '    And the later ones:'
+        "    $clOpen"
+        '      2. the second thing.'
+        "    $clClose"
+        '#>'
+        '# --- 1. the first thing -------------------------------------------------'
+        '$a = 1'
+        ''
+        '# --- 2. the second thing ------------------------------------------------'
+        '$b = 2'
+        ''
+        '# --- 3. the one in neither span ------------------------------------------'
+        '$c = 3'
+    )
+    [System.IO.File]::WriteAllText($s64Path, (($s64Lines -join "`n") + "`n"), $Utf8NoBom)
+    $rC64 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-Equal 1 ([regex]::Matches($rC64.Out, $ClFindingPattern).Count) 'scenario 64: the header in neither span is one finding, not one per span'
+    Assert-True ($rC64.Out -match "any of this file's 2 'checks:list' spans \(lines 4, 8\)") 'scenario 64: and the finding names both spans, since either could hold the entry'
+    Remove-Item -LiteralPath $s64Path -Force
 } finally {
     if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture -ErrorAction SilentlyContinue }
 }
