@@ -859,6 +859,24 @@ laps that refused:
 | **voided ONLY inside the non-required tail** | **5 (5.1%)** — what C removes |
 | voided inside the tail *and* before it | 0 |
 
+**The predicate, beside the number** ([#1750](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1750)).
+The population is every `ci.yml` `pull_request` run between `2026-09-05 17:58Z` and `2026-09-08 10:51Z`,
+one row per lap; the window per lap is `[run.created_at, last_check.completed_at]` — ending at the **last
+check of any kind**, which is what makes the two tail rows mean anything; voided is `main` gaining a
+first-parent commit inside it; and the discount is `Test-IsFoldOnlyCommit` itself, re-run over the same 99
+laps and reported identical. A rate without those four cannot be re-measured, only argued with — which is
+the general lesson, and the reason this paragraph exists at all.
+
+**The voiding row is unreconciled, and it is the one to be careful with.** A re-measurement over the same
+four days scored **3 of 193 laps (1.6%)** against this table's 25.3%. The window is the obvious suspect —
+that pass ended its own at `run.updated_at`, inside the tail — but the table bounds the window's share at
+5: tail-only is 5 and tail-and-before is 0, so narrowing to the required check's conclusion moves 25.3% to
+**20.2%** and no further. The residual is in the *discount*: this sample discounted 12 of its 37 raw
+voidings (32%), the re-measurement 39 of 42 (93%), against a trunk that ran 114 folds in 255 first-parent
+commits (**44.7%**) over those same four days by the real classifier. Neither pass is shown wrong and the
+direction is identical in both, which is all the decision below rests on — but **a decision sized off
+25.3% is being sized off the half that is still open**. The three governance rows are not in dispute.
+
 **5.1% is the mean and the mean is the wrong statistic here.** All five sit on ONE day, the busiest in
 the sample: **5 of the 8 tail-governed laps that day (62.5%)** lost a lap, against **0 of 13** across the
 three quieter days. The governance share and the tail length are flat across all four days, so what moves
