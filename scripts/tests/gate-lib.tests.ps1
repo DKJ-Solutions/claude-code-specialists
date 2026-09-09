@@ -610,6 +610,72 @@ try {
     # would put a lane count on the command line of every ordinary run for no effect.
     Assert-True ($shipPr -match '\$MaxParallel -gt 0.*\$openArgs \+=') 'ship-pr forwards it to open-pr only when it was actually asked for'
 
+    # ---------------------------------------------------------------------------------------------
+    # 18. Get-CiTestCertificate -- the third evidence source (issue #1715).
+    #
+    # WRITTEN FROM THE REFUSAL SIDE, like every other case in this file, and here the asymmetry is at
+    # its sharpest: a false negative costs one 30-minute gate run, a false positive lets a commit
+    # merge on a certificate that was issued for a DIFFERENT commit. So the SHA comparison and the
+    # all-or-nothing bucket rule each get their own case, and the happy path is one line.
+    $sha  = 'a' * 40
+    $other = 'b' * 40
+    $green = '[{"name":"lint-en-tests","bucket":"pass"}]'
+
+    $c18a = Get-CiTestCertificate -HeadSha $sha -PrHeadSha $sha -RequiredChecksJson $green
+    Assert-True $c18a.Certified 'a required check green on the exact HEAD certifies the commit'
+    Assert-True ($c18a.Note -match 'lint-en-tests') 'and the note names the check that carried it'
+    Assert-True ($c18a.Note -match [regex]::Escape($sha.Substring(0, 8))) 'and the commit it was issued for'
+
+    # THE CASE THIS FUNCTION EXISTS TO REFUSE. A moved trunk, a bring-forward, an unpushed local
+    # commit -- all three arrive here as "the PR head is not this HEAD", and all three must run.
+    $c18b = Get-CiTestCertificate -HeadSha $sha -PrHeadSha $other -RequiredChecksJson $green
+    Assert-True (-not $c18b.Certified) 'a certificate for another commit does NOT certify this one'
+    Assert-True ($c18b.Note -match 'different commit') 'and the refusal says why in those words'
+
+    # No PR yet: the first open-pr of a branch. Not an error, not a skip.
+    Assert-True (-not (Get-CiTestCertificate -HeadSha $sha -PrHeadSha '' -RequiredChecksJson $green).Certified) 'no PR head -> no certificate'
+    Assert-True (-not (Get-CiTestCertificate -HeadSha '' -PrHeadSha $sha -RequiredChecksJson $green).Certified) 'no local HEAD -> no certificate'
+
+    # EMPTY IS THE AMBIGUOUS ANSWER AND IT RESOLVES TOWARD THE GATE. `gh pr checks --required`
+    # reports what has REGISTERED, so "nothing required" and "nothing registered yet" are the same
+    # payload -- the race Get-RequiredCheckContexts documents. Skipping on it would hand every
+    # GitHub Free consumer a permanently skipped test gate.
+    foreach ($empty in @('', '   ', '[]', 'not json at all')) {
+        $label = if ($empty.Trim()) { "'$empty'" } else { 'an empty payload' }
+        Assert-True (-not (Get-CiTestCertificate -HeadSha $sha -PrHeadSha $sha -RequiredChecksJson $empty).Certified) "$label is not a certificate"
+    }
+
+    # ALL OF THEM OR NONE. A green subset is the shape that would look right in every casual test and
+    # be wrong exactly when it matters: the required check that is still pending is the one whose
+    # answer nobody has yet.
+    $mixed = '[{"name":"lint-en-tests","bucket":"pass"},{"name":"branch-entry","bucket":"pending"}]'
+    $c18c = Get-CiTestCertificate -HeadSha $sha -PrHeadSha $sha -RequiredChecksJson $mixed
+    Assert-True (-not $c18c.Certified) 'one required check still pending refuses the whole certificate'
+    Assert-True ($c18c.Note -match 'branch-entry') 'and the refusal names which one'
+    $failing = '[{"name":"lint-en-tests","bucket":"fail"}]'
+    Assert-True (-not (Get-CiTestCertificate -HeadSha $sha -PrHeadSha $sha -RequiredChecksJson $failing).Certified) 'a red required check refuses it too'
+
+    # 5.1 HANDS A ONE-ELEMENT JSON ARRAY THROUGH AS THE OBJECT ITSELF, which is why the parse wraps
+    # before it filters. This repo's own ruleset requires exactly ONE check, so a collapse here would
+    # be invisible in the source repo and would surface only in a consumer with two.
+    $twoGreen = '[{"name":"a","bucket":"pass"},{"name":"b","bucket":"pass"}]'
+    Assert-True (Get-CiTestCertificate -HeadSha $sha -PrHeadSha $sha -RequiredChecksJson $twoGreen).Certified 'two green required checks certify'
+
+    # 19. And the wiring: gate-lib honours the certificate, open-pr computes one, and neither records
+    # it as local gate evidence. Shape asserts -- running open-pr for real would run the gate this
+    # branch exists to skip.
+    $gateSrc = [System.IO.File]::ReadAllText($LibPath)
+    Assert-True ($gateSrc -match '\[string\]\$TestsProvedByCi') 'Invoke-WorkflowGates takes the certificate as a string, not a switch'
+    Assert-True ($gateSrc -match 'elseif \(\$TestsProvedByCi\)') 'and consults it AFTER the local record and BEFORE the suites'
+    Assert-True ($openPr -match 'Get-CiTestCertificate') 'open-pr computes the certificate'
+    Assert-True ($openPr -match "if \(\`$existingPr -and -not \`$SkipTests\)") 'only where a PR exists and the suites were going to run'
+    Assert-True ($openPr -match "'--required'") 'and asks for the REQUIRED checks, i.e. the trunk''s own bar'
+    # The one assertion that keeps the skip from silently outliving its certificate: a remote green
+    # must never be filed as "this machine proved this tree", which Test-GateEvidence would then
+    # honour for four hours.
+    $certBranch = [regex]::Match($gateSrc, 'elseif \(\$TestsProvedByCi\)(.|\n)*?\} elseif').Value
+    Assert-Equal 0 ([regex]::Matches($certBranch, 'Save-GateEvidence').Count) 'the CI certificate is NOT written into the local evidence record'
+
 } finally {
     if (Test-Path -LiteralPath $FixtureRoot) {
         Remove-Item -Recurse -Force -LiteralPath $FixtureRoot -ErrorAction SilentlyContinue

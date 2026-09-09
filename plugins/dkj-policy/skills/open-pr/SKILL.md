@@ -85,6 +85,8 @@ The script:
    pushed and no PR is opened. `-SkipLint` / `-SkipTests` are the deliberate escape valves, and
    `-MaxParallel <n>` runs the suites *smaller* rather than not at all — see
    [When the test gate will not finish](#when-the-test-gate-will-not-finish--maxparallel-not--skiptests).
+   The test half is skipped where **CI has already certified this exact commit** — see
+   [The CI certificate](#the-ci-certificate-when-the-test-gate-does-not-run-at-all).
 6. Pushes the current branch and opens a PR to `main` via `gh`, with a label based on the
    branch prefix and a pre-filled PR body from `.github/pull_request_template.md` +
    the changelog entry file. If the branch already had an open PR, the push **is** the update and
@@ -122,6 +124,57 @@ different verdict about the same tree.
 **A green run records gate evidence like any other**, so a later `open-pr` on the identical tree skips what
 this already proved. And it is placed *after* both pre-flights and *before* the branch check, deliberately:
 everything below that check is about a branch, a push or a PR, and none of it applies here.
+
+## The CI certificate: when the test gate does not run at all
+
+The gate records what it proved and skips a tree it has already seen — that is the gate evidence above,
+and it is keyed on a **local** fingerprint. Since
+[#1715](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1715) there is a second thing it
+consults, for the one case the fingerprint misses by construction:
+
+**`ship-pr` calls this script, and in between the branch is routinely brought forward onto a moved
+trunk.** `HEAD` is then a commit no local run has ever seen, so the fingerprint misses and every suite
+runs again — on the very commit whose required check has just gone green. Measured on PR #1708: the
+same 85 suites started for the **third** time, ~30 minutes each locally, while `lint-en-tests pass` was
+already on the screen.
+
+So before the gates, and **only where a PR already exists**, the script asks two questions of `gh`:
+
+| | |
+|---|---|
+| `gh pr view <n> --json headRefOid` | which commit did CI actually run against? |
+| `gh pr checks <n> --required --json name,bucket` | are the trunk's **required** checks green on it? |
+
+Where the PR head **is** this `HEAD` and every required check is in the `pass` bucket, the test gate
+reports what carried it and does not run:
+
+```text
+test gate: satisfied by CI -- lint-en-tests green on this exact commit (1e805d22). Not run again locally (#1715).
+```
+
+**The certificate is stronger evidence than the run it replaces**, which is what makes this a skip and
+not a relaxation. CI ran the same suites on a clean checkout of that exact commit, and it is the
+certificate the **merge** is gated on — the trunk's ruleset blocks the merge until that context passes.
+A local re-run cannot change the merge decision; it can only delay it.
+
+**Every ambiguity runs the gate.** No PR yet, a PR head that is not this `HEAD` (an unpushed commit, a
+bring-forward, a moved trunk), an unreadable answer, **zero** required checks, or any required check not
+green — each of those prints its reason and the suites run exactly as they always did:
+
+```text
+test gate: no CI certificate for this commit -- the PR head (7c1a44f0) is not this HEAD (1e805d22) -- the certificate is about a different commit. The suites run below.
+```
+
+The zero case matters most in a consumer: `gh pr checks --required` reports the required checks that
+have **registered**, so a workflow which has not created its check run yet is indistinguishable from a
+trunk that requires nothing. Both read as *no certificate*, so a repo with no required check at all —
+the GitHub Free case — keeps running its full local gate forever, which is the correct answer rather
+than a gap.
+
+**The lint gate is not skipped this way**, deliberately: it is seconds rather than half an hour, so
+there is nothing to buy. And the certificate is **not** written into the gate-evidence record — that
+record means *this machine proved this tree*, and filing a remote green in it would make the skip
+outlive the certificate by up to four hours. It is re-read in seconds on the next run instead.
 
 ## When the test gate will not finish: `-MaxParallel`, not `-SkipTests`
 

@@ -1491,7 +1491,41 @@ Fast-forward it and read what is there before trying again:
 # -GatesOnly (handled near the top, right after the pre-flights) is that route, and what it runs is
 # THIS function rather than a second copy of it: the whole value of the flag is that the two cannot
 # describe the tree differently.
-if (-not (Invoke-WorkflowGates -RepoRoot $repoRoot -SkipLint:$SkipLint -SkipTests:$SkipTests -MaxParallel $MaxParallel -Context 'the PR' -FailureConsequence 'branch not pushed, no PR opened')) {
+# AND THEY ALSO CONSULT WHAT **CI** ALREADY PROVED (issue #1715, September 9, 2026). The record above
+# is keyed on a local fingerprint, so it misses the expensive case by construction: ship-pr calls this
+# script, and in between the branch is routinely brought forward onto a moved trunk. HEAD is then a
+# commit no local run has seen -- the fingerprint misses and the full suite runs, on the very commit
+# whose `lint-en-tests pass` is still on the screen. Measured on PR #1708: three runs of one 85-suite
+# measurement, ~30 min each locally, for a two-file docs change that took over two hours end to end.
+#
+# ONLY ASKED WHERE THERE IS SOMETHING TO ASK ABOUT: a PR must already exist, and -SkipTests already
+# says the suites are not running. On the first open-pr of a branch there is no PR and no certificate,
+# so this costs nothing and changes nothing -- which is also why the -GatesOnly route six hundred lines
+# above does not carry it.
+#
+# TWO READS, BOTH CHEAP, BOTH FAIL TOWARD RUNNING THE GATE. A failed or unreadable answer is not "no
+# required checks"; Get-CiTestCertificate refuses on every ambiguity and the suites then run exactly as
+# they always did. `--required` is what makes the second read the trunk's own bar rather than this
+# script's opinion of it -- and its known race (a required workflow that has not registered yet reads
+# as nothing required) resolves here toward the gate, not past it.
+$testsProvedByCi = ''
+if ($existingPr -and -not $SkipTests) {
+    $headSha = (Invoke-NativeCapture -FilePath 'git' -Arguments @('-C', $repoRoot, 'rev-parse', 'HEAD') -DiscardStderr)
+    $prHead  = Invoke-NativeCapture -FilePath 'gh' -Arguments @('pr', 'view', "$($existingPr.number)", '--json', 'headRefOid', '--jq', '.headRefOid', '--repo', $repo) -DiscardStderr
+    $reqJson = Invoke-NativeCapture -FilePath 'gh' -Arguments @('pr', 'checks', "$($existingPr.number)", '--required', '--json', 'name,bucket', '--repo', $repo) -DiscardStderr
+    # `gh pr checks` EXITS NON-ZERO WHEN ANY CHECK IS FAILING OR STILL PENDING -- that is documented
+    # behaviour and not an error, so the payload is judged on its own rather than on the exit code.
+    # A red required check simply lands in the not-passing list below and refuses the skip.
+    $cert = Get-CiTestCertificate -HeadSha ($headSha.Output -join '') `
+                                  -PrHeadSha ($prHead.Output -join '') `
+                                  -RequiredChecksJson ($reqJson.Output -join "`n")
+    if ($cert.Certified) {
+        $testsProvedByCi = $cert.Note
+    } else {
+        Write-Host "test gate: no CI certificate for this commit -- $($cert.Note). The suites run below." -ForegroundColor DarkGray
+    }
+}
+if (-not (Invoke-WorkflowGates -RepoRoot $repoRoot -SkipLint:$SkipLint -SkipTests:$SkipTests -MaxParallel $MaxParallel -Context 'the PR' -FailureConsequence 'branch not pushed, no PR opened' -TestsProvedByCi $testsProvedByCi)) {
     exit 1
 }
 
