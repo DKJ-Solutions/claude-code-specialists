@@ -43,7 +43,44 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**39 / 95 minor entries** <!-- pending-tally -->
+**40 / 96 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1734-guard-live-theme-uses-command-guard-lib · 20260909-221442
+
+`guard-live-theme.ps1` dot-sources `command-guard-lib.ps1` instead of carrying its own copy of the
+heredoc stripping, the here-string stripping, the leading-command reader and the segment split. #1669
+extracted that machinery out of this very hook so a second guard could reuse it, and then left the
+original copy standing -- two copies of one behaviour, free to drift, with the copy that drifts being
+whichever nobody looks at. The lib is mirrored into `dkj-subagents-shopify` as its own registry entry
+(`command-guard-lib-shopify`) rather than reached for across plugin trees, because the two plugins are
+separately versioned and a Shopify consumer may run this team without the workflow plugin.
+
+All 102 existing cases pass unedited. Eight new ones pin what the swap changed: the wrapper expansion,
+its one new false positive (`perl -c`), and a broken install degrading towards checking rather than
+switching the guard off.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+A consumer running this plugin sees the same guard it had, with two differences worth knowing. A
+`perl -c "..."` command containing a theme publish, delete or live push is now refused where it used
+to pass -- a false positive, since `perl -c` only syntax-checks, and the price of the wrapper handling
+becoming explicit. And an install missing `command-guard-lib.ps1` no longer behaves unpredictably: the
+guard keeps blocking, matching the whole command without the authoring exemptions, and says on stderr
+which file to reinstall. `perl -e` is unchanged.
+
+**Score:** 2
+
+#### Pull Request
+
+guard-live-theme dot-sources the shared command-guard machinery instead of carrying its own copy
+
+Plugins: dkj-subagents-shopify
+
+[PR #1756](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1756)
+
+---
 
 ### DEPLOY: feat/1669-subagent-working-copy-guard · 20260909-215328
 
