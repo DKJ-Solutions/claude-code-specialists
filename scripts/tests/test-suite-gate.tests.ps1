@@ -623,6 +623,124 @@ Write-Host "GATE-RESULT: `$r"
     # never defines the shadow and Get-ResidentPowerShellCount runs its real Get-Process body.
     $r = Invoke-Gate -TestsDir $ok
     Assert-True ($r.Text -match 'GATE-RESULT: True') 'the real, unshadowed resident-count path still passes suites'
+
+    # --- 8. A CRASHED suite is not a FAILED one (issue #1723) ---------------------------------------
+    #
+    # WHAT WENT WRONG. The gate judged a suite on its exit code alone, so a child killed by an
+    # unhandled AccessViolationException inside the PowerShell engine was reported as
+    # 'FAILED (exit -1073741819)'. That reads as a suite that ran and said no. It did not run: it wrote
+    # no [FAIL] line and no summary, so every minute a reader then spent looking for the failing assert
+    # was spent on an assert that does not exist. Measured September 9, 2026 on a 30-lane pool --
+    # branch-entry-gate.tests.ps1 ended mid-suite on a [PASS] line, its .err file carrying
+    # WildcardPatternMatcher.PatternPositionsVisitor.Add under CommandSearcher.SearchForFunctions, and
+    # it passed 49/49 on its own re-run.
+    #
+    # THE FIXTURE EXITS WITH THE CRASH CODE RATHER THAN CRASHING. An access violation cannot be raised
+    # on demand from PowerShell, and it does not need to be: what the gate reads is the exit code, and
+    # `exit -1073741819` produces exactly the value the OS leaves behind for 0xC0000005. What is under
+    # test is the discriminator and the lone re-run, not the engine fault.
+    Write-Host "a crashed suite -- no verdict, so it is re-run alone instead of being called a failure" -ForegroundColor Cyan
+
+    # 8a. Crashes once, passes on the re-run: the gate must go GREEN and still say what happened.
+    $crashOnce = Join-Path $Fixture 'suites-crash-once'
+    $marker    = Join-Path $Fixture 'crash-once.marker'
+    New-FakeSuite -Dir $crashOnce -Name 'flaky.tests.ps1' -Body @"
+if (Test-Path -LiteralPath '$marker') { Write-Host 'MARKER-RETRY-RAN'; exit 0 }
+Set-Content -LiteralPath '$marker' -Value 'seen'
+Write-Host 'MARKER-FIRST-RUN'
+exit -1073741819
+"@
+    New-FakeSuite -Dir $crashOnce -Name 'z-good.tests.ps1' -Body "Write-Host 'MARKER-GOOD'`r`nexit 0`r`n"
+    $r = Invoke-Gate -TestsDir $crashOnce
+    if ($r.CaptureDir) { $script:KeptCaptureDirs += $r.CaptureDir }
+    Assert-True ($r.Text -match 'GATE-RESULT: True') 'a crash cleared by its lone re-run does not fail the gate'
+    Assert-Says $r.Flat 'CRASHED (exit 0xC0000005)' 'the pool run says CRASHED, with the code as hex a reader can look up'
+    Assert-Says $r.Flat 'the process died' 'and says that is what happened, rather than naming an assert'
+    Assert-True ($r.Flat -notmatch 'FAILED \(exit -1073741819\)') 'and never reports the crash as a failed verdict'
+    Assert-Says $r.Flat 're-ran ALONE and PASSED' 'the re-run is reported, not silently swallowed'
+    Assert-Says $r.Text 'MARKER-RETRY-RAN' "and the re-run's own output is printed"
+    Assert-Says $r.Flat 'crashed in the pool and passed alone: flaky.tests.ps1' 'the GREEN verdict names it -- that is the line a session quotes'
+
+    # 8b. Crashes every time: red, and still called a crash rather than dressed up as a verdict.
+    $crashAlways = Join-Path $Fixture 'suites-crash-always'
+    New-FakeSuite -Dir $crashAlways -Name 'dead.tests.ps1' -Body "Write-Host 'MARKER-DEAD'`r`nexit -1073741819`r`n"
+    $r = Invoke-Gate -TestsDir $crashAlways
+    if ($r.CaptureDir) { $script:KeptCaptureDirs += $r.CaptureDir }
+    Assert-True ($r.Text -match 'GATE-RESULT: False') 'a suite that crashes alone as well fails the gate -- nothing merges on a crash'
+    Assert-Says $r.Flat 'CRASHED AGAIN alone' 'and the second crash is named as a crash'
+    Assert-Says $r.Flat 'dead.tests.ps1' 'the verdict names the suite'
+
+    # 8c. THE GUARD THAT MATTERS MOST: an ordinary failure is NOT retried. A suite that exits 1 has
+    # measured the tree and said no; re-running that would mask a verdict, which is the whole reason
+    # the discriminator is the sign bit and not "the suite went red".
+    $failOnce = Join-Path $Fixture 'suites-fail-counted'
+    $counter  = Join-Path $Fixture 'fail-runs.txt'
+    New-FakeSuite -Dir $failOnce -Name 'honest-red.tests.ps1' -Body @"
+Add-Content -LiteralPath '$counter' -Value 'run'
+Write-Host 'MARKER-RED'
+exit 1
+"@
+    $r = Invoke-Gate -TestsDir $failOnce
+    if ($r.CaptureDir) { $script:KeptCaptureDirs += $r.CaptureDir }
+    Assert-True ($r.Text -match 'GATE-RESULT: False') 'an ordinary failure still fails the gate'
+    Assert-Equal 1 (@(Get-Content -LiteralPath $counter)).Count 'and it ran exactly ONCE -- a failure is a verdict, never a retry'
+    Assert-Says $r.Flat 'FAILED (exit 1)' 'and is reported as a failure, not as a crash'
+    Assert-True ($r.Flat -notmatch 'CRASHED') 'with no crash wording anywhere in the run'
+
+    # 8e. A NEGATIVE EXIT CODE IS NOT ENOUGH -- the window is NTSTATUS's, not the sign bit's.
+    #
+    # WHY THIS CASE EXISTS (Sebastian's security review of #1723). The first version of the
+    # discriminator tested the sign bit alone, and `exit -1` is a line any .tests.ps1 may write: it
+    # arrives as 0xFFFFFFFF, so under that test a suite could hand ITSELF the free re-run that the
+    # neighbouring promise -- an ordinary verdict is never retried -- exists to deny it. The fixture
+    # below is that exact suite, and it must be treated as an honest red.
+    $negOne  = Join-Path $Fixture 'suites-exit-minus-one'
+    $negRuns = Join-Path $Fixture 'neg-runs.txt'
+    New-FakeSuite -Dir $negOne -Name 'sneaky.tests.ps1' -Body @"
+Add-Content -LiteralPath '$negRuns' -Value 'run'
+if ((@(Get-Content -LiteralPath '$negRuns')).Count -ge 2) { Write-Host 'MARKER-SECOND-CHANCE'; exit 0 }
+Write-Host 'MARKER-NEGATIVE-ONE'
+exit -1
+"@
+    $r = Invoke-Gate -TestsDir $negOne
+    if ($r.CaptureDir) { $script:KeptCaptureDirs += $r.CaptureDir }
+    Assert-True ($r.Text -match 'GATE-RESULT: False') 'a suite exiting -1 fails the gate -- a negative code is not a crash claim'
+    Assert-Equal 1 (@(Get-Content -LiteralPath $negRuns)).Count 'and it got NO second chance, so a suite cannot hand itself one'
+    Assert-True ($r.Flat -notmatch 'CRASHED') 'and nothing calls it a crash'
+    Assert-True ($r.Text -notmatch 'MARKER-SECOND-CHANCE') 'the pass it had waiting was never reached'
+
+    # 8f. The discriminator itself, in-process: the NTSTATUS window, not a list of known codes.
+    . $LibPath
+    Assert-True (Test-GateSuiteCrashed -ExitCode -1073741819) '0xC0000005 (access violation) reads as a crash'
+    Assert-True (Test-GateSuiteCrashed -ExitCode -1073741571) '0xC00000FD (stack overflow) reads as one too -- no code is enumerated'
+    Assert-True (Test-GateSuiteCrashed -ExitCode -1073740791) '0xC0000409 (stack buffer overrun) as well -- the whole facility, not four literals'
+    Assert-True (-not (Test-GateSuiteCrashed -ExitCode -1)) '0xFFFFFFFF is NOT a crash: severity ERROR, but not NT'"'"'s own facility'
+    Assert-True (-not (Test-GateSuiteCrashed -ExitCode -2)) 'nor is any other small negative a script would choose'
+    Assert-True (-not (Test-GateSuiteCrashed -ExitCode -2147483648)) 'nor 0x80000000, whose severity is WARNING'
+    # CTRL+C IS INSIDE THE WINDOW AND IS NOT A CRASH (Marlowe's red-team of #1723). Every suite child
+    # shares one console via -NoNewWindow, so interrupting a stuck 30-lane run delivers CTRL_C_EVENT to
+    # all of them at once -- and without this exclusion the gate would answer a deliberate stop by
+    # re-running everything it had just been told to abandon.
+    Assert-True (-not (Test-GateSuiteCrashed -ExitCode 0xC000013A)) 'nor STATUS_CONTROL_C_EXIT -- Ctrl+C is a stop, not a fault'
+    Assert-True (Test-GateSuiteCrashed -ExitCode 0xC0000139)  'while its neighbours in the window still are (0xC0000139)'
+    Assert-True (Test-GateSuiteCrashed -ExitCode 0xC000013B)  'on both sides of it (0xC000013B) -- one status is excluded, not a range'
+    Assert-True (-not (Test-GateSuiteCrashed -ExitCode 1)) "a suite's own 'exit 1' is a verdict"
+    Assert-True (-not (Test-GateSuiteCrashed -ExitCode 0)) 'and so is exit 0'
+    Assert-True (-not (Test-GateSuiteCrashed -ExitCode $null)) 'an empty exit code is not claimed as a crash'
+    Assert-Equal '0xC0000005' (Format-GateExitCode -ExitCode -1073741819) 'a crash code is printed as hex'
+    Assert-Equal '0xFFFFFFFF' (Format-GateExitCode -ExitCode -1) 'a negative that is not a crash still prints as hex -- the formatter judges nothing'
+    Assert-Equal '1' (Format-GateExitCode -ExitCode 1) 'an ordinary one is printed as itself'
+
+    # AND THE REPO ITSELF MUST NOT HOLD ONE, which is the measurement the docstring cites. A suite or
+    # lib exiting negative would land in the window's blind spot by accident rather than by design.
+    $negOffenders = @()
+    foreach ($f in @(Get-ChildItem (Join-Path $RepoRoot 'scripts') -Recurse -Filter *.ps1 -File)) {
+        if ($f.FullName -eq $PSCommandPath) { continue }   # this file's own fixtures say `exit -1` on purpose
+        foreach ($m in [regex]::Matches((Get-Content -LiteralPath $f.FullName -Raw), '(?m)^\s*exit\s+-\d')) {
+            $negOffenders += $f.Name
+        }
+    }
+    Assert-Equal 0 $negOffenders.Count ("no script under scripts/ exits negative (offenders: " + ($negOffenders -join ', ') + ")")
 }
 finally {
     if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture -ErrorAction SilentlyContinue }
