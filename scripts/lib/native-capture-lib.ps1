@@ -141,6 +141,44 @@ $script:NativeCaptureSettleMilliseconds = 1000
 # kill that would otherwise look like "the machine is slow today".
 $script:ResidentPowerShellWarnThreshold = 20
 
+function Test-GateSuiteCrashed {
+    <#
+        DID THIS SUITE FAIL, OR DID ITS PROCESS DIE? -- issue #1723.
+
+        The gate judges a suite on its exit code alone, and until this function that made the two
+        indistinguishable: an unhandled AccessViolationException inside the PowerShell engine was
+        reported as 'FAILED (exit -1073741819)', which reads as a suite that ran and said no. It did
+        not run. It was killed, so it wrote no [FAIL] line and no summary, and every minute a reader
+        then spends looking for the failing assert is spent on an assert that does not exist.
+
+        MEASURED, September 9, 2026: branch-entry-gate.tests.ps1 under a 30-lane pool ended mid-suite
+        on a [PASS] line with no [FAIL] anywhere, and its .err file carried
+        System.AccessViolationException raised from WildcardPatternMatcher.PatternPositionsVisitor.Add
+        under CommandSearcher.SearchForFunctions -- a Get-Command probe faulting while walking the
+        function table. Re-run alone on the same tree: 'OK: all 49 asserts passed.'
+
+        THE TEST IS THE SIGN BIT, and it is exact rather than a list of known codes. A process killed
+        by an unhandled structured exception exits with that exception's NTSTATUS -- 0xC0000005 for an
+        access violation, 0xC00000FD for a stack overflow -- every one of which has the high bit set
+        and therefore arrives as a NEGATIVE Int32. A suite's own verdict never can: it exits through
+        `exit 0` or `exit 1`. So no crash code has to be enumerated and none can be missed.
+    #>
+    param([Parameter(Mandatory = $true)][AllowNull()][object]$ExitCode)
+    if ($null -eq $ExitCode) { return $false }
+    return ([int]$ExitCode -lt 0)
+}
+
+function Format-GateExitCode {
+    <# A crash code as the hex a reader can look up, an ordinary one as itself -- issue #1723. #>
+    param([Parameter(Mandatory = $true)][int]$ExitCode)
+    # NO [uint32] CAST: PowerShell's is CHECKED, so it throws on a negative Int32 rather than
+    # reinterpreting the bits -- which is how the first version of this failed, inside the gate's own
+    # report. Int32's own hex format is already two's complement, so -1073741819 formats as C0000005
+    # with no conversion at all.
+    if ($ExitCode -lt 0) { return ('0x{0:X8}' -f $ExitCode) }
+    return "$ExitCode"
+}
+
 function Format-GateSeconds {
     <#
         The elapsed-seconds figure Invoke-TestSuiteGate prints, FORMATTED INVARIANTLY -- and that is not
@@ -1064,9 +1102,26 @@ function Invoke-TestSuiteGate {
         sightings of these same suites: the Start-Job fan-out of August 12, 2026 (6 of 31, all green
         alone) and the two reds in the post-split pool of August 16 (bootstrap-drift and fix-mojibake,
         both green alone, not diagnosed). What cost 22 minutes of that release was not the flake; it was
-        that neither page was reached before the chase started. NOT REPAIRED HERE, deliberately and for
-        the same reason the console is not isolated above: three sightings and no reproduction is a
-        hazard to name, not yet a mechanism to fix.
+        that neither page was reached before the chase started.
+
+        AND SINCE #1723 ONE HALF OF IT IS REPAIRED -- THE HALF THAT WAS NEVER A FLAKE. #1723 measured a
+        30-lane run whose two reds had two different shapes, and only one of them was this paragraph's
+        subject. The other was a suite whose PROCESS DIED: branch-entry-gate.tests.ps1 ended mid-suite on
+        a [PASS] line with no [FAIL] anywhere, its .err file carrying System.AccessViolationException from
+        WildcardPatternMatcher.PatternPositionsVisitor.Add under CommandSearcher.SearchForFunctions -- a
+        Get-Command probe faulting while walking the function table. That suite did not fail; it never
+        finished, so it returned no verdict at all, and this function reported it as
+        'FAILED (exit -1073741819)' because it judges on the exit code alone.
+        A CRASH IS THEREFORE NOT A VERDICT, and it is now told apart from one: Test-GateSuiteCrashed
+        reads the sign bit (see it for why that is exact rather than a list of codes), the header says
+        CRASHED with the code as hex, and the suite is re-run ALONE once after the pool has emptied --
+        which is precisely what the paragraph above already told a reader to do by hand. Green on the
+        re-run leaves the gate green and still names the crash on the verdict line; a second crash, or a
+        real failure the crash was hiding, is red.
+        WHAT IS STILL NOT REPAIRED is the flake this paragraph opened with -- a suite that exits 1 under
+        the pool and 0 alone. Nothing here retries that, deliberately: an exit 1 has measured the tree
+        and said no, so re-running it would mask a verdict rather than obtain one. The console is still
+        not isolated either, for the reason given above.
 
         SHARDING: -Shard/-ShardCount RUN ONE SLICE OF THE POOL (issue #1351, September 3, 2026). The
         paragraph above says the lever is the slowest FILE and that splitting one is available where
@@ -1270,6 +1325,11 @@ function Invoke-TestSuiteGate {
     $launchDir  = (Get-Location).Path
     $sw         = [System.Diagnostics.Stopwatch]::StartNew()
     $failedNames = New-Object System.Collections.ArrayList
+    # THE SUITES WHOSE PROCESS DIED IN THE POOL, whatever their lone re-run then decided -- issue #1723.
+    # Out here beside $failedNames because the verdict is printed after the pool block has closed, and a
+    # crash that was cleared by its re-run has to reach the GREEN verdict too: that is the line a session
+    # copies into a branch document, and 'all 85 suites passed' is not the whole of what happened.
+    $crashedNames = New-Object System.Collections.ArrayList
     # PER-SUITE DURATIONS, RECORDED RATHER THAN RECONSTRUCTED -- issue #1358. This function used to time
     # only the whole pool, and it buffers each suite's output until that suite exits, so the ONLY per-suite
     # signal in a log was the timestamp of a completed suite's first line: a FINISH time. Subtracting the
@@ -1315,6 +1375,11 @@ function Invoke-TestSuiteGate {
         # and its two file paths are held at once; after $running.Remove the paths are gone, the same reason
         # $suiteTimings is filled there.
         $failedCaptureFiles = New-Object System.Collections.ArrayList
+        # THE SUITES WHOSE PROCESS DIED, re-run one at a time once the pool is empty -- issue #1723.
+        # Collected rather than judged on the spot, because a crash is not a verdict about the tree and
+        # the standing response to one was already 'run that suite alone' -- see this function's own
+        # notes on #1033. Doing it here makes that response the gate's, instead of the next reader's.
+        $crashedSuites = New-Object System.Collections.ArrayList
 
         try {
             $queue = New-Object System.Collections.Queue
@@ -1341,7 +1406,10 @@ function Invoke-TestSuiteGate {
                     # wrong answer arrives as a plausible value instead of as an error.
                     $null = $proc.Handle
                     $running.Add([pscustomobject]@{
-                        Name = $suite.Name; Process = $proc; OutFile = $outFile; ErrFile = $errFile
+                        # Path, so a suite whose process died can be launched again without going back
+                        # to the pool for it -- issue #1723.
+                        Name = $suite.Name; Path = $suite.FullName
+                        Process = $proc; OutFile = $outFile; ErrFile = $errFile
                         # WHEN THIS LANE OPENED, off the gate's own stopwatch -- see $suiteTimings for why
                         # the offset is recorded and not just the duration (issue #1358).
                         StartOffset = $sw.Elapsed.TotalSeconds
@@ -1367,6 +1435,19 @@ function Invoke-TestSuiteGate {
                     }) | Out-Null
                     if ($code -eq 0) {
                         Write-Host "== $($d.Name) ==" -ForegroundColor Cyan
+                    } elseif (Test-GateSuiteCrashed -ExitCode $code) {
+                        # NOT ADDED TO $failedNames HERE -- issue #1723. A killed process returned no
+                        # verdict, so the pool has measured nothing about this suite yet; the lone
+                        # re-run below is what decides it. The word CRASHED is the point of the branch:
+                        # 'FAILED (exit -1073741819)' sent a reader hunting for an assert that never ran.
+                        Write-Host "== $($d.Name) == CRASHED (exit $(Format-GateExitCode -ExitCode $code)) -- the process died; no verdict" -ForegroundColor Magenta
+                        $crashedNames.Add($d.Name) | Out-Null
+                        $crashedSuites.Add([pscustomobject]@{
+                            Name = $d.Name; Path = $d.Path; ExitCode = $code
+                            Timing = ($suiteTimings | Where-Object { $_.Name -eq $d.Name } | Select-Object -Last 1)
+                        }) | Out-Null
+                        $failedCaptureFiles.Add($d.OutFile) | Out-Null
+                        $failedCaptureFiles.Add($d.ErrFile) | Out-Null
                     } else {
                         Write-Host "== $($d.Name) == FAILED (exit $code)" -ForegroundColor Red
                         $failedNames.Add($d.Name) | Out-Null
@@ -1385,6 +1466,66 @@ function Invoke-TestSuiteGate {
                     }
                     $running.Remove($d)
                 }
+            }
+
+            # A CRASHED SUITE IS RE-RUN ALONE, ONCE -- issue #1723.
+            #
+            # THIS IS NOT A RETRY ON FAILURE, and the distinction is the whole licence for it. A suite
+            # that exits 1 has measured the tree and said no; re-running that would be masking a
+            # verdict, and nothing here does it. A suite whose process was killed measured nothing --
+            # it has no [FAIL] line, no summary and no exit code of its own -- so there is no verdict
+            # to mask and re-running is the only way to get one. #1622 and #1723 both ended with a
+            # human doing exactly this by hand, on the advice this function's own docstring gives.
+            #
+            # ALONE AND AFTER THE POOL, not back into a lane: the fault measured in #1723 is a
+            # PowerShell 5.1 engine fault under 30-way contention, so a re-run beside 29 siblings is
+            # the same draw again. Sequential also bounds the cost -- one suite, once, and only when
+            # a crash actually happened, which is why an ordinary run never reaches this block.
+            #
+            # A SECOND CRASH IS A FAILURE, and it is reported as a crash rather than dressed up as
+            # one: the suite goes into $failedNames so the gate is red and nothing merges, and the
+            # word CRASHED stays on the line so the reader is not sent looking for an assert.
+            if ($crashedSuites.Count -gt 0) {
+                $word = if ($crashedSuites.Count -eq 1) { 'suite' } else { 'suites' }
+                Write-Host ''
+                Write-Host "test gate: $($crashedSuites.Count) $word CRASHED in the pool -- the process died without a verdict, so each is re-run ALONE (issue #1723)." -ForegroundColor Magenta
+                foreach ($c in $crashedSuites) {
+                    $retryOut = Join-Path $captureDir ($c.Name + '.retry.out.txt')
+                    $retryErr = Join-Path $captureDir ($c.Name + '.retry.err.txt')
+                    $rp = Start-Process -FilePath 'powershell' `
+                        -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', ('"' + $c.Path + '"')) `
+                        -WorkingDirectory $launchDir -NoNewWindow -PassThru `
+                        -RedirectStandardOutput $retryOut -RedirectStandardError $retryErr
+                    $null = $rp.Handle      # same reason as the pool's launch: without it .ExitCode is empty
+                    $rp.WaitForExit()
+                    $rc = $rp.ExitCode
+                    $crashedAgain = Test-GateSuiteCrashed -ExitCode $rc
+                    if ($rc -eq 0) {
+                        # GREEN, AND THE CRASH STILL GETS SAID. The pool's own timing row is corrected
+                        # so the per-suite table does not carry a FAILED flag for a suite that passed.
+                        Write-Host "== $($c.Name) == re-ran ALONE and PASSED -- the pool's exit $(Format-GateExitCode -ExitCode $c.ExitCode) was a crash, not a verdict" -ForegroundColor Yellow
+                        if ($null -ne $c.Timing) { $c.Timing.Failed = $false }
+                    } elseif ($crashedAgain) {
+                        Write-Host "== $($c.Name) == CRASHED AGAIN alone (exit $(Format-GateExitCode -ExitCode $rc)) -- this is the suite or the engine, not the pool" -ForegroundColor Red
+                        $failedNames.Add($c.Name) | Out-Null
+                    } else {
+                        Write-Host "== $($c.Name) == re-ran alone and FAILED (exit $rc) -- the crash hid a real verdict" -ForegroundColor Red
+                        $failedNames.Add($c.Name) | Out-Null
+                    }
+                    # The re-run's own output, whichever way it went: on a pass it is the evidence that
+                    # the tree is fine, and on a failure it is the only block carrying a verdict at all.
+                    foreach ($f in @($retryOut, $retryErr)) {
+                        if (-not (Test-Path -LiteralPath $f)) { continue }
+                        $rtext = Get-Content -LiteralPath $f -Raw -Encoding Oem
+                        if ([string]::IsNullOrWhiteSpace($rtext)) { continue }
+                        Write-Host $rtext.TrimEnd()
+                    }
+                    if ($rc -ne 0) {
+                        $failedCaptureFiles.Add($retryOut) | Out-Null
+                        $failedCaptureFiles.Add($retryErr) | Out-Null
+                    }
+                }
+                Write-Host ''
             }
         } finally {
             # A RED RUN KEEPS THE FAILING SUITES' OUTPUT; A GREEN ONE KEEPS NOTHING -- issue #1636. This
@@ -1522,6 +1663,16 @@ function Invoke-TestSuiteGate {
     if ($failedNames.Count -eq 0) {
         $passScope = if ($ShardCount -gt 1) { "{0} of $poolTotal" } else { 'all {0}' }
         Write-Host ("test gate: $passScope suites passed in {1}s{2}{3}." -f $total, $elapsed, $laneNote, $shardNote) -ForegroundColor Green
+        if ($crashedNames.Count -gt 0) {
+            # GREEN, AND NOT SILENT (issue #1723). Every one of these passed on its lone re-run, so the
+            # tree is fine and the gate is right to be green -- but a process that died is a fact about
+            # the RUN, and #1622's whole cost was a sighting nobody could re-read. Indented under the
+            # verdict, the same shape the kept-output note below the red one already uses.
+            Write-Host ("           crashed in the pool and passed alone: " + (@($crashedNames | Sort-Object) -join ', ')) -ForegroundColor Magenta
+            if ($retainedCaptureDir) {
+                Write-Host ("           crash output kept at $retainedCaptureDir") -ForegroundColor Magenta
+            }
+        }
         return $true
     }
     $namesInOrder = @($failedNames | Sort-Object) -join ', '

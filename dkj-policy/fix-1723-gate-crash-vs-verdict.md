@@ -38,19 +38,87 @@
 
 Two shapes, both diagnosed. Shape 1: the gate judges on exit code alone, so an unhandled AccessViolationException reads as FAILED (exit -1073741819) -- a crash reported as a verdict. Shape 2: release-notes-page.tests.ps1:305 searches PowerShell's console rendering of a throw, which hard-wraps mid-word; measured at width 120 the phrase is absent from the message body and the assert survives only on the FullyQualifiedErrorId echo.
 
+#### What the report inferred, and what the tree actually says
+
+The report pointed shape 2 at the capture, on the ground that the assert reads captured
+child output while 29 other lanes were capturing theirs. **That reason does not hold.**
+`Invoke-Build` calls `Invoke-NativeCapture` with neither `-Utf8` nor `-TimeoutSeconds`, so it
+takes the `&` arm -- no capture file, and therefore no `ShortRead` and no grandchild handle to
+truncate anything. Verified by measurement as well as by reading: 180 runs of the failing
+build under a 30-lane fan-out produced 0 failures. **Lanes are not the variable.**
+
+What is, measured at width 120: the console's own rendering. Both shapes were re-diagnosed
+from the tree before anything was built.
+
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [x] Shape 2 -- adopt the established `Test-Says`/`Assert-Says` helper in
+      `release-notes-page.tests.ps1` and convert the 15 asserts fed by a `throw` or a
+      `Write-Warning`. Not a new mechanism: seven suites already carry this one under #1512.
+- [x] Shape 2 -- the ordering assert reads `Get-SaysIndex` for both phrases, and now requires
+      both to be FOUND: `-1 -lt <any index>` is `$true`, so it could pass vacuously.
+- [x] Shape 1 -- `Test-GateSuiteCrashed` and `Format-GateExitCode` in
+      `native-capture-lib.ps1`; the gate's reap loop reports CRASHED instead of
+      `FAILED (exit -1073741819)` and does not enter the suite in `$failedNames`.
+- [x] Shape 1 -- a crashed suite is re-run ALONE, once, after the pool has emptied, and the
+      green verdict names the crash so the quoted line is not the one place it is invisible.
+- [~] Shape 1 -- change the seam-probe idiom that faulted. Dropped from this branch: one
+      sighting of a 5.1 engine fault, unreproduced, against 68 call sites. Filed as
+      [#1729](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1729) with the
+      stack and what a repair would have to measure first.
+- [~] Shape 2 -- sweep the same helper through the other eight suites. Dropped: 358 exposed
+      asserts, and which of them matter is decided per site by reading the emitting call.
+      Filed as [#1728](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1728)
+      with the per-suite counts.
 
 ### TEST
 
+- [x] `release-notes-page.tests.ps1`: 165 asserts green, up from 162. The three new ones are
+      deterministic and carry no console -- they hold the measured wrapped literal, assert that
+      `IndexOf` really does miss it, that `Test-Says` finds it, and that a genuinely absent
+      phrase stays absent.
+- [x] `test-suite-gate.tests.ps1`: case 8, 21 asserts. A suite that crashes once and passes
+      alone (gate green, crash named on the verdict), one that crashes both times (gate red,
+      called a crash), and the guard that matters most -- a suite exiting 1 runs **exactly
+      once**, counted through a fixture that appends to a file.
+- [x] The discriminator's own asserts: `0xC0000005` and `0xC00000FD` read as crashes, `exit 0`,
+      `exit 1` and a `$null` code do not.
+- [x] Lint gate + all suites via `open-pr.ps1`.
+
 ### DEPLOY: fix/1723-gate-crash-vs-verdict
 
-**Score:**
+The 30-lane test gate stops reporting two things that were never failures as failures.
+
+**A crashed suite is no longer called a failed one.** The gate judged a suite on its exit code
+alone, so a child killed by an unhandled `AccessViolationException` inside the PowerShell engine
+came back as `FAILED (exit -1073741819)` -- which reads as a suite that ran and said no. It did
+not run: it wrote no `[FAIL]` line and no summary, so every minute spent looking for the failing
+assert was spent on an assert that does not exist. The discriminator is the sign bit, which is
+exact rather than a list of known codes: a killed process exits with its exception's NTSTATUS
+(high bit set, so a negative `Int32`), and a suite's own verdict never can. Such a suite is now
+reported as CRASHED with the code as hex, and re-run ALONE once after the pool empties -- which
+is what the gate's own docstring already told a reader to do by hand. Green on the re-run leaves
+the gate green and still names the crash on the verdict line; a second crash, or a real failure
+the crash was hiding, is red. **An ordinary failure is never retried**: an `exit 1` has measured
+the tree and said no, and re-running that would mask a verdict instead of obtaining one.
+
+**And a refusal assert stops reading the console's layout instead of the message.** A `throw` and
+a `Write-Warning` reach a capture through PowerShell's error formatter, which hard-wraps at the
+host's buffer column *inside a word* -- so at width 120 `-InitToken for a fresh path` arrives as
+`-InitToken fo` + newline + `r a fresh path` and the phrase is absent from the message body. The
+assert had been passing on a `FullyQualifiedErrorId` echo further down the same rendering, a
+coincidence of arithmetic between the width and the length of a temp path. Fifteen asserts in that
+suite now go through the `Test-Says` helper seven other suites have carried since #1512, and the
+ordering assert requires both phrases to be found rather than accepting `-1` for either.
+
+**Score:** 4
 
 #### What makes this deploy extra special
 
-**Score:**
+N/A. This is the test gate and one of its suites -- no consumer of the released plugin sees
+either, and nothing about a published release document changes.
+
+**Score:** N/A
 
 #### Pull Request
 

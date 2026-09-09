@@ -29,6 +29,14 @@
 
     Fixture paths carry $PID: the test gate is a throttled PARALLEL scheduler, so two runs at one
     fixed temp path tear down each other's tree mid-assert.
+
+    EVERY ASSERT ON A REFUSAL GOES THROUGH Assert-Says, NEVER Assert-Match (issue #1723). A `throw`
+    and a `Write-Warning` reach the capture through PowerShell's error formatter, which hard-wraps at
+    the host's buffer column -- inside a word, not at a space -- so the phrase the script composed is
+    not the phrase the capture carries. That is what made case 7's ordering assert red under a
+    30-lane gate and green standalone, and it is the same mechanism issue #1512 recorded for the
+    suites that already had this helper. `Write-Host` is unaffected and those asserts are left alone;
+    which is which is decided by reading the emitting call, not by guessing from the wording.
 #>
 $ErrorActionPreference = 'Stop'
 
@@ -69,6 +77,50 @@ function Assert-Match {
     }
 }
 
+function Test-Says {
+    <# Does captured child output contain this phrase, whatever the console did to it?
+
+       THE SAME MECHANISM AS ISSUE #1512, AT A SITE THAT NEVER GOT IT (issue #1723). Every refusal
+       this suite asserts on reaches the capture through PowerShell's error formatter -- a `throw` or
+       a `Write-Warning` -- and that formatter HARD-WRAPS at the host's buffer column, breaking
+       INSIDE a word rather than at a space. Measured at width 120, this script's -Worker refusal
+       came back as '... exhausted, -InitToken fo' + newline + 'r a fresh path ...', so the assert
+       for that phrase was reading a text the phrase is not in. It passed anyway, on the
+       FullyQualifiedErrorId echo further down the same rendering, which is a coincidence of
+       arithmetic between the width and the length of a temp path -- and that is what went red under
+       the 30-lane gate and green standalone. `Write-Host` is NOT affected: a 295-character line came
+       back whole, which is why the Write-Host-fed asserts here are left as Assert-Match.
+
+       Strips ALL whitespace from both sides. Normalizing '\s+' to a single space repairs a wrap
+       BETWEEN words and does nothing for a wrap INSIDE one. Which asserts straddle a break is
+       decided by the width, so a green run is not evidence.
+
+       Literal (IndexOf), so a phrase carrying '(', ')', '.', '[' or ']' needs no escaping;
+       OrdinalIgnoreCase keeps the case-insensitivity that -match had at these call sites. #>
+    param([string]$Text, [string]$Phrase)
+    return ((Get-SaysIndex -Text $Text -Phrase $Phrase) -ge 0)
+}
+
+function Get-SaysIndex {
+    <# WHERE the phrase starts, in the whitespace-stripped text -- or -1.
+
+       Two phrases' indexes are comparable because both are measured in that same stripped text, which
+       is what the ordering assert in case 7 needs: the console's line breaks move every raw index and
+       must not be allowed to decide which route the refusal names first. #>
+    param([string]$Text, [string]$Phrase)
+    $haystack = ($Text -replace '\s', '')
+    $needle   = ($Phrase -replace '\s', '')
+    return $haystack.IndexOf($needle, [System.StringComparison]::OrdinalIgnoreCase)
+}
+
+function Assert-Says {
+    param([string]$Text, [string]$Phrase, [string]$Name)
+    if (Test-Says -Text $Text -Phrase $Phrase) {
+        $script:pass++; Write-Host "  [PASS] $Name" -ForegroundColor Green
+    } else {
+        $script:fail++; Write-Host "  [FAIL] $Name`n         wanted to find: '$Phrase'" -ForegroundColor Red
+    }
+}
 function Write-FixtureFile {
     param([string]$Path, [string]$Content)
     $dir = Split-Path -Parent $Path
@@ -251,7 +303,7 @@ try {
         ((Get-Content -LiteralPath (Join-Path $r5b 'scripts\repo-config.ps1') -Raw) -replace "return 'major'", "return 'minor'"))
     $b5b = Invoke-Build -Root $r5b
     Assert-Equal 1 $b5b.Code 'grouping mismatch: refuses rather than writing an empty page'
-    Assert-Match 'Get-ReleaseNotesGrouping' $b5b.Out 'grouping mismatch: the error names the seam it read'
+    Assert-Says $b5b.Out 'Get-ReleaseNotesGrouping' 'grouping mismatch: the error names the seam it read'
 
     # --- 6. The title fallback --------------------------------------------------------------------
     Write-Host "build -- the title falls back to the repo name" -ForegroundColor Cyan
@@ -262,13 +314,25 @@ try {
     Assert-Match '<title>fixture-repo &middot; release notes</title>' $p6.Html 'title fallback: the name half of Get-RepoName, not the owner/name pair'
 
     # --- 7. The path token is an input ------------------------------------------------------------
+    # THE MATCHER FIRST, ON A STRING RATHER THAN ON A RUN (issue #1723). Every assert below reads a
+    # `throw`, and a throw reaches the capture through PowerShell's error formatter, which breaks the
+    # line MID-WORD at the host's width. That is what made the order assert further down red under the
+    # 30-lane gate and green standalone. These three are deterministic and carry no console: the
+    # wrapped literal is exactly what was measured coming back at width 120.
+    Write-Host "worker -- the refusal is matched across a console wrap, not as the console laid it out" -ForegroundColor Cyan
+    $wrapped = "rker's code view in the dashboard, or the Workers script API); (3) only once both of those are exhausted, -InitToken fo" + "`n" +
+               "r a fresh path -- which 404s every link already sent."
+    Assert-True ($wrapped.IndexOf('-InitToken for a fresh path') -lt 0) 'wrap: a mid-word break really does hide the phrase from IndexOf'
+    Assert-Says $wrapped '-InitToken for a fresh path' 'wrap: and Test-Says reads it across the break'
+    Assert-True (-not (Test-Says $wrapped 'a route this refusal never names')) 'wrap: while a phrase that is genuinely absent stays absent'
+
     Write-Host "worker -- the path token is never invented" -ForegroundColor Cyan
     $r7 = New-FixtureRepo -Label 'worker' -WorkerName 'fixture-release-notes'
     $pageDir7 = Join-Path $r7 'releases\page'
 
     $w1 = Invoke-Build -Root $r7 -ScriptArgs @('-Worker')
     Assert-Equal 1 $w1.Code 'token: -Worker without a token refuses'
-    Assert-Match 'does NOT invent one' $w1.Out 'token: the refusal says why, not just that'
+    Assert-Says $w1.Out 'does NOT invent one' 'token: the refusal says why, not just that'
     Assert-True (-not (Test-Path -LiteralPath (Join-Path $pageDir7 'worker-path-token.txt'))) 'token: the refusal created no token'
     Assert-True (-not (Test-Path -LiteralPath (Join-Path $pageDir7 'worker.js'))) 'token: and no worker bundle'
     Assert-True (Test-Path -LiteralPath (Join-Path $pageDir7 'release-notes.html')) 'token: the page half still ran -- the refusal is the worker half only'
@@ -294,15 +358,19 @@ try {
 
     # A copy the operator still HAS, in a folder nothing points at any more, is the likeliest reason
     # this one is missing -- so the refusal names that move even when it finds no copy (issue #1444).
-    Assert-Match 'renamed or repointed' $w1.Out 'token: with no copy anywhere, the refusal still names the move that hides one'
+    Assert-Says $w1.Out 'renamed or repointed' 'token: with no copy anywhere, the refusal still names the move that hides one'
 
     # AND THE DEPLOYMENT IS A COPY TOO (issue #1453). "No token on any machine here" was read as "the
     # URL is unrecoverable", which does not follow while the worker is up: the bundle carries its route
     # as a literal, so Cloudflare holds the token. The refusal has to name that BEFORE -InitToken,
     # because -InitToken is the step that makes the loss real.
-    Assert-Match 'THREE WAYS BACK' $w1.Out 'token: the refusal enumerates the routes rather than naming two of three'
-    Assert-Match 'read them off the DEPLOYMENT' $w1.Out 'token: and names the deployment as a copy of the token'
-    Assert-True ($w1.Out.IndexOf('DEPLOYMENT') -lt $w1.Out.IndexOf('-InitToken for a fresh path')) 'token: the recoverable route is named before the destructive one'
+    Assert-Says $w1.Out 'THREE WAYS BACK' 'token: the refusal enumerates the routes rather than naming two of three'
+    Assert-Says $w1.Out 'read them off the DEPLOYMENT' 'token: and names the deployment as a copy of the token'
+    # BOTH INDEXES ARE REQUIRED, because -1 -lt <any index> is $true: with 'DEPLOYMENT' missing this
+    # assert used to report the order it never read (issue #1723).
+    $iDeployment = Get-SaysIndex -Text $w1.Out -Phrase 'DEPLOYMENT'
+    $iFreshPath  = Get-SaysIndex -Text $w1.Out -Phrase '-InitToken for a fresh path'
+    Assert-True ($iDeployment -ge 0 -and $iFreshPath -gt $iDeployment) 'token: the recoverable route is named before the destructive one'
 
     # --- 7b. A token left behind by a folder move -------------------------------------------------
     # THE CASE THIS EXISTS FOR: the page directory is derived from the note root and gitignored, so
@@ -318,8 +386,8 @@ try {
 
     $s1 = Invoke-Build -Root $r7b -ScriptArgs @('-Worker')
     Assert-Equal 1 $s1.Code 'stray: -Worker still refuses -- the copy is named, never adopted'
-    Assert-Match ([regex]::Escape('old-releases')) $s1.Out 'stray: the refusal names where the copy actually is'
-    Assert-Match 'MOVE that folder' $s1.Out 'stray: and says to move it, not to make a second token'
+    Assert-Says $s1.Out 'old-releases' 'stray: the refusal names where the copy actually is'
+    Assert-Says $s1.Out 'MOVE that folder' 'stray: and says to move it, not to make a second token'
 
     $s2 = Invoke-Build -Root $r7b -ScriptArgs @('-Worker', '-InitToken')
     Assert-Equal 1 $s2.Code 'stray: -InitToken refuses too -- its guard asks whether a token exists ANYWHERE'
@@ -340,7 +408,7 @@ try {
     Write-Host "worker -- hosting needs the worker name" -ForegroundColor Cyan
     $w4 = Invoke-Build -Root $r1 -ScriptArgs @('-Worker')
     Assert-Equal 1 $w4.Code 'worker name: an empty seam refuses -Worker'
-    Assert-Match 'Get-ReleasePageWorkerName' $w4.Out 'worker name: the error names the function to add'
+    Assert-Says $w4.Out 'Get-ReleasePageWorkerName' 'worker name: the error names the function to add'
 
     # --- 9. wrangler.toml is written once ---------------------------------------------------------
     Write-Host "worker -- wrangler.toml is the consumer's file after the first write" -ForegroundColor Cyan
@@ -365,7 +433,7 @@ try {
     [System.IO.File]::WriteAllText($wrangler, "name = `"something-else`"`nmain = `"worker.js`"", $Utf8NoBom)
     $w6 = Invoke-Build -Root $r7 -ScriptArgs @('-Worker')
     Assert-Equal 0 $w6.Code 'wrangler: a drifted name does not fail the build'
-    Assert-Match 'something-else' $w6.Out 'wrangler: but it is reported'
+    Assert-Says $w6.Out 'something-else' 'wrangler: but it is reported'
 
     # --- 10. A missing history file ----------------------------------------------------------------
     Write-Host "build -- the release history has to be there" -ForegroundColor Cyan
@@ -373,7 +441,7 @@ try {
     Remove-Item -LiteralPath (Join-Path $r10 'releases\README.md') -Force
     $b10 = Invoke-Build -Root $r10
     Assert-Equal 1 $b10.Code 'no history: refuses'
-    Assert-Match 'Get-ReleaseHistoryPath' $b10.Out 'no history: the error names the seam that points at it'
+    Assert-Says $b10.Out 'Get-ReleaseHistoryPath' 'no history: the error names the seam that points at it'
 
     # --- 11. The palette seam (inbound #759) -------------------------------------------------------
     # WHY THE ASSERTS ARE ABOUT POSITION AND NOT ONLY PRESENCE. The override has to beat the
@@ -432,8 +500,8 @@ try {
     Assert-True (-not ($p12.Html -match '(?m)^\s*--ink: blue;')) 'hostile palette: a value carrying a brace-escape is dropped'
     Assert-True (-not ($p12.Html -match '(?m)^\s*position: fixed;')) 'hostile palette: a name that is not a custom property is dropped'
     Assert-Match '--line:\s*#123456;' $p12.Html 'hostile palette: and the SOUND value in the same map still lands -- one bad key costs one colour'
-    Assert-Match 'Get-ReleasePageTheme' $b12.Out 'hostile palette: each drop is warned about, naming the function'
-    Assert-Match "'--accent'" $b12.Out 'hostile palette: and naming the key, so a silently ignored setting is impossible'
+    Assert-Says $b12.Out 'Get-ReleasePageTheme' 'hostile palette: each drop is warned about, naming the function'
+    Assert-Says $b12.Out "'--accent'" 'hostile palette: and naming the key, so a silently ignored setting is impossible'
 
     # --- 13. The index is the page, and it is static (the design pass, inbound #759) --------------
     # THE SUITE SURVIVED THE REDESIGN UNTOUCHED, which is the reason this block exists. Every assert
@@ -643,7 +711,7 @@ try {
     $r17b = New-FixtureRepo -Label 'mastheadurl' -MastheadBody "return 'https://example.invalid/logo.svg'"
     $b17b = Invoke-Build -Root $r17b
     Assert-Equal 0 $b17b.Code 'masthead/url: a bad value costs the image, never the build'
-    Assert-Match 'Get-ReleasePageMasthead' $b17b.Out 'masthead/url: and the warning names the seam'
+    Assert-Says $b17b.Out 'Get-ReleasePageMasthead' 'masthead/url: and the warning names the seam'
     $p17b = Get-PageData -PagePath (Join-Path $r17b 'releases\page\release-notes.html')
     Assert-True ($p17b.Html -notmatch '<div class="marks">') 'masthead/url: nothing is written'
     Assert-True ($p17b.Html -notmatch 'example\.invalid') 'masthead/url: and the URL never reaches the page'
@@ -662,7 +730,7 @@ try {
     Assert-Equal 0 $b17d.Code 'masthead/cap: still builds'
     $p17d = Get-PageData -PagePath (Join-Path $r17d 'releases\page\release-notes.html')
     Assert-Equal 2 ([regex]::Matches($p17d.Html, '<img src="data:image/gif').Count) 'masthead/cap: the third mark is dropped'
-    Assert-Match 'more than 2 mark' $b17d.Out 'masthead/cap: and the warning says which cap was hit'
+    Assert-Says $b17d.Out 'more than 2 mark' 'masthead/cap: and the warning says which cap was hit'
     # A BARE STRING IS ACCEPTED, which is the one-mark case, and its alt is empty on purpose: a mark
     # beside a title that already names the product is decorative.
     Assert-Match 'alt=""' $p17d.Html 'masthead/bare: a bare data: string works, with an empty alt'
@@ -672,7 +740,7 @@ try {
     $r17e = New-FixtureRepo -Label 'mastheadfat' -MastheadBody "return '$fat'"
     $b17e = Invoke-Build -Root $r17e
     Assert-Equal 0 $b17e.Code 'masthead/size: still builds'
-    Assert-Match 'ceiling per mark' $b17e.Out 'masthead/size: the warning names the ceiling it hit'
+    Assert-Says $b17e.Out 'ceiling per mark' 'masthead/size: the warning names the ceiling it hit'
     $p17e = Get-PageData -PagePath (Join-Path $r17e 'releases\page\release-notes.html')
     Assert-True ($p17e.Html -notmatch '<div class="marks">') 'masthead/size: and the oversized mark is not written'
 
