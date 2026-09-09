@@ -43,7 +43,59 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**29 / 63 minor entries** <!-- pending-tally -->
+**29 / 64 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1673-ignore-agent-worktrees · 20260909-084638
+
+A dispatched agent's worktree lands inside the repo at `.claude/worktrees/agent-<id>`, and nothing
+ignored it -- so the primary checkout read as dirty for as long as one stood, which is a refusal in
+`cut-release.ps1`, in `prune-merged.ps1` on a branch, and in `worktree-lane.ps1 -HandBack`. It is now
+ignored, anchored so it cannot silence a legitimately-named folder deeper in the tree.
+
+The larger half is one `.gitignore` cannot reach. The lint gate and three of the suites walk the tree
+with `Get-ChildItem -Recurse`, which reads the filesystem rather than git, so a nested worktree is a
+second complete copy of the repo they are standing inside: every count doubles (`*-agent.md` 26 to
+52, `*.ps1` 236 to 472) and `check-plugin-integrity.ps1` fails with 26 duplicate-id errors, each one
+accusing the **real** file and naming the worktree's copy as the legitimate claimant. An operator
+reading that has no route back to the cause. The gate now reads `git worktree list --porcelain`
+through the new `Get-NestedWorktreePath` and reports the worktree first, saying in as many words that
+the duplicate findings below it are a consequence rather than real.
+
+The path that finding prints is guarded, which is not incidental: `git worktree add` is not held to
+`check-ref-format` the way a branch name is, so a registered path may carry spaces, shell
+metacharacters or format characters that make a printed line read as something other than what it
+says -- and the finding names the path twice, once as prose and once inside a remedy the reader is
+invited to run. This repo had already answered that shape at
+[#1637](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1637) and
+[#1638](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1638); the answer is reused
+rather than re-derived, so the command reads `<path>` when the real one is unsafe to paste and a note
+says why.
+
+Whether the gate should instead *work through* a nested worktree is left open deliberately and filed
+as [#1678](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1678): it is ~20 walk sites
+plus three suites, it needs a gate of its own or it is enforced by memory, and refusing cleanly is a
+defensible permanent answer.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A. The two things that change behaviour are both repo-local -- the `.gitignore` entry and
+`check-plugin-integrity.ps1`, which is not mirrored into any plugin. A consumer receives the new
+`Get-NestedWorktreePath` in the `dkj-policy` mirror of `worktree-lib.ps1`, but nothing on their side
+calls it yet, so nobody downstream notices this release.
+
+**Score:** N/A
+
+#### Pull Request
+
+Ignore the harness's agent worktree directory
+
+Plugins: dkj-policy
+
+[PR #1684](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1684)
+
+---
 
 ### DEPLOY: fix/1689-porcelain-path-decode-once · 20260909-074736
 
