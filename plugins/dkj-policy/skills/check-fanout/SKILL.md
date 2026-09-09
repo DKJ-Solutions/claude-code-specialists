@@ -19,6 +19,15 @@ carried by every
 agent def that holds `Bash`, and **nothing about it was ever detectable.** This skill is the other
 half: it does not stop anything, it tells you whether something already happened.
 
+**Since [#1669](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1669) there is a third
+thing, and it is not a substitute for this one.** `hooks/guard-working-copy.ps1` in this plugin
+*refuses* those commands when the payload says the caller is a dispatched subagent, so the common case
+never happens now. It still leaves this skill its whole job, for two reasons the guard's own header
+states: the guard reads a **command**, so anything it does not parse -- a script file, an encoded
+command, a text tool asked to execute -- passes it untouched, and there is no verb list that covers a
+subagent writing over a file with `Out-File`. This skill reads the **result**, which is the only
+question that stays answerable whatever the route in.
+
 ## The measurement this exists for
 
 September 8, 2026, issue

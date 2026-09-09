@@ -17,6 +17,18 @@
   `git worktree remove` when you are done. And if your work genuinely cannot be done without the
   checkout in another state, that is a sentence in your deliverable, not a command you run: say what
   you need and stop.
+- **This is enforced now, and knowing that changes what a refusal means to you.** Since issue
+  [#1669](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1669) the `dkj-policy` plugin
+  ships a `PreToolUse` hook that refuses those commands when the call comes from a dispatched
+  subagent — the payload says which you are, so the dispatching session's own `git checkout` is
+  untouched. **A `BLOCKED (guard-working-copy)` message is therefore not a tool malfunction and not
+  something to work around**: it is this rule, arriving as a refusal instead of as a paragraph. Do
+  what the paragraph above says — read the other ref without touching the tree, or say in your
+  deliverable what state you would need and stop. There is deliberately no marker, flag or wording
+  that authorises it, so a second attempt in a different shell is only a slower way to be refused.
+  Writing this rule into a file is exempt and always was; if a shell is fighting you over text, use
+  the Edit/Write tool. Where the plugin is not installed the rule still holds in full — it was prose
+  first, and prose is what it falls back to.
 - **A clean `git status` is not your evidence, because it is what the damage looks like.** It reports
   the committed tree, so it reads identically whether you touched nothing or discarded somebody's
   uncommitted edits — no error, no notice, no refusal. What proves you altered nothing is not having
