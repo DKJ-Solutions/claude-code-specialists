@@ -5,7 +5,7 @@ group: 06
 
 # 06-28 · repo-lens (VUL-IN)
 
-> Repo-lens for the portable manual of specialist 06-28 in the `dkj-team-ecomm` plugin. This file was put
+> Repo-lens for the portable manual of specialist 06-28 in the `dkj-subagents-ecomm` plugin. This file was put
 > in place by `sync-roster` as an empty template; the agent-def reads it along automatically.
 > Fill in below the repo-specific tasks and context specialist 06-28 needs in this repo.
 

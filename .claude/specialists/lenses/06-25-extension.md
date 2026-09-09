@@ -5,7 +5,7 @@ group: 06
 
 # Nolan ⚡ · claude-code-specialists addendum
 
-> Repo-lens (claude-code-specialists) accompanying the portable playbook in the `dkj-team-alpha` plugin (`plugins/dkj-teams/dkj-team-alpha/manuals/06-25-manual.md`). This file does not describe the craft, but what Nolan measures in this repo and with whom he works.
+> Repo-lens (claude-code-specialists) accompanying the portable playbook in the `dkj-subagents-alpha` plugin (`plugins/dkj-subagents/dkj-subagents-alpha/manuals/06-25-manual.md`). This file does not describe the craft, but what Nolan measures in this repo and with whom he works.
 
 A performance engineer does the same thing everywhere — measure resource cost and trim it without
 losing function. **What is repo-specific in claude-code-specialists is not that Nolan measures, but
@@ -32,12 +32,12 @@ the craft is the same, only the bill differs.
   Nolan checks whether that boundary still holds as the roster grows: does a new persona/subagent
   stay on-demand, or has something crept onto the automatic path that doesn't need to be there?
 - **The size of agent-defs, manuals, and personas** across the plugins
-  (`plugins/*/agents/*-agent.md`, `*/manuals/*-manual.md`,
+  (`plugins/*/subagents/*-agent.md`, `*/manuals/*-manual.md`,
   `specialists/personas/*-persona.md`): a manual/agent-def that has grown well past what its craft
   needs is a cost on every load, not a one-time read.
-- **The `agent-shared/` mechanism** (see [Sylvester #15](05-15-extension.md) and
+- **The `subagent-shared/` mechanism** (see [Sylvester #15](05-15-extension.md) and
   [Ravi #24](06-24-extension.md)) as a *frugality lever*, not just a DRY tool: a rule that lives once
-  in `agent-shared/<name>.md` and is filled into N agent-defs by the generator costs one edit instead
+  in `subagent-shared/<name>.md` and is filled into N agent-defs by the generator costs one edit instead
   of N, and Nolan can point to it as evidence when a savings proposal is "promote this to a shared
   block" rather than "trim this in each of the N places separately".
 - **Repeated context across a chain**: whether a multi-specialist chain (see
@@ -49,7 +49,7 @@ the craft is the same, only the bill differs.
 There is an authoritative measurement; do not estimate from file sizes:
 
 ```powershell
-claude plugin details dkj-team-alpha@claude-code-specialists
+claude plugin details dkj-subagents-alpha@claude-code-specialists
 ```
 
 It reports **Always-on** (tokens the plugin adds to *every* session through its listing text — skill
@@ -244,16 +244,16 @@ earlier tables, which is the second half of the under-count):
 | Chris's portable body (`01-01-persona.md`) | 11,051 | ~3,500 | 3.12 |
 | `.claude/specialists/SPECIALISTS.md` (the seam) | 7,982 | ~2,600 | 3.12 |
 | **documents** | **113,793** | **~36,500** | |
-| `dkj-team-alpha` listing | — | 3,009 | **API-measured** |
+| `dkj-subagents-alpha` listing | — | 3,009 | **API-measured** |
 | `dkj-policy` listing | — | 2,317 | **API-measured** |
 | **total** | | **~41,800** | range ~40,600–43,900 |
 
 **~41,800 tokens, not ~30,205.** The plugin listing has also *fallen* since v2.10.0 — 3,009 against the
-~3,505 baseline for `dkj-team-alpha`, despite the same 15 agents — so the growth is entirely in the
+~3,505 baseline for `dkj-subagents-alpha`, despite the same 15 agents — so the growth is entirely in the
 documents.
 
 **THE PERSONA MEASURED IS THE MARKETPLACE COPY, AND THAT IS NOT A DETAIL.** `SPECIALISTS.md` imports
-Chris's body from `~/.claude/plugins/marketplaces/…`, not from `plugins/dkj-teams/…` in the tree. On the day
+Chris's body from `~/.claude/plugins/marketplaces/…`, not from `plugins/dkj-subagents/…` in the tree. On the day
 of this measurement that clone sat ten commits behind `main` and the two files differed by **1,243 B**:
 12,294 B in the repo, **11,051 B actually loaded**. The table above reports what the session loads. The
 difference is not error to smooth away — it is **queued cost that arrives at the next plugin update**,
@@ -434,7 +434,7 @@ only while it says when each one was opened.
    were what somebody had counted. The gate time *was* re-measured and was unchanged (~13 of the ~30
    minutes); the end-to-end figure was captured neither before nor after, and a baseline cannot be taken
    retroactively. The portable half of that lesson is in
-   [Nolan's manual](../../../plugins/dkj-teams/dkj-team-alpha/manuals/06-25-manual.md) under *report in the unit the
+   [Nolan's manual](../../../plugins/dkj-subagents/dkj-subagents-alpha/manuals/06-25-manual.md) under *report in the unit the
    question was asked in*.
 2. **ANSWERED August 11, 2026: 9 of the 30 suites can change behaviour on a markdown-only diff — so
    "markdown-only, therefore skip the second local run" does not hold in this repo.** Measured over all 30
@@ -447,7 +447,7 @@ only while it says when each one was opened.
 
    | suite | what real markdown it reads |
    |---|---|
-   | `agent-shared.tests.ps1` | recursively enumerates every real `*-agent.md` and `*-persona.md` and asserts the shared-block marker is present in each |
+   | `subagent-shared.tests.ps1` | recursively enumerates every real `*-agent.md` and `*-persona.md` and asserts the shared-block marker is present in each |
    | `bootstrap-drift.tests.ps1` | reads the real `01-01-persona.md` for a retired heading, and asserts the real `specialists-init/SKILL.md` names every persona id on disk |
    | `cut-release-guardrail.tests.ps1` | `git ls-files -- '*.md'` — the real tracked-markdown list — held against `cut-release.ps1`'s reserved-root allowlist, so a new root `.md` file can fail it |
    | `pr-body.tests.ps1` | the real `.github/pull_request_template.md` and the shipped reference template held byte for byte |
@@ -531,7 +531,7 @@ only while it says when each one was opened.
    anything about the event type**, and it removes the tempting explanation that a docs-only diff runs faster.
    The median is what the model uses; the range is kept beside it because a cost with a 4m 10s spread should
    never again be quoted as a point. The portable half of this lesson is in
-   [Nolan's manual](../../../plugins/dkj-teams/dkj-team-alpha/manuals/06-25-manual.md) under *a cost that varies per
+   [Nolan's manual](../../../plugins/dkj-subagents/dkj-subagents-alpha/manuals/06-25-manual.md) under *a cost that varies per
    run is counted over its population*, alongside the unit rule it is the sibling of — so it applies to every
    per-run cost he is asked about, not only to a CI gate.
 
@@ -1340,4 +1340,4 @@ file the #1713 paragraph above says does not convert to this machine at all.
 
 In short: the **how** (measuring cost, proposing savings, staying out of the execution) is portable;
 the **what** (this repo's deliberate on-demand loading strategy, the size of its agent-defs/manuals,
-the `agent-shared/` lever, and the three-times-per-release gate bill) belongs to this repo.
+the `subagent-shared/` lever, and the three-times-per-release gate bill) belongs to this repo.

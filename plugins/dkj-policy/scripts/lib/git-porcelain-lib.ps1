@@ -75,7 +75,7 @@
     comment saying why neither went into sync-rules.ps1.
 
     SO THIS FILE IS MIRRORED TWICE -- into dkj-policy for park-lib and fanout-lib, and into
-    dkj-team-shopify for sync-main -- on native-capture-lib's and merged-pr-lib's precedent. One file
+    dkj-subagents-shopify for sync-main -- on native-capture-lib's and merged-pr-lib's precedent. One file
     mirrored into both plugins rather than reached across from one to the other: they are separately
     versioned and separately installed, so a cross-plugin path is a dependency a version mismatch
     breaks silently.
@@ -115,7 +115,7 @@ $gpCaptureLib = Join-Path $PSScriptRoot 'native-capture-lib.ps1'
 if (Test-Path -LiteralPath $gpCaptureLib -PathType Leaf) { . $gpCaptureLib }
 
 # THE DECODER, MOVED HERE FROM sync-rules.ps1 ON SEPTEMBER 9, 2026 (issue #1689). It was written for
-# inbound #821 and mirrored into dkj-team-shopify; sync-main.ps1 is its caller, at three sites, and now
+# inbound #821 and mirrored into dkj-subagents-shopify; sync-main.ps1 is its caller, at three sites, and now
 # dot-sources this file directly and unguarded, the same way it takes merged-pr-lib.ps1. It did NOT move
 # by having sync-rules.ps1 dot-source this file, which is what #1689 originally proposed: that file is
 # dependency-free on purpose, because the live-theme guard dot-sources it on every command inside a catch

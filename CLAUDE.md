@@ -10,7 +10,7 @@ where they are installed, and nothing below assumes either one is:
 
 - **`dkj-policy`** — the branch, entry and release mechanics, on its own page
   [`dkj-policy/CONTRIBUTING.md`](dkj-policy/CONTRIBUTING.md).
-- **`dkj-team-alpha`** — the specialists, reached through the single `@`-import at the foot of this file.
+- **`dkj-subagents-alpha`** — the specialists, reached through the single `@`-import at the foot of this file.
 
 Uninstall both and this guide still describes how the repo is run: the rules below are the repo's own,
 and where a plugin adds to one, the addition lives in that plugin's layer rather than here. Read a
@@ -163,13 +163,13 @@ The reasoning, and which sense of the word deliberately survived, is in
 
 **The nuance, so nobody repairs the wrong thing: lockstep *within* this product is correct** and
 [`cut-release.ps1`](scripts/release/cut-release.ps1) needs no change. The plugins are one system — a
-stack of teams plus one opt-in workflow — and a consumer running `dkj-team-alpha` alongside `dkj-team-shopify`
+stack of teams plus one opt-in workflow — and a consumer running `dkj-subagents-alpha` alongside `dkj-subagents-shopify`
 needs matching versions. What was wrong was never the lockstep but housing unrelated products in a
 single release train, and that dissolved with the reorganisation rather than needing a fix.
 
 **The repo consumes itself — and it enables EVERY plugin in the marketplace** (Dave,
 September 8, 2026). Via [`.claude/settings.json`](.claude/settings.json) all six are switched on —
-`dkj-team-alpha`, `dkj-team-ecomm`, `dkj-team-lifehub`, `dkj-team-shopify`, `dkj-policy` and
+`dkj-subagents-alpha`, `dkj-subagents-ecomm`, `dkj-subagents-lifehub`, `dkj-subagents-shopify`, `dkj-policy` and
 `dkj-policy-bwj` — with the `github` marketplace source `DKJ-Solutions/claude-code-specialists`, so the
 repo points at itself. That way work here runs against
 exactly the product it maintains. One consequence to be aware of: a session reads the plugins from the
@@ -196,7 +196,7 @@ expected to be, which is why an empty lens under one of them is not a gap.
 is answered. First, every specialist an enabled plugin ships needs a roster row and a repo lens —
 [`SPECIALISTS.md`](.claude/specialists/SPECIALISTS.md) says so without exception — so eleven of them hold
 an empty `VUL-IN` scaffold here, which is the intended state rather than a backlog item. Second,
-`dkj-team-shopify`'s floor check asks which theme is live, and a repo with no store has no truthful
+`dkj-subagents-shopify`'s floor check asks which theme is live, and a repo with no store has no truthful
 answer, so it reported an `[ERROR]` at every session start until
 [#1570](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1570) gave the check a third
 state to be told that in. **This repo declares `Get-ShopifyRepoHasNoStore` in
@@ -216,7 +216,7 @@ is silent, without it the `[ERROR]` returns.
 output, and script-generated document content. **The session-reply language is separate and follows
 the user.** That second half applies to every turn regardless of which files it touches, which is why
 it lives here rather than in a path-scoped rule. The system-wide norm (and its three exceptions) is in
-[the technical writer's portable manual](plugins/dkj-teams/dkj-team-alpha/manuals/06-16-manual.md#what-tessa-covers)
+[the technical writer's portable manual](plugins/dkj-subagents/dkj-subagents-alpha/manuals/06-16-manual.md#what-tessa-covers)
 under **"Guarding the language convention,"** so it travels to every consuming repo.
 
 **The per-layer detail — which layers are in scope, and the deliberate exceptions (`VUL-IN`,
@@ -263,7 +263,7 @@ nothing is created at the old path.
 
 ### Structure — where everything lives
 
-The full repo layout (`.claude-plugin/`, `plugins/` incl. `dkj-teams/agent-shared/`, `connectors/` at the root,
+The full repo layout (`.claude-plugin/`, `plugins/` incl. `dkj-subagents/subagent-shared/`, `connectors/` at the root,
 `scripts/`, `dkj-policy/` (the changelog, the contributing page and the release history since
 August 27, 2026; the folder was `contributing-davekjohn/` until September 5, 2026, #1437),
 `.claude/`, and the root docs + `.github/`) is described in
@@ -272,16 +272,19 @@ August 27, 2026; the folder was `contributing-davekjohn/` until September 5, 202
 level existed to hold several product families side by side, which the
 [one-product rule](#specific-to-this-repo-claude-code-specialists) above retired. `connectors/` moved
 **to the root** in the same movement, deliberately — it is the consumer register read by
-`scripts/sync/`, not plugin payload, and must not travel along in the plugin cache. `agent-shared/`
-stayed **inside** `plugins/` for the mirror-image reason: it *is* plugin source.
+`scripts/sync/`, not plugin payload, and must not travel along in the plugin cache. `agent-shared/` (as
+it was named then) stayed **inside** `plugins/` for the mirror-image reason: it *is* plugin source.
 
 **And on August 17, 2026 it moved one level further in, to `plugins/dkj-teams/agent-shared/`** (Dave):
 every file carrying a shared block is a team's, so sitting beside `teams/` and `workflows/` claimed a
 reach the folder does not have. **Nothing in the tooling had to learn the new address** — every script
 that asks which plugins exist reads `marketplace.json` through
 [`plugin-tree-lib.ps1`](scripts/lib/plugin-tree-lib.ps1), so a directory in no marketplace is not a
-plugin wherever it sits. Reader-facing statement, and what the move changed for the publish, in
-[`plugins/dkj-teams/README.md`](plugins/dkj-teams/README.md).
+plugin wherever it sits. **And on September 9, 2026 the team-side rename carried it one address
+further, to its current home at `plugins/dkj-subagents/subagent-shared/`**, under
+[#1698](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1698); the reasoning above is
+unaffected by the name it now carries. Reader-facing statement, and what the move changed for the
+publish, in [`plugins/dkj-subagents/README.md`](plugins/dkj-subagents/README.md).
 
 ### claude-code-specialists's safety implementation
 
@@ -462,7 +465,7 @@ The constitution above, concretely implemented here:
   and in [the release lens](.claude/specialists/lenses/05-06-extension.md#versioning--releases).
 - **This repo is `public`.** A deliberate choice, so the remote `github` marketplace source can be
   read without gh auth. Consequence: **nothing confidential** belongs here — no personal
-  information, credentials, or secrets. The core team's (`dkj-team-alpha`) agent defs are therefore
+  information, credentials, or secrets. The core team's (`dkj-subagents-alpha`) agent defs are therefore
   deliberately repo-neutral; repo-specific context lives in the consuming (private) repo's
   `.claude/specialists/lenses/` lens.
 

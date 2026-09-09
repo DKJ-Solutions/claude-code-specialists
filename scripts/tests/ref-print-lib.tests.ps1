@@ -456,7 +456,7 @@ Write-Host 'The mirrors' -ForegroundColor Cyan
 
 foreach ($m in @(
     @{ Path = 'plugins\dkj-policy\scripts\lib\ref-print-lib.ps1';      Label = 'dkj-policy (ship-pr)' },
-    @{ Path = 'plugins\dkj-teams\dkj-team-shopify\scripts\lib\ref-print-lib.ps1'; Label = 'dkj-team-shopify (sync-main)' }
+    @{ Path = 'plugins\dkj-subagents\dkj-subagents-shopify\scripts\lib\ref-print-lib.ps1'; Label = 'dkj-subagents-shopify (sync-main)' }
 )) {
     $full = Join-Path $RepoRoot $m.Path
     Assert-True (Test-Path -LiteralPath $full) "the lib is mirrored into $($m.Label)"

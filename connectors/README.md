@@ -66,7 +66,7 @@ be thorough about machines nobody uses.
   "localCheckout": "../life-hub",
   "plugins": [
     {
-      "id": "dkj-team-alpha@claude-code-specialists",
+      "id": "dkj-subagents-alpha@claude-code-specialists",
       "extensions": ["01-01", "05-05"]
     }
   ],

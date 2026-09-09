@@ -40,10 +40,21 @@ Repairs [#1749](https://github.com/DKJ-Solutions/claude-code-specialists/issues/
 `README.md` sentence naming which add-on teams may carry domain skills enumerated two of three teams
 and pointed at one that ships none.
 
-Verified before repairing, rather than taken from the report: `plugins/dkj-teams/*/skills/` holds
-nothing under `dkj-team-ecomm` and `dkj-team-lifehub`, and four skills under `dkj-team-shopify`
+Verified before repairing, rather than taken from the report: `plugins/dkj-subagents/*/skills/` holds
+nothing under `dkj-subagents-ecomm` and `dkj-subagents-lifehub`, and four skills under `dkj-subagents-shopify`
 (`adopt-shopify-floor`, `push-preview`, `start-task`, `sync-main`). The symptom, the reason and the
 proposed repair all still stand.
+
+
+#### The rename that landed mid-branch
+
+`feat/1698-rename-to-dkj-subagents` (#1747) merged to `main` while this branch was open, taking
+`plugins/dkj-teams/` → `plugins/dkj-subagents/` and every `dkj-team-*` id to `dkj-subagents-*`. All
+three defects survived it verbatim under the new names, so the repair is unchanged in substance:
+`main` was merged in, its names taken on every conflicting line, and the three edits re-applied on
+top. The one wording change the rename forced is in the new paragraph's historical clause — it now
+says *"the lifehub and Shopify teams"* rather than quoting ids that were renamed the same day, which
+would have read as a claim about the current ones.
 
 #### The call the issue left open
 
@@ -66,14 +77,14 @@ with.
 Not swept in from elsewhere — the same claim, in the file being edited and in the plugin-source README
 one level down, and leaving either would have made the repaired sentence contradict its own neighbours:
 
-- `README.md`'s plugin table said `dkj-team-shopify` carries "the domain skill `start-task`" — one,
+- `README.md`'s plugin table said `dkj-subagents-shopify` carries "the domain skill `start-task`" — one,
   where it ships four.
-- `plugins/dkj-teams/README.md` said it "ships one domain skill".
+- `plugins/dkj-subagents/README.md` said it "ships one domain skill".
 
 #### Deliberately not touched
 
 - `README.md`'s line about which teams describe *what kind* of repo it is. It names the same two teams
-  and is correct — `dkj-team-ecomm` is orthogonal, which its own next clause states. #1749 says so too.
+  and is correct — `dkj-subagents-ecomm` is orthogonal, which its own next clause states. #1749 says so too.
 - The 43 `DaveKJohn/claude-code-specialists` citations in `README.md`. `CLAUDE.md` says these are
   corrected when a file is edited for other reasons and **not swept**; 43 rewrites under a one-sentence
   prio-1 repair is the sweep that rule refuses, and it would bury the diff a reviewer has to read.
@@ -82,7 +93,8 @@ one level down, and leaving either would have made the repaired sentence contrad
 
 - [x] Rewrite the sentence and move it below the hooks thread (`README.md`)
 - [x] Correct the plugin table's skill count (`README.md`)
-- [x] Correct the same count in `plugins/dkj-teams/README.md`
+- [x] Correct the same count in `plugins/dkj-subagents/README.md`
+- [x] Merge `main` after the #1698 rename landed and re-apply all three edits under the new names
 
 ### TEST
 
@@ -93,10 +105,10 @@ one level down, and leaving either would have made the repaired sentence contrad
 
 The root `README.md` no longer points a reader at the wrong plugin when they go looking for a domain
 skill. The sentence about which add-on teams may carry one named two of the three teams — from before
-`dkj-team-ecomm` existed — and attributed skills to `dkj-team-lifehub`, which ships none. It now names
-`dkj-team-shopify`, the only add-on team that ships any, and sits below the session-hook thread instead
+`dkj-subagents-ecomm` existed — and attributed skills to `dkj-subagents-lifehub`, which ships none. It now names
+`dkj-subagents-shopify`, the only add-on team that ships any, and sits below the session-hook thread instead
 of wedged inside it, where it had been stealing the referent of the sentence after it. The same stale
-count is corrected in the plugin table and in `plugins/dkj-teams/README.md`.
+count is corrected in the plugin table and in `plugins/dkj-subagents/README.md`.
 
 **Score:** 2
 

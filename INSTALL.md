@@ -43,7 +43,7 @@ which this half is the summary of.
 
 **1. Write your repo's own `.claude/settings.json`** (create `.claude/` beside your `README.md` if it
 is not there). A complete, pasteable file; if you already have one, merge these two keys into it.
-Strict JSON — no comments, no trailing commas. `dkj-team-alpha` is the only plugin you need: **there is no
+Strict JSON — no comments, no trailing commas. `dkj-subagents-alpha` is the only plugin you need: **there is no
 default workflow to receive**, and a repo that enables none keeps the way of working it already had. Add a
 line per add-on team you want, and add `dkj-policy` only if you deliberately want that method (see
 [Enabling the workflow](#enabling-the-workflow)).
@@ -56,7 +56,7 @@ line per add-on team you want, and add `dkj-policy` only if you deliberately wan
     }
   },
   "enabledPlugins": {
-    "dkj-team-alpha@claude-code-specialists": true
+    "dkj-subagents-alpha@claude-code-specialists": true
   }
 }
 ```
@@ -69,7 +69,7 @@ it, the next command fails with `Marketplace … not found`.
 ```powershell
 claude plugin marketplace update claude-code-specialists                     # never skip: install does not refresh
 claude plugin marketplace list                                               # came the entry from YOUR repo's settings?
-claude plugin install dkj-team-alpha@claude-code-specialists --scope project    # once per plugin
+claude plugin install dkj-subagents-alpha@claude-code-specialists --scope project    # once per plugin
 ```
 
 `--scope project` is not optional — without it the install goes machine-wide and writes no
@@ -138,9 +138,9 @@ belongs to, and why**, before doing it. Look for that invariant, not for a fixed
 ### Step 4 — run the adopt skill of every plugin you enabled
 
 An install writes **nothing** into your repo — it is a clone into the plugin cache — and Step 2 answers
-only what `dkj-team-alpha` needs. Every other plugin that owns repo state ships its own `adopt-*` skill:
+only what `dkj-subagents-alpha` needs. Every other plugin that owns repo state ships its own `adopt-*` skill:
 `adopt-dkj-policy` (`dkj-policy`), `adopt-shopify-floor`
-(`dkj-team-shopify`). Your slash list holds exactly the ones your enabled plugins ship, namespaced as
+(`dkj-subagents-shopify`). Your slash list holds exactly the ones your enabled plugins ship, namespaced as
 `<plugin>:adopt-*`, and each is additive and a dry run until you add `-Apply`. Skip this and a session
 check reports what is missing at every session start — which is how a consumer ends up discovering the
 rest of their adoption one `[ERROR]` at a time (inbound
@@ -189,7 +189,7 @@ Two commands, from your repo's root, one pair per plugin:
 
 ```powershell
 claude plugin marketplace update claude-code-specialists
-claude plugin update dkj-team-alpha@claude-code-specialists --scope project
+claude plugin update dkj-subagents-alpha@claude-code-specialists --scope project
 ```
 
 **Before running them, check whether you are behind at all.** Once `dkj-policy` is installed, the
@@ -221,6 +221,84 @@ An improvement to the shared core (an agent def, playbook, persona, or skill) is
 locally: file it as an issue on this repo with the label `inbound` — there is an
 [issue template](.github/ISSUE_TEMPLATE/inbound-improvement.md). Repo-specific additions belong in
 your own lenses, which do not travel with the plugin.
+
+---
+
+## Migrating off the `dkj-team-*` ids (#1698, September 9, 2026)
+
+> **This section is for a repo that has this family's teams installed under the ids they used up to
+> September 9, 2026** — `dkj-team-alpha@claude-code-specialists` and the three add-on teams. Like the
+> section below it, this is a rename and nothing else: no team gained or lost a specialist, a manual, a
+> skill or a hook on the day it happened. The workflow ids (`dkj-policy`, `dkj-policy-bwj`) are
+> **unchanged** — do not touch them.
+
+| old plugin id | new plugin id |
+|---|---|
+| `dkj-team-alpha@claude-code-specialists` | `dkj-subagents-alpha@claude-code-specialists` |
+| `dkj-team-ecomm@claude-code-specialists` | `dkj-subagents-ecomm@claude-code-specialists` |
+| `dkj-team-lifehub@claude-code-specialists` | `dkj-subagents-lifehub@claude-code-specialists` |
+| `dkj-team-shopify@claude-code-specialists` | `dkj-subagents-shopify@claude-code-specialists` |
+
+**Why the names moved.** *Team* is this family's own word for a group of specialists; *subagent* is Claude
+Code's word for what those plugins actually ship, and it is the word your own harness uses when it loads
+them. The four now say what is in the box in the vocabulary of the thing that opens it. Nothing about how
+they stack changed: the core team is still the one every repo enables, and the add-on teams still add to
+it rather than replacing it.
+
+**What did NOT get a prefix, deliberately.** `dkj-scaffold-subagents` was considered on the same day and
+declined: on the agent anatomy *every* plugin here is scaffold, so the prefix would be a constant, and a
+constant belongs in the namespace — which `dkj-` and `@claude-code-specialists` already are.
+
+```powershell
+# 1. Refresh -- do this first, every time
+claude plugin marketplace update claude-code-specialists
+
+# 2. Uninstall the retired ids -- skip whichever you never enabled
+claude plugin uninstall dkj-team-alpha@claude-code-specialists --scope project
+claude plugin uninstall dkj-team-ecomm@claude-code-specialists --scope project
+claude plugin uninstall dkj-team-lifehub@claude-code-specialists --scope project
+claude plugin uninstall dkj-team-shopify@claude-code-specialists --scope project
+
+# 3. Refresh again, then install the new ids -- only the ones you had
+claude plugin marketplace update claude-code-specialists
+claude plugin install dkj-subagents-alpha@claude-code-specialists --scope project
+claude plugin install dkj-subagents-ecomm@claude-code-specialists --scope project
+claude plugin install dkj-subagents-lifehub@claude-code-specialists --scope project
+claude plugin install dkj-subagents-shopify@claude-code-specialists --scope project
+```
+
+**4. Restart your Claude Code session.**
+
+`--scope project` is not optional here any more than it is anywhere else on this page. Expect the
+uninstalls and the installs to rewrite `.claude/settings.json` on the way, the same rewriting behaviour
+[documented above](#connecting--the-install-step): the four `dkj-team-*` `enabledPlugins` entries come
+out, the four `dkj-subagents-*` ones go in, and any diff beyond that is formatting. **That file is the
+CLI's to edit, so it is not on the list below** — the list is what the CLI leaves for you.
+
+### The two things inside your repo that the id swap does not fix
+
+**1. The `@`-import of the orchestrator's body** names a path inside the marketplace clone, and both
+halves of that path moved: `plugins/dkj-teams/dkj-team-alpha/` is now
+`plugins/dkj-subagents/dkj-subagents-alpha/`. The shape test in the section below still applies verbatim
+— an import whose path does not contain `plugins/dkj-subagents/<team>/` or `plugins/dkj-policy/` is stale,
+whatever it contains instead — and this rename is simply the newest thing it catches.
+
+**2. Your `connectors/` register, if you keep one.** `check-connectors.ps1` resolves each record's id
+against the marketplace, so a record still naming `dkj-team-alpha@` is reported as an `[INFO]` and **the
+whole block for that plugin is then skipped** — no enabled-in-settings check, no extensions check, no
+version check, silently, until somebody edits the record. That is the same cost the two renames before
+this one paid, recorded in `connectors/claude-code-specialists.json`'s own notes. Update the record when
+you migrate, not before: the register says what a consumer **has**, so an id changed ahead of the
+uninstall/install is a second wrong answer rather than a head start.
+
+### What you will see change inside the plugin, and can ignore
+
+Each team's payload directory `agents/` is now `subagents/`, declared by an
+`"agents": "./subagents/"` key in the plugin manifest. This is internal to the package: nothing you write
+names that directory, and every reader this family ships reads **both** leaf names, new first, so a
+machine holding a pre-rename version in its plugin cache keeps resolving. `skills/` is deliberately
+**not** renamed alongside it — the plugin format always scans the default `skills/` directory in addition
+to any custom one, so a custom skills directory can only ever add, never move.
 
 ---
 
@@ -305,10 +383,10 @@ the folder to match the plugin, and move the seam answer in the same commit.
 
 | old plugin id | new plugin id |
 |---|---|
-| `specialists@claude-code-specialists` | `dkj-team-alpha@claude-code-specialists` |
-| `specialists-lifehub@claude-code-specialists` | `dkj-team-lifehub@claude-code-specialists` |
-| `specialists-shopify@claude-code-specialists` | `dkj-team-shopify@claude-code-specialists` |
-| `specialists-ecomm@claude-code-specialists` | `dkj-team-ecomm@claude-code-specialists` |
+| `specialists@claude-code-specialists` | `dkj-subagents-alpha@claude-code-specialists` |
+| `specialists-lifehub@claude-code-specialists` | `dkj-subagents-lifehub@claude-code-specialists` |
+| `specialists-shopify@claude-code-specialists` | `dkj-subagents-shopify@claude-code-specialists` |
+| `specialists-ecomm@claude-code-specialists` | `dkj-subagents-ecomm@claude-code-specialists` |
 | `specialists-workflow-davekjohn@claude-code-specialists` | `dkj-policy@claude-code-specialists` |
 
 Every plugin is now either a **team** (who the specialists are) or a **workflow** (how work moves
@@ -390,12 +468,12 @@ claude plugin uninstall specialists-workflow-davekjohn@claude-code-specialists -
 claude plugin marketplace update claude-code-specialists
 
 # 3a. The core team -- everyone runs this one
-claude plugin install dkj-team-alpha@claude-code-specialists --scope project
+claude plugin install dkj-subagents-alpha@claude-code-specialists --scope project
 
 # 3b. The add-on teams -- ONLY the ones you uninstalled in step 2. Delete the other lines.
-claude plugin install dkj-team-lifehub@claude-code-specialists --scope project
-claude plugin install dkj-team-shopify@claude-code-specialists --scope project
-claude plugin install dkj-team-ecomm@claude-code-specialists --scope project
+claude plugin install dkj-subagents-lifehub@claude-code-specialists --scope project
+claude plugin install dkj-subagents-shopify@claude-code-specialists --scope project
+claude plugin install dkj-subagents-ecomm@claude-code-specialists --scope project
 
 # 3c. The workflow -- opt-in. Uncomment it only if you deliberately want this method.
 # claude plugin install dkj-policy@claude-code-specialists --scope project
@@ -446,7 +524,7 @@ in the table above.
 moved twice under the old plugin ids, and which of the two your import names depends only on when you last
 updated — a fact your file does not state. The reliable test needs no version at all:
 
-> **Any import whose path does not contain `plugins/dkj-teams/<team>/` or `plugins/dkj-policy/`
+> **Any import whose path does not contain `plugins/dkj-subagents/<team>/` or `plugins/dkj-policy/`
 > is stale, whatever it contains instead.**
 
 The second half of that test moved on September 5, 2026
@@ -461,9 +539,9 @@ might find, the third is what you are moving to:
 |---|---|---|
 | the two-level product folder | `v1.1.0` – `v3.1.2` | `claude-code-plugins/claude-specialists/specialists/` |
 | the flat plugin folder | `v3.2.0` – `v3.9.0` | `plugins/specialists/` |
-| **current** — teams and workflows split | `v3.10.0` onward | `plugins/dkj-teams/dkj-team-alpha/` |
+| **current** — teams and workflows split | `v3.10.0` onward | `plugins/dkj-subagents/dkj-subagents-alpha/` |
 
-Read the same three rows for an add-on team (`specialists-shopify` → `plugins/dkj-teams/dkj-team-shopify/`) and
+Read the same three rows for an add-on team (`specialists-shopify` → `plugins/dkj-subagents/dkj-subagents-shopify/`) and
 for the workflow — with one exception worth knowing before you go looking for it: the workflow plugin
 **first shipped in `v3.8.0`**, so it only ever existed under the flat layout
 (`plugins/specialists-workflow-davekjohn/`). There is no two-level form of that path to find.
@@ -478,7 +556,7 @@ layout as of `v4.5.0`, which the table above is read off, and to the marketplace
 @~/.claude/plugins/marketplaces/claude-code-specialists/plugins/specialists/personas/01-01-persona.md
 
 # after -- the line you want
-@~/.claude/plugins/marketplaces/claude-code-specialists/plugins/dkj-teams/dkj-team-alpha/personas/01-01-persona.md
+@~/.claude/plugins/marketplaces/claude-code-specialists/plugins/dkj-subagents/dkj-subagents-alpha/personas/01-01-persona.md
 ```
 
 **If neither literal matches your file, do not conclude the repair is not yours** — apply the shape test
@@ -503,14 +581,14 @@ prefix, which is exactly the kind of mechanical rename a reader's eye slides ove
 
 | before | after |
 |---|---|
-| `specialists:paula` | `dkj-team-alpha:paula` |
-| `specialists-lifehub:<name>` | `dkj-team-lifehub:<name>` |
-| `specialists-shopify:liam` | `dkj-team-shopify:liam` |
-| `specialists-ecomm:sergio` | `dkj-team-ecomm:sergio` |
+| `specialists:paula` | `dkj-subagents-alpha:paula` |
+| `specialists-lifehub:<name>` | `dkj-subagents-lifehub:<name>` |
+| `specialists-shopify:liam` | `dkj-subagents-shopify:liam` |
+| `specialists-ecomm:sergio` | `dkj-subagents-ecomm:sergio` |
 
 **The rename changes no count, which is worth knowing before you start editing.** In the measured repo — three
 teams enabled — it was 4 personas + 21 subagents = 25 both before and after, every name still present. For
-`dkj-team-alpha` on its own the figures are the ones [Step 2](#step-2--run-the-bootstrap-skill) prints. So if a
+`dkj-subagents-alpha` on its own the figures are the ones [Step 2](#step-2--run-the-bootstrap-skill) prints. So if a
 count moves while you are rewriting prefixes, you have edited one line too many.
 
 ### If you call the shared workflow scripts yourself
@@ -581,7 +659,7 @@ A repo lens lives in one of two places — the seam (`.claude/specialists/lenses
 any plugin) or, for a repo that adopted before the seam existed, the pre-seam path
 `.claude/plugins/claude-specialists/<plugin>/`, where `<plugin>` is the plugin's own folder name. On
 that second path the plugin name is part of the path a reader constructs, and this migration changed
-exactly that name — `specialists` became `dkj-team-alpha`, `specialists-shopify` became `dkj-team-shopify`, and
+exactly that name — `specialists` became `dkj-subagents-alpha`, `specialists-shopify` became `dkj-subagents-shopify`, and
 so on for the rest of the table above. A repo still on the pre-seam path is therefore left looking for
 its lenses under the *old* folder name while every specialist now reads from the new one, and finds
 nothing there.
@@ -590,7 +668,7 @@ This has not been fixed by a script or a lint rule, because no consumer in this 
 register is confirmed to be in that state — repairing a state nobody has been measured to occupy would
 be exactly the pre-emptive fix this family's own working method argues against building. If it does
 bite you, the fix is one `git mv`: rename that one directory from the old plugin name to the new one
-(`git mv .claude/plugins/claude-specialists/specialists .claude/plugins/claude-specialists/dkj-team-alpha`,
+(`git mv .claude/plugins/claude-specialists/specialists .claude/plugins/claude-specialists/dkj-subagents-alpha`,
 and the matching rename for any add-on team you had) — or, the better long-term move, since it is what
 this page already recommends to anyone still on that layout regardless of this migration, move onto the
 seam instead, per [The seam, specified](README.md#the-seam-specified) in the root README.
@@ -628,7 +706,7 @@ why it changed.
 
 > **Budget well over an hour, and know where it goes.** Measured August 6, 2026: this file is ~9,300
 > words (~47 min at 200 wpm) and
-> [`specialists-init`'s `SKILL.md`](plugins/dkj-teams/dkj-team-alpha/skills/specialists-init/SKILL.md) another ~5,600
+> [`specialists-init`'s `SKILL.md`](plugins/dkj-subagents/dkj-subagents-alpha/skills/specialists-init/SKILL.md) another ~5,600
 > (~28 min) — call it **~75 minutes** for a first-time adopter. Both pages grow, so treat
 > that as an order of magnitude. The time is not in the typing: the bootstrap places the whole seam in
 > seconds. It is in **Step 4**, writing your roster and filling your lenses.
@@ -642,7 +720,7 @@ and code/security reviewers for the independent final pass before a PR or merge.
 charge: the governance (your `CLAUDE.md`, your safety rules) remains yours; the plugins only supply
 the team and its playbooks.
 
-The system consists of **teams and a workflow**: the repo-neutral core team `dkj-team-alpha` (always
+The system consists of **teams and a workflow**: the repo-neutral core team `dkj-subagents-alpha` (always
 enable it), three optional add-on teams, and exactly one **way-of-working** plugin, chosen from the two
 the marketplace offers. Which specialists live in which plugin and who they are meant for is covered in
 the [root README](README.md).
@@ -795,7 +873,7 @@ is impossible to satisfy.
 > **One *step* here, six *acts* inside it — a different unit, not a different path.** Step 1
 > below is enable → **restart** → refresh → install → restart → verify, which the
 > [root README](README.md#adoption-the-bootstrap-path) and
-> [`specialists-init`](plugins/dkj-teams/dkj-team-alpha/skills/specialists-init/SKILL.md#chicken-and-egg--step-0-is-done-by-the-user)
+> [`specialists-init`](plugins/dkj-subagents/dkj-subagents-alpha/skills/specialists-init/SKILL.md#chicken-and-egg--step-0-is-done-by-the-user)
 > both count as its six acts ("step 0" in their numbering). Saying so is the point: those two pages once
 > counted the same procedure as *four* and *three*, and this page's step count made a third number
 > (inbound [#297](https://github.com/DaveKJohn/claude-code-specialists/issues/297)). Nothing was missing from
@@ -830,7 +908,7 @@ that domain). What follows is a **complete, pasteable file** — if you already 
     }
   },
   "enabledPlugins": {
-    "dkj-team-alpha@claude-code-specialists": true
+    "dkj-subagents-alpha@claude-code-specialists": true
   }
 }
 ```
@@ -883,7 +961,7 @@ of your repo, preceded once by a refresh of that cached clone:
 
 ```powershell
 claude plugin marketplace update claude-code-specialists                     # 1. refresh the cache first
-claude plugin install dkj-team-alpha@claude-code-specialists --scope project    # 2. then install, per plugin
+claude plugin install dkj-subagents-alpha@claude-code-specialists --scope project    # 2. then install, per plugin
 # and line 2 again for each add-on team you enabled, and for dkj-policy if you enabled it
 ```
 
@@ -1061,7 +1139,7 @@ clone these commands read tracks `main`, not the tag.
 
 ```powershell
 claude plugin marketplace update claude-code-specialists          # 1. refresh the marketplace cache
-claude plugin update dkj-team-alpha@claude-code-specialists --scope project   # 2. then update, per plugin
+claude plugin update dkj-subagents-alpha@claude-code-specialists --scope project   # 2. then update, per plugin
 ```
 
 The `plugin-versions` skill (shipped by `dkj-policy`) packages the installed-vs-clone comparison this
@@ -1253,7 +1331,7 @@ then re-install at project scope from the repo root, refresh first. That `uninst
 When an update adds a **new specialist**, your repo's roster (the specialists table in your
 `CLAUDE.md`) and its lenses don't update themselves. The `roster-sessioncheck` SessionStart hook
 flags at session start any enabled agent that is missing from your roster **or** has no repo-lens;
-type `/dkj-team-alpha:sync-roster` to stage the catch-up — it creates the missing lens scaffold and
+type `/dkj-subagents-alpha:sync-roster` to stage the catch-up — it creates the missing lens scaffold and
 proposes a roster row for you to review. It never edits your `CLAUDE.md` or commits: you place the
 change on a branch under your own governance. You can also run
 `scripts/sync/check-roster-sync.ps1` yourself for the full report.
@@ -1264,7 +1342,7 @@ skill file from an updated plugin version. So a slash command that did not exist
 release stays absent until you restart — `claude plugin update`'s own `Restart to apply changes.` is
 literally true here. Don't trust the skill counter those two commands print as evidence either way:
 it excludes any skill with `disable-model-invocation: true`, and **skills from the team plugins and the
-workflow plugin alike carry that flag** — `dkj-team-alpha`'s `specialists-init`, `specialists-teardown` and
+workflow plugin alike carry that flag** — `dkj-subagents-alpha`'s `specialists-init`, `specialists-teardown` and
 `sync-roster`, and `cut-release`, `fold-changelog`, `open-pr` and `ship-pr` from
 `dkj-policy`. So an unchanged count, or even `0 skills`, proves nothing about whether a new
 skill has actually landed. The only reliable check is the slash list itself.
