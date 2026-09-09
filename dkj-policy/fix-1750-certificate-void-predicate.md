@@ -36,19 +36,70 @@
 
 ### PLAN
 
+#### The finding, and what it turned out to be
+
+`ship-pr.ps1`'s step-3b block records `certificate voided, after #1592's fold discount -- 25 of 99
+(25.3%)` and states no window, no window end and no population. A re-measurement over the same four
+days scored 1.6%, a factor of ~15 apart, and #1750 filed that as *unreconciled* rather than wrong.
+
+The predicate turned out to be recoverable -- it is in #1602's own thread, just never in the block --
+which is what makes the rest of this branch arithmetic rather than argument.
+
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [x] Recover #1602's predicate from its own thread: window `[run.created_at,
+      last_check.completed_at]`, n=99 `ci.yml` `pull_request` laps, `2026-09-05 17:58Z ..
+      2026-09-08 10:51Z`, refused laps included, discount by the real `Test-IsFoldOnlyCommit`
+- [x] Write that predicate into the step-3b block beside the number, with the unreconciled second
+      measurement and the bound on the window's share
+- [x] Same in `.claude/specialists/lenses/06-25-extension.md`, the only other live carrier of the row
+- [x] Regenerate the plugin mirror (`scripts/sync/build-shared-scripts.ps1`)
 
 ### TEST
 
+- [x] Measured the trunk's own fold share over the disputed window with the real classifier:
+      **114 of 255 first-parent commits (44.7%)**, corroborating `Test-IsFoldOnlyCommit`'s own
+      docstring (71 of 169, 42%, over an overlapping window)
+- [x] Verified the report's #1715 inference against #1715 itself -- it does NOT hold for the recorded
+      rows, so the block answers it rather than repeating it
+- [x] `check-plugin-integrity.ps1` + all suites, via `open-pr.ps1`
+
 ### DEPLOY: fix/1750-certificate-void-predicate
 
-**Score:**
+`ship-pr.ps1`'s step-3b measurement now states the predicate beside the number -- population, window
+start, window end, what counts as voided, and which classifier applied the fold discount -- so the
+next re-measurement of the certificate-voiding rate is a comparison rather than a fresh argument. The
+values were never lost: they are in
+[#1602](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1602)'s thread and only the
+block was silent, which is the whole defect.
+
+It also records that the `25 of 99 (25.3%)` row is **unreconciled** with a re-measurement scoring
+`3 of 193 (1.6%)` over the same four days, and narrows where the disagreement lives. The window is the
+obvious suspect, and the table bounds its share at 5 -- tail-only is 5, tail-and-before is 0 -- so
+narrowing to the required check's conclusion moves 25.3% to 20.2% and no further. The residual is in
+the fold discount: 12 of 37 raw voidings discounted here (32%) against 39 of 42 there (93%), measured
+against a trunk that ran **114 folds in 255 first-parent commits (44.7%)** over those same four days
+by the real `Test-IsFoldOnlyCommit`. Neither pass is shown wrong and the direction is identical in
+both, which is all #1602's decision rested on -- but a decision *sized* off 25.3% is being sized off
+the open half, and the block now says which half that is.
+
+One inference in the report is answered rather than transcribed. It read
+[#1715](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1715) as having retired the
+window these rows describe; read against #1715, it has not. Dropping ship-pr's third local gate run
+shortens the stretch between a green certificate and the merge attempt, so it does lower how often
+the gate *actually* refuses -- but the rows count commits inside a window bounded by CI's own check
+timestamps, and the run #1715 removed happens after the last of them. Repairing on the reported reason
+would have put a wrong claim into the block with a citation attached.
+
+**Score:** 2
 
 #### What makes this deploy extra special
 
-**Score:**
+N/A -- `ship-pr.ps1` reaches a consumer through the plugin mirror, but the change is entirely inside a
+comment block: no behaviour moves, no gate changes its verdict, and nothing a consumer runs reads it.
+What travels is the reasoning a maintainer meets when they next open step 3b.
+
+**Score:** N/A
 
 #### Pull Request
 
