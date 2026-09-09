@@ -43,7 +43,34 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**37 / 91 minor entries** <!-- pending-tally -->
+**37 / 92 minor entries** <!-- pending-tally -->
+
+### DEPLOY: docs/1749-readme-domain-skills · 20260909-202504
+
+The root `README.md` no longer points a reader at the wrong plugin when they go looking for a domain
+skill. The sentence about which add-on teams may carry one named two of the three teams — from before
+`dkj-subagents-ecomm` existed — and attributed skills to `dkj-subagents-lifehub`, which ships none. It now names
+`dkj-subagents-shopify`, the only add-on team that ships any, and sits below the session-hook thread instead
+of wedged inside it, where it had been stealing the referent of the sentence after it. The same stale
+count is corrected in the plugin table and in `plugins/dkj-subagents/README.md`.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+N/A — a documentation correction in this repo's own README. No consumer behaviour, no plugin payload
+and no script changes; a reader of the marketplace README gets a correct pointer, which is not a
+release note for a subscriber.
+
+**Score:** N/A
+
+#### Pull Request
+
+Name the add-on team that actually ships domain skills
+
+[PR #1751](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1751)
+
+---
 
 ### DEPLOY: fix/1750-certificate-void-predicate · 20260909-201739
 
