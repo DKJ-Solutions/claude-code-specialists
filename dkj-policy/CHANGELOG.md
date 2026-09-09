@@ -43,7 +43,49 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**30 / 68 minor entries** <!-- pending-tally -->
+**30 / 69 minor entries** <!-- pending-tally -->
+
+### DEPLOY: feat/1693-fixture-lib-dep-check · 20260909-120859
+
+A test suite that builds its fixture by hand-listing the libs it copies can no longer go stale against
+what those libs dot-source. The dot-source is guarded on purpose -- a consumer whose plugin mirror
+predates a lib must not crash on load -- and in a fixture that same guard turns *"nobody listed this
+dependency"* into *"the function is undefined"*, which in one case surfaced as an empty return value
+rather than an error: ten asserts red in one suite while three others exercising the same lib stayed
+green, each one assert away from the same failure. The new suite reads what each lib actually
+dot-sources, including through the variable this tree does it with, and holds every fixture's copy list
+against the whole dependency closure.
+
+It had nothing to check when it was written -- no lib dot-sourced a sibling -- so it was proven against
+the one real instance rather than against an invented one: reconstructed read-only from the branch that
+introduced the first lib-to-lib dependency, the pre-repair state yields exactly one finding naming the
+right pair, and the repaired state yields none. **That branch has since merged**, so the gate now
+measures a live closure through `park-lib` and `fanout-lib` and comes back clean over twelve subjects --
+confirming its repair of the five copy lists rather than waiting for a first subject to exist. The two
+false findings a naive version produced are what shaped it: the destination is the subject rather than
+any path in the command, and a repo-owned seam the caller supplies is not a debt a fixture owes.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A -- nothing here travels. The lib is not in the shared-script registry and the gate reads this
+repo's own `scripts/tests/`, so a consumer receives no file, no new check and no new failure mode from
+it. What it protects is the tree that ships their plugin: the ten red asserts it exists to catch were
+in a branch repairing a shared lib, and a stale fixture there is a defect that reaches a release
+looking green.
+
+**Score:** N/A
+
+#### Pull Request
+
+A test fixture's lib copy list is held against what those libs dot-source
+
+Plugins: dkj-policy
+
+[PR #1707](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1707)
+
+---
 
 ### DEPLOY: docs/file-before-you-cite-the-number · 20260909-114616
 
