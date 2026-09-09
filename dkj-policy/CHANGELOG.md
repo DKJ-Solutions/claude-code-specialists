@@ -43,7 +43,30 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**38 / 93 minor entries** <!-- pending-tally -->
+**38 / 94 minor entries** <!-- pending-tally -->
+
+### DEPLOY: feat/session-permission-allowlist · 20260909-213918
+
+The session harness stops asking for permission on the calls this repo's own workflow makes on every
+branch -- read-only git, the `gh` verbs the chain uses, and the scripts under `scripts/`. The five
+release-script entries are back beside them, so a cut no longer prompts either.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A -- `.claude/settings.json` is this repo's own harness configuration. It ships in no plugin, so a
+consumer's session is unaffected; they hold their own file.
+
+**Score:** N/A
+
+#### Pull Request
+
+Widen the session permission allowlist and restore the release script entries
+
+[PR #1754](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1754)
+
+---
 
 ### DEPLOY: fix/1753-ship-pr-fold-dirty-tree · 20260909-212943
 
