@@ -89,6 +89,10 @@
 # predates this lib must not crash on load.
 $captureLib = Join-Path $PSScriptRoot 'native-capture-lib.ps1'
 if (Test-Path -LiteralPath $captureLib -PathType Leaf) { . $captureLib }
+# The porcelain read and its line parse (#1682), which park-lib.ps1 dot-sources too -- that shared
+# ownership is the whole point of the file. Guarded on the same grounds as the line above.
+$porcelainLib = Join-Path $PSScriptRoot 'git-porcelain-lib.ps1'
+if (Test-Path -LiteralPath $porcelainLib -PathType Leaf) { . $porcelainLib }
 
 function Get-WorkingCopySnapshot {
     <#
@@ -96,26 +100,14 @@ function Get-WorkingCopySnapshot {
         HEAD, the branch, one entry per changed or untracked path (with its index and worktree status
         halves kept separate), and the identity of every stash entry.
 
-        THE STATUS HALVES ARE KEPT APART because they answer different questions and only one of them
-        is a loss. Porcelain reports 'XY path': X is the index, Y is the worktree. `git reset` moves a
-        change from X to Y and destroys nothing; `git checkout -- <path>` clears Y and destroys the
-        edit. A snapshot that stored the two-character code as one string could still tell them apart,
-        but every caller would then have to re-learn which column is which -- so the parse happens
-        once, here.
-
-        --untracked-files=all, AND THE DEFAULT IS MEASURABLY WRONG FOR THIS PURPOSE. git's default
-        collapses an untracked DIRECTORY to a single entry naming the directory ('?? some/dir/'), so a
-        subagent's `git clean` inside it would remove files this snapshot never listed. Per-file also
-        respects .gitignore, so a build directory does not flood the list. Same lesson, same reason, as
-        Get-GitParkBacking in park-lib.ps1.
-
-        core.quotePath IS FORCED ON, and it is the language rule about reading a native command's
-        output rather than a preference: these paths are COMPARED against a second snapshot's, and
-        PowerShell 5.1 decodes a child process's stdout with whatever console code page the run
-        inherited. Quoting holds the wire to ASCII, where every candidate code page agrees, so a
-        filename with an accent cannot decode into something that accidentally matches -- or fails to
-        match -- the same file read a minute later under a different code page. A repo may set
-        core.quotepath in its own config, hence -c rather than trusting the default.
+        THE PORCELAIN READ IS NOT DONE HERE, and since #1682 it is not documented here either. Both
+        flags (--untracked-files=all, core.quotePath=true), the reason for each, the status-halves split
+        and the rename's kept old path all live once in git-porcelain-lib.ps1, which park-lib.ps1
+        dot-sources for its own count. This lib's header used to say "Same lesson, same reason, as
+        Get-GitParkBacking in park-lib.ps1" -- a citation standing in for an extraction, which is what
+        #1682 was filed about. What is still this file's own is the MAP the entries go into, and the
+        rename repair that made From exist: measured here, on this lib before it shipped, where a file
+        at ' M' that was renamed inside the window reported as Vanished.
 
         EVERY FIGURE CARRIES ITS OWN Known FLAG. The three git reads fail independently -- a repo with
         no commit yet has no HEAD, and a `git stash list` can fail on its own -- and a caller must be
@@ -148,37 +140,23 @@ function Get-WorkingCopySnapshot {
         if ($null -ne $branch) { $branch = ([string]$branch).Trim(); $branchKnown = $true }
     }
 
+    # THE READ AND THE PARSE COME FROM git-porcelain-lib.ps1 (#1682), park-lib.ps1's other caller. The
+    # two flags and all three lessons -- --untracked-files=all, core.quotePath, and keeping the rename's
+    # old path -- are documented in that file's header; the rename repair below was measured HERE, on
+    # this lib before it shipped (a file at ' M', renamed, reported as Vanished), and it is the reason
+    # From exists at all.
+    #
+    # THE MAP IS STILL BUILT HERE, and only the three fields the baseline round trip carries. The lib's
+    # record also holds Path, which is this hashtable's key -- storing it twice would put a field in the
+    # serialised shape that Get-WorkingCopySnapshotFormat would then have to answer for.
     $entries = @{}
-    $entriesKnown = $false
-    $stRes = Invoke-NativeCapture -FilePath 'git' -Arguments @('-c', 'core.quotePath=true', '-C', $RepoRoot, 'status', '--porcelain', '--untracked-files=all')
-    if ($stRes.ExitCode -eq 0) {
-        $entriesKnown = $true
-        foreach ($line in (($stRes.Output | Out-String) -split '\r?\n')) {
-            if ($line.Length -lt 4) { continue }
-            $index = $line.Substring(0, 1)
-            $worktree = $line.Substring(1, 1)
-            $raw = $line.Substring(3)
-            # A rename reads 'old -> new'. The new path is the one that exists on disk and is the key;
-            # THE OLD ONE IS KEPT RATHER THAN DISCARDED, and that is a repair rather than a nicety.
-            # Discarding it made an ordinary `git mv` during the window look exactly like a loss: the
-            # baseline's key disappeared, no commit carried it, and the comparison reported the edit
-            # gone while it sat intact under the new name. Measured on this lib before it shipped --
-            # a file at ' M', renamed, reported as Vanished. Keeping the pair lets the comparison
-            # follow the file instead, which ALSO means the worktree-half rule still reaches a real
-            # loss that happens on the far side of a rename.
-            $from = ''
-            $arrow = $raw.IndexOf(' -> ')
-            if ($arrow -ge 0) {
-                $from = $raw.Substring(0, $arrow).Trim().Trim('"')
-                $raw = $raw.Substring($arrow + 4)
-            }
-            $path = $raw.Trim().Trim('"')
-            if (-not $path) { continue }
-            $entries[($path -replace '\\', '/')] = [pscustomobject]@{
-                Index    = $index
-                Worktree = $worktree
-                From     = if ($from) { ($from -replace '\\', '/') } else { '' }
-            }
+    $st = Get-GitPorcelainStatus -RepoRoot $RepoRoot
+    $entriesKnown = $st.Known
+    foreach ($e in $st.Entries) {
+        $entries[$e.Path] = [pscustomobject]@{
+            Index    = $e.Index
+            Worktree = $e.Worktree
+            From     = $e.From
         }
     }
 
