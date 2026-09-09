@@ -27,8 +27,8 @@
              if (Test-Path -LiteralPath $parkPorcelainLib -PathType Leaf) { . $parkPorcelainLib }
          so the dot-source command's own text is `. $parkPorcelainLib` and names no file at all. The
          first version of this reader matched on that text and missed the ONLY real instance of the
-         class it was built for. Eight libs in scripts/lib dot-source a sibling and every one of them
-         does it through a variable, so this is the normal shape here rather than an edge case.
+         class it was built for. EVERY lib in scripts/lib that dot-sources a sibling does it that way --
+         no exceptions at the time of writing -- so this is the normal shape here, not an edge case.
       3. THE NAIVE CHECK IS NOT BORN GREEN, IT IS BORN 100% FALSE. Reading any literal in the Copy-Item
          (rather than its -Destination) produced two findings on a clean tree and both were wrong:
          consumer-check-lib.tests.ps1, whose fixture deliberately has no measure-context-lib sibling
@@ -38,7 +38,7 @@
          repo-owned seams. This repo declines a findings-list check on its false-positive rate (the
          stale-path check, 124 findings, all false), so shipping this without those two would have been
          proposing exactly what it turns down.
-      4. AFTER BOTH: 84 suites read (this file included), 12 subjects, 0 findings -- and the
+      4. AFTER BOTH: 85 suites read (this file and #1682's included), 12 subjects, 0 findings -- and the
          reconstructed pre-repair state of that real branch yields exactly 1, naming
          park-lib.ps1 -> git-porcelain-lib.ps1. The asserts below deliberately do NOT pin those two
          counts (they test `-gt 50` and `-ge 10`), because a number in an assert goes stale on the day
@@ -54,12 +54,18 @@
     WALL-CLOCK, THREE RUNS EACH, BECAUSE THE COST REVIEW ASKED FOR IT: 11.0-13.2s for the first
     working version, 8.2-8.7s after memoising and splitting the AST walk, and 2.51-2.54s as it stands
     -- the last cut coming from delegating (one shared memo instead of two engines), skipping the parse
-    of any suite whose text has no 'Copy-Item' in it at all (18 of 84 do), and reading each subject's
-    copy list once rather than twice. For scale, the gate's own slowest suites run 155-237s, so none of
-    this was ever visible there; it is taken because it is correct and free, not because it was urgent.
+    of any suite whose text has no 'Copy-Item' in it at all (18 of them do, of the whole pool), and
+    reading each subject's copy list once rather than twice. For scale, the gate's own slowest suites
+    run 155-237s, so none of this was ever visible there; it is taken because it is correct and free,
+    not because it was urgent.
 
-    THE SYNTHETIC FIXTURES BELOW ARE NOT DECORATION. On this tree the gate is silent, so nothing here
-    would notice if the reader stopped reading: the shape asserts are what prove it still fires. Each
+    THE SYNTHETIC FIXTURES BELOW ARE NOT DECORATION. They were written while the gate had nothing at
+    all to check -- no lib in scripts/lib dot-sourced a sibling -- so nothing but a shape assert could
+    notice if the reader stopped reading. That changed when #1682 merged: park-lib.ps1 now dot-sources
+    git-porcelain-lib.ps1, git-porcelain-lib.ps1 dot-sources native-capture-lib.ps1, and fanout-lib.ps1
+    dot-sources three, so the tree-wide pass at the bottom is measuring a real closure and CONFIRMING
+    that branch's repair of the five copy lists rather than waiting for a first subject. The shape
+    asserts stay, because a green tree still cannot tell a working reader from a broken one -- and each
     one is a shape measured in the tree rather than invented.
 
     Pure ASCII (repo convention for .ps1).

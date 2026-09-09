@@ -78,7 +78,8 @@ changed what got built.
 
 #### Proven against the real instance, both directions
 
-The gate is **silent on this tree**, so a synthetic assert alone would not prove it fires. Measured by
+The gate was **silent on this tree** when this was written, so a synthetic assert alone would not have
+proved it fires (it is not silent any more -- see below). Measured by
 reconstructing the defect from `origin` read-only:
 
 | state | subjects | findings |
@@ -89,6 +90,24 @@ reconstructing the defect from `origin` read-only:
 and the one finding names `park-cycle.tests.ps1: park-lib.ps1 dot-sources git-porcelain-lib.ps1, which
 the fixture does not copy`. On the real tree: **84 suites read, 12 subjects, 0 findings.**
 
+
+#### And the gate stopped being vacuous while this branch was open
+
+When the reader was written, **no lib in `scripts/lib` dot-sourced a sibling at all** -- so the
+tree-wide pass had nothing to check and only the synthetic asserts could prove the mechanism. Then the
+stale-CI gate refused the first ship (`main` had gained a commit after the certificate), bringing the
+branch forward merged **#1682**, and the map changed under it:
+
+```
+fanout-lib.ps1        -> git-porcelain-lib.ps1, native-capture-lib.ps1, ref-print-lib.ps1
+git-porcelain-lib.ps1 -> native-capture-lib.ps1
+park-lib.ps1          -> git-porcelain-lib.ps1
+```
+
+So the gate now measures a real closure, on the very dependency #1693 was filed about -- and it comes
+back **0 findings over 12 subjects**, which is it **confirming that branch's repair of the five copy
+lists** rather than waiting for a first subject to exist. The synthetic asserts stay: a green tree
+still cannot tell a working reader from a broken one.
 #### Where it lives, and why not where the issue proposed
 
 The issue suggests a numbered check in `check-plugin-integrity.ps1`. It runs as a **suite** instead,
@@ -219,12 +238,14 @@ green, each one assert away from the same failure. The new suite reads what each
 dot-sources, including through the variable this tree does it with, and holds every fixture's copy list
 against the whole dependency closure.
 
-It is silent on this tree today, and it was proven against the one real instance rather than against
-an invented one: reconstructed from the branch that introduced the first lib-to-lib dependency, the
-pre-repair state yields exactly one finding naming the right pair, and the repaired state yields none.
-The two false findings a naive version produced are what shaped it -- the destination is the subject
-rather than any path in the command, and a repo-owned seam the caller supplies is not a debt a fixture
-owes.
+It had nothing to check when it was written -- no lib dot-sourced a sibling -- so it was proven against
+the one real instance rather than against an invented one: reconstructed read-only from the branch that
+introduced the first lib-to-lib dependency, the pre-repair state yields exactly one finding naming the
+right pair, and the repaired state yields none. **That branch has since merged**, so the gate now
+measures a live closure through `park-lib` and `fanout-lib` and comes back clean over twelve subjects --
+confirming its repair of the five copy lists rather than waiting for a first subject to exist. The two
+false findings a naive version produced are what shaped it: the destination is the subject rather than
+any path in the command, and a repo-owned seam the caller supplies is not a debt a fixture owes.
 
 **Score:** 3
 
