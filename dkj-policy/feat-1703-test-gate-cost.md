@@ -49,19 +49,21 @@ lever. Recorded rather than quietly dropped, because it is the repair a reader w
 
 ### CREATE
 
-- [x] Run the gate unpiped at 12 lanes and keep the whole per-suite table (84/84 green, 1,806s)
+- [x] Run the gate unpiped and keep the whole per-suite table -- TWICE, 12 and 16 lanes, both 84/84 green
 - [x] Refresh `scripts/tests/suite-durations.json` from CI runs 34345773827 / 34345361764 / 34334137051
       via the shipped `record-suite-durations.ps1` -- 65 -> 84 suites listed, pool 4,661s
 - [x] Record the measurement in Nolan's lens, this repo's home for one
-- [x] File the inverted local-to-CI ratio as #1713 rather than sweeping three copies of a shipped lib
-- [~] No scheduler change: measured at 99.2% of its floor, so there is nothing to win
+- [x] File the inverted local-to-CI ratio (#1713) and the missing progress index (#1717) rather than
+      widening this branch into plugin payload
+- [~] No scheduler change: measured at 99.2% and 100.0% of its floor, so there is nothing to win
 - [~] No orphan-reaper: the 40/36 resident counts were mid-drain readings, retracted before they became
       a finding (quiet machine shows 4, all parented by Code.exe/claude.exe)
 
 
 ### TEST
 
-- [x] Full gate unpiped: **all 84 suites passed in 1,806s (12 lanes)**, 18-thread workstation
+- [x] Full gate unpiped, n=2: **84/84 in 1,806s (12 lanes)** and **84/84 in 1,021s (16 lanes)**
+- [x] Third reading from open-pr's own gate: 84/84 in 923s (16 lanes) -- the ~10% noise band
 - [x] `ci-shard.tests.ps1` green (74 asserts) against the refreshed hints file -- it is the suite that
       asserts the real `suite-durations.json` parses and holds usable durations
 - [x] `check-plugin-integrity-links.tests.ps1` solo: 141 asserts, 759.1s -- the contention/machine split
@@ -73,45 +75,59 @@ lever. Recorded rather than quietly dropped, because it is the repair a reader w
 [#1703](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1703) reported the `open-pr` test
 gate at *"~9 hours of CPU per PR"* and said plainly that everything in it was inference until somebody ran
 the gate **unpiped** and kept the full table — the caller had piped through `Select-Object -Last 40`, which
-truncated exactly the rows above 55.8s. That table now exists: **all 84 suites green in 1,806s at 12 lanes**,
-and it retires the issue's headline metric rather than confirming it.
+truncated exactly the rows above 55.8s. Two full tables now exist, both green, both on the 18-thread
+workstation:
 
-**The scheduler is at 99.2% of its theoretical floor, so the queue order is not the lever and neither is the
-pack.** This is the half worth carrying, because everything visible points the other way.
-`scripts/tests/suite-durations.json` genuinely had gone stale — 65 of 84 suites listed, so the
-charge-the-maximum rule priced 19 of them at 236.8s each, **4,499s of phantom weight against a 3,552s real
+| | lanes | makespan | lane-seconds | longest file | lower bound | makespan ÷ bound |
+|---|---|---|---|---|---|---|
+| reading 1 | 12 | 1,806s | 21,512s | 1,617.1s | 1,793s | 100.8% |
+| reading 2 | 16 | 1,021s | 16,008s | 1,020.7s | 1,021s | 100.0% |
+
+**The scheduler is at its floor — 99.2% and 100.0% of the theoretical minimum — so the queue order is not
+the lever and neither is the pack.** That is the half worth carrying, because everything visible points the
+other way. `scripts/tests/suite-durations.json` genuinely had gone stale: 65 of 84 suites listed, so the
+charge-the-maximum rule priced 19 of them at 236.8s each — **4,499s of phantom weight against a 3,552s real
 pool**. Trivial suites bought the opening lanes on it (`claim-issue` 21.0s dequeued at +0.9s) while
 `teardown` (582.9s) waited until +1,175.1s. All true, and together worth **at most 13s of 1,806**. The
 repair a reader reaches for first would have satisfied the report and returned nothing.
 
-The hints file was refreshed anyway, from CI runs 34345773827 / 34345361764 / 34334137051 (3-run mean, 84 of
-84, pool 4,661s), **and the commit says 0s**. Both hint sets were put through the real
-`Get-TestSuiteShardOrder` pack and scored against today's durations: 374s either way, because
-`new-branch.tests.ps1` alone is 373.8s against a 291s work bound. **CI is critical-path-bound on one file,
-and no partition beats a file.** That prices what [#1358](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1358)
-left open — it asked for a 4-lane CI table before anyone costed the split, and the gap a split of
-`new-branch` could buy is **83s, 22% of the shard**. The makespan-setter is that file, not one of the four
-`check-plugin-integrity-*` suites the earlier reports named. A truthful table is what the next simulation
-reads, which is the only reason this one could be run.
+**The two readings sit in different regimes, which is why one would have been the wrong evidence.** At 12
+lanes the pool is work-bound; at 16 it is critical-path-bound and simply **is**
+`check-plugin-integrity-links.tests.ps1` — 1,020.7s against a 1,021s makespan. Past ~16 lanes this machine
+gains nothing at all.
 
-**Where the work is**, which is the issue's question 1: six files carry **8,140s of the 21,512 lane-seconds,
-37.8%**, and they are ~100% cold `powershell` children each running a full lint over a fixture —
+The hints file was refreshed anyway, from CI runs 34345773827 / 34345361764 / 34334137051 (3-run mean, 84 of
+84, pool 4,661s), **and the commit says 0s**: both hint sets were put through the real
+`Get-TestSuiteShardOrder` pack and scored against today's durations, and both give a 374s binding shard,
+because `new-branch.tests.ps1` alone is 373.8s against a 291s work bound. **CI is critical-path-bound on one
+file too, and no partition beats a file.** That prices what
+[#1358](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1358) left open — it asked for a
+4-lane CI table before anyone costed the split, and the gap a split of `new-branch` could buy is **83s, 22%
+of the shard**. Note the two machines disagree about *which* file to split — CI says `new-branch`, this
+workstation says `check-plugin-integrity-links` — and CI is the one that blocks a merge. A truthful table is
+what the next simulation reads, which is the only reason this one could be run.
+
+**Where the work is**, the issue's question 1: six files carry **8,140s of reading 1's 21,512 lane-seconds,
+37.8%**, all of it cold `powershell` children each running a full lint over a fixture —
 `check-plugin-integrity-links` 66 invocations, `new-branch` 56, `fold-changelog` 54, 44 each for the other
 three.
 
-**And lane-seconds are not CPU.** `wall × lanes` charges a blocked lane as though it were working. One file,
-one day, three readings: `check-plugin-integrity-links` costs **290.9s on CI**, **759.1s alone here**, and
-**1,617.1s in the 12-lane pool** — so 2.61× is the machine and 2.13× is contention. The same 84 suites are
-4,661 lane-seconds on CI and 21,512 here: the pool has no size, only a size per concurrency.
+**And lane-seconds are not CPU.** `wall × lanes` charges a blocked lane as though it were working. The proof
+is in the pair above: lane-seconds **fell** from 21,512 to 16,008 when lanes went **up** from 12 to 16, on
+one machine, one day, one tree. Work does not do that; queueing does. On the heaviest file: **290.9s on CI**,
+**759.1s alone here**, 1,020.7s at 16 lanes, 1,617.1s at 12 on a busier machine — so 2.61× is the machine and
+the rest is contention. The same 84 suites are 4,661 lane-seconds on CI and 16,008-21,512 here.
 
-Two things measured and deliberately not repaired here. The local-to-CI ratio is stated **backwards** in
+Three things measured and deliberately not repaired here. The local-to-CI ratio is stated **backwards** in
 three copies of a shipped lib (*"3.6-4.0x faster on a developer machine"* against 2.61× slower measured) —
-filed as [#1713](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1713), because it is plugin
-payload under the shared-scripts drift lint and replacing one wrong constant with another off n=1 is the
-error it describes. And a resident-interpreter count taken mid-drain is not an orphan count: the run opened
-at 40 and 36 were still up seconds after it returned, which reads exactly like
-[#1464](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1464)'s leak and is not one — quiet,
-the machine holds four, all parented by `Code.exe` or `claude.exe`. Retracted before it became a finding.
+[#1713](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1713), because it is plugin payload
+under the shared-scripts drift lint and replacing one wrong constant with another off n=1 is the error it
+describes. The gate prints no progress index, so a 15-30 minute run cannot be told from a wedged one —
+[#1717](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1717). And a resident-interpreter
+count taken mid-drain is not an orphan count: reading 1 opened at 40 and 36 were still up seconds after it
+returned, which reads exactly like [#1464](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1464)
+and is not it — quiet, the machine holds four, all parented by `Code.exe` or `claude.exe`. Both runs exited
+0; #1464 is about a killed one. Retracted before it became a finding.
 
 The gate's scope — why 84 suites run for a one-section README diff — is untouched. #1703 reserves it for
 Dave, correctly: it asks what the gate is *for*, and changing it changes a safety guard.
@@ -123,11 +139,11 @@ Dave, correctly: it asks what the gate is *for*, and changing it changes a safet
 N/A — this reaches no subscriber. The measurement lives in this repo's own lens, and
 `scripts/tests/suite-durations.json` is a local hint file the gate reads here; a consumer who copies the lib
 and has no such file gets the stride, unchanged. Nothing in any plugin moves, and the gate behaves
-identically — measured at 374s either way. The one consumer-facing thread, the backwards ratio in the two
-plugin mirrors, is #1713 and not this branch.
+identically — measured at 374s either way. The two consumer-facing threads, the backwards ratio in the two
+plugin mirrors and the missing progress index, are #1713 and #1717 and not this branch.
 
 **Score:** N/A
 
 #### Pull Request
 
-The test gate's nine hours, measured: the scheduler is at 99.2% of its floor and the lever is one file
+The test gate's nine hours, measured twice: the scheduler is at its floor and the lever is one file

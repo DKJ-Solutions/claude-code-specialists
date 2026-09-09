@@ -1189,40 +1189,40 @@ against the pool's makespan by a reader who does not know when the suite began.
 makespan-setter is a different suite than the report named, and nothing about it should be decided off this
 workstation table rather than a 4-lane CI one.
 
-### The gate's nine hours, measured end to end — and the lever is not the scheduler (September 9, 2026)
+### The gate's nine hours, measured twice — the scheduler is at its floor and the lever is one file (September 9, 2026)
 
 [#1703](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1703) reported *"~9 hours of CPU
 per PR: 84 suites, 2,009s over 16 lanes"*, and said plainly that everything in it was inference until
 somebody ran the gate **unpiped** and kept the full table — the caller had piped through
-`Select-Object -Last 40`, which cut off exactly the rows above 55.8s. That table now exists, and it
-answers the issue's question 1 while retiring its headline metric.
+`Select-Object -Last 40`, which cut off exactly the rows above 55.8s. Two full tables now exist, and they
+answer the issue's question 1 while retiring its headline metric.
 
-**The run: all 84 suites green, 12 lanes, on the 18-thread workstation.**
+**n=2 on the 18-thread workstation, both green, both unpiped:**
 
-| | |
-|---|---|
-| lane-seconds | **21,512s** (5.98 h) |
-| makespan | **1,806s** |
-| longest file | 1,617s `check-plugin-integrity-links.tests.ps1` |
-| work bound (lane-seconds ÷ 12) | 1,793s |
-| lower bound `max(longest file, work ÷ lanes)` | **1,793s** |
-| makespan ÷ that bound | **100.8%** |
+| | lanes | makespan | lane-seconds | longest file | lower bound `max(file, work÷lanes)` | makespan ÷ bound |
+|---|---|---|---|---|---|---|
+| reading 1 | 12 | 1,806s | 21,512s (5.98 h) | 1,617.1s | 1,793s | **100.8%** |
+| reading 2 | 16 | 1,021s | 16,008s (4.45 h) | 1,020.7s | 1,021s | **100.0%** |
 
-**THE SCHEDULER IS AT 99.2% OF ITS THEORETICAL FLOOR, so the queue order is not the lever and neither is
-the pack.** This is the finding worth keeping, because the opposite is what everything visible suggests.
-`scripts/tests/suite-durations.json` really was stale — recorded September 4 from runs 33842129201 and
-33812817842, it listed **65 of the 84** suites, and [the charge-the-maximum
-rule](../../../scripts/lib/native-capture-lib.ps1) therefore priced 19 suites at 236.8s each: 4,499s of
-phantom weight against a 3,552s real pool, i.e. **56% of what the bin-pack was allocating from was
-fictional**. Trivial suites bought the opening lanes on it (`claim-issue` 21.0s, `consumer-check-lib`
-19.2s, `fixture-git-lib` 19.3s, all dequeued at +1.4s or earlier) while `teardown` (582.9s) waited until
-+1,175.1s. Every one of those sentences is true, and together they are worth **at most 13s of 1,806**.
-A repair built on them would have satisfied the report and returned nothing.
+**THE SCHEDULER IS AT ITS FLOOR — 99.2% and 100.0% of the theoretical minimum — so the queue order is not
+the lever and neither is the pack.** That is the finding worth keeping, because everything visible points
+the other way and the wrong repair is one step away. `scripts/tests/suite-durations.json` really had gone
+stale: recorded September 4 from runs 33842129201 and 33812817842, it listed **65 of the 84** suites, so
+[the charge-the-maximum rule](../../../scripts/lib/native-capture-lib.ps1) priced 19 of them at 236.8s each
+— **4,499s of phantom weight against a 3,552s real pool**, 56% of what the bin-pack was allocating from.
+Trivial suites bought the opening lanes on it (`claim-issue` 21.0s dequeued at +0.9s, `consumer-check-lib`
+19.2s at +1.1s) while `teardown` (582.9s) waited until +1,175.1s. Every sentence there is true, and
+together they are worth **at most 13s of 1,806**.
 
-**AND ON CI — the number that actually blocks a merge — the refresh is worth exactly 0s, measured rather
-than assumed.** Refreshed from runs 34345773827, 34345361764 and 34334137051 (3-run mean, 84 of 84
-suites, pool **4,661s**), then both hint sets simulated through `Get-TestSuiteShardOrder`'s own LPT pack
-and longest-first queue and scored against today's real durations:
+**AND THE TWO READINGS SIT IN DIFFERENT REGIMES, which is why n=1 would have been the wrong evidence.** At
+12 lanes the pool is work-bound (1,793s of work against a 1,617s longest file); at 16 it is
+critical-path-bound and the pool simply **is** `check-plugin-integrity-links.tests.ps1` — 1,020.7s against
+a 1,021s makespan, #714's regime exactly. So on this machine adding lanes past ~16 buys nothing at all, and
+the only local lever left is inside that file.
+
+**ON CI the refresh is worth exactly 0s, measured rather than assumed.** Refreshed from runs 34345773827,
+34345361764 and 34334137051 (3-run mean, 84 of 84, pool **4,661s**), then both hint sets simulated through
+`Get-TestSuiteShardOrder`'s own LPT pack and longest-first queue and scored against today's real durations:
 
 | CI, 4 shards × 4 lanes | makespan on the binding shard |
 |---|---|
@@ -1230,33 +1230,38 @@ and longest-first queue and scored against today's real durations:
 | refreshed hints (84 of 84) | **374s** |
 
 Because `new-branch.tests.ps1` alone is **373.8s** against a 291s work bound (4,661 ÷ 16). **CI is
-critical-path-bound on one file, and no partition can beat a file.** That is #714's rule arriving where
+critical-path-bound on one file too, and no partition beats a file.** That is the 4-lane table
 [the #1358 section above](#inside-the-invocation--where-a-plateau-suites-time-actually-goes-september-3-2026)
-left it open — it asked for a 4-lane CI table before anyone priced the split, and this is one: the gap a
-split of `new-branch` could buy is **83s, 22% of the shard**, and the makespan-setter is that file and not
-one of the four `check-plugin-integrity-*` suites. The hints file was refreshed anyway and the commit says
-0s: a truthful table is what the next person's simulation reads, which is the whole reason this one could
-be run at all.
+asked for before anyone priced the split: the gap a split of `new-branch` could buy is **83s, 22% of the
+shard**, and the makespan-setter is that file, not one of the four `check-plugin-integrity-*` suites the
+earlier reports named. **The two machines disagree about which file to split** — CI says `new-branch`,
+this workstation says `check-plugin-integrity-links` — and CI is the one that blocks a merge. The hints
+file was refreshed anyway and the commit says 0s: a truthful table is what the next simulation reads,
+which is the only reason this one could be run.
 
-**WHERE THE WORK ACTUALLY IS, which is question 1's answer.** Six files carry **8,140s of the 21,512
-lane-seconds — 37.8%** — and they are ~100% cold `powershell` child processes, each a full lint run over a
+**WHERE THE WORK IS, which is question 1's answer.** Six files carry **8,140s of reading 1's 21,512
+lane-seconds — 37.8%** — and they are ~100% cold `powershell` children, each a full lint run over a
 fixture: `check-plugin-integrity-links` 66 invocations, `new-branch` 56, `fold-changelog` 54, and 44 each
 for the other three `check-plugin-integrity-*`.
 
 **THE HEADLINE METRIC DOES NOT SURVIVE, and this is the part to carry forward. Lane-seconds are not CPU.**
-Multiplying wall clock by lane count charges a lane that is *blocked* as though it were working, and under
-this gate most of them are. Decomposed on the heaviest suite, three readings of one file on one day:
+`wall × lanes` charges a *blocked* lane as though it were working, and under this gate most are. The proof
+is in the two readings above: **lane-seconds FELL from 21,512 to 16,008 when lanes went UP from 12 to 16**,
+on one machine, one day, one tree. Work does not behave that way; queueing does. Decomposed on the heaviest
+suite, four readings of one file:
 
 | `check-plugin-integrity-links.tests.ps1` | |
 |---|---|
 | CI, 4 lanes (3-run mean) | 290.9s |
 | this workstation, **alone** | 759.1s |
-| this workstation, **in the 12-lane pool** | 1,617.1s |
+| this workstation, 16-lane pool | 1,020.7s |
+| this workstation, 12-lane pool (busier machine) | 1,617.1s |
 
-So **2.61× is the machine and 2.13× is contention**, and the product is the 5.6× that reads as "the gate
-is enormous". The same 84 suites cost **4,661 lane-seconds on CI and 21,512 here** — the pool does not
-have a size, it has a size *per concurrency*. A figure of the `wall × lanes` shape should be reported as
-lane-seconds and never as CPU.
+So **2.61× is the machine and the rest is contention.** The same 84 suites are **4,661 lane-seconds on CI
+and 16,008-21,512 here**: the pool has no size, it has a size *per concurrency and per load*. A figure of
+the `wall × lanes` shape is reported as lane-seconds, with its lane count, and never as CPU. The ordinary
+band is worth knowing too — two 16-lane readings on the same tree minutes apart came in at 923s (open-pr's
+own gate) and 1,021s, so ~10% is noise and nothing under that is a finding.
 
 **TWO THINGS MEASURED HERE THAT ARE NOT REPAIRED HERE.**
 
@@ -1268,12 +1273,21 @@ lane-seconds and never as CPU.
   either. Filed as [#1713](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1713) rather than
   swept: it sits in the source lib plus its two plugin mirrors under the shared-scripts drift lint, it is
   plugin payload, and replacing one wrong constant with another off n=1 is the error it is describing.
-- **A resident-interpreter count taken mid-drain is not an orphan count.** The run opened with
+- **A resident-interpreter count taken mid-drain is not an orphan count.** Reading 1 opened with
   `40 powershell processes already resident` and 36 were still up seconds after it returned, which reads
   exactly like [#1464](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1464)'s leak and is
   not one: with the machine quiet, four remain and all four are parented by `Code.exe` or `claude.exe`.
-  #1464 is about a **killed** run; this one exited 0. The reading was retracted before it became a finding,
-  which is the only reason it is written down.
+  #1464 is about a **killed** run; both of these exited 0. The reading was retracted before it became a
+  finding, which is the only reason it is written down.
+
+**AND ONE THING THE MEASURING ITSELF EXPOSED.** `Invoke-TestSuiteGate` prints `== <suite> ==` per completed
+suite and no index, so a run gives no sense of how far along it is or how much is left — on a pool that
+takes 15-30 minutes locally, the operator's only signal is walls of suite output arriving in completion
+order. Filed as [#1717](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1717). The counter
+written to watch these two runs also belongs here, because the obvious one is wrong: `grep -c '^== '`
+returns 175 of 84, since `test-suite-gate.tests.ps1` prints the same header over its own fixture. Dedupe
+against the suites that actually exist — the identical trap `record-suite-durations.ps1` documents for its
+duration rows.
 
 ### Boundaries with the other roles
 
