@@ -36,21 +36,68 @@
 
 ### PLAN
 
+#### What #1680 reported, and what it turned out to be
+
+The gate's `.SYNOPSIS` enumerates its checks in prose, and that list had stopped at `30.` while the code
+ran to `36.` -- with its own item `30.` describing the check #1494 renumbered to `33` a month after the
+list was written. Verifying it against the tree turned up a third drift the report did not name: items
+`9.` and `17.` still describe checks **retired on August 8, 2026**, reading as live ones.
+
+#### And why the repair is a check and not only a rewrite
+
+Rewriting the list by hand resets the clock rather than stopping it -- the same conclusion check 32's own
+header records after three hand repairs of the mirror table, and the reason check 35 exists after the
+#1635 sweep. Check 34 already holds the column-0 headers to each other; nothing held the prose that
+summarises them for a reader who has not opened a four-thousand-line file. The check earned that
+argument on its first run by finding a seventh missing entry, `13b`, that no report had noticed.
+
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [x] Verify the drift against the code's own headers rather than the report's summary
+- [x] Repair the list: renumber the barred-skill entry to 33, write back 30, 31, 32, 34, 35 and 36, and
+      turn 9 and 17 into tombstones that keep their numbers
+- [x] Add check 37, opt-in through the existing marked-span walk, holding every column-0 header to that
+      list in ONE direction so it is born green with no exemptions
+- [x] Record the shape and the measurements in Sylvester's lens
 
 ### TEST
 
+- [x] Five scenarios in the gate's own suite: the missing entry, the entry with no header (the bound),
+      the lettered sub-section, the list in a headerless file, and the unpaired marker plus the opt-out
+- [x] The lint gate and every suite are green
+
 ### DEPLOY: feat/1680-synopsis-check-list
 
-**Score:**
+The gate's `.SYNOPSIS` enumerates its checks in prose -- the summary a reader who has not opened four
+thousand lines consults, and the one a lens, a hook, a test-scenario name or a released note quotes a
+number from. It had stopped at `30.` while the code ran to `36.`, and its own item `30.` still described
+the check #1494 renumbered to `33` a month after the list was written, so grepping the list for "check 30"
+answered with a different check. Two more drifts were found on verification and neither was in the report:
+items `9.` and `17.` still read as live checks a month after they were **retired**, and `13b` had no entry
+at all.
+
+**Check 37 now holds that list to the file's own column-0 headers**, because a hand rewrite resets the
+clock rather than stopping it -- the conclusion check 32's header already records after three hand repairs
+of the mirror table. It is opt-in through the same marked-span walk checks 10, 29 and 32 use, so it
+inherits their three refusals for free and no unmarked script becomes a subject; it reads check 34's own
+header pattern, so the two cannot disagree about what a header is; and it asserts **one direction only** --
+every header needs an entry, an entry needs no header. That is what let it be born green rather than with
+an exemption list: three entries legitimately have no header of their own, the two retirement tombstones
+and the consumer-doc guard the suites call check 19. Measured after the repair: 1 span, 37 headers, 37
+claimed, 0 findings, 0 exemptions. Its own first run is the argument for it -- `13b` was reported by the
+check, not by a reader.
+
+**Score:** 3
 
 #### What makes this deploy extra special
 
-**Score:**
+N/A. `check-plugin-integrity.ps1` is this repo's own gate and is mirrored into no plugin, so nothing here
+reaches a consumer: the repaired list, the new check and its scenarios all stay in the source tree. A
+consumer's own lint script is theirs, and the marker is opt-in, so nothing starts asserting anything on
+their side either.
+
+**Score:** N/A
 
 #### Pull Request
 
-The gate's own check list is held to its headers, and the six it had lost are back
-
+The gate's own check list is held to its headers, and the seven it had lost are back
