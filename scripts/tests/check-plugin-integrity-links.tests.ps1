@@ -113,7 +113,7 @@ try {
     # combined check would pass while three of them were absent.
     Write-Host "check 4 coverage -- the payload layers (#481) are IN the scan set" -ForegroundColor Cyan
     $payloadTargets = @(
-        @{ Rel = 'plugins\dkj-subagents\dkj-subagents-alpha\agents\09-99-agent.md';   Label = 'an agent def' },
+        @{ Rel = 'plugins\dkj-subagents\dkj-subagents-alpha\subagents\09-99-agent.md';   Label = 'an agent def' },
         @{ Rel = 'plugins\dkj-subagents\subagent-shared\fixture-block.md';  Label = 'a shared agent-def block' },
         @{ Rel = '.github\pull_request_template.md';             Label = 'a .github template' },
         @{ Rel = '.claude\rules\fixture-rule.md';                Label = 'a path-scoped rule' }
@@ -208,7 +208,7 @@ try {
     # plugins/ glob. One dead link in it must produce exactly one [link] finding. Counted on LINES carrying
     # both the path and the [link] tag, because check 3 also names this file (no frontmatter) and a naive
     # match on the path alone would count that too.
-    $dupWitnessRel = 'plugins\dkj-subagents\dkj-subagents-alpha\agents\09-98-agent.md'
+    $dupWitnessRel = 'plugins\dkj-subagents\dkj-subagents-alpha\subagents\09-98-agent.md'
     foreach ($pd in @($pluginDocTargets.Rel + $dupWitnessRel)) {
         $pdFull = Join-Path $Fixture $pd
         New-Item -ItemType Directory -Path (Split-Path -Parent $pdFull) -Force | Out-Null

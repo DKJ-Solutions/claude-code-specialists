@@ -1656,7 +1656,7 @@ the boundary is the **plugin root**, not `plugins/`, and scenario 37 of
 `check-plugin-integrity-links.tests.ps1` exists to pin exactly that difference. The report also argued
 from an expected count of **zero** (*"which is itself the reason not to build it yet"*) and stated that
 nothing had shipped; the real count was **17 escapes in 5 files**, every one passing check 4, and
-resolved inside the installed copies (`dkj-subagents-alpha` 4.21.0, `dkj-policy` 4.22.0) **all 17 are
+resolved inside the installed copies (`dkj-team-alpha` 4.21.0, `dkj-policy` 4.22.0) **all 17 are
 dead**. That inverted its conclusion rather than qualifying it: the repo's name-a-risk-and-leave-it rule
 holds until something bites, and this had bitten seventeen times in released payload.
 

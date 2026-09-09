@@ -89,6 +89,18 @@ rather than re-deciding it:
 - [x] Write `INSTALL.md`'s third migration section, with the uninstall/install sequence and the three
       things inside a consumer's repo that the id swap does not fix.
 - [x] Repair the prose the sweep made historically false, in `README.md` and `CLAUDE.md`.
+- [x] Review round on the diff -- Victor #19 on the ~60 lines of new behaviour, Edith #17 on the prose.
+      Both found real defects and both are repaired: a test that still filtered on the old leaf and so
+      gathered zero agent defs against the live tree (3 failing assertions, which made the "all green"
+      claim in this document false when it was written); two weakened fixture paths; INSTALL.md and this
+      document's own DEPLOY section claiming an uninstall does not rewrite `enabledPlugins`, which
+      INSTALL.md's own measured paragraph contradicts -- it does, so the list is TWO things and not three;
+      two dated sentences swept to a name that did not exist on their date; and `connectors/README.md`'s
+      FORMAT EXAMPLE, which is illustrative rather than a consumer's record and therefore does travel with
+      a rename, as the previous round's own commit shows.
+- [x] Cover the new behaviour: Tycho #18 added the `Get-SubagentDirName` / `Get-SubagentDirPath` cases
+      (new shape, old shape, both, neither, and a FILE named `subagents`) plus a `Resolve-PluginDir` scan
+      over a version shipping the new leaf. Nothing exercised the preferred shape before this.
 - [x] Lint gate and every test suite green.
 
 ### TEST
@@ -119,12 +131,12 @@ only add, never move.
 #### What makes this deploy extra special
 
 **A plugin rename is not a `claude plugin update`.** Every consumer must uninstall the four
-`dkj-team-*` ids, install the `dkj-subagents-*` ones, and then fix three things no install touches:
-the `enabledPlugins` keys in their own `.claude/settings.json`, the `@`-import in their
-`SPECIALISTS.md` (which carries the full marketplace path, and both halves of it moved), and their
-`connectors/` register if they keep one -- an unresolvable id there makes `check-connectors.ps1` skip
-that plugin's whole drift check silently. `INSTALL.md` carries the command sequence and all three, as
-its third migration section.
+`dkj-team-*` ids and install the `dkj-subagents-*` ones -- which rewrites their `enabledPlugins` for
+them, as this page already documents -- and then fix the two things the CLI leaves behind: the
+`@`-import in their `SPECIALISTS.md`, which carries the full marketplace path and both halves of it
+moved, and their `connectors/` register if they keep one, where an unresolvable id makes
+`check-connectors.ps1` skip that plugin's whole drift check silently. `INSTALL.md` carries the command
+sequence and both, as its third migration section.
 
 **Score:** 5
 

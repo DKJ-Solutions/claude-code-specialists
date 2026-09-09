@@ -96,7 +96,7 @@ bar, so the next bullet is weighed rather than appended.
   conversation history, branch); (2) the **detection lint** as alarm-bell automation.
 
   **Extending the mechanism to the persona templates was the third, and it shipped on August 8, 2026**
-  — the generator walks `personas/` alongside `subagents/` (`scripts/agents/build-agent-defs.ps1`), which
+  — the generator started walking `personas/` alongside `agents/`, as that directory was named then (`scripts/agents/build-agent-defs.ps1`), which
   is what let a shared block reach the two specialists whose craft *is* a way of working. It is written
   here as a closed job rather than deleted, because the comment in that generator still cites this list
   as the place the widening was foreseen; a reader who follows that citation has to land on the answer,

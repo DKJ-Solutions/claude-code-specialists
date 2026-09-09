@@ -697,6 +697,51 @@ try {
     finally {
         $env:USERPROFILE = $savedProfile
     }
+
+    # --- Get-SubagentDirName / Get-SubagentDirPath: the shape a plugin ships its subagents in ---------
+    #     New-first precedence (subagents/ over agents/) is the one branch nothing else exercises: no
+    #     fixture in this tree carries both shapes, so only a test can hold the docstring's claim that a
+    #     dir carrying both resolves to the one the manifest's "agents": "./subagents/" key points at.
+    Write-Host "Get-SubagentDirName / Get-SubagentDirPath -- new shape, old shape, both, neither" -ForegroundColor Cyan
+    $sdnBase = Join-Path $Fixture 'sdn'
+    $sdnSubagentsOnly = Join-Path $sdnBase 'subagents-only'
+    $sdnAgentsOnly    = Join-Path $sdnBase 'agents-only'
+    $sdnBoth          = Join-Path $sdnBase 'both'
+    $sdnNeither       = Join-Path $sdnBase 'neither'
+    $sdnFileNotDir    = Join-Path $sdnBase 'file-not-dir'
+
+    New-Item -ItemType Directory -Path (Join-Path $sdnSubagentsOnly 'subagents') -Force | Out-Null
+    New-Item -ItemType Directory -Path (Join-Path $sdnAgentsOnly 'agents') -Force | Out-Null
+    New-Item -ItemType Directory -Path (Join-Path $sdnBoth 'subagents') -Force | Out-Null
+    New-Item -ItemType Directory -Path (Join-Path $sdnBoth 'agents') -Force | Out-Null
+    New-Item -ItemType Directory -Path $sdnNeither -Force | Out-Null
+    New-Item -ItemType Directory -Path $sdnFileNotDir -Force | Out-Null
+    [System.IO.File]::WriteAllText((Join-Path $sdnFileNotDir 'subagents'), 'not a directory')
+
+    Assert-Equal 'subagents' (Get-SubagentDirName -PluginDir $sdnSubagentsOnly) 'only subagents/ present: the new shape'
+    Assert-Equal 'agents' (Get-SubagentDirName -PluginDir $sdnAgentsOnly) 'only agents/ present: the pre-rename, back-compat shape'
+    Assert-Equal 'subagents' (Get-SubagentDirName -PluginDir $sdnBoth) 'both present: subagents wins (new-first precedence)'
+    Assert-Equal '' (Get-SubagentDirName -PluginDir $sdnNeither) 'neither present: empty string, no throw'
+    Assert-Equal '' (Get-SubagentDirName -PluginDir $sdnFileNotDir) "a FILE named 'subagents' is not mistaken for the directory (-PathType Container)"
+
+    Assert-Equal (Join-Path $sdnSubagentsOnly 'subagents') (Get-SubagentDirPath -PluginDir $sdnSubagentsOnly) 'Get-SubagentDirPath joins the leaf: subagents/'
+    Assert-Equal (Join-Path $sdnAgentsOnly 'agents') (Get-SubagentDirPath -PluginDir $sdnAgentsOnly) 'Get-SubagentDirPath joins the leaf: agents/'
+    Assert-Equal '' (Get-SubagentDirPath -PluginDir $sdnNeither) 'Get-SubagentDirPath: empty string when neither shape is present'
+
+    # --- Resolve-PluginDir: the cache scan also resolves a version shipping the new subagents/ shape ---
+    #     The Resolve-PluginDir block above builds every fixture with agents/ only, so the preferred
+    #     shape was untested end to end even though Resolve-PluginDir's own discriminator call sites
+    #     were switched to Get-SubagentDirName. Mirrors that block's own "no -RepoRoot" case (case 1)
+    #     rather than rewriting it.
+    Write-Host "Resolve-PluginDir -- cache scan resolves a version shipping subagents/ (the new shape)" -ForegroundColor Cyan
+    $rpSubCache = Join-Path $Fixture 'rpcache-subagents'
+    foreach ($v in @('1.9.0', '1.10.0')) {
+        New-Item -ItemType Directory -Path (Join-Path $rpSubCache "m\dkj-subagents-alpha\$v\subagents") -Force | Out-Null
+    }
+    # A version with NEITHER shape, to prove the scan's existing filter still applies underneath.
+    New-Item -ItemType Directory -Path (Join-Path $rpSubCache 'm\dkj-subagents-alpha\2.0.0') -Force | Out-Null
+    $d = Resolve-PluginDir -Name 'dkj-subagents-alpha' -Marketplace 'm' -CacheRoot $rpSubCache
+    Assert-Equal '1.10.0' (Split-Path $d -Leaf) 'cache scan: the semantically highest version shipping subagents/ (1.10.0 over 1.9.0, 2.0.0 skipped for shipping neither)'
 }
 finally {
     if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture -ErrorAction SilentlyContinue }

@@ -756,7 +756,7 @@ try {
     # them again -- every other check in this file reads that plugin too, and a stray agent def would
     # change what checks 7 and 26 walk for the scenarios below.
     Write-Host "check 6b: a manual may be backed by a persona, and must then be named by it" -ForegroundColor Cyan
-    $spAgents   = Join-Path $Fixture 'plugins\dkj-subagents\dkj-subagents-alpha\agents'
+    $spAgents   = Join-Path $Fixture 'plugins\dkj-subagents\dkj-subagents-alpha\subagents'
     $spManuals  = Join-Path $Fixture 'plugins\dkj-subagents\dkj-subagents-alpha\manuals'
     $spPersonas = Join-Path $Fixture 'plugins\dkj-subagents\dkj-subagents-alpha\personas'
     New-Item -ItemType Directory -Path $spManuals  -Force | Out-Null

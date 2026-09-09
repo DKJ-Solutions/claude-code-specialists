@@ -269,25 +269,21 @@ claude plugin install dkj-subagents-shopify@claude-code-specialists --scope proj
 
 **4. Restart your Claude Code session.**
 
-### The three things inside your repo that the id swap does not fix
+`--scope project` is not optional here any more than it is anywhere else on this page. Expect the
+uninstalls and the installs to rewrite `.claude/settings.json` on the way, the same rewriting behaviour
+[documented above](#connecting--the-install-step): the four `dkj-team-*` `enabledPlugins` entries come
+out, the four `dkj-subagents-*` ones go in, and any diff beyond that is formatting. **That file is the
+CLI's to edit, so it is not on the list below** — the list is what the CLI leaves for you.
 
-**1. `enabledPlugins` in your own `.claude/settings.json`** holds the id as a literal string, and an
-uninstall does not touch it. Rewrite the four keys by hand, in the same commit, or the settings chain
-still enables a plugin nothing publishes:
+### The two things inside your repo that the id swap does not fix
 
-```jsonc
-"enabledPlugins": {
-  "dkj-subagents-alpha@claude-code-specialists": true
-}
-```
-
-**2. The `@`-import of the orchestrator's body** names a path inside the marketplace clone, and both
+**1. The `@`-import of the orchestrator's body** names a path inside the marketplace clone, and both
 halves of that path moved: `plugins/dkj-teams/dkj-team-alpha/` is now
 `plugins/dkj-subagents/dkj-subagents-alpha/`. The shape test in the section below still applies verbatim
 — an import whose path does not contain `plugins/dkj-subagents/<team>/` or `plugins/dkj-policy/` is stale,
 whatever it contains instead — and this rename is simply the newest thing it catches.
 
-**3. Your `connectors/` register, if you keep one.** `check-connectors.ps1` resolves each record's id
+**2. Your `connectors/` register, if you keep one.** `check-connectors.ps1` resolves each record's id
 against the marketplace, so a record still naming `dkj-team-alpha@` is reported as an `[INFO]` and **the
 whole block for that plugin is then skipped** — no enabled-in-settings check, no extensions check, no
 version check, silently, until somebody edits the record. That is the same cost the two renames before

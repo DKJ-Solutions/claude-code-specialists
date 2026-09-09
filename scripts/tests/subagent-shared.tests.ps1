@@ -134,7 +134,7 @@ try {
     # its source since the day it was placed.
     Write-Host "the personas are in scope, not just the agent defs" -ForegroundColor Cyan
     $realAgents = @(Get-ChildItem -Path $RepoRoot -Recurse -Filter '*-agent.md' -File |
-        Where-Object { $_.FullName -match '\\agents\\' })
+        Where-Object { $_.FullName -match '\\subagents\\' })
     $realPersonas = @(Get-ChildItem -Path $RepoRoot -Recurse -Filter '*-persona.md' -File |
         Where-Object { $_.FullName -match '\\personas\\' })
     Assert-True ($realPersonas.Count -gt 0) 'there are personas to cover in the first place'
