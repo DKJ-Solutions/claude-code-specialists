@@ -84,7 +84,23 @@ infrastructure.
   it switches the check off for itself, silently.
 - **`.github/workflows/ci.yml`** — the CI gate on GitHub: runs the same lint gate + all test suites
   (`scripts/tests/*.tests.ps1`) on every PR and every push to `main`, so the guard also applies to
-  work that comes about outside `open-pr.ps1`. **"The same" is literal since August 7, 2026** — the step
+  work that comes about outside `open-pr.ps1`.
+
+  **AND "THE SAME GATE" IS NOT "THE SAME ANSWER", BECAUSE THE TWO RUN ON DIFFERENT TREES**
+  (measured September 9, 2026, on this lens's own branch). The local gate runs on **your branch**; CI
+  runs on the **merge** of your branch with the trunk. The suite list is a glob, so a suite the trunk
+  gained while your branch was open **does not exist locally** — the local gate cannot run it, reports
+  green, and CI then runs it against your change and fails. Measured exactly here: `feat/1726-…` passed
+  all 86 suites locally twice, and `lint-en-tests` went red on
+  `command-probe-lib.tests.ps1` — a rule (#1729, *no `Get-Command` function probe*) that landed on `main`
+  hours earlier and that the new script broke three times over. After `git merge origin/main` the same
+  command reported **87** suites, and the count is the only thing that said anything was different.
+
+  **Read the count, then: a local gate pass is evidence about your branch and NOT a prediction about CI.**
+  This is not what ship-pr's staleness guard is for — that dates a CI certificate against commits the
+  trunk gained *after* the run (#1292), and it fires at the merge, which is well after the red run has
+  already happened. The cheap habit is the fix: `git fetch` and merge the trunk **before** the gates, so
+  the tree you prove is the tree CI will build. **"The same" is literal since August 7, 2026** — the step
   dot-sources `native-capture-lib.ps1` and calls `Invoke-TestSuiteGate`, the one function `open-pr.ps1`
   and `cut-release.ps1` also call. It held its own inline `foreach` until then, which is how a gate
   improvement can land in both local callers and miss the only one that actually blocks a merge; the

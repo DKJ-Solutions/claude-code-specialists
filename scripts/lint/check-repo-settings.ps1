@@ -157,8 +157,15 @@ if (Test-Path -LiteralPath $checkLib -PathType Leaf) { . $checkLib }
 . (Join-Path $PSScriptRoot '..\lib\pr-issues-lib.ps1')
 . (Join-Path $PSScriptRoot '..\lib\native-capture-lib.ps1')
 
+# Test-FunctionDefined (issue #1729): the three seam probes below read the function table directly
+# rather than through Get-Command, which parses the name as a wildcard pattern and pays a full PATH
+# scan on every miss -- and a miss is the normal case for an optional seam. A repo-wide suite enforces
+# this, and it landed on `main` while this branch was open: the branch never had the suite, so the
+# local gate passed and CI -- which tests the merge -- did not.
+. (Join-Path $PSScriptRoot '..\lib\command-probe-lib.ps1')
+
 $repoRoot = ''
-if (Get-Command Resolve-CheckRepoRoot -ErrorAction SilentlyContinue) {
+if (Test-FunctionDefined -Name 'Resolve-CheckRepoRoot') {
     $repoRoot = Resolve-CheckRepoRoot -RootOverride $RootOverride
 } elseif ($RootOverride) {
     $repoRoot = $RootOverride
@@ -176,7 +183,7 @@ if (-not (Test-Path -LiteralPath $configPath -PathType Leaf)) {
 }
 . $configPath
 
-if (-not (Get-Command Get-ExpectedRepoSettings -ErrorAction SilentlyContinue)) {
+if (-not (Test-FunctionDefined -Name 'Get-ExpectedRepoSettings')) {
     Write-Host '[SKIP] scripts/repo-config.ps1 supplies no Get-ExpectedRepoSettings -- this repo declares no GitHub-side settings to watch.'
     exit 0
 }
@@ -194,7 +201,7 @@ if ($declared.Count -eq 0) {
 # loaded and correct. Measured while writing this script -- the run reported '[SKIP] names no repo'
 # against a repo-config.ps1 whose value printed correctly two lines earlier.
 $targetRepo = ''
-if (Get-Command Get-RepoName -ErrorAction SilentlyContinue) { $targetRepo = [string](Get-RepoName) }
+if (Test-FunctionDefined -Name 'Get-RepoName') { $targetRepo = [string](Get-RepoName) }
 if (-not $targetRepo) {
     Write-Host '[SKIP] scripts/repo-config.ps1 names no repo (Get-RepoName) -- there is no repo to read settings from.'
     exit 0

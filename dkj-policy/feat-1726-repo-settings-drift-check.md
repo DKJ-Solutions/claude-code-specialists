@@ -102,6 +102,18 @@ rather than the rule list #1726's title names.
 - [x] Verified against the live repo: six declared facts match, one drift reported -- `allow_auto_merge`,
       i.e. #1730, found by the check rather than by a person.
 - [x] Lint gate + all suites green.
+- [x] **CI went red after all 86 suites had passed locally, twice** -- and the discrepancy was the
+      lesson, not the rule. `main` gained `command-probe-lib.tests.ps1` (#1729, *no `Get-Command`
+      function probe outside the named exceptions*) hours after this branch was cut. The suite list is a
+      glob, so the suite **did not exist on the branch**: the local gate could not run it, reported
+      green, and CI -- which builds the **merge** -- ran it against the new script and failed on three
+      probes. `git merge origin/main` then reported **87** suites, and that count was the only thing
+      that said anything had changed. Repaired by using the sanctioned `Test-FunctionDefined` rather
+      than adding this script to the exception list: the rule is right and the script was simply
+      written before it existed. Recorded in Sylvester's lens on the `ci.yml` bullet, because
+      *"a local gate pass is evidence about your branch, not a prediction about CI"* is the reusable
+      half. Note this is **not** what ship-pr's staleness guard covers -- that dates a certificate
+      against commits landing *after* the run and fires at the merge, long after the red run.
 - [x] Reviewed in parallel by Victor (code), Edith (copy) and Sebastian (security). Nine findings, all
       nine acted on; the four that changed behaviour are worth naming because each was a defect an
       assert would not have found on its own:
