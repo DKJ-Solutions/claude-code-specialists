@@ -221,8 +221,8 @@ function New-FilterFixture {
     "name": "fixture-marketplace",
     "owner": { "name": "fixture" },
     "plugins": [
-        { "name": "core",  "source": "./plugins/dkj-teams/core",      "description": "the core team $emDash always enabled" },
-        { "name": "extra", "source": "./plugins/dkj-teams/extra",     "description": "an add-on team -- see C:\\uadded\\check.ps1" },
+        { "name": "core",  "source": "./plugins/dkj-subagents/core",      "description": "the core team $emDash always enabled" },
+        { "name": "extra", "source": "./plugins/dkj-subagents/extra",     "description": "an add-on team -- see C:\\uadded\\check.ps1" },
         { "name": "flow",  "source": "./plugins/workflows/flow",  "description": "a way of working" }
     ]
 }
@@ -230,7 +230,7 @@ function New-FilterFixture {
     $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
     [System.IO.File]::WriteAllText((Join-Path $Dir '.claude-plugin\marketplace.json'), $manifest, $utf8NoBom)
 
-    foreach ($p in @(@{ kind = 'dkj-teams'; n = 'core' }, @{ kind = 'dkj-teams'; n = 'extra' }, @{ kind = 'workflows'; n = 'flow' })) {
+    foreach ($p in @(@{ kind = 'dkj-subagents'; n = 'core' }, @{ kind = 'dkj-subagents'; n = 'extra' }, @{ kind = 'workflows'; n = 'flow' })) {
         $pdir = Join-Path $Dir "plugins\$($p.kind)\$($p.n)\.claude-plugin"
         New-Item -ItemType Directory -Path $pdir -Force | Out-Null
         "{ ""name"": ""$($p.n)"", ""version"": ""1.0.0"" }" |
@@ -240,7 +240,7 @@ function New-FilterFixture {
     }
 
     '# the plugins'   | Set-Content -LiteralPath (Join-Path $Dir 'plugins\README.md') -Encoding Ascii
-    '# the teams'     | Set-Content -LiteralPath (Join-Path $Dir 'plugins\dkj-teams\README.md') -Encoding Ascii
+    '# the teams'     | Set-Content -LiteralPath (Join-Path $Dir 'plugins\dkj-subagents\README.md') -Encoding Ascii
     '# the workflows' | Set-Content -LiteralPath (Join-Path $Dir 'plugins\workflows\README.md') -Encoding Ascii
     '# fixture'       | Set-Content -LiteralPath (Join-Path $Dir 'README.md') -Encoding Ascii
 
@@ -435,7 +435,7 @@ function Get-BusinessMarketplaceRepo { return `$script:BusinessMarketplaceRepo }
     Assert-Equal 0 $r.ExitCode 'an unfiltered run exits 0'
     $tree = Get-TargetTree -BareDir $filterBareDir
     Assert-True ($tree -contains 'plugins/workflows/flow/.claude-plugin/plugin.json') 'unfiltered: the workflow travelled'
-    Assert-True ($tree -contains 'plugins/dkj-teams/core/.claude-plugin/plugin.json') 'unfiltered: the team travelled'
+    Assert-True ($tree -contains 'plugins/dkj-subagents/core/.claude-plugin/plugin.json') 'unfiltered: the team travelled'
     Assert-Says $r.Output 'every entry in the manifest' 'unfiltered: the run says it filtered nothing'
 
     # 11. the filter: the excluded plugin is gone from the tree AND from the manifest, and the kind
@@ -447,8 +447,8 @@ function Get-BusinessMarketplaceRepo { return `$script:BusinessMarketplaceRepo }
     $tree = Get-TargetTree -BareDir $filterBareDir
     Assert-True ($tree -notcontains 'plugins/workflows/flow/.claude-plugin/plugin.json') 'the excluded plugin did not travel'
     Assert-True ($tree -notcontains 'plugins/workflows/README.md') 'and the emptied kind directory went with it, README included'
-    Assert-True ($tree -contains 'plugins/dkj-teams/core/.claude-plugin/plugin.json') 'the kept plugins did travel'
-    Assert-True ($tree -contains 'plugins/dkj-teams/README.md') 'and their kind directory kept its README'
+    Assert-True ($tree -contains 'plugins/dkj-subagents/core/.claude-plugin/plugin.json') 'the kept plugins did travel'
+    Assert-True ($tree -contains 'plugins/dkj-subagents/README.md') 'and their kind directory kept its README'
     Assert-True ($tree -contains 'plugins/README.md') 'the plugins root README is untouched by the pruning'
 
     # Read the published manifest from a CHECKOUT, not from `git show`. Native stdout is decoded with
@@ -513,7 +513,7 @@ function Get-BusinessMarketplaceRepo { return `$script:BusinessMarketplaceRepo }
     # 15. THE REVERSE INTEGRITY CHECK -- the silent half. A plugin folder that travels while the
     #     manifest never names it produces no error anywhere: Claude just never offers it, and the
     #     manifest reads as complete to anyone who checks it instead of the tree.
-    $strayDir = Join-Path $filterDir 'plugins\dkj-teams\stray\.claude-plugin'
+    $strayDir = Join-Path $filterDir 'plugins\dkj-subagents\stray\.claude-plugin'
     New-Item -ItemType Directory -Path $strayDir -Force | Out-Null
     '{ "name": "stray", "version": "9.9.9" }' | Set-Content -LiteralPath (Join-Path $strayDir 'plugin.json') -Encoding Ascii
     Invoke-FixtureGit -Dir $filterDir -GitArgs @('add', '-A') | Out-Null
@@ -521,11 +521,11 @@ function Get-BusinessMarketplaceRepo { return `$script:BusinessMarketplaceRepo }
     $before = Get-TargetCommitCount -BareDir $filterBareDir
     $r = Invoke-Publish -ScriptArgs @('-RepoRoot', $filterDir, '-TargetRepo', $filterBareDir)
     Assert-Equal 1 $r.ExitCode 'an undeclared plugin folder is exit 1'
-    Assert-Says $r.Output 'plugins/dkj-teams/stray travelled but no manifest entry names it' 'the refusal names the stray folder'
+    Assert-Says $r.Output 'plugins/dkj-subagents/stray travelled but no manifest entry names it' 'the refusal names the stray folder'
     Assert-Equal $before (Get-TargetCommitCount -BareDir $filterBareDir) 'and nothing was committed on it either'
 
     # 16. the subset seam: without -Plugins the list comes from Get-BusinessMarketplacePlugins.
-    Remove-Item -Recurse -Force -LiteralPath (Join-Path $filterDir 'plugins\dkj-teams\stray')
+    Remove-Item -Recurse -Force -LiteralPath (Join-Path $filterDir 'plugins\dkj-subagents\stray')
     New-Item -ItemType Directory -Path (Join-Path $filterDir 'scripts') -Force | Out-Null
     @"
 function Get-BusinessMarketplacePlugins { return @('core', 'extra') }

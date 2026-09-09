@@ -9,7 +9,7 @@
 The orchestrator (Chris) is always loaded -- portable body from the plugin install and repo lens from
 `lenses/`; he routes on demand to the specialists below.
 
-@~/.claude/plugins/marketplaces/claude-code-specialists/plugins/dkj-teams/dkj-team-alpha/personas/01-01-persona.md
+@~/.claude/plugins/marketplaces/claude-code-specialists/plugins/dkj-subagents/dkj-subagents-alpha/personas/01-01-persona.md
 
 @lenses/01-01-extension.md
 ## The Claude Specialists — who does what
@@ -172,7 +172,7 @@ specialist arrives with is the one thing the id does not say:
 
 
 
-**`dkj-team-alpha`** (the core team — the only one of the four with real work here):
+**`dkj-subagents-alpha`** (the core team — the only one of the four with real work here):
 
 
 
@@ -190,7 +190,7 @@ Editor) · `06-19` Victor (Code Reviewer) · `06-23` Sebastian (Security Enginee
 
 
 
-**`dkj-team-ecomm`** (a commercial webshop, platform-independent — enabled here for validation only):
+**`dkj-subagents-ecomm`** (a commercial webshop, platform-independent — enabled here for validation only):
 
 
 
@@ -198,7 +198,7 @@ Editor) · `06-19` Victor (Code Reviewer) · `06-23` Sebastian (Security Enginee
 
 
 
-**`dkj-team-lifehub`** (a personal-life repo — enabled here for validation only):
+**`dkj-subagents-lifehub`** (a personal-life repo — enabled here for validation only):
 
 
 
@@ -208,7 +208,7 @@ Coach) · `04-03` Ian (Information Architect) · `04-04` Onyx (Ontologist)
 
 
 
-**`dkj-team-shopify`** (a Shopify store repo — enabled here for validation only):
+**`dkj-subagents-shopify`** (a Shopify store repo — enabled here for validation only):
 
 
 

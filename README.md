@@ -63,7 +63,7 @@ correct as past tense.
 
 **The nuance, so nobody repairs the wrong thing later: lockstep *within* this product is correct.**
 The plugins are one system — a stack of teams plus an opt-in workflow — and a consumer running
-`dkj-team-alpha` alongside `dkj-team-shopify` needs matching versions. What was wrong was never the lockstep;
+`dkj-subagents-alpha` alongside `dkj-subagents-shopify` needs matching versions. What was wrong was never the lockstep;
 it was housing unrelated products in a single release train. The lockstep in
 [`cut-release.ps1`](scripts/release/cut-release.ps1) therefore needs no change, and the versioning
 problem dissolved with the reorganisation instead of needing a fix. (That script *was* changed later
@@ -86,7 +86,7 @@ September 9, 2026). The sentence above was written on August 8, 2026, when the s
 just been made and one claim could still cover everything that shipped. It cannot any more, because the
 two kinds of plugin stand in opposite relations to a consumer's own rules:
 
-- **A team adapts to the repo it lands in.** `dkj-team-alpha` and the add-on teams describe a *craft*,
+- **A team adapts to the repo it lands in.** `dkj-subagents-alpha` and the add-on teams describe a *craft*,
   and a craft that overrode its host would be worth less, not more — which is what the test question
   below is for.
 - **`dkj-policy` is adopted BY the consumer, and it wins — on the cycle, not on everything.** The
@@ -125,8 +125,11 @@ That gives one test question, and it applies to everything added to a plugin fro
 > A way of working belongs to whoever authored it, and is therefore opt-in.
 
 **Why it had to be written down: the core did not pass its own test.** Measured on August 8, 2026, the
-`team-alpha` plugin — `dkj-team-alpha` since [#1480](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1480)
-put the `dkj-` prefix on the four teams on September 5, 2026 — shipped 1,973,691 bytes, of which the
+`team-alpha` plugin — `dkj-subagents-alpha` today, by way of
+[#1480](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1480), which put the `dkj-` prefix
+on the four teams on September 5, 2026, and
+[#1698](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1698), which renamed them again on
+September 9 — shipped 1,973,691 bytes, of which the
 personas, agent defs and manuals — the craft
 itself — were 175,672, or **9%**. Against that, the shared scripts, the seven workflow skills and the
 session hooks together came to 923,277 bytes, or **47%**: machinery that implements one particular way
@@ -191,11 +194,11 @@ which the post itself compresses to **Agent = Model + Harness**:
 | **model** | whichever Claude model the session runs on |
 | **scaffold** — *"the behavior-defining layer around the model: system prompt, tool descriptions, how the model's responses get parsed, what it remembers across steps"* | **every plugin here** — the personas, the manuals, the agent defs, the skills |
 | **agent** | the **running session**: harness + model + this scaffold. Never a directory and never a file |
-| **subagent** — *"an agent called by another agent to handle a specific subtask"* | what a session spawns from an `agents/*.md` definition |
+| **subagent** — *"an agent called by another agent to handle a specific subtask"* | what a session spawns from a `subagents/*.md` definition |
 | **policy** — *"the behavior an agent follows: given any situation, it defines the probability of taking each possible action"* | what `dkj-policy` encodes, in prose instead of weights: work is finished → open a PR; a merge landed → fold the entry; a finding appears → file an issue |
 
 **The scaffold here has two halves, and they are the same two the next section names in this repo's own
-words.** `dkj-team-*` encodes **who acts** — the personas, their craft rules, their tool access.
+words.** `dkj-subagents-*` encodes **who acts** — the personas, their craft rules, their tool access.
 `dkj-policy` encodes **what follows** — given a situation in a repo, which action comes next. "Team" and
 "workflow" are this repo's names for those halves, and they are deliberately not agent-anatomy terms:
 they answer *what does this give me*, which is the question somebody choosing a plugin actually has. The
@@ -217,9 +220,9 @@ neither vocabulary has to give way to the other.
 
 **`specialist`** is this repo's own word and has no equivalent in either vocabulary: a subagent
 definition carrying a persona, a craft and a repo lens. The core team is nineteen of them — fifteen that
-ship as subagents in `agents/`, and four main-loop personas in `personas/`.
+ship as subagents in `subagents/`, and four main-loop personas in `personas/`.
 
-### Why none of this renamed a plugin (Dave, September 9, 2026)
+### Three plugin-id renames declined, one carried out (Dave, September 9, 2026)
 
 [#1697](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1697) proposed carrying the
 anatomy into the plugin ids: `dkj-policy` → `dkj-agent`, `dkj-policy-bwj` → `dkj-scaffold-bwj`, a new
@@ -245,13 +248,19 @@ were declined and the reasoning is recorded here, because it is the kind of prop
   and each left `check-connectors.ps1` unable to resolve the retired id, skipping that plugin's whole
   drift check until somebody edited the register.
 
-**The fourth — the team side to `dkj-subagents-*` — survived on the merits and is deferred**, with its
-measured cost and its checklist, in
-[#1698](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1698).
+**The fourth — the team side to `dkj-subagents-*` — survived on the merits and paid that cost the same
+day, under [#1698](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1698).** Every
+consumer running `dkj-team-alpha` or one of its siblings owes exactly the migration the reasoning above
+warned of: uninstall, install under the new id, the `settings.json` edit, plus its own `SPECIALISTS.md`
+`@`-import and its `connectors/` register entry. The full walkthrough is in INSTALL.md's own
+[Migrating off the `dkj-team-*` ids](INSTALL.md#migrating-off-the-dkj-team--ids-1698-september-9-2026)
+section.
 
-What the anatomy earned instead is this section and each plugin's `displayName` — the label a person
-reads when choosing what to install. Both were free: no id changed, so no consumer has anything to
-migrate.
+What the three declined renames earned instead is this section and each plugin's `displayName` — the
+label a person reads when choosing what to install. Both were free there: none of those three ids
+changed, so `dkj-policy`, `dkj-policy-bwj` and a would-be `dkj-scaffold-core` left no consumer anything
+to migrate. The fourth id did change, and the paragraph above is its migration cost, not a footnote to
+this one.
 
 ## Teams and workflows — what's the difference?
 
@@ -259,9 +268,9 @@ migrate.
 repo.** That split arrived on August 8, 2026, when the branch/release workflow moved out of the core
 into a pack of its own — the packaging consequence of
 [the plugin serves the consumer's repo](#the-plugin-serves-the-consumers-repo). Read the table with
-that split in mind: `dkj-team-lifehub`, `dkj-team-shopify` and `dkj-team-ecomm` are add-on teams,
+that split in mind: `dkj-subagents-lifehub`, `dkj-subagents-shopify` and `dkj-subagents-ecomm` are add-on teams,
 `dkj-policy` is the one answer offered to the workflow question, and only the core team is
-for everyone. **Teams stack** — a consuming repo enables `dkj-team-alpha` plus as many add-on teams as its
+for everyone. **Teams stack** — a consuming repo enables `dkj-subagents-alpha` plus as many add-on teams as its
 domain calls for. **Workflows are opt-in** — a repo that enables none keeps the way of working it
 already had. There is one general workflow, `dkj-policy`, plus one deliberately narrow,
 additive one — see below.
@@ -296,7 +305,7 @@ these — nothing counts them, so adding one means making this call again on the
 **The naming rule outlived the count that justified it, on a reason of its own.** Lint check 23
 (`[plugin-kind]`) in [`check-plugin-integrity.ps1`](scripts/lint/check-plugin-integrity.ps1) holds every
 published plugin to being a team or a way of working **by name**, and holds two of those name shapes to a
-directory as well: `dkj-team-*` under `plugins/dkj-teams/`, and `*-policy` / `*-policy-*` under
+directory as well: `dkj-subagents-*` under `plugins/dkj-subagents/`, and `*-policy` / `*-policy-*` under
 `plugins/dkj-policy/`. It used to say the hook counted a workflow by
 the `workflow-` prefix and nothing else; now the teeth are internal — **the directory half is derived
 from the name**, so a plugin matching none of those shapes has its location held against nothing at all,
@@ -313,24 +322,27 @@ their directory half.
 **[#1480](https://github.com/DaveKJohn/claude-code-specialists/issues/1480) applied that same reading to
 the team side, where it had not reached.** Bare `team-*` joined the name-only group when this family's own
 teams took the `dkj-` prefix: a prefixless `team-*` is now precisely what *somebody else's* team is called,
-and `dkj-team-*` carries the directory rule in its place. The alternative — keeping `team-*` pointed at
-`plugins/dkj-teams/` and adding `dkj-team-*` beside it — costs nothing until the day a stranger publishes
-a plugin named `team-something`, which is the one case the rule is there for.
+and `dkj-team-*` carried the directory rule in its place. The alternative — keeping `team-*` pointed at
+`plugins/dkj-teams/` and adding `dkj-team-*` beside it — cost nothing until the day a stranger publishes
+a plugin named `team-something`, which was the one case the rule was there for. **The team side itself
+moved on again on September 9, 2026** — `dkj-team-*` → `dkj-subagents-*`, `plugins/dkj-teams/` →
+`plugins/dkj-subagents/` — under [#1698](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1698);
+the directory rule rides along with the name, unaffected, exactly as this paragraph describes.
 
 | Plugin | What it is | Who it's for |
 |---|---|---|
-| [`dkj-team-alpha/`](plugins/dkj-teams/dkj-team-alpha/) | **The core team.** Fifteen repo-neutral specialists who work the same way in *every* repo (research, systems administration, technical writing, copy editing, code review, security review, and testing, among others). Also carries the persona templates of the main loop (Chris/Bianca/Derek/Rendall) and the bootstrap skill `specialists-init`. | **Every** consuming repo — this is the foundation, always enable it. |
-| [`dkj-team-lifehub/`](plugins/dkj-teams/dkj-team-lifehub/) | **An add-on team.** Five specialists for a personal information hub / brain-based knowledge repo (Astrid, Fiona, Hugo, Ian, Onyx). Deliberately domain-flavored: they know their repo and teammates by name. | Only a life-hub-style repo. |
-| [`dkj-team-shopify/`](plugins/dkj-teams/dkj-team-shopify/) | **An add-on team.** Three specialists for a Shopify store repo (Liam · Liquid, Sandra · store management, Steven · configuration) plus the domain skill `start-task`. Also deliberately domain-flavored. | Only a Shopify repo (e.g. smartwatchbanden). |
-| [`dkj-team-ecomm/`](plugins/dkj-teams/dkj-team-ecomm/) | **An add-on team.** E-commerce specialists for a commercial webshop repo of any platform (Sergio · SEO, Craig · CRO, Sean · performance/SEA). Platform-agnostic, and complementary to a platform team rather than exclusive. | Any commercial webshop repo — including a Shopify repo alongside `dkj-team-shopify`. |
+| [`dkj-subagents-alpha/`](plugins/dkj-subagents/dkj-subagents-alpha/) | **The core team.** Fifteen repo-neutral specialists who work the same way in *every* repo (research, systems administration, technical writing, copy editing, code review, security review, and testing, among others). Also carries the persona templates of the main loop (Chris/Bianca/Derek/Rendall) and the bootstrap skill `specialists-init`. | **Every** consuming repo — this is the foundation, always enable it. |
+| [`dkj-subagents-lifehub/`](plugins/dkj-subagents/dkj-subagents-lifehub/) | **An add-on team.** Five specialists for a personal information hub / brain-based knowledge repo (Astrid, Fiona, Hugo, Ian, Onyx). Deliberately domain-flavored: they know their repo and teammates by name. | Only a life-hub-style repo. |
+| [`dkj-subagents-shopify/`](plugins/dkj-subagents/dkj-subagents-shopify/) | **An add-on team.** Three specialists for a Shopify store repo (Liam · Liquid, Sandra · store management, Steven · configuration) plus the domain skill `start-task`. Also deliberately domain-flavored. | Only a Shopify repo (e.g. smartwatchbanden). |
+| [`dkj-subagents-ecomm/`](plugins/dkj-subagents/dkj-subagents-ecomm/) | **An add-on team.** E-commerce specialists for a commercial webshop repo of any platform (Sergio · SEO, Craig · CRO, Sean · performance/SEA). Platform-agnostic, and complementary to a platform team rather than exclusive. | Any commercial webshop repo — including a Shopify repo alongside `dkj-subagents-shopify`. |
 | [`dkj-policy/`](plugins/dkj-policy/) | **The workflow — a way of working, not a team.** DaveKJohn's own branch-and-entry model, packaged so a repo can *choose* it: the workflow skills (`new-branch`, `open-pr`, `ship-pr`, `fold-changelog`, `cut-release`, `park`, `fix-mojibake`, `adopt-dkj-policy` and the rest — the plugin's own README carries the full list), their shared scripts, the session hooks that belong to running this across several repos, and one Stop hook that keeps a branch's development document on `origin` (#900). Also ships a **config blueprint** — the source's own answers to the repo-owned seam, with the reasoning behind each — which `adopt-dkj-policy`'s Part 2 places or proposes (see below). Carries **no specialists** — it changes how the existing ones work, not who they are. | Only a repo that deliberately wants *this* way of working on top of its own. |
-| [`dkj-policy-bwj/`](plugins/dkj-policy/dkj-policy-bwj/) | **A narrow, additive workflow.** BWJ's codex — the binding rules its two Shopify store repos operate under. Two chapters: **ticket handling** — a discovered issue is filed on GitHub first, mirrored to Asana as a colleague-friendly variant, and closing the GitHub issue only makes a CI workflow (shipped as a template) post that the work is ready to test and move the card to `ReadyToTest` — it never resolves the task itself; and **the sync log** — a `sync/` branch is exempt from the changelog by design and owes `dkj-policy-bwj/SYNC-LOG.md` instead, written by `dkj-team-shopify`'s `sync-main.ps1`. Two skills (`report-issue`, `adopt-dkj-policy-bwj`), no specialists, no hooks. Extends only the ticket-work step of `dkj-policy` and what a sync branch owes; contradicts nothing it decides. | Only BWJ's two store repos; requires `dkj-team-alpha` **and** `dkj-policy` — the sync chapter also expects `dkj-team-shopify`. |
+| [`dkj-policy-bwj/`](plugins/dkj-policy/dkj-policy-bwj/) | **A narrow, additive workflow.** BWJ's codex — the binding rules its two Shopify store repos operate under. Two chapters: **ticket handling** — a discovered issue is filed on GitHub first, mirrored to Asana as a colleague-friendly variant, and closing the GitHub issue only makes a CI workflow (shipped as a template) post that the work is ready to test and move the card to `ReadyToTest` — it never resolves the task itself; and **the sync log** — a `sync/` branch is exempt from the changelog by design and owes `dkj-policy-bwj/SYNC-LOG.md` instead, written by `dkj-subagents-shopify`'s `sync-main.ps1`. Two skills (`report-issue`, `adopt-dkj-policy-bwj`), no specialists, no hooks. Extends only the ticket-work step of `dkj-policy` and what a sync branch owes; contradicts nothing it decides. | Only BWJ's two store repos; requires `dkj-subagents-alpha` **and** `dkj-policy` — the sync chapter also expects `dkj-subagents-shopify`. |
 
-In short: **`dkj-team-alpha` is the foundation; everything else is optional, along two different axes.**
-`dkj-team-lifehub` and `dkj-team-shopify` describe what *kind* of repo it is, so a repo
-enables at most one of those; `dkj-team-ecomm` is orthogonal — it applies to any commercial
+In short: **`dkj-subagents-alpha` is the foundation; everything else is optional, along two different axes.**
+`dkj-subagents-lifehub` and `dkj-subagents-shopify` describe what *kind* of repo it is, so a repo
+enables at most one of those; `dkj-subagents-ecomm` is orthogonal — it applies to any commercial
 webshop regardless of platform, so a webshop repo can enable it *on top of* a platform team (a
-Shopify store repo, for instance, enables both `dkj-team-shopify` and `dkj-team-ecomm`). The
+Shopify store repo, for instance, enables both `dkj-subagents-shopify` and `dkj-subagents-ecomm`). The
 core is written repo-neutrally (no repo names, paths, or script names — that context comes from the
 consumer's repo lens); the add-on teams name their domain explicitly, because only a matching repo
 enables them.
@@ -350,16 +362,16 @@ to fill in, and a `repo-config.ps1` holding the roster half alone.
 
 Two of the plugins serve a **commercial webshop** and are built to work together:
 
-- **`dkj-team-shopify`** — the *platform* layer: theme code, store management, configuration for a Shopify store.
-- **`dkj-team-ecomm`** — the platform-agnostic *disciplines* that any webshop needs: SEO, CRO, and performance/SEA.
+- **`dkj-subagents-shopify`** — the *platform* layer: theme code, store management, configuration for a Shopify store.
+- **`dkj-subagents-ecomm`** — the platform-agnostic *disciplines* that any webshop needs: SEO, CRO, and performance/SEA.
 
-They sit on different axes — one is "which platform," the other is "which marketing disciplines" — so they complement rather than replace each other. A **Shopify** store repo typically enables **both**; a **non-Shopify** webshop enables just `dkj-team-ecomm`. The other plugins — `dkj-team-alpha` (the core team), `dkj-team-lifehub` and the workflow plugin `dkj-policy` — fall outside this e-commerce grouping. This is a reading aid, not a packaging change: every plugin is still enabled or disabled on its own.
+They sit on different axes — one is "which platform," the other is "which marketing disciplines" — so they complement rather than replace each other. A **Shopify** store repo typically enables **both**; a **non-Shopify** webshop enables just `dkj-subagents-ecomm`. The other plugins — `dkj-subagents-alpha` (the core team), `dkj-subagents-lifehub` and the workflow plugin `dkj-policy` — fall outside this e-commerce grouping. This is a reading aid, not a packaging change: every plugin is still enabled or disabled on its own.
 
 ## What lives here and what doesn't
 
 **Does live here:** the plugin folders under [`plugins/`](plugins/) with **subagent definitions**
 (`agents/`) and the **portable playbook** per specialist (`manuals/<group>-<id>-manual.md`) that the
-agent def reads in via `${CLAUDE_PLUGIN_ROOT}/manuals/`. The core team (`dkj-team-alpha`) additionally
+agent def reads in via `${CLAUDE_PLUGIN_ROOT}/manuals/`. The core team (`dkj-subagents-alpha`) additionally
 carries two things that cover the **main-loop layer** (see
 [Adoption: the bootstrap path](#adoption-the-bootstrap-path)): the **persona templates**
 (`personas/<group>-<id>-persona.md`) of the orchestrator + main-loop specialists (Chris, Bianca, Derek,
@@ -394,7 +406,7 @@ read-only — but it is still not a *guardrail*: it blocks nothing, refuses noth
 outcome. What earns it a place beside the read-only set above is that it is repo-neutral and touches exactly one
 document, whose path the shared resolver decides; the four bounds that keep it that narrow are in the
 `park` skill.
-The add-on teams `dkj-team-lifehub` and `dkj-team-shopify` may carry domain skills that a repo shares.
+The add-on teams `dkj-subagents-lifehub` and `dkj-subagents-shopify` may carry domain skills that a repo shares.
 
 **Those last two moved out of the core on August 8, 2026, and the reason is the doctrine rather than
 tidiness.** `connector-sessioncheck` reads a register of *Dave's own* repos, and
@@ -410,18 +422,18 @@ The full picture, top-level folder by folder:
 - **[`plugins/`](plugins/)** — the plugin source, split by kind (its own
   [README](plugins/README.md) states that split side by side, with the test question that decides
   which kind a new plugin is): the teams under
-  [`plugins/dkj-teams/`](plugins/dkj-teams/) (`dkj-team-alpha`, `dkj-team-lifehub`, `dkj-team-shopify`, `dkj-team-ecomm`) and
+  [`plugins/dkj-subagents/`](plugins/dkj-subagents/) (`dkj-subagents-alpha`, `dkj-subagents-lifehub`, `dkj-subagents-shopify`, `dkj-subagents-ecomm`) and
   the policy at [`plugins/dkj-policy/`](plugins/dkj-policy/) — the prime ministry's own files at that
   root, and its one ministry `dkj-policy-bwj` a level inside it — each of those two directories carrying
   its own README for what belongs in it
   and the rules that govern it. One folder per plugin, each carrying
   `agents/`/`manuals/`/`personas/`/`skills/` plus its own `plugin.json` — and beside the four teams
-  **[`plugins/dkj-teams/agent-shared/`](plugins/dkj-teams/agent-shared/)**, the canonical source of the shared
+  **[`plugins/dkj-subagents/subagent-shared/`](plugins/dkj-subagents/subagent-shared/)**, the canonical source of the shared
   agent-def blocks described under
   [Shared agent-def blocks](#shared-agent-def-blocks--one-source-for-the-verbatim-boundaries). See
   [Manuals — the split model](#manuals--the-split-model) for the manual/agent-def/persona split.
-  `agent-shared/` belongs under `plugins/` rather than at the root because it is plugin *source*: its
-  generator writes those blocks into plugin agent defs. It sits under `dkj-teams/` rather than one level
+  `subagent-shared/` belongs under `plugins/` rather than at the root because it is plugin *source*: its
+  generator writes those blocks into plugin agent defs. It sits under `dkj-subagents/` rather than one level
   up because **every** file carrying a shared block is a team's — 30 agent defs and personas across the
   four teams, none in either workflow — so a level up described a reach it does not have. It is a
   directory inside a kind directory that is not a plugin, and nothing has to be told so: a script asks
@@ -432,14 +444,14 @@ The full picture, top-level folder by folder:
   must not travel along with the plugin cache.
 - **`scripts/lib/`, `scripts/lint/`, `scripts/release/`, `scripts/sync/`, `scripts/agents/`,
   `scripts/task/`, `scripts/tests/`** — the shared helpers (`branch-info.ps1`, `release-lib.ps1`,
-  `agent-shared-lib.ps1`, and `plugin-tree-lib.ps1`, which answers which plugins this repo publishes
+  `subagent-shared-lib.ps1`, and `plugin-tree-lib.ps1`, which answers which plugins this repo publishes
   and where each folder sits, so no other script has to encode the layout), the lint gate + drift
   check, the changelog/PR/release scripts (incl.
   `cut-release.ps1`), the connectors check (`check-connectors.ps1`), the agent-def generator
-  (`build-agent-defs.ps1` — fills in the shared blocks from `plugins/dkj-teams/agent-shared/`), and the tests.
+  (`build-agent-defs.ps1` — fills in the shared blocks from `plugins/dkj-subagents/subagent-shared/`), and the tests.
   [`scripts/README.md`](scripts/README.md) is the directory-by-directory map, with the entry points and
   the gates on the branch dossier. A
-  mirrored copy for consumers lives inside the plugins — the sync/check scripts in `dkj-team-alpha`, the
+  mirrored copy for consumers lives inside the plugins — the sync/check scripts in `dkj-subagents-alpha`, the
   branch/release workflow in `dkj-policy` — see its own
   [README](plugins/dkj-policy/scripts/README.md).
 - **`dkj-policy/`** — the workflow's own root folder (named `contributing-davekjohn/` from August 27
@@ -565,11 +577,11 @@ the lens in `.claude/specialists/lenses/<group>-<id>-extension.md`. The agent de
 **All four teams have now been migrated** — every handbook lives here in the `manuals/` folder of
 its plugin, and every consuming repo keeps only its repo lens in `.claude/specialists/lenses/`:
 
-- **`dkj-team-alpha` (the core team)** → `plugins/dkj-teams/dkj-team-alpha/manuals/` (Paula, Rebecca, Vera, Gwen, Cody, Tycho,
+- **`dkj-subagents-alpha` (the core team)** → `plugins/dkj-subagents/dkj-subagents-alpha/manuals/` (Paula, Rebecca, Vera, Gwen, Cody, Tycho,
   Sylvester, Tessa, Edith, Victor, Sebastian, Ravi, Nolan, Marlowe, Auden).
-- **`dkj-team-lifehub` (an add-on team)** → `plugins/dkj-teams/dkj-team-lifehub/manuals/` (Astrid, Fiona, Hugo, Ian, Onyx).
-- **`dkj-team-shopify` (an add-on team)** → `plugins/dkj-teams/dkj-team-shopify/manuals/` (Liam, Sandra, Steven).
-- **`dkj-team-ecomm` (an add-on team)** → `plugins/dkj-teams/dkj-team-ecomm/manuals/` (Sergio, Craig, Sean).
+- **`dkj-subagents-lifehub` (an add-on team)** → `plugins/dkj-subagents/dkj-subagents-lifehub/manuals/` (Astrid, Fiona, Hugo, Ian, Onyx).
+- **`dkj-subagents-shopify` (an add-on team)** → `plugins/dkj-subagents/dkj-subagents-shopify/manuals/` (Liam, Sandra, Steven).
+- **`dkj-subagents-ecomm` (an add-on team)** → `plugins/dkj-subagents/dkj-subagents-ecomm/manuals/` (Sergio, Craig, Sean).
 
 ### Agent def vs. manual — two files, one specialist
 
@@ -635,11 +647,11 @@ the **main loop**, not as subagents. A plugin *can* inject always-on main-loop c
 is **verified and deliberately not switched on**, because it changes every consumer's main loop from a
 version bump they did not read, and a second `agent`-setting plugin silently wins on load order
 ([issue #215](https://github.com/DaveKJohn/claude-code-specialists/issues/215); the same correction has
-been in [`specialists-init`'s page](plugins/dkj-teams/dkj-team-alpha/skills/specialists-init/SKILL.md) since
+been in [`specialists-init`'s page](plugins/dkj-subagents/dkj-subagents-alpha/skills/specialists-init/SKILL.md) since
 that decision, and this sentence was the copy it never reached). An intake conversation moreover
 requires direct back-and-forth with the client. They therefore
 deliberately have **no** agent def; their portable source lives in
-`plugins/dkj-teams/dkj-team-alpha/personas/<group>-<id>-persona.md` as a **self-contained template** (portable body
+`plugins/dkj-subagents/dkj-subagents-alpha/personas/<group>-<id>-persona.md` as a **self-contained template** (portable body
 + a repo-lens placeholder). The consumer loads the **portable body straight from the plugin install**
 via an `@` import in its `CLAUDE.md` (the orchestrator always, the other personas on demand). The
 local extension `.claude/specialists/lenses/<group>-<id>-extension.md` is
@@ -657,7 +669,7 @@ agent-def body (always loaded, also for a directly invoked worker subagent), but
 native transclusion in an agent def — what's written there is there, literally. To still maintain
 those blocks in **one place** instead of in every agent def, a **build-and-lint** model applies:
 
-- The canonical text of each shared block lives in `plugins/dkj-teams/agent-shared/<name>.md` (a sibling of
+- The canonical text of each shared block lives in `plugins/dkj-subagents/subagent-shared/<name>.md` (a sibling of
   the four team folders — every file carrying a block is a team's).
 - In an agent def the block appears between sentinels:
   `<!-- BEGIN shared:<name> … -->` … `<!-- END shared:<name> -->`. The content really is there (self-contained), but is marked as generated.
@@ -676,7 +688,7 @@ those blocks in **one place** instead of in every agent def, a **build-and-lint*
   what did **not** widen with it — the lint's agent-def↔manual coupling still leaves personas alone,
   because that check is about a pairing personas genuinely do not have.
 
-Current blocks — one canonical source file each under `plugins/dkj-teams/agent-shared/`, so the directory
+Current blocks — one canonical source file each under `plugins/dkj-subagents/subagent-shared/`, so the directory
 listing is always the up-to-date enumeration: `inbound-behaviour`, `laziness-automation`,
 `language-behavior`, `no-conversation-history`, `no-commit-push-pr`, `repo-way-of-working`,
 `lens-optional`, `browser-compatibility`, `webcontent-boundary`, `filecontent-boundary`,
@@ -861,9 +873,9 @@ specialist's *craft* is portable and one step of one procedure is not. So:
 
 | verdict | meaning | who |
 |---|---|---|
-| **portable** | works with no repository | the personas, manuals, and 13 of 15 `dkj-team-alpha` agent defs; the shared blocks in `agent-shared/`; the `orchestrator` skill |
+| **portable** | works with no repository | the personas, manuals, and 13 of 15 `dkj-subagents-alpha` agent defs; the shared blocks in `subagent-shared/`; the `orchestrator` skill |
 | **degraded** | works, minus a named step | Ravi `06-24` and Liam `04-20` — one step each, both of them a script |
-| **repo-bound** | cannot function at all | both workflow plugins whole; `dkj-team-alpha`'s three PowerShell skills and its one SessionStart hook; `dkj-team-shopify`'s `start-task` |
+| **repo-bound** | cannot function at all | both workflow plugins whole; `dkj-subagents-alpha`'s three PowerShell skills and its one SessionStart hook; `dkj-subagents-shopify`'s `start-task` |
 
 **What the Claude App package is: a filtered publication, not a second repository.**
 [`publish-to-business.ps1`](scripts/release/publish-to-business.ps1) already overwrites
@@ -875,10 +887,10 @@ invented: the manifest format has none, and one would need Claude to honour it, 
 not travel cannot be offered by anything.
 
 **The marketplace keeps its name.** `claude-code-specialists` is the key in every consumer's
-`enabledPlugins` (`dkj-team-alpha@claude-code-specialists`), so the filtered marketplace is the *same*
+`enabledPlugins` (`dkj-subagents-alpha@claude-code-specialists`), so the filtered marketplace is the *same*
 marketplace with fewer entries, not a second one under a new key.
 
-**The unit is the plugin, and the degraded items travel.** `dkj-team-alpha`'s three PowerShell skills and
+**The unit is the plugin, and the degraded items travel.** `dkj-subagents-alpha`'s three PowerShell skills and
 two hooks go to the App target along with everything else in that plugin, because the plugin published
 there has to be byte-identical to the plugin released here — otherwise its version number stops meaning
 one thing. They are handled where they can be handled without forking: the hooks are simply inert in a
@@ -964,7 +976,7 @@ Cowork's value sits in other, non-code work — not in this repo.
 ## Invocation
 
 Once enabled, the specialists can be invoked with the **plugin name as namespace**:
-`@dkj-team-alpha:<name>`, `@dkj-team-lifehub:<name>`, `@dkj-team-shopify:<name>`, or `@dkj-team-ecomm:<name>`.
+`@dkj-subagents-alpha:<name>`, `@dkj-subagents-lifehub:<name>`, `@dkj-subagents-shopify:<name>`, or `@dkj-subagents-ecomm:<name>`.
 
 ## Which release am I on?
 
@@ -991,7 +1003,7 @@ skill counters `/reload-plugins`/`/reload-skills` print are not reliable evidenc
 > is the underlying explanation.
 
 Enabling the plugin delivers the **worker subagents**, but not the **conductor** (Chris) or the
-governance/hooks layer, so the skill **`specialists-init`** (from `dkj-team-alpha`, the core team) closes
+governance/hooks layer, so the skill **`specialists-init`** (from `dkj-subagents-alpha`, the core team) closes
 that gap in a consuming repo. Because a plugin skill cannot hook itself in, the path is two-stage:
 
 > **One half of the old reason for this is false, and it matters for
@@ -1065,7 +1077,7 @@ second `agent`-setting plugin gets a different orchestrator without being told.
   > **Why six, and why the same six everywhere** (inbound
   > [#297](https://github.com/DaveKJohn/claude-code-specialists/issues/297)). This procedure is described at
   > three entry points, and they used to count it as *four acts* here, *three acts* in
-  > [`specialists-init`](plugins/dkj-teams/dkj-team-alpha/skills/specialists-init/SKILL.md#chicken-and-egg--step-0-is-done-by-the-user)
+  > [`specialists-init`](plugins/dkj-subagents/dkj-subagents-alpha/skills/specialists-init/SKILL.md#chicken-and-egg--step-0-is-done-by-the-user)
   > and *three steps* in the [adoption page](INSTALL.md#connecting--the-install-step) — the same path, no
   > step missing anywhere, three different numbers. A reader following it for the first time has the
   > count as their only check on whether they skipped something, and three counts remove exactly that.
@@ -1102,7 +1114,7 @@ second `agent`-setting plugin gets a different orchestrator without being told.
   > `**five** steps` — the asterisks sit between the two words. Written
   > `(…)\*{0,2} \*{0,2}(acts?|steps?)` it surfaces that line, and one more the original sweep never
   > showed: a fourth counting of the seam migration in
-  > [`specialists-teardown`](plugins/dkj-teams/dkj-team-alpha/skills/specialists-teardown/SKILL.md). Two lessons worth keeping
+  > [`specialists-teardown`](plugins/dkj-subagents/dkj-subagents-alpha/skills/specialists-teardown/SKILL.md). Two lessons worth keeping
   > if count-linting is ever built: a sweep that returns few hits is not evidence of few instances, and a
   > file the same PR touched is not automatically covered by that PR's verification.
 
@@ -1170,11 +1182,11 @@ second `agent`-setting plugin gets a different orchestrator without being told.
   > **Verify with the `projectPath` record, not with `claude plugin list`** — that command is not
   > repo-scoped and reported a plugin as `enabled`, at `project` scope, in this very repo while it
   > held no install record of its own and loaded nothing. The exact query is in
-  > [`specialists-init` step 0c](plugins/dkj-teams/dkj-team-alpha/skills/specialists-init/SKILL.md). This documentation
+  > [`specialists-init` step 0c](plugins/dkj-subagents/dkj-subagents-alpha/skills/specialists-init/SKILL.md). This documentation
   > path is the only thing a new consumer has, because until the plugin loads, the skill that would
   > say otherwise does not exist.
 - **Step 1 (the skill).** Invoke `specialists-init`. The bundled
-  [`bootstrap.ps1`](plugins/dkj-teams/dkj-team-alpha/skills/specialists-init/bootstrap.ps1) performs only **additive**
+  [`bootstrap.ps1`](plugins/dkj-subagents/dkj-subagents-alpha/skills/specialists-init/bootstrap.ps1) performs only **additive**
   actions: for a **fresh** consumer it writes the seam — lens-only persona templates and an empty
   `VUL-IN` lens scaffold per enabled subagent into `.claude/specialists/lenses/` (never overwriting),
   `.claude/specialists/SPECIALISTS.md` carrying the body import, the lens import and the roster slot,
@@ -1272,7 +1284,7 @@ cannot be removed cleanly; one import pointing at one directory can.
 ### What exists now: the `specialists-teardown` skill
 
 **Built July 29, 2026** — the third item of the target shape below, and the half that could be built
-and tested without restructuring anything first. [`specialists-teardown`](plugins/dkj-teams/dkj-team-alpha/skills/specialists-teardown/SKILL.md)
+and tested without restructuring anything first. [`specialists-teardown`](plugins/dkj-subagents/dkj-subagents-alpha/skills/specialists-teardown/SKILL.md)
 is the bootstrap's mirror image: where `specialists-init` is strictly **additive** and never
 overwrites, the teardown is strictly **subtractive** and never deletes what the owner wrote.
 
@@ -1457,7 +1469,7 @@ before diagnosing "the specialists stopped loading" as a bug in this repo.
 
 An add-on team is its own plugin folder — but adding one touches more than that folder, because the
 docs enumerate the plugins and go stale silently if you forget them. The full checklist (learned from
-adding `dkj-team-ecomm`) is written for a **team**; a **workflow** carries no specialists, so it would
+adding `dkj-subagents-ecomm`) is written for a **team**; a **workflow** carries no specialists, so it would
 differ at step 4:
 
 **One step left this list on August 9, 2026, and it is worth saying which.** It used to open with the
@@ -1472,7 +1484,7 @@ reminder is what a derivation makes unnecessary.
    `version`, matching the other plugins). That is the whole of it since August 8, 2026 — a new plugin
    used to owe a `CHANGELOG.md` intro and a `RELEASE.md` card as well, and both were retired with the
    documents themselves.
-2. **The name, and where it sits.** `team-<name>` under `plugins/dkj-teams/`, `<name>-policy-<ministry>`
+2. **The name, and where it sits.** `dkj-subagents-<name>` under `plugins/dkj-subagents/`, `<name>-policy-<ministry>`
    under `plugins/dkj-policy/` — for a **team**, always the first; a **workflow** is the rare exception, see
    the diverging note at step 4 below. Since August 9, 2026 this is not a style preference, and since
    [#886](https://github.com/DaveKJohn/claude-code-specialists/issues/886) the reason is a different

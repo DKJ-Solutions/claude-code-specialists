@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Regression tests for scripts/task/sync-main.ps1 -- dkj-team-shopify's pre-task sync (inbound #787,
+    Regression tests for scripts/task/sync-main.ps1 -- dkj-subagents-shopify's pre-task sync (inbound #787,
     rewritten for the content rule on inbound #807).
 
 .DESCRIPTION
@@ -861,26 +861,26 @@ try {
     $eap = @([regex]::Matches($src, [regex]::Escape('$prevEap = $ErrorActionPreference'))).Count
     Assert-True ($eap -eq 0) "net: no hand-rolled EAP bracket left -- the lib owns that dance (found $eap)"
 
-    # THE LIB TRAVELS IN dkj-team-shopify's OWN PAYLOAD. Without this entry the mirrored script dot-sources a
-    # file that is not in the mirror, and it fails at load in a consumer that installed dkj-team-shopify
+    # THE LIB TRAVELS IN dkj-subagents-shopify's OWN PAYLOAD. Without this entry the mirrored script dot-sources a
+    # file that is not in the mirror, and it fails at load in a consumer that installed dkj-subagents-shopify
     # without dkj-policy -- which is most of them. build-shared-scripts -Check cannot catch
     # that: it compares the pairs the registry declares, so a missing entry is a pair it never looks at.
     . (Join-Path $RepoRoot 'scripts\lib\shared-scripts-lib.ps1')
     $shopLib = @(Get-SharedScriptPairs -RepoRoot $RepoRoot |
-        Where-Object { $_.Plugin -eq 'dkj-team-shopify' -and $_.SourceRel -eq 'scripts\lib\native-capture-lib.ps1' })
-    Assert-True ($shopLib.Count -eq 1) 'net: the registry mirrors the lib into dkj-team-shopify'
+        Where-Object { $_.Plugin -eq 'dkj-subagents-shopify' -and $_.SourceRel -eq 'scripts\lib\native-capture-lib.ps1' })
+    Assert-True ($shopLib.Count -eq 1) 'net: the registry mirrors the lib into dkj-subagents-shopify'
     Assert-True ($shopLib.Count -eq 1 -and (Test-Path -LiteralPath $shopLib[0].MirrorPath -PathType Leaf)) `
         'net: and that mirror is present beside the mirrored sync-main.ps1'
 
     # AND THE SAME FOR THE QUOTED-PATH DECODER (issue #1689, September 9, 2026). Convert-GitQuotedPath moved
     # out of sync-rules.ps1 into git-porcelain-lib.ps1, which this script now dot-sources directly and
-    # unguarded -- so it needs its own dkj-team-shopify mirror for exactly the reason the block above gives,
+    # unguarded -- so it needs its own dkj-subagents-shopify mirror for exactly the reason the block above gives,
     # and the same reason that block gives for why nothing else can catch a missing entry. The dot-source is
     # asserted too: unguarded is the point, because a payload without the file must fail at LOAD rather than
     # fall through to a path that is silently mis-decoded, which is inbound #821's failure exactly.
     $porcLib = @(Get-SharedScriptPairs -RepoRoot $RepoRoot |
-        Where-Object { $_.Plugin -eq 'dkj-team-shopify' -and $_.SourceRel -eq 'scripts\lib\git-porcelain-lib.ps1' })
-    Assert-True ($porcLib.Count -eq 1) 'decoder: the registry mirrors git-porcelain-lib into dkj-team-shopify'
+        Where-Object { $_.Plugin -eq 'dkj-subagents-shopify' -and $_.SourceRel -eq 'scripts\lib\git-porcelain-lib.ps1' })
+    Assert-True ($porcLib.Count -eq 1) 'decoder: the registry mirrors git-porcelain-lib into dkj-subagents-shopify'
     Assert-True ($porcLib.Count -eq 1 -and (Test-Path -LiteralPath $porcLib[0].MirrorPath -PathType Leaf)) `
         'decoder: and that mirror is present beside the mirrored sync-main.ps1'
     Assert-True ($src -match [regex]::Escape("lib\git-porcelain-lib.ps1")) 'decoder: sync-main dot-sources the lib it takes Convert-GitQuotedPath from'

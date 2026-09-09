@@ -48,7 +48,7 @@ function Get-RepoBlobUrl {
 #
 # The published repo keeps the marketplace NAME 'claude-code-specialists' even though it is called
 # claude-plugins-bwj: the name is the key in every consumer's enabledPlugins
-# ('dkj-team-alpha@claude-code-specialists'), so aligning it with the repo name would break that line in
+# ('dkj-subagents-alpha@claude-code-specialists'), so aligning it with the repo name would break that line in
 # every consuming repo. Decision by Dave, August 14, 2026.
 $script:BusinessMarketplaceRepo = 'BWJ-ecommerce/claude-plugins-bwj'
 
@@ -74,7 +74,7 @@ function Get-BusinessMarketplaceRepo {
 # because it is not there -- the mechanism this repo already has, and the one that cannot be
 # misconfigured into offering the thing anyway.
 #
-# THE UNIT IS THE PLUGIN, NOT THE ITEM, AND THAT IS DELIBERATE. dkj-team-alpha ships three PowerShell
+# THE UNIT IS THE PLUGIN, NOT THE ITEM, AND THAT IS DELIBERATE. dkj-subagents-alpha ships three PowerShell
 # skills (specialists-init, specialists-teardown, sync-roster) and one SessionStart hook that a Claude
 # App user cannot run either. They travel anyway: the plugin published here has to be byte-identical to
 # the plugin released here, or its version number stops meaning one thing. Those four items are already
@@ -87,10 +87,10 @@ function Get-BusinessMarketplaceRepo {
 # manifest", which is what the script did before this function existed -- so a consumer that has never
 # heard of it publishes exactly as it did.
 $script:BusinessMarketplacePlugins = @(
-    'dkj-team-alpha'
-    'dkj-team-lifehub'
-    'dkj-team-shopify'
-    'dkj-team-ecomm'
+    'dkj-subagents-alpha'
+    'dkj-subagents-lifehub'
+    'dkj-subagents-shopify'
+    'dkj-subagents-ecomm'
 )
 
 function Get-BusinessMarketplacePlugins {
@@ -415,7 +415,7 @@ function Get-MachineLocalPaths {
 
 # --- THIS REPO HAS NO SHOPIFY STORE, AND SAYS SO (issue #1579; the seam from inbound #1570) --------
 #
-# dkj-team-shopify is enabled here and this repo is not a store. It is on for validation: the repo
+# dkj-subagents-shopify is enabled here and this repo is not a store. It is on for validation: the repo
 # that ships a plugin is also a repo that loads it, so an agent def, a manifest, a frontmatter or a
 # hook that stops resolving surfaces at this repo's own session start instead of in somebody else's.
 # The repo slot in CLAUDE.md states that reason, for all four add-on teams at once.
@@ -447,7 +447,7 @@ function Get-MachineLocalPaths {
 $script:ShopifyRepoHasNoStore = $true
 
 function Get-ShopifyRepoHasNoStore {
-    <# $true when this repo enables dkj-team-shopify without owning a store, which is what stops
+    <# $true when this repo enables dkj-subagents-shopify without owning a store, which is what stops
        shopify-floor-sessioncheck.ps1 asking for a live-theme id this repo cannot truthfully give.
        Remove the function outright if this repo ever gets a store. #>
     return $script:ShopifyRepoHasNoStore

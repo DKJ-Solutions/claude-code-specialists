@@ -17,7 +17,7 @@
                                           copied, because it must name exactly the plugins that
                                           travelled (see WHICH PLUGINS below)
         plugins/                          the plugin folders the filtered manifest points at, plus
-                                          dkj-teams/agent-shared/ (the source of the generated shared
+                                          dkj-subagents/subagent-shared/ (the source of the generated shared
                                           blocks) and the README/ADOPTION pages
         README.md, LICENSE                context for whoever opens the business repo
         dkj-policy/CHANGELOG.md              the changelog -- in the workflow folder since August 27, 2026
@@ -40,15 +40,15 @@
     source repo's scripts/repo-config.ps1 names the plugins that travel; -Plugins overrides it, and an
     absent or empty answer means "all of them", which is what this script did before the seam existed.
     Excluded plugin folders are pruned after the copy and the manifest is rebuilt to match, so the two
-    cannot disagree. A kind-directory left with no plugin in it (plugins/dkj-teams/ and its README) is
+    cannot disagree. A kind-directory left with no plugin in it (plugins/dkj-subagents/ and its README) is
     removed whole rather than published as a page describing plugins that are not there. It read
     plugins/workflows/ until #1467 renamed that directory to plugins/dkj-policy/, which is a plugin root
     rather than a kind directory and is therefore pruned as a plugin.
 
-    THAT NOW ALSO GOVERNS agent-shared/, and it is the one behaviour the August 17, 2026 move changed.
+    THAT NOW ALSO GOVERNS subagent-shared/, and it is the one behaviour the August 17, 2026 move changed.
     While that folder sat directly under plugins/ it was in no kind-directory, so it travelled on every
     publish -- including one carrying no team at all, where the source of the team agent defs' shared
-    blocks is payload about plugins that are not there. Under plugins/dkj-teams/ it sits inside the teams
+    blocks is payload about plugins that are not there. Under plugins/dkj-subagents/ it sits inside the teams
     kind-directory, so it travels exactly when at least one team does and is pruned with them. Nothing
     here had to learn that: the pruning asks whether a directory still holds a plugin.json, which is a
     question about the directory rather than about a list of exceptions.
@@ -122,7 +122,7 @@
     Publishes the same set to a different target, for a second organisation.
 
 .EXAMPLE
-    ./scripts/release/publish-to-business.ps1 -TargetRepo OTHER-ORG/dev-plugins -Plugins dkj-team-alpha,dkj-policy -DryRun
+    ./scripts/release/publish-to-business.ps1 -TargetRepo OTHER-ORG/dev-plugins -Plugins dkj-subagents-alpha,dkj-policy -DryRun
 
     A different subset to a different target -- for an organisation that does have repositories.
 #>
@@ -418,7 +418,7 @@ function Select-PublishedPlugins {
     # Which directories under plugins/ hold a plugin at all, measured BEFORE pruning. Afterwards, one
     # that has been emptied of plugins is removed whole: a kind directory carries its own README about
     # what is in it, and a page describing plugins that are not there is worse than no page. It named
-    # plugins/workflows/ until #1467; plugins/dkj-teams/ is the one such directory left, since
+    # plugins/workflows/ until #1467; plugins/dkj-subagents/ is the one such directory left, since
     # plugins/dkj-policy/ is a plugin root in its own right and is pruned by the loop above instead.
     #
     # ONE RISK THE NESTING ADDS, NAMED RATHER THAN GUARDED. Dropping 'dkj-policy' removes

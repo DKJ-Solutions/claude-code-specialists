@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Tests for scripts/task/adopt-shopify-floor.ps1 -- the command that places dkj-team-shopify's operational
+    Tests for scripts/task/adopt-shopify-floor.ps1 -- the command that places dkj-subagents-shopify's operational
     floor in a consuming Shopify repo.
 
 .DESCRIPTION
