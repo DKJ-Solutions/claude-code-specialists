@@ -71,6 +71,12 @@ needs no ratio at all — CI is a different machine, not a scaled one.
       correction beside it, because it is the worked example of the trap; what is added is that the
       conclusion it reached was independently settled by the recorded CI numbers, which that lens
       already says one section down.
+- [x] **A seventh site that arrived DURING the branch**, on the merge-forward the staleness guard
+      ([#1292](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1292)) forced: `main` had
+      meanwhile gained the lens block that *filed* #1713, which reads *"is stated backwards … filed rather
+      than swept"* and would have shipped as a live finding one commit after its own repair. One sentence
+      added beside it; the block itself is left standing, because it is the measurement that produced the
+      issue.
 - [~] Publishing a replacement constant — dropped, per the reasoning above.
 - [~] The four archived release documents under `dkj-policy/releases/**` — out of scope by the history
       carve-out in [`.claude/rules/language-layers.md`](../.claude/rules/language-layers.md), as the

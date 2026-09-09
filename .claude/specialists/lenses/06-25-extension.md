@@ -1287,6 +1287,10 @@ own gate) and 1,021s, so ~10% is noise and nothing under that is a finding.
   either. Filed as [#1713](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1713) rather than
   swept: it sits in the source lib plus its two plugin mirrors under the shared-scripts drift lint, it is
   plugin payload, and replacing one wrong constant with another off n=1 is the error it is describing.
+  **Repaired in [#1722](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1722)** (September 9,
+  2026), and deliberately without a replacement number: all three copies now say there is no ratio to divide
+  out and that the sign is not fixed either. The paragraph higher up this lens keeps its two predictions as
+  the worked example of the trap.
 - **A resident-interpreter count taken mid-drain is not an orphan count.** Reading 1 opened with
   `40 powershell processes already resident` and 36 were still up seconds after it returned, which reads
   exactly like [#1464](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1464)'s leak and is
