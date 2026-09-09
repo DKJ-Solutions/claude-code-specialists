@@ -88,10 +88,9 @@ product: agent defs, manuals, docs, and tooling.
 - **Every issue filed here carries a priority label, `prio-1` (lowest) to `prio-4` (highest)** — set
   in the same `gh issue create` that files the finding, because an issue filed without one postpones
   the triage to whoever reads the tracker next (a hard rule from Dave, September 9, 2026,
-  [#1685](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1685)). It is a **separate
-  axis** from the prefix→label mapping that classifies a *pull request*, and neither substitutes for
-  the other; the four rungs, and how to relabel, are in
-  [Derek #05](05-05-extension.md#issue-labels--every-issue-carries-a-priority).
+  [#1685](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1685)). The four rungs, the
+  relabel command, and why this is a **separate axis** from the labels that classify a *pull request*
+  are in [Derek #05](05-05-extension.md#issue-labels--every-issue-carries-a-priority).
 
 ### The gatekeepers, as implemented here
 

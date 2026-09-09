@@ -51,10 +51,15 @@ a `prio-N` without being told, which is the half a tracker cannot enforce.
 - [x] Create `prio-1` … `prio-4` on the tracker, colours escalating green → dark red, each with a
       description saying which rung it is.
 - [x] Label all ten open issues, and read the labels back to prove none was missed.
-- [x] Record the always-on half in Chris's lens under **The Dave rules** — five lines, because every
-      session pays for them.
+- [x] Record the always-on half in Chris's lens under **The Dave rules** — as short as the rule
+      allows, because every session pays for it whether or not an issue is filed that turn.
 - [x] Record the detail in Derek's lens as its own section: the rung table, why it is a separate axis
       from the prefix→label mapping for a pull request, and why nothing enforces it.
+- [x] File the naming collision found on the way: `dkj-policy-bwj` already prescribes four prio
+      buckets for the BWJ store repos, on three of the same colour codes but under the names
+      `very low`/`low`/`high`/`very high` and derived from an Asana score. Filed as
+      [#1686](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1686) — unifying the two
+      means renaming labels on live trackers, which is Dave's call and not this branch's.
 - [~] A gate or session check that reports an open issue without a `prio-N` — dropped: it would put a
       network call to the tracker on the critical path of a local check, for a field only a person can
       fill in. Stated as a deliberate decline in Derek's lens instead, beside the `inbound` precedent.
@@ -65,6 +70,11 @@ a `prio-N` without being told, which is the half a tracker cannot enforce.
       without a `prio-N`: ten issues, zero missing.
 - [x] The lint gate and every suite, via `open-pr.ps1` — the two lenses are always-on prose and the
       new anchors have to resolve.
+- [x] Copy edit (Edith) and cost check (Nolan) on the diff. Four defects repaired, two of them real
+      contradictions this branch had introduced: *"carries exactly one"* stated above a command that
+      leaves two rungs on an issue, and a citation of the branch table for an argument that table does
+      not make — it derives the changelog *type* from the prefix. The always-on bullet came down 49
+      bytes on Nolan's measurement, with the argument left on the on-demand page it points at.
 
 ### DEPLOY: feat/1685-prio-labels
 
@@ -73,8 +83,10 @@ Every issue in this repo's tracker now carries exactly one priority, `prio-1` (l
 movement — a taxonomy applied only to new issues splits the tracker in two, and the older half is
 where the backlog is — and the rule that a finding is filed *with* its priority is written down in
 the always-on layer, so the next session does it without being reminded. It is a separate axis from
-the prefix→label mapping that classifies a pull request, and Derek's lens says so, because those are
-the labels this repo already had.
+the prefix→label mapping that classifies a pull request — `enhancement`, `bug` and `documentation` are
+the labels this repo already had, written from the branch prefix; a `prio-N` is the new one, written by
+whoever files. Derek's lens says so, and says which command re-ranks an issue without leaving two
+rungs on it.
 
 **Score:** 3
 
