@@ -86,7 +86,7 @@ one level down, and leaving either would have made the repaired sentence contrad
 
 ### TEST
 
-- [ ] Lint gate + all suites via `open-pr.ps1`
+- [~] Lint gate + all suites -- dropped as a step: `open-pr.ps1` runs both itself at the push, so a box here can only be ticked for work the gate has not done yet
 - [x] Copy edit on the diff (Edith) -- referent tightened, the duplicated "only team" claim kept to one place
 
 ### DEPLOY: docs/1749-readme-domain-skills
