@@ -43,7 +43,45 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**34 / 77 minor entries** <!-- pending-tally -->
+**34 / 78 minor entries** <!-- pending-tally -->
+
+### DEPLOY: docs/1720-merge-queue-off-main-ci-gate · 20260909-161642
+
+The always-on `CLAUDE.md` told every session to *"read the queue as live here until he has made it"* --
+and he had. Measured September 9, 2026: `main-ci-gate` holds
+`["deletion","non_fast_forward","required_status_checks"]` and no `merge_queue`. The sentence is replaced
+by the state that holds, so a session now reasons correctly about how a merge lands here: `ship-pr.ps1`
+merges directly and folds in its own step 5, rather than enqueueing and waiting for `fold-on-merge.yml`.
+
+**Nothing mechanical was ever misled, which is what makes this shape dangerous.** `ship-pr.ps1` reads the
+trunk's own rules before it merges, so no gate failed and no merge went wrong -- only a reader's model of
+the repo. An always-on document is uniquely able to cause that and uniquely unable to report it.
+
+**The same fact was stale in a second place, and is repaired in the same move.** Sylvester's lens recorded
+the ruleset as holding a fourth rule and taught a reader to expect a two-line push rejection; it now
+carries the dated successor showing three, with the September 6 block kept intact so an old run stays
+explainable. The generalisable half went to Tessa's lens: **a conditional in always-on prose needs a
+detector behind it, or it is written as the dated state instead** -- and the removal above has no date of
+its own, because a ruleset is GitHub-side state that no commit records, no gate reads and no session is
+told about.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+Nothing reaches a subscriber. All three files are this repo's own governance and lens layer -- `CLAUDE.md`
+and two `.claude/specialists/lenses/` documents -- none of which ships in a plugin. A consumer's own
+merge-queue conditional is untouched, deliberately.
+
+**Score:** N/A
+
+#### Pull Request
+
+Record that the merge_queue rule is off main-ci-gate
+
+[PR #1725](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1725)
+
+---
 
 ### DEPLOY: feat/1715-ci-certificate-skips-third-gate · 20260909-160035
 
