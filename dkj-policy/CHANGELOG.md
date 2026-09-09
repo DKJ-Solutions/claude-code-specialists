@@ -43,7 +43,49 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**36 / 85 minor entries** <!-- pending-tally -->
+**36 / 86 minor entries** <!-- pending-tally -->
+
+### DEPLOY: feat/1726-repo-settings-drift-check · 20260909-190954
+
+A daily CI leg now reports when GitHub-side repo settings drift from what this tree declares -- the
+class behind #1720, where `main-ci-gate` gained and lost a `merge_queue` rule with nothing in the repo
+recording either event. `Get-ExpectedRepoSettings` in [`../scripts/repo-config.ps1`](../scripts/repo-config.ps1)
+declares seven load-bearing facts (the trunk's rules, its required check, `strict`, `allow_auto_merge`,
+`allow_update_branch`, visibility, the bypass actor types), each with the document that states it and
+the date it was last measured; `scripts/lint/check-repo-settings.ps1` compares them and names which
+document to repair when the drift turns out to be deliberate.
+
+Built rather than written down because #1726's own premise -- *"one occurrence is not a rate"* -- turned
+out to be wrong: three drifts in eight days, two of them mechanical. The emptied bypass list killed
+every fold for a day (#1244) and was found by a failing push; `allow_auto_merge` was found live `true`
+against four records saying `false` by this check's first run, and is filed as #1730.
+
+Scheduled rather than a SessionStart hook, on Dave's call: a hook reaches a drift sooner and costs a
+`gh api` round trip at every session start, but only a scheduled run leaves a **dated** record -- which
+is exactly what #1720 says is missing, since "September 9 is when it was measured, not when it
+happened". Advisory and not in `main-ci-gate`, and it writes nothing to GitHub: repo settings stay
+Dave's surface. One field, `bypass_actors`, is admin-only and reports as **not read** in CI rather than
+as green, because reporting the #1244 field as passing would be the worst possible silence.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A -- this is a maintenance-repo detector over this repo's own GitHub settings. Nothing ships to a
+consumer: the check is deliberately not mirrored into the plugin, and the one portable half is a
+PowerShell trap added to the system-administration manual.
+
+**Score:** N/A
+
+#### Pull Request
+
+A scheduled runner that reports GitHub-side repo settings drifting from what the tree declares
+
+Plugins: dkj-team-alpha
+
+[PR #1741](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1741)
+
+---
 
 ### DEPLOY: fix/1736-says-classification-swept · 20260909-184930
 
