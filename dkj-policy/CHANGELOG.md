@@ -43,7 +43,42 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**37 / 92 minor entries** <!-- pending-tally -->
+**38 / 93 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1753-ship-pr-fold-dirty-tree · 20260909-212943
+
+`ship-pr.ps1` no longer loses the fold to an uncommitted file. Step 5 used to run `git checkout main`
+whenever HEAD was where the script had left it -- the same checkout step 2b had already declined one
+step earlier because the tree was unclean -- so an unrelated uncommitted path was carried onto the trunk
+and `git merge --ff-only origin/main` then failed on it, leaving the PR merged and the changelog
+unfolded. It now chooses the tree it folds in on the tree's cleanliness as well as on HEAD's location:
+an unclean checkout folds in the throwaway worktree #1069 already built, so the fold completes, the
+uncommitted path stays where its author left it, and nothing is refused. A tree already standing on the
+trunk stays on the in-place arm, because git refuses a second worktree on a branch the primary holds.
+The three failures that can still land after the merge now all say so -- the `ff-only` arm, the one that
+actually fired, said only `git merge --ff-only of origin/main failed.` while its neighbour one branch up
+carried the full merged-but-unfolded sentence and the by-hand fold command.
+
+**Score:** 4
+
+#### What makes this deploy extra special
+
+`ship-pr.ps1` and `worktree-lib.ps1` are both shipped by `dkj-policy`, so every repo running this
+workflow gets the repair. It matters more there than here: this repo recovers a skipped fold through
+`fold-on-merge.yml` (#1493), and a consumer that has not adopted that runner is left with the entry
+stranded on the trunk with nothing saying so until the next session's check reports it.
+
+**Score:** 3
+
+#### Pull Request
+
+ship-pr folds a dirty tree in a worktree instead of dragging it to the trunk
+
+Plugins: dkj-policy
+
+[PR #1755](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1755)
+
+---
 
 ### DEPLOY: docs/1749-readme-domain-skills · 20260909-202504
 
