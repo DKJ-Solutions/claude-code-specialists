@@ -43,7 +43,47 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**28 / 59 minor entries** <!-- pending-tally -->
+**29 / 60 minor entries** <!-- pending-tally -->
+
+### DEPLOY: docs/1686-priority-axis-decision · 20260909-065028
+
+The priority axis exists twice in this family and now says so on purpose. The two schemes -- `prio-1`
+to `prio-4` here, `very low` to `very high` in the BWJ store repos -- stay apart, because the names are
+the only thing that says which motor owns the rung: one is a judgement typed by whoever files, the
+other is derived from an Asana score by a daily sweep, and a single vocabulary would invite a session
+to hand-set a rung that a sweep is about to overwrite. Measured on all three trackers, the two sets are
+disjoint in both directions, so the collision the issue was filed about can only ever produce a refused
+label that names itself -- not an issue filed at a rung meaning something else. And the rule that every
+issue carries a rung stays this repo's own: nothing in the workflow reads a priority, so a portable
+version would prescribe a convention no gate enforces and hand consumers four labels they never asked
+for.
+
+**One thing the decision deliberately does not close, and it is now named rather than implied.** The
+same measurement that clears the names indicts the **colours**: `0E8A16` is the floor here and one rung
+above the floor in a BWJ repo, and nothing refuses a colour the way `gh` refuses a name. The lens
+carries that table and the instruction not to read a rung off a badge across the two families; the
+repair itself is #1691, because its cheap half edits live labels in two repos this one does not own.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+One paragraph reaches a consumer, and it is the half worth having: a BWJ session that reaches for
+`prio-4` and gets a refusal now reads that as the expected answer rather than as a broken setup, and
+is told in the same breath that nothing on their side needs doing. The rule itself deliberately did
+not become theirs to follow.
+
+**Score:** 2
+
+#### Pull Request
+
+The two priority label sets stay apart, and the rule stays repo-local
+
+Plugins: dkj-policy-bwj
+
+[PR #1692](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1692)
+
+---
 
 ### DEPLOY: fix/1679-utf8-short-read-class · 20260909-062511
 
