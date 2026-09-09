@@ -598,13 +598,27 @@ if ($Title) {
 $resolveList = @(ConvertTo-IssueNumberList -Value $Resolves)
 $resolveIssues = @()
 if (-not $NoResolves -or $resolveList.Count -gt 0) {
-    # What the branch itself mentions: the WHOLE development document (always present on a branch) plus a
-    # -Body the caller supplied, since either can carry the reference. Deliberately not narrowed to the
-    # DEPLOY section the way the two gates are -- an issue named in a step is a mention of that issue, and
-    # this is the one reader of this file whose subject is the branch rather than the entry.
+    # What the branch itself mentions: the branch's OWN text out of the development document (always
+    # present on a branch) plus a -Body the caller supplied, since either can carry the reference.
+    # Deliberately not narrowed to the DEPLOY section the way the two gates are -- an issue named in a step
+    # is a mention of that issue, and this is the one reader of this file whose subject is the branch
+    # rather than the entry.
+    #
+    # AND FOR THE SAME REASON IT IS NARROWED AT THE OTHER END, from the first phase heading (issue #1718).
+    # It read the whole file until September 9, 2026, guidance block included -- and that block is where
+    # this workflow records why its shape rules exist, so every issue it cites was a mention on EVERY
+    # branch in every repo. Measured on feat/1703-test-gate-cost: the already-done check reported '#1650 is
+    # already CLOSED, and it is already resolved by PR #1661 (merged)' on a branch with no connection to
+    # #1650, from StepsGuidance's own 'refused since #1650'. The same run also warned about #1464, which
+    # was a real context citation, and nothing in the output separated the two.
+    #
+    # The guidance cites CLOSED issues today, so what it produced was noise in this advisory check; a
+    # citation of an OPEN one would have blocked every branch at the refusal above. Get-DevelopmentBranchText
+    # carries why the split is safe -- #899's preamble rule already refuses branch content in that region,
+    # in every repo, before this push.
     $mentionText = ''
     if (Test-Path $entryPath) {
-        $mentionText = [System.IO.File]::ReadAllText($entryPath, [System.Text.Encoding]::UTF8)
+        $mentionText = Get-DevelopmentBranchText -Text ([System.IO.File]::ReadAllText($entryPath, [System.Text.Encoding]::UTF8))
     }
     if ($Body) { $mentionText = $mentionText + "`n" + $Body }
 

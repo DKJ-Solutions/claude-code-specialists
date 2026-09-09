@@ -7478,6 +7478,60 @@ function Get-DevelopmentShapeFindings {
     }
 }
 
+function Get-DevelopmentBranchText {
+    <#
+        The branch's OWN text out of a development document -- everything from the first phase heading to
+        the end of the file, with the title and the scaffolder's guidance block left behind.
+
+        FOR THE ONE READER WHOSE SUBJECT IS THE BRANCH RATHER THAN THE ENTRY: open-pr.ps1's mention scan,
+        which asks which issues THIS branch is about. It cannot use Split-Development, because a number
+        named in a step is a mention of that issue and the entry is only the last of the four phases -- so
+        it read the WHOLE file, guidance and all, and the guidance is where this workflow records why its
+        shape rules exist. Every citation in it is therefore a mention on every branch, in every repo.
+
+        MEASURED SEPTEMBER 9, 2026 ON feat/1703-test-gate-cost (issue #1718): the already-done check
+        warned that '#1650 is already CLOSED, and it is already resolved by PR #1661 (merged)' on a branch
+        that has nothing to do with #1650. The citation is StepsGuidance's own -- 'refused since #1650' --
+        so the warning fires unconditionally, and the same run also warned about #1464, which WAS a
+        deliberate context citation. A check whose false positives are indistinguishable from its findings
+        has stopped being read. And it grows: each new rule the guidance cites adds a permanent warning to
+        every branch that will ever be opened.
+
+        AN IGNORE-LIST OF NUMBERS IS EXPLICITLY NOT THE FIX, and #1718 said so when it was filed. It would
+        need editing every time the guidance cites a new issue, which is the same maintenance failure one
+        file further along.
+
+        THE SPLIT IS SAFE BECAUSE ANOTHER GATE ALREADY GUARANTEES IT. #899's preamble rule -- 'nothing
+        branch-specific above the first of those four headings' -- is refused by open-pr before the push,
+        in every repo, so the region this function drops is generic by construction: nothing citable by the
+        author can be lost in it. That is why the boundary is the first phase heading and not, say, the
+        end of the blockquote.
+
+        IT RE-DERIVES NOTHING, which is the reason it is three lines. Get-DevelopmentShapeFindings already
+        walks this text fence-aware, reads the title and phase levels OFF the document rather than pinning
+        them, and reports each phase heading's line -- and it is the reader of the very rule quoted above.
+        A second walk with its own level derivation is exactly the drift this file exists to prevent: the
+        levels shifted once already (August 26, 2026), and a copy free to disagree did.
+
+        NO PHASE HEADING MEANS THE WHOLE TEXT, and that fail-safe carries two cases on one rule. A legacy
+        entry-only file has no document around its entry -- Test-DevelopmentHasPlan turns it away at that
+        function's door, so PhaseHeadings comes back empty -- and a document whose phases have gone is one
+        this function must not silently empty. Erring toward the whole text errs toward the surplus
+        mention, which is the direction Get-IssueMentions itself chose: a mention too many asks the author
+        one question, a mention missed is the silent open issue the gate exists to prevent.
+    #>
+    param([Parameter(Mandatory)][AllowEmptyString()][string]$Text)
+
+    $first = @((Get-DevelopmentShapeFindings -Text $Text).PhaseHeadings)[0]
+    if ($null -eq $first) { return $Text }
+    # Line is 1-BASED, off the same '\r?\n' split as below, so the first phase heading is kept and
+    # everything above it is dropped. A heading on line 1 leaves nothing above it to drop.
+    $at = [int]$first.Line - 1
+    if ($at -le 0) { return $Text }
+    $lines = @($Text -split '\r?\n')
+    return ($lines[$at..($lines.Count - 1)] -join "`n")
+}
+
 function Test-BranchChangelogIsFilled {
     <#
         Pure: does the development file hold a branch's work, or is it still (back) in the reset state

@@ -1734,6 +1734,18 @@ Assert-True ($openPrText.Contains("'number,state,headRefName,body'")) 'the PR-bo
 Assert-True ($openPrText.Contains("'--state', 'all'")) "the search is --state all, so a MERGED claimant counts -- that is the #1282 case"
 Assert-True ($openPrText -like '*-CurrentBranch $branch*') "the current branch is passed, so this branch's own PR is not read as a rival"
 
+# AND THE SCAN'S OWN INPUT IS NARROWED (issue #1718). Get-TargetIssueWarnings is only as good as the
+# numbers it is handed, and until September 9, 2026 those came off the WHOLE development document --
+# guidance block included, which is where this workflow records why its shape rules exist. Every issue
+# that block cites was therefore a mention on every branch: 'issue #1650 is already CLOSED' fired on
+# feat/1703-test-gate-cost, which has nothing to do with #1650. The split itself is proven in
+# entry-scaffold.tests.ps1; this is the assert that the script actually uses it.
+Assert-True ($openPrText -match '\$mentionText = Get-DevelopmentBranchText -Text \(\[System\.IO\.File\]::ReadAllText\(\$entryPath') `
+    'the mention text is the branch''s own content, not the whole file -- the guidance block cites issues of its own'
+$idxBranchText = $openPrText.IndexOf('$mentionText = Get-DevelopmentBranchText')
+Assert-True ($idxBranchText -ge 0 -and $idxBranchText -lt $idxAlreadyDone) 'and the narrowing happens before the already-done check reads it'
+Assert-True ($openPrText -notmatch '\$mentionText = \[System\.IO\.File\]::ReadAllText') 'with no second, unnarrowed read left behind'
+
 # --- Get-DirectPushBlockingRules / Get-FoldPushVerdict (issue #1278) ------------------------------
 # WHY THIS BLOCK EXISTS. ship-pr merged PR #1271, checked out main, folded, committed -- and the push
 # was refused with GH013, "Required status check 'lint-en-tests' is expected". The run ended

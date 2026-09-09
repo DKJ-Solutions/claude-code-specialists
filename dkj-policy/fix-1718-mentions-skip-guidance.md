@@ -36,19 +36,45 @@
 
 ### PLAN
 
+The already-done check warned about `#1650` on every branch, because open-pr's mention scan read the
+WHOLE development document and the scaffold's guidance block cites `#1650` in the line explaining the
+preamble rule. The repair is the one #1718 asked for: read the branch's OWN content, from the first phase
+heading, and reuse the split the shape gate already makes rather than filtering numbers.
+
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [x] `Get-DevelopmentBranchText` in `scripts/lib/entry-scaffold-lib.ps1`, reusing
+      `Get-DevelopmentShapeFindings`' heading walk so the levels and the fence-awareness have one definition
+- [x] `scripts/release/open-pr.ps1`: the mention scan reads that instead of the whole file
+- [x] Mirror both into `plugins/dkj-policy/` via `scripts/sync/build-shared-scripts.ps1`
 
 ### TEST
 
+- [x] `entry-scaffold.tests.ps1`: the split, the round trip through `Get-IssueMentions`, a number written
+      under each of the four headings, and the three no-phase fallbacks
+- [x] `pr-issues.tests.ps1`: open-pr actually uses it, before the already-done check
+- [x] Lint gate + all suites green
+
 ### DEPLOY: fix/1718-mentions-skip-guidance
 
-**Score:**
+open-pr's mention scan reads the branch's own content now -- everything from the first phase heading down --
+instead of the whole development document. The scaffold's guidance block is where this workflow records why
+its shape rules exist, so every issue it cites was being read as a mention of whatever branch happened to be
+open: the already-done check reported `#1650 is already CLOSED, and it is already resolved by PR #1661` on a
+branch with no connection to it, unconditionally, in this repo and in every consumer. That warning could not
+be told apart from a real one in the same run, and it would have grown by one line every time a new rule was
+cited. The new `Get-DevelopmentBranchText` reuses the heading walk `Get-DevelopmentShapeFindings` already
+does, so the levels and the fence-awareness keep one definition; the region it drops is the one that gate
+already refuses branch content in, which is what makes it safe to drop. No ignore-list of numbers.
+
+**Score:** 3
 
 #### What makes this deploy extra special
 
-**Score:**
+Every repo running this workflow gets its ship output back: the already-done check goes quiet unless it has
+something to say, so the next warning it prints is worth reading.
+
+**Score:** 3
 
 #### Pull Request
 
