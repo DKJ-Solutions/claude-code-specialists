@@ -132,6 +132,16 @@ $script:ContractRecords = @(
     # the call sites, so open-pr's gate and the cut's gate cannot drift into checking different things --
     # the function's founding rule. The release route is where the gap bites: it is the one route with no
     # later gate that can still stop anything, since CI fires after the tag is pushed.
+    # WHICH CHECK'S GREEN PROVES THE SUITES (issue #1715, September 9, 2026). open-pr skips its local
+    # test gate when this check is green on the exact commit it would ship -- so the seam names a check
+    # rather than the gate trusting "any required check", which two reviews of the first draft each
+    # found a hole in: an unrelated required check (a CLA bot, a PR-title linter) certifying on its own
+    # green, and -- where a trunk requires two -- the unrelated one going green while the test check has
+    # not registered at all. UNSTATED IS THE PRE-SEAM BEHAVIOUR: no name, no certificate, gate runs.
+    @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-CiTestCheckName'; Scripts = @('open-pr');
+       Adopt = 'decide'; AdoptWhy = 'it names one of THIS repo''s check contexts, and the source''s answer (lint-en-tests) exists nowhere else. Copying it would name a check the consumer''s trunk does not have, which is a permanent refusal rather than a wrong skip -- but it also silently withholds the shorter cycle the seam exists to give';
+       Optional = $true; Default = 'no certificate -- the local test gate runs on every open-pr exactly as it did before the seam existed';
+       Returns = 'the check context whose green on a commit proves this repo''s test suites, e.g. ''lint-en-tests''. Name a check the trunk actually REQUIRES: the certificate is read from the required set, so a check the merge does not depend on never certifies' },
     @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-TestCommands'; Scripts = @('open-pr', 'cut-release');
        Adopt = 'decide'; AdoptWhy = 'which commands test this repo is a fact about its stack that no script can read from the tree. The source answers none (its suites are all PowerShell, and the gate already runs those); copying that none into a repo with an app layer leaves the release gate blind to exactly the tests that layer needs';
        Optional = $true; Default = 'no extra commands -- the *.tests.ps1 suites in scripts/tests are the whole gate, unchanged from before the seam existed';

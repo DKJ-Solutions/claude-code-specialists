@@ -72,6 +72,14 @@
     honoured -- native-capture-lib is not widened. The move is a clean follow-up on its own.
 #>
 
+# THE PROSE SANITISER FOR EXTERNALLY-AUTHORED NAMES, loaded here rather than asked of the caller
+# (issue #1715). Get-CiTestCertificate below prints check names read out of a `gh` payload, and a
+# check's displayed name is chosen by whoever produced it. remote-ahead-lib.ps1 and
+# entry-scaffold-lib.ps1 both load this the same way, for the reason their own notes give:
+# ref-print-lib.ps1 is a leaf with no dependencies of its own, which is what makes it safe to load
+# first -- so this is not the class of dependency the header above asks the caller to supply.
+. (Join-Path $PSScriptRoot 'ref-print-lib.ps1')
+
 # How long a recorded pass is allowed to stand in for a fresh run. Not a content property -- the
 # fingerprint already covers content exactly -- but a bound on the environment drifting underneath
 # it. Four hours comfortably covers the measured case (open-pr and ship-pr minutes apart) while
@@ -473,10 +481,163 @@ function Clear-GateEvidence {
     return $true
 }
 
+function Get-CiTestCertificate {
+    <#
+        Is the commit that is about to be shipped ALREADY proved by the trunk's own required checks?
+        Pure: it judges JSON and two SHAs that the caller fetched, so the suite can walk every refusal
+        without a network or a PR. Returns Certified (bool) and Note (string, always set).
+
+        WHY A THIRD EVIDENCE SOURCE AT ALL (issue #1715, September 9, 2026). The record above is
+        keyed on a LOCAL fingerprint, so it answers "did THIS machine already gate this exact tree".
+        That is blind to the one run that costs the most: ship-pr calls open-pr, and between the two
+        the branch is routinely brought forward onto a moved trunk. HEAD is then a commit no local run
+        has seen, the fingerprint misses, and the full suite runs -- on a commit CI has just certified
+        green. Measured on PR #1708: 84 suites in 1,775s locally, then ~7 min in CI, then the same 85
+        suites starting again while `lint-en-tests pass` was already on the screen. Three runs of one
+        measurement.
+
+        AND THE WALL-CLOCK IS THE CHEAPER HALF. A ~40-minute cycle loses races a ~10-minute one wins:
+        on that same PR the trunk moved during the third run, the stale-CI gate (#1292) refused
+        correctly, the re-run went CONFLICTING (#1247), and a two-file docs change took over two hours.
+        The window is what makes those gates fire, and this run is a third of the window spent
+        re-proving what the required check had already recorded.
+
+        THE CERTIFICATE IS STRONGER EVIDENCE THAN THE RUN IT REPLACES, which is what makes this a
+        skip and not a relaxation. CI ran the same suites on a clean checkout of that exact commit,
+        and it is the certificate the MERGE is gated on -- `main`'s ruleset blocks the merge until the
+        required context passes. A local re-run cannot change the merge decision; it can only delay it.
+
+        IT CERTIFIES ON A NAMED CHECK AND NEVER ON "WHATEVER WAS REQUIRED", which is the whole safety
+        of the skip. The first draft of this function trusted every record `gh pr checks --required`
+        returned, and two independent reviews found the same hole from opposite sides:
+
+          - A consumer whose trunk requires an UNRELATED check -- a CLA bot, a PR-title linter, a
+            theme-check -- would have its local test gate skipped the moment that check went green,
+            with the suites never having run anywhere for that commit.
+          - Where a trunk requires TWO contexts, the unrelated one registers and goes green first
+            while the test check has not registered at all; the payload is then non-empty, every
+            record in it is `pass`, and the certificate is granted. That is the registration race
+            Get-RequiredCheckContexts documents in pr-issues-lib -- in its PARTIAL shape rather than
+            its empty one, which is the shape a `Count -eq 0` guard cannot see.
+
+        So the caller passes the check its repo has NAMED (Get-CiTestCheckName), and the named check
+        must be PRESENT in the required set and green. Absent is a refusal, which is what closes the
+        race: a check that has not registered cannot be found, so it cannot certify.
+
+        WHAT IT REFUSES, and every one of these runs the gate exactly as before:
+
+          - No check name. A repo that has not said which check proves its suites gets no certificate
+            -- the pre-seam behaviour, and the reason the seam is optional.
+          - No PR head to compare against (the first open-pr of a branch, before any push).
+          - PR head != local HEAD. The certificate is about a commit; anything else is about a
+            different tree. This is what makes an unpushed local commit safe.
+          - Nothing readable, or an empty required set.
+          - The named check missing from the payload -- not required by this trunk, or not registered
+            yet. Both are "no certificate", deliberately: a check the merge does not depend on is not
+            a bar this gate may stand down for.
+          - The named check not in the `pass` bucket.
+
+        THE CHECK NAMES IT PRINTS COME FROM OUTSIDE, so they go through Get-DisplayRef before they
+        reach a console -- the same rule, and the same single source, that new-branch.ps1's remote-tip
+        line follows. A check's displayed name is chosen by whoever produced it, and a third-party
+        integration can build one out of branch- or PR-derived text; an ANSI or OSC escape in it
+        repaints the terminal it lands in, and a zero-width run makes the printed line read as
+        something other than what it says -- in the one line whose job is to say what stood down a
+        gate. ref-print-lib.ps1 is dot-sourced at the top of THIS file rather than asked of the
+        caller, which is what remote-ahead-lib and entry-scaffold-lib do with the same function and
+        for the reason their notes give: it is a leaf with no dependencies, so loading it here cannot
+        produce the two-answers problem the header's caller contract exists to avoid. Not degraded
+        gracefully if it were ever absent, deliberately -- a sanitiser that silently switches itself
+        off is worse than none.
+
+        THE DIRTY-TREE CASE IS THE CALLER'S, deliberately, and this function never asks. What lands is
+        HEAD, so a certificate on HEAD is exactly as true on a dirty tree as on a clean one; what
+        changes is that the local gate would have judged something else. Invoke-WorkflowGates already
+        warns about that difference in one place for both gates, and open-pr's backing gate is where
+        the shape that is genuinely wrong gets stopped.
+
+    .PARAMETER HeadSha
+        The local HEAD this run would push and merge.
+
+    .PARAMETER PrHeadSha
+        `gh pr view <n> --json headRefOid` -- the commit CI actually ran against.
+
+    .PARAMETER RequiredChecksJson
+        `gh pr checks <n> --required --json name,bucket` output. Empty or unparseable -> not certified.
+
+    .PARAMETER CheckName
+        The check context whose green proves the suites, from the repo's own Get-CiTestCheckName seam.
+        Empty or absent -> not certified, which is the pre-seam behaviour.
+
+    .OUTPUTS
+        [pscustomobject] Certified (bool), Note (string).
+    #>
+    param(
+        [string]$HeadSha,
+        [string]$PrHeadSha,
+        [string]$RequiredChecksJson,
+        [string]$CheckName
+    )
+
+    $refuse = { param([string]$Why) [pscustomobject]@{ Certified = $false; Note = $Why } }
+    # Eight characters is what git itself abbreviates to here, and a reader asked to compare two
+    # 40-character hashes by eye is being asked to do the job this line exists to have done for them.
+    $short = { param([string]$Sha) $Sha.Substring(0, [Math]::Min(8, $Sha.Length)) }
+
+    $wanted = Get-DisplayRef -Ref $CheckName
+    if (-not $wanted) { return (& $refuse 'this repo has not named the check that proves its test suites (Get-CiTestCheckName)') }
+
+    $head = ([string]$HeadSha).Trim()
+    $prHead = ([string]$PrHeadSha).Trim()
+    if (-not $head)   { return (& $refuse 'no local HEAD to compare') }
+    if (-not $prHead) { return (& $refuse 'no PR head to compare -- nothing has been certified yet') }
+    if ($head -ne $prHead) {
+        return (& $refuse ("the PR head ({0}) is not this HEAD ({1}) -- the certificate is about a different commit" -f (& $short $prHead), (& $short $head)))
+    }
+
+    if (-not $RequiredChecksJson -or -not $RequiredChecksJson.Trim()) {
+        return (& $refuse 'the required checks could not be read')
+    }
+    try { $parsed = $RequiredChecksJson | ConvertFrom-Json } catch {
+        return (& $refuse 'the required checks could not be parsed')
+    }
+
+    # Assign first, wrap second -- 5.1 hands a parsed JSON array to the pipeline as ONE object, the
+    # same trap Get-RequiredCheckContexts and Get-MergeQueueVerdict each document beside their parse.
+    $records = @(@($parsed) | Where-Object { $_ -and $_.PSObject.Properties['name'] })
+    if ($records.Count -eq 0) {
+        return (& $refuse ("'{0}' has not registered on this commit yet -- no required check has" -f $wanted))
+    }
+
+    # SANITISED BEFORE IT IS COMPARED, not only before it is printed. The comparison has to be made on
+    # the same string the reader is shown, or a name carrying a zero-width character could match here
+    # and print as something else -- or, worse, fail to match while the printed line says it should.
+    $named = @($records | Where-Object { (Get-DisplayRef -Ref ([string]$_.name)) -eq $wanted })
+    if ($named.Count -eq 0) {
+        $present = @(@($records | ForEach-Object { Get-DisplayRef -Ref ([string]$_.name) }) | Sort-Object -Unique)
+        return (& $refuse ("'{0}' is not among this trunk's required checks on this commit (found: {1})" -f $wanted, ($present -join ', ')))
+    }
+
+    $notPassing = @($named | Where-Object {
+        $bucket = if ($_.PSObject.Properties['bucket']) { ([string]$_.bucket).Trim().ToLowerInvariant() } else { '' }
+        $bucket -ne 'pass'
+    })
+    if ($notPassing.Count -gt 0) {
+        return (& $refuse ("'{0}' is not green on this commit" -f $wanted))
+    }
+
+    return [pscustomobject]@{
+        Certified = $true
+        Note      = ("{0} green on this exact commit ({1})" -f $wanted, (& $short $head))
+    }
+}
+
 function Invoke-WorkflowGates {
     <#
         Runs the repo's two gates -- the lint script, then every test suite -- against the working tree,
-        consulting and recording the evidence above so an unchanged tree is not gated twice. Returns
+        consulting and recording the evidence above so an unchanged tree is not gated twice -- and,
+        since issue #1715, honouring the caller's CI certificate for the same commit so a tree CI has
+        already proved is not gated a third time. Returns
         $true when both passed (or were skipped) and $false when either failed, having already written
         the diagnosis; the caller decides what a failure costs and whether to exit.
 
@@ -535,7 +696,15 @@ function Invoke-WorkflowGates {
         # What a failure costs at THIS point in the chain, e.g. 'branch not pushed, no PR opened'.
         [string]$FailureConsequence = 'nothing further ran',
         # Lanes for the test gate. 0 = let Invoke-TestSuiteGate resolve its own default; see the header.
-        [int]$MaxParallel = 0
+        [int]$MaxParallel = 0,
+        # The CI certificate for THIS commit, as Get-CiTestCertificate's Note (issue #1715). Non-empty
+        # means the trunk's required checks are green on the exact HEAD this run would ship, and the
+        # test gate is then satisfied without running. A STRING AND NOT A SWITCH: the note is the whole
+        # value of the parameter -- a skip nobody can read is a gate nobody can audit -- and one
+        # parameter cannot disagree with itself the way a switch plus a message can. The caller decides
+        # whether a certificate exists, because it is the caller that can reach `gh`; this function
+        # only decides what a certificate is worth.
+        [string]$TestsProvedByCi = ''
     )
 
     # The fingerprint is computed ONCE for both gates -- it hashes HEAD plus every dirty and untracked
@@ -651,6 +820,20 @@ function Invoke-WorkflowGates {
     if (-not $SkipTests) {
         if (Test-GateEvidence -RepoRoot $RepoRoot -Gate 'tests' -Fingerprint $gateFingerprint) {
             Write-Host "test gate: all suites already proved against this exact tree -- skipped." -ForegroundColor DarkGray
+        } elseif ($TestsProvedByCi) {
+            # THE CI CERTIFICATE, CONSULTED AFTER THE LOCAL RECORD AND BEFORE THE RUN (issue #1715).
+            # Second and not first because the local record is free -- it is a file read -- while the
+            # certificate cost the caller two `gh` calls it has already paid for by the time we are
+            # here. Order changes nothing about the verdict; it keeps the cheaper answer first.
+            #
+            # NOT RECORDED AS GATE EVIDENCE, deliberately -- and this branch is the one place in the
+            # function that writes nothing at all. The record means "this machine proved this tree",
+            # so filing a remote green in it would make the certificate look like a local run for the
+            # next four hours, including after it stopped applying. It is re-read in seconds on the
+            # next run, so there is nothing to cache and no reason to blur what the record means.
+            # (The suite asserts the absence, and it also counts the record's writers by name -- which
+            # is why this comment does not spell either of them out.)
+            Write-Host "test gate: satisfied by CI -- $TestsProvedByCi. Not run again locally (#1715)." -ForegroundColor DarkGray
         } elseif (-not (Invoke-TestSuiteGate -TestsDir (Join-Path $RepoRoot 'scripts\tests') -Context $Context -MaxParallel $MaxParallel)) {
             # THIS IS THE GATE THE MOVEMENT CHECK WAS MEASURED ON (issue #1145). One suite of 55 went red
             # inside a backgrounded ship while prune-merged.ps1 held the trunk in the same checkout, and

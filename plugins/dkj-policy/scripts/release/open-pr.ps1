@@ -1491,7 +1491,52 @@ Fast-forward it and read what is there before trying again:
 # -GatesOnly (handled near the top, right after the pre-flights) is that route, and what it runs is
 # THIS function rather than a second copy of it: the whole value of the flag is that the two cannot
 # describe the tree differently.
-if (-not (Invoke-WorkflowGates -RepoRoot $repoRoot -SkipLint:$SkipLint -SkipTests:$SkipTests -MaxParallel $MaxParallel -Context 'the PR' -FailureConsequence 'branch not pushed, no PR opened')) {
+# AND THEY ALSO CONSULT WHAT **CI** ALREADY PROVED (issue #1715, September 9, 2026). The record above
+# is keyed on a local fingerprint, so it misses the expensive case by construction: ship-pr calls this
+# script, and in between the branch is routinely brought forward onto a moved trunk. HEAD is then a
+# commit no local run has seen -- the fingerprint misses and the full suite runs, on the very commit
+# whose `lint-en-tests pass` is still on the screen. Measured on PR #1708: three runs of one 85-suite
+# measurement, ~30 min each locally, for a two-file docs change that took over two hours end to end.
+#
+# ONLY ASKED WHERE THERE IS SOMETHING TO ASK ABOUT: a PR must already exist, and -SkipTests already
+# says the suites are not running. On the first open-pr of a branch there is no PR and no certificate,
+# so this costs nothing and changes nothing -- which is also why the -GatesOnly short-circuit, handled
+# up with the pre-flights, never reaches this block.
+#
+# TWO READS, BOTH CHEAP, BOTH FAIL TOWARD RUNNING THE GATE. A failed or unreadable answer is not a
+# certificate; Get-CiTestCertificate refuses on every ambiguity and the suites then run exactly as they
+# always did. `--required` makes the second read the trunk's own bar rather than this script's opinion
+# of it, and the check the repo NAMED (Get-CiTestCheckName) has to be in that answer -- which is what
+# makes the registration race harmless in its partial shape as well as its empty one: a check that has
+# not registered is simply not found, and not found is a refusal.
+#
+# THE REMOTE-AHEAD GATE ABOVE IS WHAT MAKES TWO SEPARATE READS SAFE. A push landing between them could
+# in principle pair a stale head comparison with newer check data -- but a remote that is ahead of this
+# checkout has already been refused a few lines up, before either read, and the merge itself remains
+# gated on the required check regardless. So the residual window is sub-second and costs at worst one
+# unnecessary skip of a gate the merge does not depend on; it is named here rather than mechanised.
+$testsProvedByCi = ''
+if ($existingPr -and -not $SkipTests) {
+    $headSha = (Invoke-NativeCapture -FilePath 'git' -Arguments @('-C', $repoRoot, 'rev-parse', 'HEAD') -DiscardStderr)
+    $prHead  = Invoke-NativeCapture -FilePath 'gh' -Arguments @('pr', 'view', "$($existingPr.number)", '--json', 'headRefOid', '--jq', '.headRefOid', '--repo', $repo) -DiscardStderr
+    $reqJson = Invoke-NativeCapture -FilePath 'gh' -Arguments @('pr', 'checks', "$($existingPr.number)", '--required', '--json', 'name,bucket', '--repo', $repo) -DiscardStderr
+    # `gh pr checks` EXITS NON-ZERO WHEN ANY CHECK IS FAILING OR STILL PENDING -- that is documented
+    # behaviour and not an error, so the payload is judged on its own rather than on the exit code.
+    # A red required check simply lands in the not-passing list below and refuses the skip.
+    # The seam is read defensively: a consumer whose repo-config predates it has no such function, and
+    # a missing name is the safe answer (no certificate, the gate runs) rather than an error.
+    $ciCheckName = if (Get-Command -Name 'Get-CiTestCheckName' -ErrorAction SilentlyContinue) { Get-CiTestCheckName } else { '' }
+    $cert = Get-CiTestCertificate -HeadSha ($headSha.Output -join '') `
+                                  -PrHeadSha ($prHead.Output -join '') `
+                                  -RequiredChecksJson ($reqJson.Output -join "`n") `
+                                  -CheckName $ciCheckName
+    if ($cert.Certified) {
+        $testsProvedByCi = $cert.Note
+    } else {
+        Write-Host "test gate: no CI certificate for this commit -- $($cert.Note). The suites run below." -ForegroundColor DarkGray
+    }
+}
+if (-not (Invoke-WorkflowGates -RepoRoot $repoRoot -SkipLint:$SkipLint -SkipTests:$SkipTests -MaxParallel $MaxParallel -Context 'the PR' -FailureConsequence 'branch not pushed, no PR opened' -TestsProvedByCi $testsProvedByCi)) {
     exit 1
 }
 

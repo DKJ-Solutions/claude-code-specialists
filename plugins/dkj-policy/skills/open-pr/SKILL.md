@@ -16,7 +16,7 @@ disable-model-invocation: true
 
 This is the **plugin mirror** of `open-pr.ps1`: the same tested source as in the source repo,
 shared here so consumers do not duplicate it. Background in
-[issue #81](https://github.com/DaveKJohn/claude-code-specialists/issues/81).
+[issue #81](https://github.com/DKJ-Solutions/claude-code-specialists/issues/81).
 
 ## What the skill does
 
@@ -31,8 +31,8 @@ powershell -NoProfile -File "${CLAUDE_PLUGIN_ROOT}/scripts/release/open-pr.ps1"
 lags its own source by however many merges have landed since. A consumer keeps no copy of their own, so
 for them the line above is the correct one.
 
-**No title is passed, and that is the change of August 7, 2026 ([#506](https://github.com/DaveKJohn/claude-code-specialists/issues/506)
-+ [#505](https://github.com/DaveKJohn/claude-code-specialists/issues/505)).** The PR is called
+**No title is passed, and that is the change of August 7, 2026 ([#506](https://github.com/DKJ-Solutions/claude-code-specialists/issues/506)
++ [#505](https://github.com/DKJ-Solutions/claude-code-specialists/issues/505)).** The PR is called
 `<branch type>: <the entry's Branch title>` — the type off the branch prefix, the words out of
 the DEPLOY section of `dkj-policy/<branch>.md`. So the sentence is written **once**, when the branch is created
 (`new-branch -Title`), and the PR, `CHANGELOG.md` and the release documents cannot disagree about what the
@@ -85,6 +85,8 @@ The script:
    pushed and no PR is opened. `-SkipLint` / `-SkipTests` are the deliberate escape valves, and
    `-MaxParallel <n>` runs the suites *smaller* rather than not at all — see
    [When the test gate will not finish](#when-the-test-gate-will-not-finish--maxparallel-not--skiptests).
+   The test half is skipped where **CI has already certified this exact commit** — see
+   [The CI certificate](#the-ci-certificate-when-the-test-gate-does-not-run-at-all).
 6. Pushes the current branch and opens a PR to `main` via `gh`, with a label based on the
    branch prefix and a pre-filled PR body from `.github/pull_request_template.md` +
    the changelog entry file. If the branch already had an open PR, the push **is** the update and
@@ -102,7 +104,7 @@ nothing to the working tree and nothing to GitHub -- the one thing it records is
 `-SkipLint` / `-SkipTests` still work and still mean what they mean everywhere else.
 
 **It exists for the commits that are made on the trunk**
-([#1156](https://github.com/DaveKJohn/claude-code-specialists/issues/1156), August 30, 2026). Three changes
+([#1156](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1156), August 30, 2026). Three changes
 land directly on `main` under named exceptions — the fold, the release commit, and the release notes —
 and the first two are made by scripts that gate themselves. The third is typed by hand, and the
 `cut-release` page told its reader to run the gates *"exactly as `open-pr` would have run them for you"*.
@@ -113,7 +115,7 @@ instruction was right about the rule and unreachable as a route.
 entry point, the reader assembles one — a fresh process dot-sourcing `native-capture-lib.ps1` and calling
 `Invoke-TestSuiteGate` directly. It runs, it goes green, and it is quietly missing two things:
 `Get-TestCommands` is not in scope, so a repo whose suites are not all PowerShell has the rest of them
-skipped **without a word** (the failure [#644](https://github.com/DaveKJohn/claude-code-specialists/issues/644)
+skipped **without a word** (the failure [#644](https://github.com/DKJ-Solutions/claude-code-specialists/issues/644)
 was filed about), and the lint half gets a hardcoded script rather than the repo's own `Get-LintScript`.
 A consumer meets both harder than the source does. `-GatesOnly` calls the same `Invoke-WorkflowGates`
 the PR path calls, through the same seams — the point of the flag is that the two **cannot** reach a
@@ -122,6 +124,81 @@ different verdict about the same tree.
 **A green run records gate evidence like any other**, so a later `open-pr` on the identical tree skips what
 this already proved. And it is placed *after* both pre-flights and *before* the branch check, deliberately:
 everything below that check is about a branch, a push or a PR, and none of it applies here.
+
+## The CI certificate: when the test gate does not run at all
+
+The gate records what it proved and skips a tree it has already seen — that is the gate evidence above,
+and it is keyed on a **local** fingerprint. Since
+[#1715](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1715) there is a second thing it
+consults, for the one case the fingerprint misses by construction:
+
+**`ship-pr` calls this script, and in between the branch is routinely brought forward onto a moved
+trunk.** `HEAD` is then a commit no local run has ever seen, so the fingerprint misses and every suite
+runs again — on the very commit whose required check has just gone green. Measured on PR #1708: the
+same 85 suites started for the **third** time, ~30 minutes each locally, while `lint-en-tests pass` was
+already on the screen.
+
+**Your repo names the check, and until it does nothing changes.** The certificate is granted on one
+named check context — `Get-CiTestCheckName` in your `scripts/repo-config.ps1` — and not on "whatever
+the trunk requires". A repo that has not named one keeps running its full local gate, which is what
+makes this safe to arrive with a plugin update:
+
+```powershell
+function Get-CiTestCheckName { return 'lint-en-tests' }   # the check whose green proves YOUR suites
+```
+
+**Name a check your trunk actually requires.** The certificate is read from the required set, so a
+check the merge does not depend on never certifies — deliberately: standing a local gate down on
+something the merge ignores lowers the bar rather than moving it.
+
+So before the gates, and **only where a PR already exists**, the script asks two questions of `gh`:
+
+| | |
+|---|---|
+| `gh pr view <n> --json headRefOid` | which commit did CI actually run against? |
+| `gh pr checks <n> --required --json name,bucket` | is the **named** check among the required ones, and green on it? |
+
+Where the PR head **is** this `HEAD` and the named check is in the `pass` bucket, the test gate
+reports what carried it and does not run:
+
+```text
+test gate: satisfied by CI -- lint-en-tests green on this exact commit (1e805d22). Not run again locally (#1715).
+```
+
+**The certificate is stronger evidence than the run it replaces**, which is what makes this a skip and
+not a relaxation. CI ran the same suites on a clean checkout of that exact commit, and it is the
+certificate the **merge** is gated on — the trunk's ruleset blocks the merge until that context passes.
+A local re-run cannot change the merge decision; it can only delay it.
+
+**Every ambiguity runs the gate.** No named check, no PR yet, a PR head that is not this `HEAD` (an
+unpushed commit, a bring-forward, a moved trunk), an unreadable answer, an empty required set, the
+named check missing from it, or the named check not green — each of those prints its reason and the
+suites run exactly as they always did:
+
+```text
+test gate: no CI certificate for this commit -- the PR head (7c1a44f0) is not this HEAD (1e805d22) -- the certificate is about a different commit. The suites run below.
+```
+
+**Why it asks for the named check by name rather than counting greens.** `gh pr checks --required`
+reports the required checks that have **registered**, so a workflow which has not created its check
+run yet is simply absent from the answer — the race `Get-RequiredCheckContexts` documents. Its empty
+shape is obvious and harmless. Its **partial** shape is neither: on a trunk requiring two contexts, the
+unrelated one can register and go green while the test check has not started, leaving a payload that is
+non-empty and holds no failure. Asking for one name closes both shapes at once, because a check that
+has not registered cannot be found, and not found is a refusal:
+
+```text
+test gate: no CI certificate for this commit -- 'lint-en-tests' is not among this trunk's required checks on this commit (found: branch-entry). The suites run below.
+```
+
+A repo with no required check at all — the GitHub Free case — therefore keeps its full local gate
+forever, which is the correct answer rather than a gap. Check names are printed through the same
+sanitiser the remote-tip line uses, because a check's displayed name is chosen by whoever produced it.
+
+**The lint gate is not skipped this way**, deliberately: it is seconds rather than half an hour, so
+there is nothing to buy. And the certificate is **not** written into the gate-evidence record — that
+record means *this machine proved this tree*, and filing a remote green in it would make the skip
+outlive the certificate by up to four hours. It is re-read in seconds on the next run instead.
 
 ## When the test gate will not finish: `-MaxParallel`, not `-SkipTests`
 
@@ -135,7 +212,7 @@ leaves the resolution exactly where it was, so passing nothing behaves as it alw
 prints the number it used, so the run says how it was measured.
 
 **It exists because the default can fail to *finish***
-([#1443](https://github.com/DaveKJohn/claude-code-specialists/issues/1443), September 5, 2026). Each
+([#1443](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1443), September 5, 2026). Each
 lane spawns a `powershell` child that spawns children of its own, and the reservation formula reasons
 about **cores**, not memory. Measured on an 18-core machine, same 68 suites, same function: **16 lanes**
 passed once in 716s and was then **killed twice** — *"the system is running low on memory"* — while
@@ -159,7 +236,7 @@ evidence, and #1443 did not measure it.
 ## A branch whose PR is already MERGED stops the run, and that is good news
 
 **The lookup above asks for an *open* PR, and until [inbound
-#1077](https://github.com/DaveKJohn/claude-code-specialists/issues/1077) that was the only question
+#1077](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1077) that was the only question
 asked.** For a branch whose PR has been *merged* it answers "none", so the script took the create path
 and GitHub refused it — and what the reader saw was a PowerShell error naming `gh` authentication, on a
 branch that was in fact completely finished. `gh` had just listed PRs, pushed and read the issue list in
@@ -192,12 +269,12 @@ August 4, 2026 the create was unconditional: a duplicate made `gh` return non-ze
 **steps 2-6 — the CI watch, the merge, the fold, and the issue verification — never ran.** A branch
 whose PR had been opened in an earlier session therefore had to be merged and folded by hand, which is
 the five-step sequence `ship-pr` exists to remove. Measured on
-[PR #457](https://github.com/DaveKJohn/claude-code-specialists/pull/457).
+[PR #457](https://github.com/DKJ-Solutions/claude-code-specialists/pull/457).
 
 **Title and body are left alone by default.** The body may have been edited on github.com since it was
 opened, and overwriting someone's edits with a freshly generated template loses more than a stale title
 costs — the title is at least visible on the PR. Use `gh pr edit` if you want the title changed. Since
-[#506](https://github.com/DaveKJohn/claude-code-specialists/issues/506) that holds for every PR rather
+[#506](https://github.com/DKJ-Solutions/claude-code-specialists/issues/506) that holds for every PR rather
 than only a resumed one: the title is composed once, at creation, and no later run rewrites it. Rewriting
 a rewritten entry's title into an open PR was weighed and left out — a title is what people refer to a PR
 by, and quietly renaming one mid-review is the same class of surprise as overwriting the body.
@@ -228,7 +305,7 @@ description is the body's **leading section**, and every heading in the template
 **That rule arrived in two steps, and both are worth knowing if your own template's shape has moved.** The
 match was `## ` exactly until August 9, 2026, which meant a template promoted to `#` silently lost the
 whole feature. And the position read was "the first heading" until August 24, 2026
-([#865](https://github.com/DaveKJohn/claude-code-specialists/issues/865)), which agreed with the placeholder
+([#865](https://github.com/DKJ-Solutions/claude-code-specialists/issues/865)), which agreed with the placeholder
 only while this family's template opened with an H1 — in a template of `<placeholder>` + `## Checklist` it
 would have named the checklist as the description and overwritten it on every refresh.
 
@@ -277,7 +354,7 @@ when you have something to put in it.
 is inserted by an exact whole-line match against the built-in strings — every placeholder this family has
 ever shipped, oldest first, so a consumer who has not migrated keeps working — and a template one word away
 from all of them gets a PR body with no description at all. Since
-[#573](https://github.com/DaveKJohn/claude-code-specialists/issues/573) a run that matched no
+[#573](https://github.com/DKJ-Solutions/claude-code-specialists/issues/573) a run that matched no
 placeholder **warns** and prints the strings it compared against — before that it was silent, and a
 consumer merged 12 of 60 PRs with an empty description before anyone noticed. Your own line is the
 answer: return it from `Get-PrDescriptionPlaceholder` in `scripts/repo-config.ps1`, or make the template
@@ -449,7 +526,7 @@ right.
 **It tries two bases for that suggestion** — the document's own directory first, then the repo root. The
 second exists for the author who followed the older wording: a root-relative link, correct everywhere until
 the changelog isolated, would otherwise be the one finding with no way out named (inbound
-[#967](https://github.com/DaveKJohn/claude-code-specialists/issues/967)).
+[#967](https://github.com/DKJ-Solutions/claude-code-specialists/issues/967)).
 
 **And the refusal names the two directories it actually compared**, rather than restating the convention.
 Until #967 it named the repo root and `dkj-policy/branch/`, and on the shipped defaults neither
@@ -467,7 +544,7 @@ section of the cycle document.
 - **Not `-Force`-able**, like the impact gate: `-Force` exists for text somebody legitimately wrote, and
   there is no legitimate dead link. The fix the message spells out is a one-line edit.
 - **Refused here and not at the fold**, which is where inbound
-  [#806](https://github.com/DaveKJohn/claude-code-specialists/issues/806) asked for it. A defect decidable
+  [#806](https://github.com/DKJ-Solutions/claude-code-specialists/issues/806) asked for it. A defect decidable
   before the merge is caught while the branch is still the only thing affected; refusing an
   already-merged branch's fold would leave an unfolded entry on the trunk with `main` looking finished. A
   fold-time *rewrite* is declined for a second reason — the fold copies the entry verbatim on purpose, and
@@ -500,7 +577,7 @@ its reason on the page, which is the half worth reading later.
   same shape the scaffold gate above was measured on, one file over. **No mark resolves this one**, and
   the refusal now says so on the finding's own line: the fix is to replace the placeholder text with the
   step you actually took, or to delete the line if the plan grew past it. Both findings printed the same
-  advice until [inbound #1081](https://github.com/DaveKJohn/claude-code-specialists/issues/1081), which
+  advice until [inbound #1081](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1081), which
   was measured on a virgin repo as a loop — the author followed the marks it offered, was refused again
   by the same gate, and read "there is no `-Force` for this gate" as *you are stuck* rather than as
   *you have used the wrong tool for this finding*.
@@ -547,7 +624,7 @@ the prefix at a label that exists (scripts\lib\branch-info.ps1). ...
 
 **It is not your mistake, which is why it is a gate rather than a better error message.** Measured in a
 consumer on September 1, 2026 (inbound
-[#1221](https://github.com/DaveKJohn/claude-code-specialists/issues/1221)): `bug` and `enhancement` were
+[#1221](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1221)): `bug` and `enhancement` were
 deleted org-wide because the issue **type** now carries that classification. The seam table was correct
 the day before and nothing in the consumer changed. Any repo that renames or retires a label breaks the
 same way, and the first sign of it was a failed create after a push.
@@ -575,7 +652,7 @@ same way, and the first sign of it was a failed create after a push.
   about a label your seam *named* and your repo does not have, where dropping it would sail a PR past a
   workflow gating on the label. This one is your repo saying there is no label, so sending none is the
   answer you gave. Inbound
-  [#1395](https://github.com/DaveKJohn/claude-code-specialists/issues/1395), measured in a consumer on
+  [#1395](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1395), measured in a consumer on
   September 4, 2026: `--label` was appended unconditionally, so an empty answer went out as
   `--label ''` -- a label named `''`, which `gh` cannot find and refuses the whole create over, after
   the push, with this gate green. The gate had always read an empty label as "nothing to check"; it was
