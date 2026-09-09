@@ -43,7 +43,39 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**36 / 83 minor entries** <!-- pending-tally -->
+**36 / 84 minor entries** <!-- pending-tally -->
+
+### DEPLOY: feat/1717-gate-progress-index · 20260909-181938
+
+The test gate now reports its own progress. It prints one line as each lane opens and one as each
+suite leaves one -- `test gate: progress [depth 1] 37/84 started, 30 done, 7 running (+412.6s) --
+started roster-sync.tests.ps1` -- so a 15-30 minute local run no longer goes silent between walls of
+completion-order output. Started is reported as well as done because the queue dequeues longest-first
+(#1358): a done-count alone sits at 0 through exactly the window an operator is asking the question
+in. The `[depth N]` marker is what makes the count dedupable -- the gate's own suite drives the gate
+over a fixture, so a nested run is unavoidable here, and every external way of deriving this number
+failed on it (#1717 measured three, each differently). The `== <suite> ==` header is untouched, and
+no remaining-time estimate is printed: the duration hints are CI's seconds, and #1713 established
+they do not convert to another machine.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A -- the gate is a maintainer's tool. A subscriber of this system never watches it run; what
+reaches them is a release, and this changes nothing about one.
+
+**Score:** N/A
+
+#### Pull Request
+
+Report the test gate's own progress: started, done and running, per suite
+
+Plugins: dkj-policy, dkj-team-shopify
+
+[PR #1739](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1739)
+
+---
 
 ### DEPLOY: fix/1728-says-on-merged-captures · 20260909-180707
 
