@@ -38,21 +38,58 @@
 
 Phase 0 of the #1697 plan: the glossary section in the root README, then the displayName labels and the marketplace descriptions. No plugin renames -- decided against in the issue's plan comment.
 
+#### What this branch is NOT doing, and why
+
+- **No plugin id changes.** Three of the four renames #1697 proposed were declined on the merits; the
+  fourth survived and is deferred with its full cost in #1698. The reasoning for all four is now in
+  `README.md` rather than only in the issue.
+- **No sweep of the 101 `"this workflow"` self-references** in `plugins/dkj-policy/**`. That was the
+  repair proposed in conversation, and reading the tree changed it: `plugins/dkj-policy/` calls itself
+  *"this workflow"* because **workflow is this repo's own product taxonomy**, held by lint check 23
+  (`[plugin-kind]`) and by the whole `## Teams and workflows` section. Sweeping it would fight a checked
+  convention to import a word from a different register. The glossary states the **bridge** instead --
+  the workflow plugin is the policy half of the scaffold -- so both vocabularies stand.
+- **No change to `marketplace.json`'s descriptions.** Same reason: the team/workflow split they state is
+  correct in its own register, and the glossary now says how it maps onto the anatomy.
+
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [x] `README.md`: new `## The vocabulary -- where these plugins sit inside an agent` section, placed
+      immediately above `## Teams and workflows` so the terms are fixed before the taxonomy uses them --
+      the sourced anatomy table, the two-halves bridge, the three overloaded words, and the declined
+      renames with their reasons.
+- [x] `README.md`: one `## Start here` row routing to it.
+- [x] The six `plugin.json` `displayName` labels carry the anatomy where a person chooses what to
+      install -- `(subagent scaffold)` on the four teams, `(policy scaffold)` on the two policy plugins.
+      Verified free first: nothing in `scripts/`, `.github/` or any doc reads that field.
+- [x] #1698 filed for the deferred rename, `prio-1`, with the measured cost and the checklist.
 
 ### TEST
 
+- [x] `check-plugin-integrity.ps1` -- the dead-link scan is what proves the new section's own anchor and
+      the `## Start here` row that points at it.
+- [x] The full suite set, as CI runs it.
+
 ### DEPLOY: docs/1697-vocabulary-glossary
 
-**Score:**
+The README now states where these plugins sit inside an agent -- Claude Code is the harness, every plugin
+here is scaffold, `dkj-team-*` is the half that says who acts and `dkj-policy` the half that says what
+follows -- with each term quoted from the source that defines it. It also records why none of that renamed
+a plugin: `dkj-agent` is the one name the source rules out, `scaffold` is a constant across every plugin
+here and already means two narrower things in this tree, and `dkj-scaffold-core` could not have reached
+its own content across a `${CLAUDE_PLUGIN_ROOT}` boundary. Each plugin's `displayName` carries the same
+vocabulary to the place a person actually chooses from.
+
+**Score:** 3
 
 #### What makes this deploy extra special
 
-**Score:**
+A consumer sees the six plugins under new labels in their own plugin listing -- `(subagent scaffold)` and
+`(policy scaffold)` -- and can now place them against the vocabulary they already use for agents.
+Nothing to migrate: no plugin id changed, so no install, no `enabledPlugins` key and no `@`-import moved.
+
+**Score:** 2
 
 #### Pull Request
 
 A glossary for the agent anatomy, and the plugin labels that carry it
-
