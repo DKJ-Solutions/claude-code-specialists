@@ -136,10 +136,10 @@ try {
     Write-Host ""
     Write-Host "-- group 4: the refusal text" -ForegroundColor Cyan
 
-    $r = Invoke-Guard (New-Payload -Command 'git stash' -AgentId 'a1' -AgentType 'dkj-team-alpha:victor')
+    $r = Invoke-Guard (New-Payload -Command 'git stash' -AgentId 'a1' -AgentType 'dkj-subagents-alpha:victor')
     Assert-Equal 2 $r.Code 'the refusal blocks'
     Assert-True ($r.Out -match 'BLOCKED \(guard-working-copy\)') 'and names itself'
-    Assert-True ($r.Out -match 'dkj-team-alpha:victor')          'and names WHICH specialist was stopped'
+    Assert-True ($r.Out -match 'dkj-subagents-alpha:victor')          'and names WHICH specialist was stopped'
     Assert-True ($r.Out -match 'git diff <ref>\.\.\.HEAD')       'and offers the read-only alternative'
     Assert-True ($r.Out -match 'git worktree add')               'and says a second checkout is not blocked'
     Assert-True ($r.Out -match 'a sentence in your') `

@@ -24,7 +24,7 @@
     block `working-copy-boundary`, carried by every agent def that holds Bash. Nothing enforced it.
 
     This repo already shipped the counter-argument, verbatim, in the header of
-    dkj-team-shopify/hooks/guard-live-theme.ps1: "The plugin stated the rule in prose in three manuals;
+    dkj-subagents-shopify/hooks/guard-live-theme.ps1: "The plugin stated the rule in prose in three manuals;
     prose does not stop a command." #1669 held that against #1665's repair, and this is the answer.
 
     IT SITS IN THIS PLUGIN BECAUSE DETECTION ALREADY DOES. #1670's Compare-WorkingCopySnapshot, which

@@ -5,7 +5,7 @@
 
 .DESCRIPTION
     THIS LIB IS TESTED SEPARATELY FROM ITS CALLER ON PURPOSE. It carries no knowledge of git or of any
-    other CLI, and it exists to serve MORE than one guard: dkj-team-shopify's guard-live-theme.ps1 is
+    other CLI, and it exists to serve MORE than one guard: dkj-subagents-shopify's guard-live-theme.ps1 is
     the reason the machinery is worth sharing at all, and the route for it to adopt this file is a
     second registry entry rather than a rewrite. A lib with a second caller ahead of it needs its own
     suite, or the day that caller arrives the only coverage will be the first caller's cases.
@@ -82,11 +82,11 @@ Assert-True  $p.Parsed               'a well-formed payload reports Parsed'
 
 $subPayload = @{
     hook_event_name = 'PreToolUse'; session_id = 's1'; cwd = 'C:\repo'; agent_id = 'a1'
-    agent_type = 'dkj-team-alpha:victor'; tool_name = 'Bash'; tool_input = @{ command = 'git status' }
+    agent_type = 'dkj-subagents-alpha:victor'; tool_name = 'Bash'; tool_input = @{ command = 'git status' }
 } | ConvertTo-Json -Compress -Depth 5
 $p = Get-HookCommandPayload $subPayload
 Assert-Equal 'a1' $p.AgentId 'a dispatched subagent carries agent_id -- the gate'
-Assert-Equal 'dkj-team-alpha:victor' $p.AgentType 'agent_type is read too, to NAME who was stopped'
+Assert-Equal 'dkj-subagents-alpha:victor' $p.AgentType 'agent_type is read too, to NAME who was stopped'
 
 # THE --agent SESSION, which is the whole reason agent_type is not the gate. Claude Code's own schema:
 # agent_type is present "on the main thread of a session started with --agent (without agent_id)".

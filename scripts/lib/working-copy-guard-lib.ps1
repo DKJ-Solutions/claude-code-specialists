@@ -21,7 +21,7 @@
 
     IT KNOWS ABOUT GIT, AND command-guard-lib DELIBERATELY DOES NOT. The machinery there is generic --
     heredocs, here-strings, segments, wrappers -- and is meant to serve any command guard, including
-    dkj-team-shopify's, which is about a completely different CLI. Git belongs on this side of that
+    dkj-subagents-shopify's, which is about a completely different CLI. Git belongs on this side of that
     line.
 
     THE CLASS IS ONE CLASS, which is #1669's own correction to #1665. #1665 measured `git stash`

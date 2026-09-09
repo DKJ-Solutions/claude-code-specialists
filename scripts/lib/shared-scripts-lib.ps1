@@ -401,7 +401,7 @@ function Get-SharedScriptPairs {
         @{
             # THE FALSE-POSITIVE MACHINERY A PreToolUse COMMAND GUARD NEEDS (issue #1669), dot-sourced
             # by hooks/guard-working-copy.ps1. It exists as a lib rather than inside that hook because
-            # this repo already ships a second command guard -- dkj-team-shopify's guard-live-theme.ps1 --
+            # this repo already ships a second command guard -- dkj-subagents-shopify's guard-live-theme.ps1 --
             # whose header records what learning these exemptions the hard way cost it, and #1669's
             # point is that the second guard must not pay that price again.
             #

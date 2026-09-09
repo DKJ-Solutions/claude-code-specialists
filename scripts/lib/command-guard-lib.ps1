@@ -13,7 +13,7 @@
     Get-LeadingCommand, Split-CommandSegments, Get-InterpreterScriptBody.
 
     WHY THIS EXISTS RATHER THAN A SECOND GUARD LEARNING IT AGAIN (issue #1669). This repo already
-    ships a PreToolUse command guard -- dkj-team-shopify's guard-live-theme.ps1 -- and its header
+    ships a PreToolUse command guard -- dkj-subagents-shopify's guard-live-theme.ps1 -- and its header
     records what its own first version cost: matching the forbidden words anywhere in the command
     string blocked the heredoc that wrote the rule into a CLAUDE.md, and then the one-liner that later
     edited that sentence. Neither touched the store. #1669's whole premise is that a guard for the
@@ -52,7 +52,7 @@
     a constraint. A plugin must not reach into another plugin's tree -- they are separately versioned
     and separately installed -- but the shared-scripts registry already answers that by mirroring ONE
     source into TWO plugins, which is what check-report-lib does for its two readers. So the route for
-    dkj-team-shopify to dot-source this file is a second registry entry, not a rewrite. It is not taken
+    dkj-subagents-shopify to dot-source this file is a second registry entry, not a rewrite. It is not taken
     here because guard-live-theme guards a revenue-serving live theme, and putting that refactor in the
     same branch as a new guard doubles the review surface of both. Filed as #1734.
 
