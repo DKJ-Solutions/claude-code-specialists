@@ -43,7 +43,47 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**29 / 62 minor entries** <!-- pending-tally -->
+**29 / 63 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1689-porcelain-path-decode-once · 20260909-074736
+
+Reading a git path now happens in one place. `Convert-GitQuotedPath` — which decodes git's C-quoted
+form, escape by escape, into the real filename — has moved out of `sync-rules.ps1` and into
+`git-porcelain-lib.ps1`, beside the `core.quotePath` flag that produces the form it decodes. So the
+porcelain reading no longer stops one step short: `park-lib`, `fanout-lib` and `sync-main` all get the
+readable path, and `fanout-lib` loses a limit it had written down as permanent.
+
+**The move went in the opposite direction from the one #1689 proposed, and that is the substance of the
+change.** `sync-rules.ps1` is dependency-free on purpose — the live-theme guard loads it on every
+command inside a catch that returns no live theme id — so making it dot-source anything is a way to
+disarm that guard silently. It never called the function it defined, so it could lose it instead, and
+`sync-main.ps1` takes the lib directly, unguarded, exactly as it already takes two others.
+
+**And a decode obliges a print guard**, which is the second half of the change. Since a decoded
+path can carry a live ESC byte or an RTL override, `fanout-lib`'s loss report now routes every printed
+path through `Get-DisplayPath` and every printed ref through `Get-DisplayRef` -- three sites, one of
+them older than this branch. The strip is at the report, so a finding still carries the exact path.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A — nothing a consumer of the plugins notices, provided the release carries both mirrors, which is
+what the new `sync-main.tests.ps1` assert exists to prove. A consumer running `dkj-team-shopify`
+without `dkj-policy` gets the lib from its own plugin's payload; the readable path in a sync report is
+the only visible difference, and reports are not a published surface.
+
+**Score:** N/A
+
+#### Pull Request
+
+Reading a git path lives once: the quoted-path decoder moves into git-porcelain-lib
+
+Plugins: dkj-policy, dkj-team-shopify
+
+[PR #1696](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1696)
+
+---
 
 ### DEPLOY: feat/1680-synopsis-check-list · 20260909-072322
 
