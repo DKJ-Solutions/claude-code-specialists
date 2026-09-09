@@ -40,15 +40,32 @@ Two shapes, both diagnosed. Shape 1: the gate judges on exit code alone, so an u
 
 #### What the report inferred, and what the tree actually says
 
-The report pointed shape 2 at the capture, on the ground that the assert reads captured
-child output while 29 other lanes were capturing theirs. **That reason does not hold.**
-`Invoke-Build` calls `Invoke-NativeCapture` with neither `-Utf8` nor `-TimeoutSeconds`, so it
-takes the `&` arm -- no capture file, and therefore no `ShortRead` and no grandchild handle to
-truncate anything. Verified by measurement as well as by reading: 180 runs of the failing
-build under a 30-lane fan-out produced 0 failures. **Lanes are not the variable.**
+The report pointed shape 2 at the capture, on the ground that the assert reads captured child
+output while 29 other lanes were capturing theirs. **That specific reason does not hold**, and
+it is falsified by reading rather than by argument: `Invoke-Build` calls `Invoke-NativeCapture`
+with neither `-Utf8` nor `-TimeoutSeconds`, so it takes the `&` arm -- which has no capture file,
+hard-codes `ShortRead = $false`, and therefore has no grandchild handle for anything to truncate.
 
-What is, measured at width 120: the console's own rendering. Both shapes were re-diagnosed
-from the tree before anything was built.
+**What IS established**, at width 120: the assert reads PowerShell's error formatter's output,
+which hard-wraps mid-word, so `-InitToken for a fresh path` is absent from the message body and
+the assert was passing on the `FullyQualifiedErrorId` echo. Sweeping the interpolated path length
+over 130 values, 9 fail the old assert -- one contiguous band, which is a wrap boundary sliding
+through the phrase. The assert's verdict was a function of a temp path's length.
+
+**And here is what is NOT established, stated plainly because the tempting sentence is one step
+further than the evidence goes.** *Which* length the failing run actually hit was never
+identified. The suite's own path varies only by `$PID`'s digit count, and digit counts 3 to 7 all
+PASS on this machine at this width -- so the failing run differed in something still unnamed
+(another machine's `$env:TEMP`, another console width, a `ship-pr` run with no console of its
+own). An earlier fan-out here -- 180 runs of the build under 30 lanes, 0 failures -- was quoted as
+proof that lanes are not the variable; **it is not**, because it composed a path of a different
+length and so never exercised the one quantity the diagnosis turns on. Marlowe's red-team caught
+that, and the claim is withdrawn rather than restated.
+
+**Neither gap changes the repair.** The assert was reading a rendering instead of a message, that
+is true independently of what tripped it, and an assert whose verdict moves with a temp path's
+length is broken whether or not this run is the one that proved it. What the gaps do change is
+what may be claimed: shape 2 is a latent defect now removed, not a closed mystery.
 
 ### CREATE
 
@@ -66,6 +83,20 @@ from the tree before anything was built.
       (`0xC0000000..0xCFFFFFFF`), on Sebastian's security review: `exit -1` is a line any
       `.tests.ps1` may write and arrives as `0xFFFFFFFF`, so the sign-bit test let a suite hand
       ITSELF the re-run that the promise beside it exists to deny.
+- [x] Shape 1 -- exclude `0xC000013A` (`STATUS_CONTROL_C_EXIT`) from the window, on Marlowe's
+      red-team: it sits inside it and is not a fault. Every suite child shares one console via
+      `-NoNewWindow`, so interrupting a stuck 30-lane run would otherwise have the gate answer a
+      deliberate stop by re-running everything it was just told to abandon.
+- [x] `native-capture-lib.ps1` is a MIRRORED source (Victor): both plugin copies regenerated via
+      `scripts/sync/build-shared-scripts.ps1`, or the fix reaches no consumer and
+      `shared-scripts.tests.ps1` stays red. Caught only because it was looked for -- the local
+      suites were all green.
+- [x] The per-suite duration table no longer reports a crashed suite as a cheap one (Victor): the
+      row keeps its honest "died this far in" seconds and says `CRASHED` beside them, and the lone
+      re-run prints its own elapsed time, which is where that file's real cost is legible.
+- [x] The retention comment ("A GREEN ONE KEEPS NOTHING") corrected (Victor): a crash cleared by
+      its re-run deliberately keeps the pool run's capture files on an otherwise green run, which
+      is the evidence #1622 lost.
 - [~] Shape 1 -- change the seam-probe idiom that faulted. Dropped from this branch: one
       sighting of a 5.1 engine fault, unreproduced, against 68 call sites. Filed as
       [#1729](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1729) with the
@@ -94,7 +125,19 @@ from the tree before anything was built.
 - [x] Shape 2's mechanism, measured rather than argued: sweeping the interpolated path's length
       over 130 values, 9 of them (a contiguous band, which is a wrap boundary sliding through the
       phrase) make the OLD assert fail. The assert's verdict was a function of a temp path's length.
+- [x] `shared-scripts.tests.ps1`: 636 asserts green once the mirrors were rebuilt.
+- [x] Ctrl+C pinned: `0xC000013A` is not a crash, while `0xC0000139` and `0xC000013B` on either
+      side of it still are -- one status is excluded, not a range.
 - [x] Lint gate + all suites via `open-pr.ps1`.
+
+#### What the review round changed, since it is most of this branch
+
+Five reviewers ran in parallel on the diff, and three of them found things that mattered. **The
+blocker was invisible to every local suite**: `native-capture-lib.ps1` is mirrored into two plugins,
+so a green run here still shipped nothing to a consumer. Sebastian and Marlowe both attacked the
+discriminator and both landed -- the sign bit was forgeable by a suite writing `exit -1`, and the
+narrower NTSTATUS window that replaced it still swallowed Ctrl+C. Marlowe also caught the branch
+overclaiming its own diagnosis, which is why the section above now says what was not established.
 
 ### DEPLOY: fix/1723-gate-crash-vs-verdict
 
@@ -126,7 +169,8 @@ assert had been passing on a `FullyQualifiedErrorId` echo further down the same 
 coincidence of arithmetic between the width and the length of a temp path -- and that is measured
 rather than argued: sweeping the interpolated path's length over 130 values, 9 of them fail the old
 assert, in one contiguous band, which is what a wrap boundary sliding through a 27-character phrase
-looks like. Fifteen asserts in that
+looks like. What was NOT identified is which length the one failing run hit, so this is a latent
+defect removed rather than a mystery closed. Fifteen asserts in that
 suite now go through the `Test-Says` helper seven other suites have carried since #1512, and the
 ordering assert requires both phrases to be found rather than accepting `-1` for either.
 

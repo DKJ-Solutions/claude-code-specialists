@@ -717,6 +717,13 @@ exit -1
     Assert-True (-not (Test-GateSuiteCrashed -ExitCode -1)) '0xFFFFFFFF is NOT a crash: severity ERROR, but not NT'"'"'s own facility'
     Assert-True (-not (Test-GateSuiteCrashed -ExitCode -2)) 'nor is any other small negative a script would choose'
     Assert-True (-not (Test-GateSuiteCrashed -ExitCode -2147483648)) 'nor 0x80000000, whose severity is WARNING'
+    # CTRL+C IS INSIDE THE WINDOW AND IS NOT A CRASH (Marlowe's red-team of #1723). Every suite child
+    # shares one console via -NoNewWindow, so interrupting a stuck 30-lane run delivers CTRL_C_EVENT to
+    # all of them at once -- and without this exclusion the gate would answer a deliberate stop by
+    # re-running everything it had just been told to abandon.
+    Assert-True (-not (Test-GateSuiteCrashed -ExitCode 0xC000013A)) 'nor STATUS_CONTROL_C_EXIT -- Ctrl+C is a stop, not a fault'
+    Assert-True (Test-GateSuiteCrashed -ExitCode 0xC0000139)  'while its neighbours in the window still are (0xC0000139)'
+    Assert-True (Test-GateSuiteCrashed -ExitCode 0xC000013B)  'on both sides of it (0xC000013B) -- one status is excluded, not a range'
     Assert-True (-not (Test-GateSuiteCrashed -ExitCode 1)) "a suite's own 'exit 1' is a verdict"
     Assert-True (-not (Test-GateSuiteCrashed -ExitCode 0)) 'and so is exit 0'
     Assert-True (-not (Test-GateSuiteCrashed -ExitCode $null)) 'an empty exit code is not claimed as a crash'

@@ -87,8 +87,7 @@ function Test-Says {
        came back as '... exhausted, -InitToken fo' + newline + 'r a fresh path ...', so the assert
        for that phrase was reading a text the phrase is not in. It passed anyway, on the
        FullyQualifiedErrorId echo further down the same rendering, which is a coincidence of
-       arithmetic between the width and the length of a temp path -- and that is what went red under
-       the 30-lane gate and green standalone. `Write-Host` is NOT affected: a 295-character line came
+       arithmetic between the width and the length of a temp path. `Write-Host` is NOT affected: a 295-character line came
        back whole, which is why the Write-Host-fed asserts here are left as Assert-Match.
 
        THE COINCIDENCE IS MEASURED, NOT ARGUED, because "it depends on the width" is the kind of
@@ -98,6 +97,15 @@ function Test-Says {
        9 of them fail the old assert, in ONE CONTIGUOUS BAND. A band is the signature; it is a wrap
        boundary sliding through a 27-character phrase, and it is why a green run on this machine was
        never evidence about a run on any other.
+
+       WHAT IS NOT CLAIMED: that this is what tripped the one run in issue #1723. WHICH length that
+       run hit was never identified -- $PID digit counts 3 to 7 all pass here at this width -- so
+       something still unnamed differed (another machine's $env:TEMP, another width, a ship-pr run
+       with no console of its own). The repair does not rest on it: an assert whose verdict moves
+       with a temp path's length is broken whether or not that run is the one that proved it. Said
+       out loud because the tempting sentence -- "so THAT is what went red" -- is one step further
+       than the measurement goes, and a repair carrying a citation it has not earned is worse than
+       one carrying none.
 
        Strips ALL whitespace from both sides. Normalizing '\s+' to a single space repairs a wrap
        BETWEEN words and does nothing for a wrap INSIDE one. Which asserts straddle a break is

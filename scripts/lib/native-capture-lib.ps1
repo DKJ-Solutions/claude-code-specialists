@@ -178,6 +178,18 @@ function Test-GateSuiteCrashed {
         -- not to withstand the repo's own content. Measured at the time of writing: no suite or lib
         under scripts/ exits negative at all.
 
+        ONE STATUS INSIDE THE WINDOW IS EXCLUDED BY NAME: 0xC000013A, STATUS_CONTROL_C_EXIT, which is
+        what Windows leaves behind for a console process stopped by Ctrl+C (Marlowe's red-team of this
+        change). It is not a crash and it is not rare -- it is the single most likely thing an operator
+        does to a stuck 30-lane run, and this function's own docstring already records that every suite
+        child shares ONE console via -NoNewWindow, so a CTRL_C_EVENT reaches all of them at once.
+        Without the exclusion, interrupting the gate would print a magenta "the process died" for every
+        suite still running and then RE-RUN each one -- the exact opposite of what the operator asked
+        for, and a way to make a deliberate stop take longer than not stopping.
+        IT IS EXCLUDED RATHER THAN THE WINDOW NARROWED, because the window is a severity-and-facility
+        range and this is one status inside it that happens not to describe a fault. A narrower range
+        would have to be justified status by status; an exclusion says what it is.
+
         AND IT IS ASKED OF SUITES ONLY. Get-TestCommands entries are judged in their own block further
         down, which propagates a native tool's exit code directly -- a tool returning a negative value
         is not given a re-run, because there the code is the command's answer rather than a process's
@@ -192,6 +204,8 @@ function Test-GateSuiteCrashed {
     # A [uint32] cast is NOT the way to do this -- PowerShell's is checked and throws on a negative.
     # The facility bits matter as much as the severity: 0xFFFFFFFF (`exit -1`) also carries severity
     # ERROR, and is excluded only because 0xCxxxxxxx pins the facility to NT's own.
+    # STATUS_CONTROL_C_EXIT: inside the window, but a stop rather than a fault. See the docstring.
+    if ($code -eq 0xC000013A) { return $false }
     return ($code -ge 0xC0000000 -and $code -le 0xCFFFFFFF)
 }
 
@@ -1459,6 +1473,14 @@ function Invoke-TestSuiteGate {
                         StartOffset = $d.StartOffset
                         Duration    = ($sw.Elapsed.TotalSeconds - $d.StartOffset)
                         Failed      = ($code -ne 0)
+                        # CRASHED IS TRACKED SEPARATELY FROM FAILED, so the table below cannot report a
+                        # crashed suite as a cheap one -- issue #1723. A process that died 2s into what
+                        # is a 60s suite records 2s here, which is TRUE of this lane and a lie about the
+                        # file: the whole purpose of this table (#714, #1358) is finding the file that
+                        # sets the makespan, so an unmarked 2s row is the one wrong answer it must not
+                        # give. The row keeps the honest 2s and says CRASHED beside it; the lone re-run
+                        # prints its own seconds, which is where that file's real cost is legible.
+                        Crashed     = $false
                     }) | Out-Null
                     if ($code -eq 0) {
                         Write-Host "== $($d.Name) ==" -ForegroundColor Cyan
@@ -1469,9 +1491,10 @@ function Invoke-TestSuiteGate {
                         # 'FAILED (exit -1073741819)' sent a reader hunting for an assert that never ran.
                         Write-Host "== $($d.Name) == CRASHED (exit $(Format-GateExitCode -ExitCode $code)) -- the process died; no verdict" -ForegroundColor Magenta
                         $crashedNames.Add($d.Name) | Out-Null
+                        $crashedTiming = ($suiteTimings | Where-Object { $_.Name -eq $d.Name } | Select-Object -Last 1)
+                        if ($null -ne $crashedTiming) { $crashedTiming.Crashed = $true }
                         $crashedSuites.Add([pscustomobject]@{
-                            Name = $d.Name; Path = $d.Path; ExitCode = $code
-                            Timing = ($suiteTimings | Where-Object { $_.Name -eq $d.Name } | Select-Object -Last 1)
+                            Name = $d.Name; Path = $d.Path; ExitCode = $code; Timing = $crashedTiming
                         }) | Out-Null
                         $failedCaptureFiles.Add($d.OutFile) | Out-Null
                         $failedCaptureFiles.Add($d.ErrFile) | Out-Null
@@ -1509,6 +1532,17 @@ function Invoke-TestSuiteGate {
             # the same draw again. Sequential also bounds the cost -- one suite, once, and only when
             # a crash actually happened, which is why an ordinary run never reaches this block.
             #
+            # AND THAT IS ALSO THIS BLOCK'S OWN WEAKNESS, WHICH IS WORTH STATING WHERE IT LIVES
+            # (Marlowe's red-team of #1723). Removing the contention is what makes the re-run useful
+            # AND what makes it near-certain to pass, for exactly the load-triggered class of crash
+            # this was built for -- so a crash that recurs every run still leaves a green gate, and
+            # the only trace is a magenta line nobody tallies across runs. Two things are done about
+            # that rather than nothing: the crash is named on the GREEN verdict, which is the line a
+            # session copies, and the pool run's capture files are KEPT even on that green run, so
+            # the evidence #1622 lost is on disk at a path the verdict prints. What is deliberately
+            # not built is a tally: a counter across runs needs somewhere to persist, and this
+            # function has no state between invocations.
+            #
             # A SECOND CRASH IS A FAILURE, and it is reported as a crash rather than dressed up as
             # one: the suite goes into $failedNames so the gate is red and nothing merges, and the
             # word CRASHED stays on the line so the reader is not sent looking for an assert.
@@ -1524,19 +1558,22 @@ function Invoke-TestSuiteGate {
                         -WorkingDirectory $launchDir -NoNewWindow -PassThru `
                         -RedirectStandardOutput $retryOut -RedirectStandardError $retryErr
                     $null = $rp.Handle      # same reason as the pool's launch: without it .ExitCode is empty
+                    $retrySw = [System.Diagnostics.Stopwatch]::StartNew()
                     $rp.WaitForExit()
+                    $retrySw.Stop()
                     $rc = $rp.ExitCode
+                    $retrySecs = Format-GateSeconds $retrySw.Elapsed.TotalSeconds -Decimals 1
                     $crashedAgain = Test-GateSuiteCrashed -ExitCode $rc
                     if ($rc -eq 0) {
                         # GREEN, AND THE CRASH STILL GETS SAID. The pool's own timing row is corrected
                         # so the per-suite table does not carry a FAILED flag for a suite that passed.
-                        Write-Host "== $($c.Name) == re-ran ALONE and PASSED -- the pool's exit $(Format-GateExitCode -ExitCode $c.ExitCode) was a crash, not a verdict" -ForegroundColor Yellow
+                        Write-Host "== $($c.Name) == re-ran ALONE and PASSED in ${retrySecs}s -- the pool's exit $(Format-GateExitCode -ExitCode $c.ExitCode) was a crash, not a verdict" -ForegroundColor Yellow
                         if ($null -ne $c.Timing) { $c.Timing.Failed = $false }
                     } elseif ($crashedAgain) {
-                        Write-Host "== $($c.Name) == CRASHED AGAIN alone (exit $(Format-GateExitCode -ExitCode $rc)) -- this is the suite or the engine, not the pool" -ForegroundColor Red
+                        Write-Host "== $($c.Name) == CRASHED AGAIN alone after ${retrySecs}s (exit $(Format-GateExitCode -ExitCode $rc)) -- this is the suite or the engine, not the pool" -ForegroundColor Red
                         $failedNames.Add($c.Name) | Out-Null
                     } else {
-                        Write-Host "== $($c.Name) == re-ran alone and FAILED (exit $rc) -- the crash hid a real verdict" -ForegroundColor Red
+                        Write-Host "== $($c.Name) == re-ran alone and FAILED in ${retrySecs}s (exit $rc) -- the crash hid a real verdict" -ForegroundColor Red
                         $failedNames.Add($c.Name) | Out-Null
                     }
                     # The re-run's own output, whichever way it went: on a pass it is the evidence that
@@ -1555,7 +1592,13 @@ function Invoke-TestSuiteGate {
                 Write-Host ''
             }
         } finally {
-            # A RED RUN KEEPS THE FAILING SUITES' OUTPUT; A GREEN ONE KEEPS NOTHING -- issue #1636. This
+            # A RED RUN KEEPS THE FAILING SUITES' OUTPUT; A GREEN ONE KEEPS NOTHING -- issue #1636 --
+            # WITH ONE EXCEPTION SINCE #1723: a suite that CRASHED in the pool and then passed on its
+            # lone re-run leaves the pool run's two capture files behind on an otherwise green run. That
+            # is the point rather than a leak. #1622's entire cost was a sighting whose evidence had been
+            # thrown away, and a crash cleared by a re-run is exactly that sighting -- the verdict says
+            # green, so nothing else would ever keep it. The green verdict names the directory for the
+            # same reason the red one does. This
             # block used to delete the directory either way, which made the console the ONLY copy of a
             # failing suite's output and gave no flag to keep it. The gate does print each block, and that
             # is what #1622 correctly observed -- but a pipe through 'tail', a scrollback limit, a truncated
@@ -1652,7 +1695,12 @@ function Invoke-TestSuiteGate {
             $finish = $t.StartOffset + $t.Duration
             # Within a tick of the pool's end, so a rounding difference does not hide the marker.
             $marker = if ([Math]::Abs($finish - $lastFinish) -lt 0.05) { '  <-- set the makespan' } else { '' }
-            $flag   = if ($t.Failed) { ' FAILED' } else { '' }
+            # CRASHED WINS OVER FAILED in the flag, because the two say different things about the
+            # number on the same row: FAILED means the suite ran that long and said no, CRASHED means
+            # it died that far in and never answered -- so the duration is a fragment of the file's
+            # real cost rather than a measurement of it (issue #1723).
+            $flag   = if ($t.Crashed) { ' CRASHED -- died this far in; real cost is in the lone re-run above' }
+                      elseif ($t.Failed) { ' FAILED' } else { '' }
             Write-Host ("  {0,8}s  {1,-$nameWidth}  started +{2}s{3}{4}" -f `
                 (Format-GateSeconds $t.Duration -Decimals 1), $t.Name,
                 (Format-GateSeconds $t.StartOffset -Decimals 1), $flag, $marker) `
