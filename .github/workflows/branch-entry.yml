@@ -29,8 +29,24 @@ permissions:
   contents: read
   pull-requests: read
 
+# 'edited' IS LOAD-BEARING AND IS NOT THE DEFAULT (issue #1710). Without a types: list, pull_request
+# fires on opened/synchronize/reopened -- a push, in other words. But half of what this check judges is
+# the PR BODY, and the body changes with no push behind it: `open-pr.ps1 -RefreshBody` is the documented
+# remedy for a DEPLOY section that has drifted from what the PR published, and it edits the body through
+# the API and reports 'Everything up-to-date'. So the one action that repairs the drift this check
+# reports could not make it look again.
+#
+# MEASURED ON PR #1707: the check correctly reported drift at 11:57, -RefreshBody republished the
+# section at ~12:05, ship-pr's own arm of the same lock read the refreshed body and passed, and the
+# merge landed at 12:08 with this check still red -- describing a state that had stopped being true
+# eleven minutes earlier, on the one PR whose author had taken the honest route. Two arms of one lock
+# reaching opposite verdicts, because only one of them could be asked twice.
+#
+# 'edited' also fires on a title change and a base change, so a person editing the description costs
+# one ~20s job. That is the whole price, and it buys a trigger that matches the check's subject.
 on:
   pull_request:
+    types: [opened, synchronize, reopened, edited]
     branches: [main]
 
 jobs:

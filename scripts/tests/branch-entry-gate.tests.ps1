@@ -418,6 +418,44 @@ finally {
     }
 }
 
+
+# --- the workflow's own trigger, because half this check's subject is the PR BODY (issue #1710) ------
+#
+# THE SCRIPT IS ONLY HALF THE GATE. Everything above exercises check-branch-entry.ps1; this asserts the
+# one thing about it that lives in .github/ -- WHEN CI asks it. Without a types: list, pull_request
+# fires on a push (opened/synchronize/reopened), and the DEPLOY half of this check compares the PR body
+# against the document. A body edit has no push behind it, so `open-pr.ps1 -RefreshBody` -- the
+# documented remedy for exactly the drift this check reports -- could not make it look again.
+#
+# Measured on PR #1707: reported drift at 11:57, -RefreshBody republished at ~12:05, ship-pr's arm of
+# the same lock passed on the refreshed body, and the merge landed at 12:08 with this check still red.
+# Two arms of one lock, opposite verdicts, because only one could be asked twice.
+Write-Host ''
+Write-Host 'The workflow trigger matches the check subject (#1710)' -ForegroundColor Cyan
+
+$workflowPath = Join-Path $RepoRoot '.github\workflows\branch-entry.yml'
+Assert-True (Test-Path -LiteralPath $workflowPath) 'the branch-entry workflow is where this suite expects it'
+$workflow = [System.IO.File]::ReadAllText($workflowPath)
+
+Assert-True ($workflow -match "(?m)^\s*types:\s*\[[^\]]*\bedited\b[^\]]*\]") `
+    "the trigger includes 'edited', so a PR body republished by -RefreshBody is judged again"
+foreach ($t in @('opened', 'synchronize', 'reopened')) {
+    Assert-True ($workflow -match "(?m)^\s*types:\s*\[[^\]]*\b$t\b[^\]]*\]") `
+        "and it still includes '$t' -- naming types: at all replaces the default list rather than adding to it"
+}
+Assert-True ($workflow -match '(?m)^\s*branches:\s*\[main\]') `
+    'the base-branch filter survives beside the types list'
+Assert-True ($workflow -match '#1710') `
+    'and the reason is written beside the trigger, not only here'
+
+# AND THE INDENTATION, WHICH IS THE ONE WAY THIS CHANGE FAILS SILENTLY. The asserts above would all
+# pass on a `types:` sitting at the wrong depth -- under `on:` instead of under `pull_request:`, say --
+# and GitHub would then read the workflow as having no types list at all and fire on the default
+# events. There is no error for that: the trigger simply goes back to what it was, and the check goes
+# back to being unaskable. So the nesting is pinned as GitHub reads it: on/pull_request at 0/2, and
+# types/branches both at 4.
+Assert-True ($workflow -match "(?m)^on:\r?\n  pull_request:\r?\n    types: \[opened, synchronize, reopened, edited\]\r?\n    branches: \[main\]") `
+    'the trigger block is nested on/pull_request/types/branches at columns 0/2/4/4'
 Write-Host ''
 if ($script:fail -gt 0) {
     Write-Host "FAILED: $($script:fail) of $($script:pass + $script:fail) asserts." -ForegroundColor Red
