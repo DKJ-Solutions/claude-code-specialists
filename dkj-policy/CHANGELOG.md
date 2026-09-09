@@ -43,7 +43,50 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**33 / 76 minor entries** <!-- pending-tally -->
+**34 / 77 minor entries** <!-- pending-tally -->
+
+### DEPLOY: feat/1715-ci-certificate-skips-third-gate · 20260909-160035
+
+The local test gate stops re-proving what CI has already proved. `open-pr` now asks whether the
+trunk's required checks are green on the exact commit it would ship, and where they are, the suites
+do not run again -- naming the check and the commit that carried the skip. Measured on PR #1708, that
+was a third run of 85 suites at ~30 minutes, started while `lint-en-tests pass` was already on the
+screen.
+
+The wall-clock is the cheaper half. A ~40-minute cycle loses races a shorter one wins: on that same
+PR the trunk moved during the third run, the stale-CI gate refused correctly, the re-run went
+`CONFLICTING`, and a two-file docs change took over two hours. Shortening the window is what stops
+those gates from firing, and it needed no gate to be relaxed -- the certificate skipped for is the
+one the merge is blocked on anyway.
+
+The skip is granted on **one named check**, declared by the repo in `Get-CiTestCheckName`, and never
+on "whatever the trunk happens to require" -- which is what keeps it from standing a gate down on a
+CLA bot's green, or on a neighbour check that went green while the test check had not registered.
+Every ambiguity runs the gate: no declared name, no PR, a PR head that is not this HEAD, an
+unreadable answer, an empty required set, the named check missing from it, or that check not green.
+
+**Score:** 4
+
+#### What makes this deploy extra special
+
+The shorter cycle is opt-in, and it arrives switched off. A consumer gets today's behaviour until it
+names the check that proves its own suites -- one line in `scripts/repo-config.ps1`, offered by the
+adopt blueprint like every other seam -- so a plugin update cannot quietly stand down a gate in a
+repo nobody has looked at. The reason it is a declaration rather than an inference: which of a
+repo's checks actually runs its tests is a fact about that repo's CI that no script can read from the
+tree, and guessing it wrong is silent in the one direction that matters.
+
+**Score:** 4
+
+#### Pull Request
+
+The CI certificate satisfies the local test gate
+
+Plugins: dkj-policy
+
+[PR #1724](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1724)
+
+---
 
 ### DEPLOY: fix/1713-local-to-ci-ratio-backwards · 20260909-153554
 
