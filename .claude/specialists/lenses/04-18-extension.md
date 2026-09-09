@@ -134,6 +134,64 @@ consequences:
   failing assert to point at**, deliberately: "it passes here today" is a fact about one checkout, and
   leaving the old capture in the file others copy from is what makes the next instance.
 
+### And the other half is the READER — two conditions, measured per suite (September 9, 2026)
+
+The section above is about the **capture**. This one is about the **assert**, and the two fail
+independently: a sound capture still carries a phrase the child's own formatter hard-wrapped, and a
+whitespace-blind reader still cannot rejoin a sentence the parent interrupted.
+
+**A captured phrase can only be broken when BOTH hold.** Neither alone is enough, which is why the
+question is answered per assert and not per suite:
+
+1. **the capture carries the child's error stream** — `2>&1`, a `StandardError.ReadToEnd()`
+   concatenated onto stdout, or `Invoke-NativeCapture` without `-DiscardStderr`; and
+2. **the script under test emits that particular phrase through the formatter** — `throw`,
+   `Write-Error` or `Write-Warning`. `Write-Host` and `Write-Output` do not go through it at all, and a
+   long line written either way comes back whole.
+
+**Condition 2 is about the assert, not the script**, and that is the trap
+([#1736](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1736)). A script carrying
+twenty `Write-Error` calls proves nothing about a suite whose asserts all read its `Write-Host` report.
+Of the eight suites #1736 nominated on a script-level count, **four turned out to read no
+formatter-emitted phrase at all** — `gate-lib` (which starts no child), `fanout-lib`,
+`find-specialist-mentions` and `measure-always-on` — and a fifth, `verify-pushed-merges`, already
+carried the reader.
+
+**Routing a `Write-Host` assert through the whitespace-blind reader is a LOSS, not a neutral tidy-up.**
+It asserts strictly less than `-match` does, and it destroys any assert that cares about line structure
+— `round-tally`'s `(?m)^\| v10 \| A2 extra \|` is a real example that must keep `-match`.
+
+**The three flatteners in this tree are not equally safe, and the ranking was measured** rather than
+reasoned about — 120 wrap positions × 4 phrases, padding a `Write-Error` until its break swept every
+column of a 120-wide render:
+
+| what the suite does with the captured records | checks failed, of 480 |
+|---|---:|
+| collapse the break to a space (`-replace "\r?\n", ' '`) | 68 |
+| leave it alone, or join the records with a newline | 68 / 51 |
+| join with nothing between them (`''`) | **0** |
+
+The formatter breaks **inside a word**, so collapsing to a space is the one variant that cannot repair
+the break it was written for — `dirty working tre e`. Joining with `''` reconstructs it exactly.
+
+**But that immunity is incidental, and this is the part worth carrying forward.** Joining with `''`
+survives a break that landed *on* a space only because PowerShell keeps that space at the end of the
+line it wrapped. That is a property of the renderer, which nothing in this repo controls or tests.
+`Test-Says` — strip **all** whitespace from both sides, compare with `IndexOf` — needs neither
+property, and is immune by construction. So the conversion is a **hardening** wherever the flattener
+already joins with `''`, and a **repair** only where it does not.
+
+**One suite in the queue was genuinely exposed**: `round-tally.tests.ps1`, which joins its records with
+a newline and measured 51 of 480. It had already met this in
+[#1242](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1242) and answered it by
+rejoining the lines at **one** call site by hand, leaving two `Write-Warning` asserts beside it
+untouched — and that hand-rolled form only worked because the phrase it guarded was a single token.
+A local fix to a class defect is how the class survives.
+
+**Say which of the two you did.** A green suite before and after is the expected result of a hardening,
+so a commit that claims a fix and shows no failing assert is unreadable a month later. State the
+measurement, and state that nothing was letting a phrase through if that is what you found.
+
 In short: the **how** (automated tests, regression guarding) is portable; the **what** (the
 PowerShell scripts as the test surface, and building out a suite once the lint gate warrants it)
 belongs to this repo.
