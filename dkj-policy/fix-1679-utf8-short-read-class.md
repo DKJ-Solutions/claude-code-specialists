@@ -74,6 +74,30 @@ produce. The two are behaviourally identical, so a guard there would have been a
 citation. What a short read costs at that call is one spurious stale-CI refusal, never a merge that
 should have been refused. The measurement is recorded in a comment beside the call instead.
 
+#### What the reviews changed, and one correction to the issue's own triage
+
+Victor #19 found a **seventh site the issue put in the wrong group**. `claim-issue.ps1:288` is filed
+under group C on the ground that *"the read-back fails, which is the safe direction -- it says the
+claim did not land"*. It does not fail. `$readOk` asked the exit code alone, so a short read made it
+**true** while `$landed` was false -- which lands on the REFUSED branch and prints *"gh accepted the
+claim but '<account>' is not on #N ... Treat the issue as UNCLAIMED"*, then exits 1. A confident false
+stop, on the step that opens every issue-driven assignment, and the branch's own comment states the
+premise that a short read breaks: *"gh answered, and the account is not in the list it returned."*
+Repaired here, because the correct branch -- could-not-verify, which deliberately does not block --
+was already two blocks below.
+
+**Two of Victor's other citations did not survive the check, and that is worth writing down.**
+`open-pr.ps1:543` (`$prLookup`) is genuinely in the class, but the issue's group C reasoning holds: an
+empty read takes the create path and `gh pr create` then refuses because a PR for the head already
+exists, so it degrades **loudly**. And `$mergedLookup` at `:572` is **not in the class at all** -- it
+carries no `-Utf8`, so it runs on the `&` arm, which has no capture file and therefore no short read
+to have. Left alone, both of them.
+
+Sebastian #23 found no blocking issue and one thing worth acting on: widening *"unreadable"* to cover
+a short read trades a **false refusal** for a check that did not run, and the second is only
+defensible while it is **visible**. The DEPLOY lock's skip was a dim grey line; it is a warning now,
+and the comment says why refusing is not the alternative and why a longer budget would not help.
+
 ### CREATE
 
 - [x] Measure whether a `FileShare.Read` probe can distinguish a lingering writer from a settled
@@ -92,6 +116,10 @@ should have been refused. The measurement is recorded in a comment beside the ca
 - [x] Regenerate the plugin mirrors (`build-shared-scripts.ps1` -- 8 updated across two rounds)
 - [x] `remote-ahead-lib.ps1`'s #1676 comment: the old function name is gone, and it records that the
       fact is now available as a field while keeping its own inference, which is provably sound there
+- [x] `claim-issue.ps1`: `$readOk` folds in `ShortRead`, so a truncated read-back reaches the
+      could-not-verify branch instead of asserting the claim was refused; the reason is named on both
+      that branch and the pre-write read's parse failure
+- [x] `ship-pr.ps1`: the DEPLOY lock's skipped check is a warning rather than a dim grey line
 
 ### TEST
 
@@ -99,30 +127,36 @@ should have been refused. The measurement is recorded in a comment beside the ca
       budget actually being spent, an **empty and settled** capture staying distinguishable from a
       short one, a missing file rethrown at once rather than waited on, and `ShortRead` present on
       both arms
+- [x] `claim-issue.tests.ps1`: the `ShortRead` half of `$readOk` pinned exactly, the reason named
+      before the exit-code arm, and #1628's own assert loosened from `0)` to `0` -- its subject is
+      that `$readOk` is its own value, never that the expression has exactly two terms
 - [x] The lint gate (`check-plugin-integrity.ps1`) -- 0 errors
-- [ ] Code review (Victor #19) and security review (Sebastian #23) on the diff
-
+- [x] Code review (Victor #19) and security review (Sebastian #23) on the diff -- one real miss found
+      (`claim-issue.ps1`), two citations that did not survive the check, and one advisory acted on
 ### DEPLOY: fix/1679-utf8-short-read-class
 
 `Invoke-NativeCapture` now says when a capture was read while a writer still held it, so a caller can
 tell "the child said nothing" from "we read before the flush". Both are an empty `Output` at exit `0`,
-and until now nothing separated them: five callers in the shipping scripts resolved that toward a
-substantive answer -- "no PR", "no issue declared", "the body does not carry the section". The
-sharpest was the DEPLOY lock, which refused the merge over a section that had not changed, in a gate
-with no `-Force`; the quietest was the resolves verification, which reported itself as a clean pass
-having checked nothing. The read itself is unchanged -- `FileShare.ReadWrite` still returns whatever
-was flushed (#1252) -- it simply no longer does so in silence, and on a clean exit it now waits
-briefly for the handle to release rather than reporting a short read it could have avoided.
+and until now nothing separated them -- so six callers in the shipping scripts resolved the ambiguity
+toward a substantive answer: "no PR", "no issue declared", "the body does not carry the section",
+"the claim was refused". The sharpest refused the merge over a section that had not changed, in a
+gate with no `-Force`. The quietest reported the resolves verification as a clean pass having checked
+nothing. And the one that reaches furthest is the claim step, which told an operator to treat an
+issue as UNCLAIMED on a claim that had in fact landed -- the first move of every issue-driven
+assignment. The read itself is unchanged: `FileShare.ReadWrite` still returns whatever was flushed
+(#1252), it simply no longer does so in silence, and on a clean exit it now waits briefly for the
+handle to release rather than reporting a short read it could have avoided.
 
 **Score:** 3
 
 #### What makes this deploy extra special
 
 These are the scripts a consumer runs through the workflow plugin, so the wrong verdicts were theirs
-to meet: a merge refused by a gate that has no way past it, and an already-done check that quietly
-stopped warning. Nothing to do on adoption -- the field is additive and every existing caller keeps
-working -- but the refusals a consumer does hit now name the read that failed instead of accusing
-their document.
+to meet: a merge refused by a gate with no way past it, an already-done check that quietly stopped
+warning, and a claim step that refused a claim it had itself just written. Nothing to do on adoption
+-- the field is additive and every existing caller keeps working -- but the refusals a consumer does
+hit now name the read that failed instead of accusing their document, and the one skipped check that
+cannot be recovered says so in a warning rather than in a dim grey line.
 
 **Score:** 3
 

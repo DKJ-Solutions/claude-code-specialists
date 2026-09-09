@@ -2141,10 +2141,12 @@ if ($null -ne $shipCycleText) {
     # already settled -- an unreadable body is NOT a finding -- so this widens what counts as
     # unreadable rather than adding a verdict.
     $lockUnread = ''
+    $lockShortRead = $false
     if ($lockView.ExitCode -ne 0) {
         $lockUnread = "gh exited $($lockView.ExitCode)"
     } elseif ($lockView.ShortRead) {
         $lockUnread = 'gh exited 0 but its capture was still being written when it was read, so the body this run holds may be truncated'
+        $lockShortRead = $true
     }
     if (-not $lockUnread) {
         $lockBody = ''
@@ -2177,6 +2179,27 @@ CI has already passed, so a re-run picks up from here. There is no -Force for th
 "@
             exit 1
         }
+    } elseif ($lockShortRead) {
+        # LOUDER THAN THE NEIGHBOURING LINE, ON PURPOSE. Both reasons end in the same place -- the
+        # section was not compared -- but only this one is fixable by the person reading it, and a
+        # skipped check in a gate with no -Force does not belong in a dim grey line. Raised on
+        # Sebastian's review of this branch: widening "unreadable" to cover a short read trades a
+        # FALSE REFUSAL for a check that did not run, and the second is only defensible while it is
+        # visible.
+        #
+        # AND REFUSING IS DELIBERATELY NOT THE ALTERNATIVE. A short read means this run does not hold
+        # the body, so there is no evidence in either direction -- and the comment above this block
+        # already settles what such a gate does with that: it does not refuse on no evidence. The old
+        # behaviour was not the safe version of this, it was #1446 -- Test-DeployLock against an empty
+        # body reports drift, so every short read produced a refusal naming a section that had not
+        # changed. What is genuinely given up is the rare coincidence of real drift AND a lost read on
+        # one run; what is bought is that the common case stops accusing the document.
+        #
+        # A LONGER SETTLE BUDGET WOULD NOT CHANGE THIS, which is why the answer is a louder line rather
+        # than a bigger number. A capture that is merely being flushed settles on the first probe
+        # (measured: 2-8 ms over five gh calls), and one held by a grandchild that is still RUNNING
+        # never releases inside any budget worth waiting for -- so raising it buys stalls, not reads.
+        Write-Warning "DEPLOY lock: PR #$pr's body could not be read ($lockUnread) -- the section was NOT compared against what the PR published, and the merge is proceeding without that check. This is this run's own read rather than a fact about the PR, so a re-run normally settles it."
     } else {
         Write-Host "  DEPLOY lock: PR #$pr's body could not be read ($lockUnread) -- not checked (this is not a finding)." -ForegroundColor DarkGray
     }
