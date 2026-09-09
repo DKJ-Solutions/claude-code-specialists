@@ -43,7 +43,46 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**38 / 94 minor entries** <!-- pending-tally -->
+**39 / 95 minor entries** <!-- pending-tally -->
+
+### DEPLOY: feat/1669-subagent-working-copy-guard · 20260909-215328
+
+The working-copy boundary stops being prose only. A dispatched subagent that runs `git checkout`,
+`stash`, `reset`, `restore`, `switch`, `clean` or a ref mutation in the checkout it was dispatched into
+is now refused by a `PreToolUse` hook in `dkj-policy`, while the dispatching session's own identical
+command is untouched -- the payload's `agent_id` is what tells them apart, which is the mechanism
+[#1669](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1669) filed itself to have
+verified before anything was built on it.
+
+Measured against the 995 commands this repo's own dispatched subagents have actually run: 11 refusals,
+**all eleven real**, including both commands #1665 measured and the `git checkout` #1669's comment
+records -- and **no false positives**. The one that had to be answered was a test engineer in its own
+fixture repo, so a git command aimed at another repo is now out of scope, as is an isolated agent's own
+worktree.
+
+**Score:** 4
+
+#### What makes this deploy extra special
+
+A consumer's dispatched specialists lose the ability to move that consumer's working copy, which is a
+behaviour change they notice the first time one tries -- and it closes a hazard that discards
+uncommitted work with no error, no notice and a clean `git status` afterwards. It also costs them
+~437 ms on every `Bash` and `PowerShell` call, of which ~397 ms is the `powershell` launch any command
+hook pays; that is the price of the feature and is stated rather than buried. Nothing to migrate: the
+rule was already in every agent def that holds `Bash`, and this makes it enforceable instead of
+advisory.
+
+**Score:** 4
+
+#### Pull Request
+
+Block the working-copy commands a dispatched subagent must not run
+
+Plugins: dkj-policy, dkj-subagents-alpha, dkj-subagents-ecomm
+
+[PR #1733](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1733)
+
+---
 
 ### DEPLOY: feat/session-permission-allowlist · 20260909-213918
 
