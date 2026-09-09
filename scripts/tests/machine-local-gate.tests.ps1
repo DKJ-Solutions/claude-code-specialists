@@ -220,12 +220,14 @@ Assert-True ($cfgText -match 'for that case and no other') 'and scopes the setti
 # --- 7. open-pr.ps1 wires it in, as an advisory note ----------------------------------------------
 Write-Host "`n== 7. open-pr.ps1 reaches the gate and only warns ==" -ForegroundColor Cyan
 $openPr = [System.IO.File]::ReadAllText((Join-Path $RepoRoot 'scripts\release\open-pr.ps1'))
-Assert-True ($openPr -match 'Get-Command -Name Get-MachineLocalPaths') 'open-pr probes the optional seam'
+# The probe's idiom changed with #1729 (inline Get-Command -> Test-FunctionDefined); the subject of
+# this assert is that the optional seam is PROBED before it is called, not which call does the probing.
+Assert-True ($openPr -match 'Test-FunctionDefined ''Get-MachineLocalPaths''') 'open-pr probes the optional seam'
 Assert-True ($openPr -match 'Get-BranchMachineLocalFindings -RepoRoot \$repoRoot -Trunk \(Get-BranchTrunkName\)') 'it asks the shared check with the resolved trunk'
 Assert-Equal 1 ([regex]::Matches($openPr, '\$mlFinding = Get-BranchMachineLocalFindings').Count) 'called exactly once'
 Assert-True ($openPr -match 'machine-local path gate: this branch''s commits touch') 'it names the finding'
 # advisory: Write-Warning, and no exit in the block
-$mlBlock = [regex]::Match($openPr, "(?s)if \(Get-Command -Name Get-MachineLocalPaths.*?\n\}\n\n# Scaffold gate").Value
+$mlBlock = [regex]::Match($openPr, "(?s)if \(Test-FunctionDefined 'Get-MachineLocalPaths'.*?\n\}\n\n# Scaffold gate").Value
 Assert-True ([bool]$mlBlock) 'the gate block is findable'
 Assert-True ($mlBlock -match 'Write-Warning \$machineLocalNote') 'the block warns'
 Assert-Equal 0 ([regex]::Matches($mlBlock, 'exit 1').Count) 'the block never refuses -- no exit'

@@ -551,7 +551,7 @@ $repoConfig = Join-Path $root 'scripts\repo-config.ps1'
 if (Test-Path -LiteralPath $repoConfig -PathType Leaf) { . $repoConfig }
 
 if (-not $TargetRepo) {
-    if (Get-Command Get-BusinessMarketplaceRepo -ErrorAction SilentlyContinue) {
+    if (Test-FunctionDefined 'Get-BusinessMarketplaceRepo') {
         $TargetRepo = Get-BusinessMarketplaceRepo
     }
     if (-not $TargetRepo) {
@@ -563,7 +563,7 @@ if (-not $TargetRepo) {
 # No -Plugins and no seam is NOT a refusal, unlike the target above: publishing every plugin is what
 # this script did before the seam existed, and a consumer that never heard of it must keep doing that.
 if (-not $Plugins) {
-    if (Get-Command Get-BusinessMarketplacePlugins -ErrorAction SilentlyContinue) {
+    if (Test-FunctionDefined 'Get-BusinessMarketplacePlugins') {
         $Plugins = @(Get-BusinessMarketplacePlugins)
     }
 }

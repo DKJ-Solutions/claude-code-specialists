@@ -116,6 +116,12 @@ $ErrorActionPreference = 'Stop'
 $guardLib = Join-Path $PSScriptRoot '..\lib\source-repo-guard-lib.ps1'
 if (Test-Path -LiteralPath $guardLib -PathType Leaf) { . $guardLib; Assert-OwnCopy -ScriptPath $PSCommandPath }
 
+# Test-FunctionDefined (issue #1729): the seam probes below read the function table directly rather
+# than through Get-Command, which parses the name as a wildcard pattern and pays a full PATH scan on
+# every miss -- and a miss is the normal case for an optional seam. $PSScriptRoot-relative, so it
+# resolves in the plugin mirror as well as here.
+. (Join-Path $PSScriptRoot '..\lib\command-probe-lib.ps1')
+
 $repoRoot = if ($RootOverride) { $RootOverride }
             elseif ($env:CLAUDE_PROJECT_DIR) { $env:CLAUDE_PROJECT_DIR }
             else { (git rev-parse --show-toplevel).Trim() }
@@ -146,16 +152,16 @@ $config = & {
         Write-Warning "scripts\repo-config.ps1 could not be loaded ($($_.Exception.Message)) -- using the built-in defaults."
         return $answers
     }
-    if (Get-Command Get-ReleaseNoteRoot        -ErrorAction SilentlyContinue) { $answers.NoteRoot    = Get-ReleaseNoteRoot }
-    if (Get-Command Get-ReleaseNotesGrouping   -ErrorAction SilentlyContinue) { $answers.Grouping    = Get-ReleaseNotesGrouping }
-    if (Get-Command Get-ReleaseHistoryPath     -ErrorAction SilentlyContinue) { $answers.HistoryPath = Get-ReleaseHistoryPath }
-    if (Get-Command Get-ReleasePageTitle       -ErrorAction SilentlyContinue) { $answers.Title       = Get-ReleasePageTitle }
-    if (Get-Command Get-ReleasePageWorkerName  -ErrorAction SilentlyContinue) { $answers.WorkerName  = Get-ReleasePageWorkerName }
-    if (Get-Command Get-ReleasePageTheme       -ErrorAction SilentlyContinue) { $answers.Theme       = Get-ReleasePageTheme }
-    if (Get-Command Get-ReleasePageMasthead    -ErrorAction SilentlyContinue) { $answers.Masthead    = Get-ReleasePageMasthead }
+    if (Test-FunctionDefined 'Get-ReleaseNoteRoot') { $answers.NoteRoot    = Get-ReleaseNoteRoot }
+    if (Test-FunctionDefined 'Get-ReleaseNotesGrouping') { $answers.Grouping    = Get-ReleaseNotesGrouping }
+    if (Test-FunctionDefined 'Get-ReleaseHistoryPath') { $answers.HistoryPath = Get-ReleaseHistoryPath }
+    if (Test-FunctionDefined 'Get-ReleasePageTitle') { $answers.Title       = Get-ReleasePageTitle }
+    if (Test-FunctionDefined 'Get-ReleasePageWorkerName') { $answers.WorkerName  = Get-ReleasePageWorkerName }
+    if (Test-FunctionDefined 'Get-ReleasePageTheme') { $answers.Theme       = Get-ReleasePageTheme }
+    if (Test-FunctionDefined 'Get-ReleasePageMasthead') { $answers.Masthead    = Get-ReleasePageMasthead }
     # The page title falls back to the repo's own name rather than to a generic label, so a page
     # built in a repo that never answered still says whose releases it carries.
-    if (-not $answers.Title -and (Get-Command Get-RepoName -ErrorAction SilentlyContinue)) {
+    if (-not $answers.Title -and (Test-FunctionDefined 'Get-RepoName')) {
         $answers.Title = ((Get-RepoName) -split '/')[-1]
     }
     return $answers

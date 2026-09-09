@@ -80,6 +80,12 @@ $ErrorActionPreference = 'Stop'
 $guardLib = Join-Path $PSScriptRoot '..\lib\source-repo-guard-lib.ps1'
 if (Test-Path -LiteralPath $guardLib -PathType Leaf) { . $guardLib; Assert-OwnCopy -ScriptPath $PSCommandPath }
 
+# Test-FunctionDefined (issue #1729): the seam probes below read the function table directly rather
+# than through Get-Command, which parses the name as a wildcard pattern and pays a full PATH scan on
+# every miss -- and a miss is the normal case for an optional seam. $PSScriptRoot-relative, so it
+# resolves in the plugin mirror as well as here.
+. (Join-Path $PSScriptRoot '..\lib\command-probe-lib.ps1')
+
 . (Join-Path $PSScriptRoot '..\lib\preview-theme.ps1')
 
 # THE SHOPIFY CLI WRAPPER (inbound #1183, September 1, 2026). All three Shopify calls below were bare,
@@ -133,13 +139,13 @@ $seam = & {
     if (Test-Path -LiteralPath $branchInfoPath -PathType Leaf) {
         try { . $branchInfoPath } catch { }
     }
-    if (Get-Command Get-ShopifyLiveThemeId -ErrorAction SilentlyContinue) { $answers.LiveThemeId = [string](Get-ShopifyLiveThemeId) }
-    if (Get-Command Get-ShopifyStoreDomain -ErrorAction SilentlyContinue) { $answers.StoreDomain = [string](Get-ShopifyStoreDomain) }
-    if (Get-Command Get-TrunkBranchName    -ErrorAction SilentlyContinue) { $answers.Trunk       = [string](Get-TrunkBranchName) }
-    if (Get-Command Get-BranchInfo         -ErrorAction SilentlyContinue) {
+    if (Test-FunctionDefined 'Get-ShopifyLiveThemeId') { $answers.LiveThemeId = [string](Get-ShopifyLiveThemeId) }
+    if (Test-FunctionDefined 'Get-ShopifyStoreDomain') { $answers.StoreDomain = [string](Get-ShopifyStoreDomain) }
+    if (Test-FunctionDefined 'Get-TrunkBranchName') { $answers.Trunk       = [string](Get-TrunkBranchName) }
+    if (Test-FunctionDefined 'Get-BranchInfo') {
         try { $answers.ThemeName = [string]((Get-BranchInfo -Branch $branchName).SafeName) } catch { }
     }
-    $answers.HasPreviewUrls = [bool](Get-Command Get-ShopifyPreviewUrls -ErrorAction SilentlyContinue)
+    $answers.HasPreviewUrls = [bool](Test-FunctionDefined 'Get-ShopifyPreviewUrls')
     return $answers
 } $repoRoot $branch
 

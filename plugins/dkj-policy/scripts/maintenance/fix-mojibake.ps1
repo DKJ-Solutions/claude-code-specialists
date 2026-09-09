@@ -86,6 +86,12 @@ $ErrorActionPreference = 'Stop'
 $guardLib = Join-Path $PSScriptRoot '..\lib\source-repo-guard-lib.ps1'
 if (Test-Path -LiteralPath $guardLib -PathType Leaf) { . $guardLib; Assert-OwnCopy -ScriptPath $PSCommandPath }
 
+# Test-FunctionDefined (issue #1729): the seam probes below read the function table directly rather
+# than through Get-Command, which parses the name as a wildcard pattern and pays a full PATH scan on
+# every miss -- and a miss is the normal case for an optional seam. $PSScriptRoot-relative, so it
+# resolves in the plugin mirror as well as here.
+. (Join-Path $PSScriptRoot '..\lib\command-probe-lib.ps1')
+
 $repoRoot = if ($env:CLAUDE_PROJECT_DIR) { $env:CLAUDE_PROJECT_DIR } else { (git rev-parse --show-toplevel).Trim() }
 
 if (-not $Path -or @($Path).Count -eq 0) {
@@ -107,7 +113,7 @@ if (-not $Path -or @($Path).Count -eq 0) {
                 Write-Warning "scripts\repo-config.ps1 could not be loaded ($($_.Exception.Message)) -- using the built-in default file set."
                 return $null
             }
-            if (Get-Command Get-MojibakePaths -ErrorAction SilentlyContinue) {
+            if (Test-FunctionDefined 'Get-MojibakePaths') {
                 return @(Get-MojibakePaths -RepoRoot $args[1])
             }
             return $null

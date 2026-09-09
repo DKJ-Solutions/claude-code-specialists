@@ -13,6 +13,11 @@
 
     Pure ASCII (repo convention for .ps1).
 #>
+
+# Test-FunctionDefined (issue #1729): the retirement asserts below ask the function table directly
+# rather than through Get-Command, whose miss path -- the case every one of those asserts is in --
+# scans the whole PATH for an executable of that name.
+. (Join-Path $PSScriptRoot '..\lib\command-probe-lib.ps1')
 $ErrorActionPreference = 'Stop'
 $RepoRoot   = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
 $PluginRoot = Join-Path $RepoRoot 'plugins\dkj-policy\dkj-policy-bwj'
@@ -143,8 +148,8 @@ Assert-Throws { Get-AsanaTaskState -Gid 'abc' -Pat 'x' } 'Get-AsanaTaskState thr
 # at all. This is asserted over the source text rather than over behaviour, because the guarantee is
 # the ABSENCE of a code path and no call can demonstrate an absence.
 $mirrorSrc = Get-Content -LiteralPath (Join-Path $PluginRoot 'templates\asana-mirror.ps1') -Raw
-Assert-True (-not (Get-Command -Name 'New-AsanaCompleteRequest' -ErrorAction SilentlyContinue)) 'no request builder for completing a task exists'
-Assert-True (-not (Get-Command -Name 'Set-AsanaTaskCompleted'   -ErrorAction SilentlyContinue)) 'no helper for completing a task exists'
+Assert-True (-not (Test-FunctionDefined 'New-AsanaCompleteRequest')) 'no request builder for completing a task exists'
+Assert-True (-not (Test-FunctionDefined 'Set-AsanaTaskCompleted')) 'no helper for completing a task exists'
 Assert-True ($mirrorSrc -notmatch "completed\s*=\s*\`$(true|false)") 'the script never builds a completed=true/false payload'
 Assert-True ($mirrorSrc -notmatch "(?m)^\s*[^#]*-Method\s+PUT")      'the script issues no PUT at all -- the only write it knows is a comment'
 

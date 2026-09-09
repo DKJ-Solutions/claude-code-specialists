@@ -77,6 +77,11 @@
     Pure ASCII (repo convention for .ps1).
 #>
 
+# THE FUNCTION-TABLE PROBE (issue #1729), for the Get-TestCommands seam below. Unconditional and
+# $PSScriptRoot-relative so it resolves in both plugin mirrors of this file as well as here; it is a
+# leaf with no dependencies of its own, so loading it first is safe.
+. (Join-Path $PSScriptRoot 'command-probe-lib.ps1')
+
 $script:NativeCaptureInvariant = [System.Globalization.CultureInfo]::InvariantCulture
 
 # THE NON-INTERACTIVE ENVIRONMENT every child is bracketed with (inbound #1179). See
@@ -1298,7 +1303,7 @@ function Invoke-TestSuiteGate {
     # repo-config function, so a repo that defines nothing is untouched and a missing repo-config cannot
     # crash the gate.
     $extraCommands = @()
-    if (Get-Command Get-TestCommands -ErrorAction SilentlyContinue) {
+    if (Test-FunctionDefined 'Get-TestCommands') {
         $extraCommands = @(Get-TestCommands | ForEach-Object { "$_" } | Where-Object { $_.Trim() })
     }
 

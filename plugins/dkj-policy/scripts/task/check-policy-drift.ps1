@@ -104,12 +104,18 @@ $ErrorActionPreference = 'Stop'
 $guardLib = Join-Path $PSScriptRoot '..\lib\source-repo-guard-lib.ps1'
 if (Test-Path -LiteralPath $guardLib -PathType Leaf) { . $guardLib; Assert-OwnCopy -ScriptPath $PSCommandPath }
 
+# Test-FunctionDefined (issue #1729): the seam probes below read the function table directly rather
+# than through Get-Command, which parses the name as a wildcard pattern and pays a full PATH scan on
+# every miss -- and a miss is the normal case for an optional seam. $PSScriptRoot-relative, so it
+# resolves in the plugin mirror as well as here.
+. (Join-Path $PSScriptRoot '..\lib\command-probe-lib.ps1')
+
 # THE ROOT COMES FROM ONE DEFINITION (#1422), the same call the two prose checks make. Dot-sourced
 # guarded, so a mirror built before that lib existed degrades to the old inline form rather than throwing.
 $checkRootLib = Join-Path $PSScriptRoot '..\lib\consumer-check-lib.ps1'
 if (Test-Path -LiteralPath $checkRootLib -PathType Leaf) { . $checkRootLib }
 
-$repoRoot = if (Get-Command Resolve-CheckRepoRoot -ErrorAction SilentlyContinue) {
+$repoRoot = if (Test-FunctionDefined 'Resolve-CheckRepoRoot') {
     Resolve-CheckRepoRoot -RootOverride $RootOverride
 } elseif ($RootOverride) { $RootOverride } elseif ($env:CLAUDE_PROJECT_DIR) { $env:CLAUDE_PROJECT_DIR } else { '' }
 
@@ -182,7 +188,7 @@ function Get-PortablePageDir {
 
     # 1. This repo's own marketplace, when it publishes one. Empty in every consumer, which is what
     #    Get-RepoPluginRoots returns there rather than throwing.
-    if (Get-Command Get-RepoPluginRoots -ErrorAction SilentlyContinue) {
+    if (Test-FunctionDefined 'Get-RepoPluginRoots') {
         try {
             $declared = Get-PluginRootByName -PluginRoots @(Get-RepoPluginRoots -RepoRoot $RepoRoot) -Name $Name
             if ($declared) { $candidates.Add([string]$declared.Root) | Out-Null }
@@ -361,7 +367,7 @@ foreach ($id in $unlocated) {
 # ---------------------------------------------------------------------------------------------------
 # RANKS 2 AND 3 -- this repo's own prose
 # ---------------------------------------------------------------------------------------------------
-$documents = if (Get-Command Get-CheckProseCorpus -ErrorAction SilentlyContinue) {
+$documents = if (Test-FunctionDefined 'Get-CheckProseCorpus') {
     @(Get-CheckProseCorpus -RepoRoot $repoRoot -RootDocument $RootDocument)
 } else { @() }
 
