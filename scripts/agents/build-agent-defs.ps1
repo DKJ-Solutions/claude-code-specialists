@@ -1,10 +1,10 @@
 <#
 .SYNOPSIS
     Builds the agent defs: fills every shared-block region (<!-- BEGIN/END shared:NAME -->) with
-    the canonical source from plugins/dkj-teams/agent-shared/<name>.md.
+    the canonical source from plugins/dkj-subagents/subagent-shared/<name>.md.
 .DESCRIPTION
     Verbatim-shared bullets under **Boundaries** (e.g. the inbound rule, 19/19) are maintained in
-    ONE place (agent-shared/) and filled in here across all agent defs. If you change a shared
+    ONE place (subagent-shared/) and filled in here across all agent defs. If you change a shared
     block, run this script: every agent def carrying that block gets updated. The content stays
     literally in the agent def (always-loaded, self-contained); this script keeps it in sync.
 
@@ -29,12 +29,12 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $RepoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
-. (Join-Path $PSScriptRoot '..\lib\agent-shared-lib.ps1')
+. (Join-Path $PSScriptRoot '..\lib\subagent-shared-lib.ps1')
 $SharedDir = Get-AgentSharedDir -RepoRoot $RepoRoot
 $Utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 
 if (-not (Test-Path -LiteralPath $SharedDir -PathType Container)) {
-    Write-Host "Source folder agent-shared/ is missing ($SharedDir) -- stopping." -ForegroundColor Red
+    Write-Host "Source folder subagent-shared/ is missing ($SharedDir) -- stopping." -ForegroundColor Red
     exit 1
 }
 

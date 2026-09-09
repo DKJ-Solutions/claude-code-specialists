@@ -210,7 +210,7 @@ function New-Clone {
     param(
         [Parameter(Mandatory = $true)][string]$Dir,
         [string]$Version = '4.32.0',
-        [string[]]$PluginNames = @('dkj-team-alpha'),
+        [string[]]$PluginNames = @('dkj-subagents-alpha'),
         [switch]$NoGit,
         [string]$GcsSha = ''
     )
@@ -258,7 +258,7 @@ function New-DivergedClone {
     param(
         [Parameter(Mandatory = $true)][string]$Dir,
         [string]$Version = '4.32.0',
-        [string[]]$PluginNames = @('dkj-team-alpha')
+        [string[]]$PluginNames = @('dkj-subagents-alpha')
     )
     New-Clone -Dir $Dir -Version $Version -PluginNames $PluginNames | Out-Null
     $base = Git-X $Dir @('rev-parse', 'HEAD')
@@ -312,8 +312,8 @@ function Invoke-PV {
     }
 }
 
-$ID  = 'dkj-team-alpha@ccs-fixture'
-$UPD = 'claude plugin update dkj-team-alpha@ccs-fixture --scope project'
+$ID  = 'dkj-subagents-alpha@ccs-fixture'
+$UPD = 'claude plugin update dkj-subagents-alpha@ccs-fixture --scope project'
 $MKT = 'claude plugin marketplace update ccs-fixture'
 
 try {
@@ -331,7 +331,7 @@ try {
     Write-Admin -Path $c.Admin -Plugins @{ $ID = @( (New-Rec -ProjectPath $c.Repo -Version '4.32.0' -Sha $head) ) }
     $r = Invoke-PV -Repo $c.Repo -UserHome $c.Home
     Assert-Equal 0 $r.Code '1: exit 0'
-    Assert-Has  $r 'dkj-team-alpha@ccs-fixture' '1: the plugin id heads its block'
+    Assert-Has  $r 'dkj-subagents-alpha@ccs-fixture' '1: the plugin id heads its block'
     Assert-Has  $r 'up to date -- your install is at the clone''s HEAD' '1: verdict is "up to date"'
     Assert-Has  $r 'All 1 plugin(s) up to date on 4.32.0' '1: summary says every plugin is current'
     Assert-Has  $r $MKT '1: the action names the clone-refresh command (currency is unprovable from here)'
@@ -392,7 +392,7 @@ try {
     Assert-Equal 0 $r.Code '5: exit 0'
     Assert-Has  $r 'no install record in this checkout (enabled declaratively only)' '5: the installed-here line names the state'
     Assert-Has  $r 'cannot determine -- not installed in this checkout (enabled declaratively only)' '5: and the verdict does too'
-    Assert-Has  $r 'claude plugin install dkj-team-alpha@ccs-fixture --scope project' '5: the action offers the install command'
+    Assert-Has  $r 'claude plugin install dkj-subagents-alpha@ccs-fixture --scope project' '5: the action offers the install command'
     Assert-Lacks $r 'Exception' '5: no unhandled exception text leaked'
 
     # --- 6. No marketplace clone at all ------------------------------------------------------------
@@ -419,7 +419,7 @@ try {
     Assert-Equal 0 $r.Code '7: exit 0'
     Assert-Has  $r '2 CONFLICTING records for this checkout' '7: the installed-here line reports the conflict'
     Assert-Has  $r 'cannot determine -- this checkout has 2 conflicting install records' '7: the verdict withholds the comparison'
-    Assert-Has  $r 'repair: claude plugin install dkj-team-alpha@ccs-fixture --scope project' '7: the action offers the repair install'
+    Assert-Has  $r 'repair: claude plugin install dkj-subagents-alpha@ccs-fixture --scope project' '7: the action offers the repair install'
     Assert-Lacks $r 'Exception' '7: no crash on the multi-record shape'
 
     # --- 8a. Non-git clone: HEAD read from .gcs-sha, and it matches the install sha -------------------
@@ -458,7 +458,7 @@ try {
     # --- 9. A foreign plugin id that the clone's marketplace.json does not list ----------------------
     Write-Host "9. foreign plugin id -> cannot determine, no error" -ForegroundColor Cyan
     $c = New-Case 'foreign'
-    New-Clone -Dir $c.Clone -Version '4.32.0' -PluginNames @('dkj-team-alpha') | Out-Null
+    New-Clone -Dir $c.Clone -Version '4.32.0' -PluginNames @('dkj-subagents-alpha') | Out-Null
     $foreign = 'foreign-thing@ccs-fixture'
     Set-Enabled -RepoDir $c.Repo -Ids @($foreign)
     Write-Admin -Path $c.Admin -Plugins @{ $foreign = @( (New-Rec -ProjectPath $c.Repo -Version '9.9.9' -Sha 'beefbeef') ) }
@@ -624,7 +624,7 @@ try {
     # --- 19. -Brief: an 'indeterminate' verdict (foreign plugin) -> "[INFO]", NEVER "[ERROR]" --------
     Write-Host "19. -Brief: 'indeterminate' (foreign plugin) -> [INFO], never [ERROR]" -ForegroundColor Cyan
     $c = New-Case 'brief-indeterminate'
-    New-Clone -Dir $c.Clone -Version '4.32.0' -PluginNames @('dkj-team-alpha') | Out-Null
+    New-Clone -Dir $c.Clone -Version '4.32.0' -PluginNames @('dkj-subagents-alpha') | Out-Null
     $foreign = 'foreign-thing@ccs-fixture'
     Set-Enabled -RepoDir $c.Repo -Ids @($foreign)
     Write-Admin -Path $c.Admin -Plugins @{ $foreign = @( (New-Rec -ProjectPath $c.Repo -Version '9.9.9' -Sha 'beefbeef') ) }

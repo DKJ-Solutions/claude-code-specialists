@@ -27,7 +27,7 @@ refuses nothing — like every session check here — so it tells you which way 
 stopping anything.
 
 **It carries no specialists.** A workflow changes how the existing ones work, not who they are; the
-specialists come from [the teams](https://github.com/DKJ-Solutions/claude-code-specialists/tree/main/plugins/dkj-teams/). Enabling this without `dkj-team-alpha` gives you skills with
+specialists come from [the teams](https://github.com/DKJ-Solutions/claude-code-specialists/tree/main/plugins/dkj-subagents/). Enabling this without `dkj-subagents-alpha` gives you skills with
 nobody to invoke them.
 
 **This folder is the government, and its ministries sit inside it.** `dkj-policy` is the prime ministry:
@@ -97,7 +97,7 @@ this plugin: [`RELEASES-portable.md`](RELEASES-portable.md) for the release work
 
 | [`dkj-policy-bwj/`](dkj-policy-bwj/) | **not this plugin's payload — a ministry under it.** BWJ's codex: the binding rules its two Shopify store repos (smartwatchbanden, xoxowildhearts) operate under, in two chapters. **Ticket handling** — file on GitHub first, mirror to Asana as a colleague-friendly variant; closing the GitHub issue only makes a CI template post that the work is ready to test and move the card to `ReadyToTest`, and never resolves the task itself. **The sync log** — a `sync/` branch is exempt from the changelog by design and owes `dkj-policy-bwj/SYNC-LOG.md` instead ([#1382](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1382)). Two skills, no specialists, no hooks. Separately published and separately enabled; it has [its own README](dkj-policy-bwj/README.md) |
 
-**No `agents/`, no `manuals/`.** Those belong to a team, and a workflow that shipped one would be
+**No `subagents/`, no `manuals/`.** Those belong to a team, and a workflow that shipped one would be
 answering the question the other directory owns.
 
 ## The skills
@@ -176,7 +176,7 @@ answered by the repo rather than baked into the plugin:
   grouping, and the rest.
 - **`scripts/lib/branch-info.ps1`** — your branch taxonomy: which prefixes exist and what each one means.
 
-`specialists-init` (from `dkj-team-alpha`) scaffolds both, and **the `adopt-dkj-policy` skill's Part 2 fills them in**: it *places*
+`specialists-init` (from `dkj-subagents-alpha`) scaffolds both, and **the `adopt-dkj-policy` skill's Part 2 fills them in**: it *places*
 the answers that state a shared way of working and *proposes* — never places — the answers that state what
 your repo **is**. A `decide` answer is deliberately never written as a stub, because a stub returning a
 placeholder overrides a documented fallback that is usually right; absent beats wrong.
@@ -222,7 +222,7 @@ stay; the skills and scripts that read them stop.
 ## Enabling it
 
 Part of the adoption path in [`INSTALL.md`](https://github.com/DKJ-Solutions/claude-code-specialists/blob/main/INSTALL.md);
-[`UNINSTALL.md`](https://github.com/DKJ-Solutions/claude-code-specialists/blob/main/UNINSTALL.md) is the mirror. It requires the core team `dkj-team-alpha`, which
+[`UNINSTALL.md`](https://github.com/DKJ-Solutions/claude-code-specialists/blob/main/UNINSTALL.md) is the mirror. It requires the core team `dkj-subagents-alpha`, which
 every consuming repo enables anyway. Enabling or disabling it is an ordinary plugin change rather than a
 migration, and there is no second one to switch between: the two directions are **on** and **off**.
 

@@ -5,7 +5,7 @@ group: 03
 
 # 03-08 · repo-lens (VUL-IN)
 
-> Repo-lens for the portable manual of specialist 03-08 in the `dkj-team-lifehub` plugin. This file was put
+> Repo-lens for the portable manual of specialist 03-08 in the `dkj-subagents-lifehub` plugin. This file was put
 > in place by `sync-roster` as an empty template; the agent-def reads it along automatically.
 > Fill in below the repo-specific tasks and context specialist 03-08 needs in this repo.
 

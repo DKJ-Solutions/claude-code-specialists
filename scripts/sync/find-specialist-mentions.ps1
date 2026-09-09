@@ -95,7 +95,7 @@ function Get-SpecialistRoster {
     if (-not (Test-Path -LiteralPath $pluginRoot)) { return $roster }
 
     foreach ($dir in @(Get-ChildItem -LiteralPath $pluginRoot -Directory -Recurse -ErrorAction SilentlyContinue |
-                       Where-Object { $_.Name -in @('agents', 'personas') })) {
+                       Where-Object { $_.Name -in @('subagents', 'agents', 'personas') })) {
         foreach ($f in @(Get-ChildItem -LiteralPath $dir.FullName -Filter '*.md' -File -ErrorAction SilentlyContinue)) {
             $txt = [System.IO.File]::ReadAllText($f.FullName, [System.Text.Encoding]::UTF8)
             # The id comes from the filename, which the lint already holds to the frontmatter.

@@ -13,7 +13,7 @@
     worth stating plainly: while this was written, another branch was repairing that script's .SYNOPSIS
     check list (#1680), and appending a check would have meant both of us rewriting the same block. The
     merits were even -- that file already carries a fixture-shaped check ([fixture-git]) and this one
-    already carries three tree-walking meta-suites (shared-scripts, agent-shared,
+    already carries three tree-walking meta-suites (shared-scripts, subagent-shared,
     template-selfcontained) -- so collision decided it. Moving it later is a one-call change: the
     reading is all in the lib, and Get-FixtureDepReport is the whole answer.
 

@@ -92,10 +92,10 @@ enabled plugin:
 
 ```powershell
 claude plugin marketplace update claude-code-specialists                            # 1. refresh the clone
-claude plugin update dkj-team-alpha@claude-code-specialists --scope project         # 2. then update, per plugin
-claude plugin update dkj-team-ecomm@claude-code-specialists --scope project
-claude plugin update dkj-team-lifehub@claude-code-specialists --scope project
-claude plugin update dkj-team-shopify@claude-code-specialists --scope project
+claude plugin update dkj-subagents-alpha@claude-code-specialists --scope project         # 2. then update, per plugin
+claude plugin update dkj-subagents-ecomm@claude-code-specialists --scope project
+claude plugin update dkj-subagents-lifehub@claude-code-specialists --scope project
+claude plugin update dkj-subagents-shopify@claude-code-specialists --scope project
 claude plugin update dkj-policy@claude-code-specialists --scope project
 claude plugin update dkj-policy-bwj@claude-code-specialists --scope project
 ```

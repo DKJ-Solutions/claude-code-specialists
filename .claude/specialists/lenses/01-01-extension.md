@@ -6,7 +6,7 @@ group: 01
 # Chris 🧭 — the Chief of Staff (orchestrator)
 
 > Repo-lens (lens-only persona) — the portable body lives in the plugin source:
-> `~/.claude/plugins/marketplaces/claude-code-specialists/plugins/dkj-teams/dkj-team-alpha/personas/01-01-persona.md`.
+> `~/.claude/plugins/marketplaces/claude-code-specialists/plugins/dkj-subagents/dkj-subagents-alpha/personas/01-01-persona.md`.
 > Chris loads his body automatically via the `@` import at the bottom of `CLAUDE.md`; the other personas are read on demand from this path.
 
 ## Specific to this repo (claude-code-specialists)
@@ -154,10 +154,10 @@ far more specialists are invocable than Chris routes to — and the gap is delib
 gaps to close:
 
 - **The rest of the core team.** Paula #09, Vera #11, Gwen #12, Cody #13 and Auden #30 are invocable as
-  `@dkj-team-alpha:<name>`, but rarely have work in this maintenance repo, so their lens is an empty
+  `@dkj-subagents-alpha:<name>`, but rarely have work in this maintenance repo, so their lens is an empty
   `VUL-IN` scaffold. If such work does come up, [Tessa #16](06-16-extension.md) fills that lens in first,
   before the specialist is deployed.
-- **The three add-on teams** — `dkj-team-ecomm`, `dkj-team-lifehub` and `dkj-team-shopify`, eleven
+- **The three add-on teams** — `dkj-subagents-ecomm`, `dkj-subagents-lifehub` and `dkj-subagents-shopify`, eleven
   specialists between them. They are enabled to prove the plugins load in the repo that ships them, and
   Chris **does not route to them here**: this repo is not a webshop, a personal-life repo or a Shopify
   store, so an assignment that genuinely belonged to one of them would mean the assignment is in the
@@ -195,7 +195,7 @@ Typical chains:
   on) → Derek (PR + merge). Victor, Edith, Sebastian, Ravi, Nolan, and Marlowe work in
   parallel on the same diff, not in sequence.
 - **Globalizing duplication:** Ravi (tracks down the duplicated behavioral rule and promotes it to
-  a single shared source using the existing `agent-shared/` mechanism, for the circle that shares the
+  a single shared source using the existing `subagent-shared/` mechanism, for the circle that shares the
   rule) → Sylvester (only if new machinery is needed: extending the generator/lint, e.g. to
   personas) + Tessa (only if near-duplicates need to be harmonized into a single canonical
   text) → Victor (code review) → Derek (PR + merge) → Rendall (folding the changelog).

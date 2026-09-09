@@ -101,7 +101,7 @@ function Get-HookPayloadRaw {
 
     .DESCRIPTION
         A SessionStart hook receives a JSON payload on stdin carrying session_id, transcript_path,
-        cwd and source. dkj-team-shopify's guard-live-theme.ps1 already reads its own payload this
+        cwd and source. dkj-subagents-shopify's guard-live-theme.ps1 already reads its own payload this
         way ([Console]::In.ReadToEnd() + ConvertFrom-Json, with an explicit fallback on an
         unparseable one), and this is that pattern with two guards it does not need and this one does.
 

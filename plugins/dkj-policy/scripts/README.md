@@ -31,8 +31,8 @@ land here, because a script travels to whichever plugin owns the surface that ca
 | where the mirror lands | why there |
 |---|---|
 | `dkj-policy` (this folder) | the branch/PR/release way of working, which is what this plugin *is* |
-| `dkj-team-shopify` | the store-facing scripts, whose surface belongs to the platform team |
-| `dkj-team-alpha` | `sync/check-roster-sync.ps1`, `lib/check-report-lib.ps1` and `lib/hook-check-lib.ps1` — the roster check belongs to the core team, since the roster does, and it carries the one SessionStart hook in this family that ships outside the workflow plugin |
+| `dkj-subagents-shopify` | the store-facing scripts, whose surface belongs to the platform team |
+| `dkj-subagents-alpha` | `sync/check-roster-sync.ps1`, `lib/check-report-lib.ps1` and `lib/hook-check-lib.ps1` — the roster check belongs to the core team, since the roster does, and it carries the one SessionStart hook in this family that ships outside the workflow plugin |
 
 *A fourth destination, `workflow-default`, held one pair — `lib/check-report-lib.ps1` again — until
 [#886](https://github.com/DaveKJohn/claude-code-specialists/issues/886) removed that plugin on
@@ -42,7 +42,7 @@ August 26, 2026.*
 stale** — three times over, so far. Three rows were missing when the count was last checked (August 15,
 2026 — `adopt-workflow-folder`, `session-status` and `source-repo-guard-lib`, each registered but never
 listed), re-measuring on August 26 found the header, the destination split and the row list all wrong at
-once, the split not even naming `dkj-team-shopify` as a destination, and a third re-measurement
+once, the split not even naming `dkj-subagents-shopify` as a destination, and a third re-measurement
 ([#1486](https://github.com/DaveKJohn/claude-code-specialists/issues/1486), September 6, 2026) found 21
 more rows absent — every row from `task/claim-issue.ps1` down through `lib/claim-issue-lib.ps1` in the
 table above, now added. `session-status` has since gone the other way: it was removed along with `/lock`
@@ -117,7 +117,7 @@ an absent link is a fact rather than an oversight.
 | `lib/remote-ahead-lib.ps1` | composes the "behind the remote" sentence a caller prints when a local ref has fallen behind its own remote-tracking ref | none — dot-sourced lib |
 | `lib/worktree-lib.ps1` | reads `git worktree list --porcelain`: who holds which branch, and which tree is the primary one | none — dot-sourced lib |
 | `lib/git-identity-lib.ps1` | the identity a checkout acts as on the tracker and the identity it commits as, read once for every caller that needs either | none — dot-sourced lib |
-| `lib/git-porcelain-lib.ps1` | the one reading of a git path: the `git status --porcelain` command with its two flags, the line parse into `{Path, Index, Worktree, From}`, and `Convert-GitQuotedPath`, which decodes git's C-quoted form. Dot-sourced by `park-lib` for its uncommitted count, by `fanout-lib` for its per-path snapshot, and — through a second mirror in `dkj-team-shopify` — by `sync-main` for the decoder | none — dot-sourced lib |
+| `lib/git-porcelain-lib.ps1` | the one reading of a git path: the `git status --porcelain` command with its two flags, the line parse into `{Path, Index, Worktree, From}`, and `Convert-GitQuotedPath`, which decodes git's C-quoted form. Dot-sourced by `park-lib` for its uncommitted count, by `fanout-lib` for its per-path snapshot, and — through a second mirror in `dkj-subagents-shopify` — by `sync-main` for the decoder | none — dot-sourced lib |
 | `lib/claim-issue-lib.ps1` | the two decisions `claim-issue.ps1` makes: which account this checkout claims under, and whether the issue in front of it may be claimed at all | none — dot-sourced lib |
 | `lib/ref-print-lib.ps1` | `Get-PasteableRef` — may this branch name go into a printed command a reader will run verbatim? Returns the placeholder and the explaining line when it may not, because git accepts shell metacharacters in a ref and no quoting closes that | none — dot-sourced lib |
 | `lib/command-probe-lib.ps1` | `Test-FunctionDefined` — is a function of this name defined? Reads the function table directly, where `Get-Command` parses the name as a wildcard pattern and pays a full `PATH` scan on every miss — and a miss is the normal case for an optional seam | none — dot-sourced lib |

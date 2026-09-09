@@ -5,7 +5,7 @@ group: 06
 
 # Ravi ♻️ · claude-code-specialists addendum
 
-> Repo-lens (claude-code-specialists) accompanying the portable playbook in the `dkj-team-alpha` plugin (`plugins/dkj-teams/dkj-team-alpha/manuals/06-24-manual.md`). This file does not describe the craft, but what Ravi guards in this repo and with which mechanism.
+> Repo-lens (claude-code-specialists) accompanying the portable playbook in the `dkj-subagents-alpha` plugin (`plugins/dkj-subagents/dkj-subagents-alpha/manuals/06-24-manual.md`). This file does not describe the craft, but what Ravi guards in this repo and with which mechanism.
 
 A refactoring specialist does the same thing everywhere — track down duplication of behavioral rules
 and promote it to a single source. **What is repo-specific in claude-code-specialists is not that Ravi
@@ -13,7 +13,7 @@ deduplicates, but which artifacts fall under him here and with which mechanism h
 
 ### What Ravi guards here
 
-- **The agent defs** in all plugins (`plugins/*/agents/*-agent.md`)
+- **The agent defs** in all plugins (`plugins/*/subagents/*-agent.md`)
   and the **persona templates** (`.../specialists/personas/*-persona.md`) — for verbatim-shared bullets
   under **Boundaries** and **Working method**, and for standalone behavior
   directives outside those sections (e.g. the closing language-choice line). This repo is the **source** of
@@ -26,7 +26,7 @@ deduplicates, but which artifacts fall under him here and with which mechanism h
 
 The verbatim-shared blocks run on **build-and-lint** (built July 2026):
 
-- **Source:** `plugins/dkj-teams/agent-shared/<name>.md` — one canonical text
+- **Source:** `plugins/dkj-subagents/subagent-shared/<name>.md` — one canonical text
   per block, placed next to the four team directories (every carrier is a team's) and outside every
   plugin root, so it does not travel with the plugin cache.
 - **Sentinels:** in an agent def the block sits between `<!-- BEGIN/END shared:<name> -->`; the
@@ -35,7 +35,7 @@ The verbatim-shared blocks run on **build-and-lint** (built July 2026):
 - **Gate:** `check-plugin-integrity.ps1` (check 7) fails as soon as a marked region deviates from its
   source. Details in the [Sylvester #15 lens](05-15-extension.md).
 
-Current shared blocks, sourced one file each under `agent-shared/`, fall into four tiers by how far
+Current shared blocks, sourced one file each under `subagent-shared/`, fall into four tiers by how far
 each one reaches: **universal** — `inbound-behaviour` and `laziness-automation` (every agent def
 carries both), plus `repo-way-of-working` and `findings-become-issues`, which are the only two that
 reach the four personas as well, so 30 carriers rather than 26; **near-universal** —
@@ -54,7 +54,7 @@ circle for a given block, search the sentinel across the plugins — e.g.
 `Get-ChildItem -Recurse -Filter '*-agent.md' plugins | Select-String
 -Pattern 'BEGIN shared:<name>'` lists every agent def currently carrying it;
 `scripts/agents/build-agent-defs.ps1 -Check` complements that by flagging any of those that has
-drifted from its source in `agent-shared/`.
+drifted from its source in `subagent-shared/`.
 
 **A UNIVERSAL BLOCK'S COST IS NOT UNIFORM, AND THAT IS THE FACT THE TIER MODEL ABOVE DOES NOT CARRY**
 ([#1705](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1705), September 9, 2026).
@@ -96,12 +96,12 @@ bar, so the next bullet is weighed rather than appended.
   conversation history, branch); (2) the **detection lint** as alarm-bell automation.
 
   **Extending the mechanism to the persona templates was the third, and it shipped on August 8, 2026**
-  — the generator walks `personas/` alongside `agents/` (`scripts/agents/build-agent-defs.ps1`), which
+  — the generator walks `personas/` alongside `subagents/` (`scripts/agents/build-agent-defs.ps1`), which
   is what let a shared block reach the two specialists whose craft *is* a way of working. It is written
   here as a closed job rather than deleted, because the comment in that generator still cites this list
   as the place the widening was foreseen; a reader who follows that citation has to land on the answer,
   not on the plan.
 
 In short: the **how** (tracking down duplication and promoting it to a single source) is portable;
-the **what** (the agent defs/personas of this marketplace and the `agent-shared/` build-and-lint
+the **what** (the agent defs/personas of this marketplace and the `subagent-shared/` build-and-lint
 mechanism) belongs to this repo.

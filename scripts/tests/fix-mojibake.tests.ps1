@@ -307,7 +307,7 @@ function Get-MojibakePaths {
     Assert-Says $lintOut 'releases/' 'and its coverage line names the releases/ notes, which were outside the scope until #360-era'
     Assert-Says $lintOut 'Summary: 0 error' 'and the repo is clean of mojibake'
     # The findings, on failure only -- same reason as the twin asserts in bootstrap-drift.tests.ps1 and
-    # agent-shared.tests.ps1: this reads the gate's verdict over the LIVE repo, so it can fail from a
+    # subagent-shared.tests.ps1: this reads the gate's verdict over the LIVE repo, so it can fail from a
     # collision with a concurrent suite. Measured August 16, 2026: this assert and bootstrap-drift's failed
     # together in one pooled run of 43 suites and passed in the next three, and neither said WHAT the gate
     # had found. Note it fires on any non-zero summary, including one that names no mojibake at all -- that

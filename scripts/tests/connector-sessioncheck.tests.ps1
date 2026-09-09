@@ -174,7 +174,7 @@ function New-Clone {
     param(
         [Parameter(Mandatory = $true)][string]$Dir,
         [string]$Version = '4.32.0',
-        [string[]]$PluginNames = @('dkj-team-alpha')
+        [string[]]$PluginNames = @('dkj-subagents-alpha')
     )
     New-Item -ItemType Directory -Path (Join-Path $Dir '.claude-plugin') -Force | Out-Null
     $plugins = @()
@@ -447,9 +447,9 @@ try {
     Write-Host "2a. no [ERROR], an [INFO] exists (stale clone) -> one line, the INFO is NOT forwarded" -ForegroundColor Cyan
     $c = New-Case 'branch2a'
     New-Clone -Dir $c.Clone -Version '4.32.0' | Out-Null
-    Set-Enabled -RepoDir $c.Repo -Ids @('dkj-team-alpha@ccs-fixture')
+    Set-Enabled -RepoDir $c.Repo -Ids @('dkj-subagents-alpha@ccs-fixture')
     Write-Admin -Path $c.Admin -Plugins @{
-        'dkj-team-alpha@ccs-fixture' = @( (New-Rec -ProjectPath $c.Repo -Version '4.32.0' -Sha 'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef') )
+        'dkj-subagents-alpha@ccs-fixture' = @( (New-Rec -ProjectPath $c.Repo -Version '4.32.0' -Sha 'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef') )
     }
     $r = Invoke-Hook -RepoDir $c.Repo -HomeDir $c.Home
     Assert-Equal 0 $r.Code '2a: exit 0'
@@ -460,9 +460,9 @@ try {
     Write-Host "2b. fully quiet run (nothing behind, nothing undetermined) -> the same one-line shape" -ForegroundColor Cyan
     $c = New-Case 'branch2b'
     $head = New-Clone -Dir $c.Clone -Version '4.32.0'
-    Set-Enabled -RepoDir $c.Repo -Ids @('dkj-team-alpha@ccs-fixture')
+    Set-Enabled -RepoDir $c.Repo -Ids @('dkj-subagents-alpha@ccs-fixture')
     Write-Admin -Path $c.Admin -Plugins @{
-        'dkj-team-alpha@ccs-fixture' = @( (New-Rec -ProjectPath $c.Repo -Version '4.32.0' -Sha $head) )
+        'dkj-subagents-alpha@ccs-fixture' = @( (New-Rec -ProjectPath $c.Repo -Version '4.32.0' -Sha $head) )
     }
     $r = Invoke-Hook -RepoDir $c.Repo -HomeDir $c.Home
     Assert-Equal 0 $r.Code '2b: exit 0'
@@ -511,7 +511,7 @@ try {
     # safe to have at all: a replayed firing prints exactly what the measured one printed.
     Write-Host '5a. two firings, same session id -> the engine is spawned ONCE and the line is identical' -ForegroundColor Cyan
     $c = New-Case 'branch5a'
-    Set-Enabled -RepoDir $c.Repo -Ids @('dkj-team-alpha@ccs-fixture')
+    Set-Enabled -RepoDir $c.Repo -Ids @('dkj-subagents-alpha@ccs-fixture')
     $case = Join-Path $Fixture 'branch5a\case'
     $sid  = "a1b2c3d4-e5f6-4789-abcd-$PID"
     $r1 = Invoke-CountedHook -CaseDir $case -RepoDir $c.Repo -HomeDir $c.Home -Payload (New-Payload -SessionId $sid -Source 'startup')
@@ -533,7 +533,7 @@ try {
 
     Write-Host '5c. a payload with no usable session id -> no cache at all, exactly as before #1605' -ForegroundColor Cyan
     $c = New-Case 'branch5c'
-    Set-Enabled -RepoDir $c.Repo -Ids @('dkj-team-alpha@ccs-fixture')
+    Set-Enabled -RepoDir $c.Repo -Ids @('dkj-subagents-alpha@ccs-fixture')
     $case = Join-Path $Fixture 'branch5c\case'
     $n1 = Invoke-CountedHook -CaseDir $case -RepoDir $c.Repo -HomeDir $c.Home -Payload (New-Payload -SessionId '')
     $n2 = Invoke-CountedHook -CaseDir $case -RepoDir $c.Repo -HomeDir $c.Home -Payload (New-Payload -SessionId '')
@@ -546,7 +546,7 @@ try {
     # A plugin payload predating the lib, which is the same degradation branch 4 covers for the
     # engine: the dot-source is guarded precisely so a missing cache cannot take out the verdict.
     $c = New-Case 'branch5d'
-    Set-Enabled -RepoDir $c.Repo -Ids @('dkj-team-alpha@ccs-fixture')
+    Set-Enabled -RepoDir $c.Repo -Ids @('dkj-subagents-alpha@ccs-fixture')
     $case = Join-Path $Fixture 'branch5d\case'
     $r4 = Invoke-CountedHook -CaseDir $case -RepoDir $c.Repo -HomeDir $c.Home -Payload (New-Payload -SessionId "c1c2c3c4-d5d6-4789-abcd-$PID")
     Remove-Item -LiteralPath (Join-Path $case 'scripts\lib\session-cache-lib.ps1') -Force

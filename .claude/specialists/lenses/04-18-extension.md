@@ -5,7 +5,7 @@ group: 04
 
 # Tycho 🧪 · claude-code-specialists addendum
 
-> Repo-lens (claude-code-specialists) accompanying the portable playbook in the `dkj-team-alpha` plugin (`plugins/dkj-teams/dkj-team-alpha/manuals/04-18-manual.md`). This file does not describe the craft, but what Tycho does in this repo.
+> Repo-lens (claude-code-specialists) accompanying the portable playbook in the `dkj-subagents-alpha` plugin (`plugins/dkj-subagents/dkj-subagents-alpha/manuals/04-18-manual.md`). This file does not describe the craft, but what Tycho does in this repo.
 
 A test engineer (SDET) does the same thing everywhere — write and maintain automated tests, guard
 against regressions, secure reliability with a suite instead of manual checking. **What is
@@ -27,7 +27,7 @@ logic in `release-lib.ps1` (version bump, CHANGELOG transformation, release-note
   exit-1-on-first-failure style now runs across the suite under `scripts/tests/`, which covers most
   of what Sylvester's lens lists: the lint gate (`check-plugin-integrity-*.tests.ps1`, four of them —
   see [the split below](#the-lint-gate-suite-is-four-files-august-16-2026)), the shared
-  agent-def blocks (`agent-shared.tests.ps1`), the branch/changelog/release chain
+  agent-def blocks (`subagent-shared.tests.ps1`), the branch/changelog/release chain
   (`branch-info.tests.ps1`, `new-branch.tests.ps1`, `fold-changelog.tests.ps1`,
   `cut-release-guardrail.tests.ps1`, `park-branch.tests.ps1`), the connectors + roster machinery
   (`connectors.tests.ps1`, `roster-sync.tests.ps1`, `sync-roster.tests.ps1`), the shared-scripts

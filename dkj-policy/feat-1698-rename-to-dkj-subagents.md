@@ -36,23 +36,98 @@
 
 ### PLAN
 
-Phase 1 of #1697: rename dkj-team-* -> dkj-subagents-*, plugins/dkj-teams -> plugins/dkj-subagents, agents/ -> subagents/, agent-shared -> subagent-shared.
+#### What this branch is
+
+Phase 1 of the vocabulary plan in #1697, filed and deferred as #1698 and picked up on
+September 9, 2026. The team side of the marketplace takes the vendor's own word for what those
+plugins ship: `plugins/dkj-teams/` becomes `plugins/dkj-subagents/`, the four `dkj-team-*` plugins
+become `dkj-subagents-*`, each team's `agents/` payload directory becomes `subagents/`, and
+`agent-shared/` becomes `subagent-shared/`. Nothing else is renamed -- `dkj-policy` and
+`dkj-policy-bwj` are untouched, and `skills/` is deliberately left alone.
+
+#### The two premises, verified before any file moved
+
+- **`"agents"` in `plugin.json` REPLACES the default directory**, and its value must start with
+  `./`. Verified against the plugin reference rather than assumed, because the whole `agents/` ->
+  `subagents/` half of this rename rests on it. Each team manifest now carries
+  `"agents": "./subagents/"`.
+- **`skills` can never replace its default** -- the format always scans `skills/` in addition to
+  any custom path -- so the rename deliberately stops short of it. #1698 said so; it now has a
+  citation.
+
+#### What the previous round decided, and is followed here
+
+The #1437 rename commit (`17149edb`) states this tree's answer to a rename, and this branch obeys it
+rather than re-deciding it:
+
+- **Readers GREW an entry rather than being substituted.** Every reader that resolves the payload
+  directory by name now reads `subagents/` and `agents/`, new first, so a consumer whose plugin cache
+  holds a pre-rename version keeps resolving. The lint's `[plugin-kind]` check keeps `dkj-team-*` as
+  an accepted retired shape, held to no location, exactly as it already did for bare `team-*`.
+- **Dated measurements keep the name they were written with (#952).** `connectors/`, the folded
+  entries in `CHANGELOG.md` and the archived release notes under `dkj-policy/releases/**` are NOT
+  swept; only the archive's LINK TARGETS are repointed.
 
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [x] Move the directories with `git mv`: `plugins/dkj-teams/` -> `plugins/dkj-subagents/`, the four
+      team folders, each team's `agents/` -> `subagents/`, `agent-shared/` -> `subagent-shared/`, and
+      `scripts/lib/agent-shared-lib.ps1` + `scripts/tests/agent-shared.tests.ps1` with them.
+- [x] Sweep the three names across every tracked text file except `dkj-policy/releases/**`.
+- [x] Add `"agents": "./subagents/"` to the four team manifests.
+- [x] Teach every reader of the payload directory both leaf names, new first: one shared pair of
+      helpers (`Get-SubagentDirName` / `Get-SubagentDirPath`) in `check-report-lib.ps1`, used by
+      `Resolve-PluginDir` and `check-roster-sync.ps1`, plus the same both-leaves rule in
+      `bootstrap.ps1`, `sync-roster.ps1`, `teardown.ps1`, `check-connectors.ps1`,
+      `check-consumer-drift.ps1` and `find-specialist-mentions.ps1`.
+- [x] Point the lint at `subagents/` where it reads THIS tree (which only ever has the new shape),
+      and keep `dkj-team-*` accepted by name in check 23.
+- [x] Regenerate the three derived artefacts: the shared agent-def blocks, the plugin script mirrors
+      and the config blueprint.
+- [x] Restore what must not be swept: `connectors/**` and `CHANGELOG.md` reverted; only the link
+      targets under `dkj-policy/releases/**` repointed.
+- [x] Write `INSTALL.md`'s third migration section, with the uninstall/install sequence and the three
+      things inside a consumer's repo that the id swap does not fix.
+- [x] Repair the prose the sweep made historically false, in `README.md` and `CLAUDE.md`.
+- [x] Lint gate and every test suite green.
 
 ### TEST
 
+`check-plugin-integrity.ps1`: 0 errors, with every coverage count intact -- 26 agent defs, 30 shared
+blocks, 165 plugin links across 6 plugin roots, 346 link-scan files. A coverage count that had
+collapsed to 0 is the failure mode this rename could most easily have caused silently, which is why
+the counts are read rather than only the verdict.
+
+All test suites green.
+
 ### DEPLOY: feat/1698-rename-to-dkj-subagents
 
-**Score:**
+The four team plugins are renamed from `dkj-team-*` to `dkj-subagents-*`, their directory from
+`plugins/dkj-teams/` to `plugins/dkj-subagents/`, each team's payload directory from `agents/` to
+`subagents/` (declared by a new `"agents": "./subagents/"` key in each manifest), and
+`agent-shared/` to `subagent-shared/`. *Team* is this family's own word for a group of specialists;
+*subagent* is Claude Code's word for what those plugins actually ship, so the four now say what is in
+the box in the vocabulary of the thing that opens it. Every reader of that payload directory reads
+both leaf names, new first, so a machine holding a pre-rename version in its plugin cache keeps
+resolving, and the lint keeps `dkj-team-*` as an accepted retired shape. `dkj-policy` and
+`dkj-policy-bwj` are unchanged, and `skills/` is deliberately not renamed -- the plugin format always
+scans the default `skills/` directory in addition to any custom one, so a custom skills directory can
+only add, never move.
+
+**Score:** 3
 
 #### What makes this deploy extra special
 
-**Score:**
+**A plugin rename is not a `claude plugin update`.** Every consumer must uninstall the four
+`dkj-team-*` ids, install the `dkj-subagents-*` ones, and then fix three things no install touches:
+the `enabledPlugins` keys in their own `.claude/settings.json`, the `@`-import in their
+`SPECIALISTS.md` (which carries the full marketplace path, and both halves of it moved), and their
+`connectors/` register if they keep one -- an unresolvable id there makes `check-connectors.ps1` skip
+that plugin's whole drift check silently. `INSTALL.md` carries the command sequence and all three, as
+its third migration section.
+
+**Score:** 5
 
 #### Pull Request
 
 Rename the team side of the marketplace to dkj-subagents
-
