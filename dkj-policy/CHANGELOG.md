@@ -43,7 +43,35 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**32 / 73 minor entries** <!-- pending-tally -->
+**32 / 74 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1710-refreshbody-recheck · 20260909-151207
+
+The `branch-entry` gate now re-runs when a pull request's body is edited, which is what
+`open-pr.ps1 -RefreshBody` does. Half of what that check judges is the PR body -- whether the DEPLOY
+section still matches what the review approved -- while its trigger listed only the push events, so the
+documented repair for a drifting section could not clear the finding it was repairing. Measured on
+PR #1707: the check reported drift, `-RefreshBody` republished the section, `ship-pr`'s own arm of the
+same lock read the refreshed body and passed, and the merge landed with the CI arm still red on a state
+that had stopped being true eleven minutes earlier. The two arms share one definition of "diverged" on
+purpose; now they also share the chance to be asked twice.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+N/A -- the workflow is this repo's own and travels to nobody. A consumer running the shipped
+`branch-entry` gate keeps whatever trigger their own copy carries, and nothing in the plugin changes.
+
+**Score:** N/A
+
+#### Pull Request
+
+The branch-entry gate re-runs when the PR body is edited, which is what -RefreshBody does
+
+[PR #1712](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1712)
+
+---
 
 ### DEPLOY: feat/1703-test-gate-cost · 20260909-134144
 
