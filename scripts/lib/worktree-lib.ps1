@@ -7,7 +7,7 @@
 
         . (Join-Path $PSScriptRoot '..\lib\worktree-lib.ps1')
 
-    Supplies the seven pure functions below. None of them runs git -- the caller passes the lines
+    Supplies the eight pure functions below. None of them runs git -- the caller passes the lines
     `git worktree list --porcelain` produced, so every one of them is testable, which is the whole
     reason this file exists rather than a fourth inline parse.
 
@@ -35,14 +35,15 @@
 
     Pure ASCII (repo convention for .ps1).
 
-    ONE DEPENDENCY, and only the last function has it: Get-DisplayRef (ref-print-lib.ps1), loaded below.
-    The six readers above stay pure functions of the porcelain text.
+    ONE DEPENDENCY: Get-DisplayRef (ref-print-lib.ps1), loaded below, which the two functions that
+    COMPOSE A SENTENCE need -- Get-FoldTreeDecision and Get-TrunkReturnGoAheadLine. The six readers stay
+    pure functions of the porcelain text.
 #>
 
 # THE PROSE SANITISER, loaded rather than copied (issue #1623) -- see Get-TrunkReturnGoAheadLine at the
-# foot of this file for what needs it. $PSScriptRoot-relative so it resolves in the plugin mirror as well
-# as here, and unconditional because the function that calls it has no fallback wording; ref-print-lib.ps1
-# is a leaf with no dependencies of its own.
+# foot of this file, and Get-FoldTreeDecision (#1753), for what needs it. $PSScriptRoot-relative so it
+# resolves in the plugin mirror as well as here, and unconditional because the functions that call it
+# have no fallback wording; ref-print-lib.ps1 is a leaf with no dependencies of its own.
 . (Join-Path $PSScriptRoot 'ref-print-lib.ps1')
 
 # THE COMPARISON KEY, and it is not decoration. Three things make two spellings of the same directory
@@ -221,6 +222,82 @@ function Get-TrunkReturnDecision {
     return [pscustomobject]@{ Return = $true; Reason = '' }
 }
 
+# WHICH TREE DOES THE FOLD RUN IN? (issue #1753, September 9, 2026.)
+#
+# THE INCONSISTENCY THIS CLOSES SITS INSIDE ONE SCRIPT, and both halves are above. Get-TrunkReturnDecision
+# declines the trunk return on an unclean tree for a stated reason -- "a checkout would take them to the
+# trunk or fail on them" -- and ship-pr.ps1's step 5 then ran `git checkout main` UNCONDITIONALLY, which
+# is that same checkout, performed after the merge instead of refused before it. Measured shipping PR
+# #1752: one unrelated uncommitted path (.claude/settings.json) made step 2b stay on the branch, and step
+# 5 checked the trunk out over it anyway, dragged it there, and lost the fold to `git merge --ff-only`
+# ("Your local changes to the following files would be overwritten by merge"). Merged, not folded -- the
+# one state nothing reports until a release trips over it.
+#
+# THE ANSWER IS NOT A REFUSAL, AND THAT IS A DELIBERATE DEPARTURE FROM WHAT THE REPORT ASKED FOR. Its
+# suggested shape was a step-0 refusal on the same reading, on this tree's "a refusal costs nothing
+# before the irreversible act" posture (#1405, #1417). But step 5 ALREADY has an arm that does not touch
+# this checkout at all -- the throwaway worktree #1069 added for a HEAD that moved -- and it is available
+# in exactly the failing case: an unclean tree means step 2b declined, which means HEAD is still on the
+# shipping branch, which means the trunk is free (step 0a refused otherwise) and `git worktree add` can
+# have it. So the fold completes rather than being refused, the uncommitted path stays where its author
+# left it, and the condition the report itself named -- "the fold would have to ff-only past it" -- is
+# false instead of guarded. A refusal would have stopped a ship this repairs.
+#
+# THE TRUNK ARM IS EXEMPT FROM THE DIRT TEST, and it has to be: git refuses `worktree add <path> main`
+# once the primary holds main, so a tree already standing there has no second route and folds in place as
+# it always did. That state is reachable -- step 2b returns a CLEAN tree to the trunk, and the CI wait
+# after it is long enough for something else to write into it -- so the residual is real, narrow, and
+# unpreventable at step 0, which is the second reason a step-0 refusal would have been aimed wrong. What
+# it gets instead is ship-pr's post-merge failures naming the merged-but-unfolded state.
+#
+# THE STATUS LINES ARE READ AT STEP 5, NOT REUSED FROM STEP 2B, for the same reason: the CI wait sits
+# between them, and a decision about the tree as it is now cannot be made from a reading taken before the
+# longest step in the run.
+#
+# PURE, LIKE EVERY OTHER FUNCTION HERE. It takes the two strings git printed and the porcelain status
+# lines, and answers which arm to take plus the sentence that arm prints -- so the branch that only a
+# full live ship could otherwise exercise is asserted in worktree-lib.tests.ps1 instead.
+function Get-FoldTreeDecision {
+    param(
+        # HEAD as `git rev-parse --abbrev-ref HEAD` printed it, or '' when that read failed.
+        [Parameter(Mandatory = $true)][AllowEmptyString()][string]$Head,
+        [Parameter(Mandatory = $true)][AllowEmptyString()][string]$ShipBranch,
+        [Parameter(Mandatory = $true)][string]$TrunkBranch,
+        [string[]]$StatusLines
+    )
+    # THE TRUNK FIRST, so the dirt test below cannot send a tree holding the trunk to a worktree add that
+    # git will refuse. Order is load-bearing here, not stylistic.
+    if ($Head -and $Head -eq $TrunkBranch) {
+        return [pscustomobject]@{ InPlace = $true; Reason = '' }
+    }
+    if (-not $Head) {
+        # AN UNREADABLE HEAD TAKES THE WORKTREE ROUTE, unchanged from #1069: it is the arm that leaves
+        # somebody else's checkout alone, so being wrong about it costs a temporary directory.
+        return [pscustomobject]@{
+            InPlace = $false
+            Reason  = "HEAD could not be read, so this checkout may be standing anywhere."
+        }
+    }
+    if ($Head -ne $ShipBranch) {
+        $shownHead = Get-DisplayRef -Ref $Head
+        $shownShip = Get-DisplayRef -Ref $ShipBranch
+        return [pscustomobject]@{
+            InPlace = $false
+            Reason  = "HEAD is on '$shownHead', not '$shownShip' -- this checkout moved while CI ran."
+        }
+    }
+    # SAME COUNT, SAME FILTER as Get-TrunkReturnDecision's: a porcelain line that is blank or whitespace
+    # is not a path, and both decisions have to agree about what "unclean" means or step 2b and step 5
+    # go back to contradicting each other, which is the whole defect.
+    $dirty = @(@($StatusLines) | Where-Object { $_ -and "$_".Trim() })
+    if ($dirty.Count -gt 0) {
+        return [pscustomobject]@{
+            InPlace = $false
+            Reason  = "the working tree is not clean ($($dirty.Count) path(s)) -- a checkout would take them to the trunk, and the fold's ff-only merge would fail on them (#1753)."
+        }
+    }
+    return [pscustomobject]@{ InPlace = $true; Reason = '' }
+}
 # IS ANY WORKTREE STANDING INSIDE THE ONE WE ARE ABOUT TO WALK? (issue #1673, September 8, 2026.)
 #
 # THE HARNESS PLACES ITS OWN WORKTREE INSIDE THE REPO, at .claude/worktrees/agent-<id>, and nothing

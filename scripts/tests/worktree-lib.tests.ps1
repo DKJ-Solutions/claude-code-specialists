@@ -1,8 +1,8 @@
 <#
 .SYNOPSIS
     Regression tests for scripts/lib/worktree-lib.ps1 -- the porcelain reader behind ship-pr.ps1's
-    trunk-lock pre-flight (issue #1069), its trunk hand-back before the CI wait (issue #1073), and
-    prune-merged.ps1's error message.
+    trunk-lock pre-flight (issue #1069), its trunk hand-back before the CI wait (issue #1073), its
+    choice of which tree to fold in after the merge (issue #1753), and prune-merged.ps1's error message.
 
 .DESCRIPTION
     Dependency-free: no Pester needed, only PowerShell. Every function in the lib is pure -- it takes
@@ -44,7 +44,12 @@
          shape the harness's own dispatched-agent worktree takes -- while a sibling lane and a directory
          that merely shares a text PREFIX with the primary ('<repo>-lanes/x' against '<repo>') are both
          left unreported, the primary never reports itself, and an empty/malformed/unreadable input
-         answers no findings rather than throwing or matching everything.
+         answers no findings rather than throwing or matching everything;
+     11. Get-FoldTreeDecision (issue #1753) sends an UNCLEAN tree to the throwaway worktree instead of
+         checking the trunk out over it -- the same reading Get-TrunkReturnDecision already makes at step
+         2b, which step 5 made after the merge instead of before it -- while a tree already ON the trunk
+         stays exempt (git refuses `worktree add` there), the ordinary clean run still folds in place, and
+         the sentence each arm prints says which of the three reasons it was rather than asserting one.
 
     Pure ASCII (repo convention for .ps1).
 #>
@@ -416,6 +421,91 @@ $PorcelainTwoNested = @(
 )
 Assert-Equal '2' "$((Get-NestedWorktreePath -PorcelainLines $PorcelainTwoNested -PrimaryRoot 'C:/repo').Count)" `
     'two worktrees standing inside the primary root are both reported, not just the first'
+
+Write-Host ""
+Write-Host "10. Get-FoldTreeDecision -- which tree does step 5 fold in? (issue #1753)" -ForegroundColor Cyan
+
+# THE DEFECT: step 5 chose its arm on HEAD'S LOCATION ALONE, so a tree standing where this script left
+# it got `git checkout main` run over it however unclean it was -- the same checkout Get-TrunkReturnDecision
+# above had already declined, made after the merge instead of before it. Measured shipping PR #1752: one
+# unrelated uncommitted path, carried onto the trunk by that checkout, and `git merge --ff-only` then
+# failed on it. Merged, not folded.
+$Ship = 'fix/1753-example'
+
+# THE ORDINARY FOREGROUND RUN: HEAD is still on the shipping branch and nothing is uncommitted, so the
+# in-place arm runs exactly what it always ran. This is the assert that keeps the repair from becoming a
+# worktree on every ship.
+$fdClean = Get-FoldTreeDecision -Head $Ship -ShipBranch $Ship -TrunkBranch 'main' -StatusLines @()
+Assert-True $fdClean.InPlace 'a clean tree on the shipping branch folds in place'
+Assert-Equal '' $fdClean.Reason 'and an in-place answer carries no sentence -- nothing is being explained'
+
+# THE REPAIR ITSELF. The worktree arm is correct whatever this checkout holds, so the fold completes
+# instead of being refused -- which is why #1753 was NOT answered with a step-0 refusal.
+$fdDirty = Get-FoldTreeDecision -Head $Ship -ShipBranch $Ship -TrunkBranch 'main' -StatusLines @(' M .claude/settings.json')
+Assert-True (-not $fdDirty.InPlace) 'an unclean tree on the shipping branch folds in a worktree instead'
+Assert-True ($fdDirty.Reason -like '*not clean*') 'and the sentence says why'
+Assert-True ($fdDirty.Reason -like '*1 path*') 'and counts the paths, so the reader knows how much is in the way'
+Assert-True ($fdDirty.Reason -notlike '*moved while CI ran*') 'and does NOT claim the checkout moved -- it did not'
+# UNTRACKED COUNTS TOO, for the reason section 6 gives: `git checkout main` carries an untracked file
+# across as well, and the ff-only merge fails on it just the same.
+Assert-True (-not (Get-FoldTreeDecision -Head $Ship -ShipBranch $Ship -TrunkBranch 'main' -StatusLines @('?? notes.txt')).InPlace) `
+    'an untracked file counts as unclean here too'
+# AND THE TWO DECISIONS AGREE ABOUT WHAT DIRT IS. Step 2b and step 5 contradicting each other about the
+# same tree is the whole defect, so a blank capture line is not dirt in either of them.
+Assert-True (Get-FoldTreeDecision -Head $Ship -ShipBranch $Ship -TrunkBranch 'main' -StatusLines @('', '   ')).InPlace `
+    'blank status lines are not treated as changes, exactly as at step 2b'
+
+# THE TRUNK ARM IS EXEMPT, AND THIS IS THE ASSERT THAT KEEPS IT SO. git refuses `worktree add <path> main`
+# once the primary holds main, so sending a tree already standing there to the worktree arm would turn a
+# fold that mostly works into one that provably cannot. The state is reachable: step 2b returns a CLEAN
+# tree to the trunk, and something can write into it during the CI wait.
+$fdTrunkDirty = Get-FoldTreeDecision -Head 'main' -ShipBranch $Ship -TrunkBranch 'main' -StatusLines @(' M .claude/settings.json')
+Assert-True $fdTrunkDirty.InPlace 'a tree already on the trunk folds in place even when unclean -- git would refuse the worktree'
+Assert-True (Get-FoldTreeDecision -Head 'main' -ShipBranch $Ship -TrunkBranch 'main' -StatusLines @()).InPlace `
+    'and a clean one does too, which is the ordinary run since #1073'
+
+# HEAD MOVED: unchanged from #1069/#972, and asserted here because the sentence moved into this function.
+$fdMoved = Get-FoldTreeDecision -Head 'docs/other-work' -ShipBranch $Ship -TrunkBranch 'main' -StatusLines @()
+Assert-True (-not $fdMoved.InPlace) 'a checkout that moved to another branch is left alone'
+Assert-True ($fdMoved.Reason -like '*moved while CI ran*') 'and the sentence still says the session moved'
+Assert-True ($fdMoved.Reason -like "*'docs/other-work'*") 'and names where HEAD actually is'
+Assert-True ($fdMoved.Reason -like "*'$Ship'*") 'and what it was expected to be'
+Assert-True (-not (Get-FoldTreeDecision -Head 'HEAD' -ShipBranch $Ship -TrunkBranch 'main' -StatusLines @()).InPlace) `
+    'a detached HEAD (which rev-parse prints as ''HEAD'') takes the worktree arm too'
+
+# AN UNREADABLE HEAD TAKES THE WORKTREE ARM, deliberately: being wrong that way costs a temporary
+# directory, being wrong the other way costs the merged-but-unfolded half-state.
+$fdNoHead = Get-FoldTreeDecision -Head '' -ShipBranch $Ship -TrunkBranch 'main' -StatusLines @()
+Assert-True (-not $fdNoHead.InPlace) 'an unreadable HEAD takes the worktree arm'
+Assert-True ($fdNoHead.Reason -like '*could not be read*') 'and says so rather than inventing a branch name'
+Assert-True ($fdNoHead.Reason -notlike '*moved while CI ran*') 'and does not claim the checkout moved'
+
+# THE TRUNK IS THE CALLER'S PARAMETER HERE TOO: a consumer whose trunk is 'master' gets the same exemption.
+Assert-True (Get-FoldTreeDecision -Head 'master' -ShipBranch $Ship -TrunkBranch 'master' -StatusLines @(' M x')).InPlace `
+    'the trunk name is the caller''s, not hardcoded'
+Assert-True (-not (Get-FoldTreeDecision -Head 'master' -ShipBranch $Ship -TrunkBranch 'main' -StatusLines @()).InPlace) `
+    'and a tree on master is just another branch to a repo whose trunk is main'
+
+# THE STRIP IS THIS COMPOSER'S TOO (issue #1623). Both names in the moved-HEAD sentence are refs read off
+# git, so leaving either raw would sanitise one half of the line and print the other -- the exact defect
+# section 8 pins for the go-ahead line.
+$evilHead = 'docs/a' + [char]0x202E + 'b'
+$fdEvil = Get-FoldTreeDecision -Head $evilHead -ShipBranch 'docs/plain' -TrunkBranch 'main' -StatusLines @()
+Assert-True ($fdEvil.Reason -notmatch '[\p{Cc}\p{Cf}]') 'no control or format character survives into the worktree-arm sentence'
+Assert-True ($fdEvil.Reason -like "*'docs/a b'*") 'and the name still reads, stripped, so the operator can recognise it'
+
+# WHAT GIT MIGHT ACTUALLY HAND OVER: every one of these answers instead of throwing. This decision runs
+# AFTER the merge, so a function that throws here produces the very half-state it exists to prevent.
+Assert-True (-not (Get-FoldTreeDecision -Head '' -ShipBranch '' -TrunkBranch 'main' -StatusLines @()).InPlace) `
+    'an empty HEAD and an empty branch name answer rather than throwing'
+Assert-True (Get-FoldTreeDecision -Head $Ship -ShipBranch $Ship -TrunkBranch 'main').InPlace `
+    'omitting -StatusLines entirely is a clean tree, not an exception'
+
+# AND ship-pr ACTUALLY ASKS. The whole repair is one call site; a refactor that reinstated the old
+# `-eq $branch -or -eq 'main'` test would pass every assert above while restoring the defect.
+$shipText = [System.IO.File]::ReadAllText((Join-Path $RepoRoot 'scripts\release\ship-pr.ps1'))
+Assert-True ($shipText -match 'Get-FoldTreeDecision') 'ship-pr chooses its fold tree through this function'
+Assert-True ($shipText -match [regex]::Escape('if ($foldDecision.InPlace) {')) 'and branches on its answer rather than on HEAD alone'
 
 Write-Host ""
 if ($script:fail -gt 0) {
