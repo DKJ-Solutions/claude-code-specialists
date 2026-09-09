@@ -43,7 +43,43 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**30 / 69 minor entries** <!-- pending-tally -->
+**31 / 70 minor entries** <!-- pending-tally -->
+
+### DEPLOY: docs/1699-policy-is-adopted-craft-adapts · 20260909-122141
+
+*"The plugin serves the consumer's repo"* is now only half the story, and the README says which half.
+A specialist **team** adapts to the repo it lands in — that is a craft, and a craft that overrode its
+host would be worth less. **`dkj-policy` runs the other way**: nothing arrives unasked, and enabling it
+is choosing to be governed by it, with the consuming repo's own page yielding on conflict. The evidence
+that this reaches outward rather than being a local arrangement is a mechanism the plugin ships — a
+SessionStart check that reports a consumer's own prose when it claims precedence.
+
+The August 8, 2026 sentence was written when one claim could still cover everything that shipped, and
+its last clause now reads *"nothing travels outward **unasked** that assumes otherwise"*. The
+craft-versus-way-of-working test question below it is untouched and is what both halves point at; what
+#1699 adds is that **opt-in describes the install, not the obedience**.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+A consumer reading `dkj-policy`'s own front page now learns what installing it commits them to, in the
+place they meet the plugin — that page said *"not a baseline every consumer inherits"* and stopped
+there, which is true of the install and easy to read as a promise about the rest. Nothing they run
+changes, and no value they set changes: the portable page still names a seam wherever the repo owns the
+answer.
+
+**Score:** 3
+
+#### Pull Request
+
+The plugin serves the consumer -- except the policy, which the consumer adopts
+
+Plugins: dkj-policy
+
+[PR #1709](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1709)
+
+---
 
 ### DEPLOY: feat/1693-fixture-lib-dep-check · 20260909-120859
 
