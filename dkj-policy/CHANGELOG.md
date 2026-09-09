@@ -43,7 +43,43 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**36 / 82 minor entries** <!-- pending-tally -->
+**36 / 83 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1728-says-on-merged-captures · 20260909-180707
+
+The two test suites whose capture carries the child's error stream now read it with `Test-Says`, which
+strips whitespace from both sides and compares literally -- so a phrase the error formatter hard-wrapped
+mid-word is still found. 22 asserts converted across `publish-to-business.tests.ps1` and
+`cut-release-drive.tests.ps1`, including the negative direction, where the old form went **green for the
+wrong reason**: it reported absence and had actually measured a line break.
+
+The other six suites #1728 named are left exactly as they are, and that is the finding rather than a
+shortcut. A wrapped phrase needs two conditions together -- a capture that carries the error stream, and
+a script that emits the asserted phrase through `throw`/`Write-Error`/`Write-Warning` rather than
+`Write-Host`. Those six capture stdout only, from scripts with none of the three, so they are immune by
+construction; 311 of the report's 358 sites had no defect behind them. What made the difference
+measurable is written into the test engineer's lens beside the capture rule it completes, because the
+mechanism had until now been recorded only inside the seven suites already repaired -- where nobody
+writing an eighth would find it.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+Nothing here ships to a consumer: both files are this repo's own test suites, and the lens is
+repo-local. A consumer's own suites are subject to the same mechanism, and the rule that now describes
+it lives in a lens rather than in the portable manual -- so this reaches them only if the classification
+is later promoted.
+
+**Score:** N/A
+
+#### Pull Request
+
+Read merged child captures with Test-Says where the error formatter can reach them
+
+[PR #1738](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1738)
+
+---
 
 ### DEPLOY: fix/1731-gate-tolerant-capture-read · 20260909-175551
 
