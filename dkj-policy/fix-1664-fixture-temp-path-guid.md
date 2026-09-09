@@ -157,9 +157,17 @@ test **data**, not paths any run creates — plus one real fixture, which is rew
 
 Every temp fixture path in `scripts/tests/` now carries a fresh guid as well as `$PID`, and the rule in
 `test-suite-gate.tests.ps1` requires it — `$PID` alone no longer passes. 96 statements across 53 suites
-were rewritten to `<label>-$PID-<guid>` (97 with the one that arrived from `main` mid-branch), which is exactly how `New-ScratchPath` composes a path one
-layer up: the pid stays in front because it is what attributes a leftover to a run that is still alive,
-and the guid is what nobody can name in advance.
+were rewritten to `<label>-$PID-<guid>` (98 with the two that arrived from `main` mid-branch), which is
+exactly how `New-ScratchPath` composes a path one layer up: the pid stays in front because it is what
+attributes a leftover to a run that is still alive, and the guid is what nobody can name in advance.
+
+Both of those two are the same shape, and worth naming because it is the one this branch cannot close
+by itself: a suite written on `main` while the rule lived only here arrives green by its own lights and
+guid-less by ours. The second, `fanout-lib.tests.ps1`, composed `fanout-lib-test-$PID` and stood at it
+with both `New-Item -ItemType Directory -Force` and `Remove-Item -Recurse -Force` — the write half and
+the teardown half of exactly the failure above. The gate is what caught each of them on the merge, which
+is the argument for the gate rather than against the branch: once this lands, `main` carries the rule and
+the next such suite is refused where it is written instead of here.
 
 This is the half [#1659](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1659) did not
 close. `$PID` is neither secret nor large, so a composed leaf was a name a local actor could reach
