@@ -43,7 +43,45 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**32 / 75 minor entries** <!-- pending-tally -->
+**33 / 76 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1713-local-to-ci-ratio-backwards · 20260909-153554
+
+A shipped lib, its recorder and the hints file that recorder writes all stated the local-to-CI suite
+ratio as a fact — *"3.6-4.0x faster on a developer machine"* — and it was backwards. Measured: one suite
+took **759.1s solo on an 18-thread workstation against a 290.9s mean over three 4-lane CI runs**, which
+is 2.6x *slower*, and a third configuration agrees with neither. So there is **no ratio to divide out and
+the sign is not even fixed**, and every site now says that instead of a number. A reader who trusted the
+old sentence and converted a local figure by ~3.8 landed about ten times out.
+
+**The conclusion it was there to support is unaffected and reinforced.** The reason `suite-durations.json`
+is committed rather than written by the gate was never the size of the ratio: CI is a different machine,
+not a scaled one, so its durations cannot be derived from a workstation at all.
+
+**And the evidence document carried the old claim too**, which the filing had not caught — the
+performance lens used the ratio to predict a suite's CI duration, in the same file that measured its
+absence. The prediction stays as the worked example of the trap, with the correction beside it.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+A consumer receives the corrected docstring in `native-capture-lib.ps1` through both plugin mirrors, and
+the hints note in their own regenerated `suite-durations.json` if they run the recorder. Nothing they run
+behaves differently — the gate never read the number — but anybody sizing their own CI off a local run
+was being told to divide by a figure that does not exist.
+
+**Score:** 2
+
+#### Pull Request
+
+The local-to-CI suite ratio is not a constant, and it was stated backwards
+
+Plugins: dkj-policy, dkj-team-shopify
+
+[PR #1722](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1722)
+
+---
 
 ### DEPLOY: fix/1700-1701-load-sensitive-suites · 20260909-152912
 
