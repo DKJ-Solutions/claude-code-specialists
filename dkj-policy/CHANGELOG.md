@@ -43,7 +43,49 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**32 / 74 minor entries** <!-- pending-tally -->
+**32 / 75 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1700-1701-load-sensitive-suites · 20260909-152912
+
+Two test suites stopped racing a wall-clock bound under the test gate's own parallel lanes, and in
+neither case by widening a number -- which is what
+[#1232](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1232) did, and why this class
+reopened twice.
+
+`native-capture.tests.ps1` no longer guesses how long two cold PowerShell 5.1 startups take: it runs the
+same launch once, unbounded and unkilled, polls for the grandchild's marker with a stopwatch, and derives
+its ladder from that reading -- 4x, floored at 6s so an idle machine pays roughly what this fixture always
+paid, capped at 60s so a pathological reading cannot hang the gate behind one suite. The ladder survives,
+with one derived rung above the calibrated one, because a calibration is itself a sample. The measured
+figure is printed and named in the assert that would fail, so a miss at both rungs reads as the machine
+rather than as the code under test.
+
+`connector-sessioncheck.ps1`'s 30s version bound is now `-VersionTimeoutSeconds`, defaulted to 30 -- a real
+session start behaves exactly as before. The bound was a literal at its call site, where the one caller that
+must raise it, this hook's own suite, could not; that suite now raises it once in the helper every block
+shares. The un-degraded output stays pinned rather than being relaxed to "either shape", and the degraded
+shape gets a scenario of its own: a fake engine that sleeps five seconds against a bound of one, so the
+exit-124 line is forced on any machine at any load instead of being raced for.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+N/A. The hook travels in `dkj-policy`, so a consumer receives the new parameter, but its default is the
+figure the call site already used and nothing on their side passes it -- a session start there prints
+exactly what it printed before. The two suites are this repo's own gate and are mirrored into no plugin.
+
+**Score:** N/A
+
+#### Pull Request
+
+Two suites stop racing a wall-clock bound under the gate's own load
+
+Plugins: dkj-policy
+
+[PR #1721](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1721)
+
+---
 
 ### DEPLOY: fix/1710-refreshbody-recheck · 20260909-151207
 
