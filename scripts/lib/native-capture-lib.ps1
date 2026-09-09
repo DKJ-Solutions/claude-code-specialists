@@ -157,15 +157,42 @@ function Test-GateSuiteCrashed {
         under CommandSearcher.SearchForFunctions -- a Get-Command probe faulting while walking the
         function table. Re-run alone on the same tree: 'OK: all 49 asserts passed.'
 
-        THE TEST IS THE SIGN BIT, and it is exact rather than a list of known codes. A process killed
-        by an unhandled structured exception exits with that exception's NTSTATUS -- 0xC0000005 for an
-        access violation, 0xC00000FD for a stack overflow -- every one of which has the high bit set
-        and therefore arrives as a NEGATIVE Int32. A suite's own verdict never can: it exits through
-        `exit 0` or `exit 1`. So no crash code has to be enumerated and none can be missed.
+        THE TEST IS NTSTATUS'S SEVERITY FIELD, which is exact without being a list of known codes. A
+        process killed by an unhandled structured exception exits with that exception's NTSTATUS, and
+        every member of that family carries severity STATUS_SEVERITY_ERROR in its top two bits --
+        0xC0000005 access violation, 0xC00000FD stack overflow, 0xC0000374 heap corruption,
+        0xC0000409 stack buffer overrun. So the window is 0xC0000000..0xCFFFFFFF and nothing inside
+        the family has to be enumerated or can be missed.
+
+        THE WINDOW IS NARROWER THAN 'ANY NEGATIVE Int32', AND THAT IS THE POINT (Sebastian's security
+        review of this change). The first version tested the sign bit alone, which is forgeable by the
+        very content this gate exists to judge: `exit -1` is a line any .tests.ps1 may write, it
+        arrives as 0xFFFFFFFF, and under the sign-bit test it would have bought that suite a free
+        re-run -- turning the neighbouring promise, that an ordinary verdict is NEVER retried, into
+        something the suite itself got to opt out of. 0xFFFFFFFF is outside this window, as is every
+        small negative a script would plausibly choose.
+        WHAT IT DOES NOT CLAIM is proof that the OS did the killing. An exit code is not a signal, and
+        a suite determined to land inside the window still can. That is accepted rather than papered
+        over, on the measurement that a suite wanting a green gate has `exit 0` available and needs
+        none of this: the window is here to stop an ACCIDENT -- a negative code that was never a crash
+        -- not to withstand the repo's own content. Measured at the time of writing: no suite or lib
+        under scripts/ exits negative at all.
+
+        AND IT IS ASKED OF SUITES ONLY. Get-TestCommands entries are judged in their own block further
+        down, which propagates a native tool's exit code directly -- a tool returning a negative value
+        is not given a re-run, because there the code is the command's answer rather than a process's
+        gravestone.
     #>
     param([Parameter(Mandatory = $true)][AllowNull()][object]$ExitCode)
     if ($null -eq $ExitCode) { return $false }
-    return ([int]$ExitCode -lt 0)
+    $code = [int]$ExitCode
+    # THE BOUNDS ARE WRITTEN AS THE HEX THEY COME FROM, and no conversion is needed to compare them:
+    # Windows PowerShell parses 0xC0000000 as the Int32 -1073741824, which is exactly the value .NET's
+    # Process.ExitCode hands back for that status. So the line reads as the NTSTATUS window it is.
+    # A [uint32] cast is NOT the way to do this -- PowerShell's is checked and throws on a negative.
+    # The facility bits matter as much as the severity: 0xFFFFFFFF (`exit -1`) also carries severity
+    # ERROR, and is excluded only because 0xCxxxxxxx pins the facility to NT's own.
+    return ($code -ge 0xC0000000 -and $code -le 0xCFFFFFFF)
 }
 
 function Format-GateExitCode {

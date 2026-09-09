@@ -36,7 +36,7 @@
 
 ### PLAN
 
-Two shapes, both diagnosed. Shape 1: the gate judges on exit code alone, so an unhandled AccessViolationException reads as FAILED (exit -1073741819) -- a crash reported as a verdict. Shape 2: release-notes-page.tests.ps1:305 searches PowerShell's console rendering of a throw, which hard-wraps mid-word; measured at width 120 the phrase is absent from the message body and the assert survives only on the FullyQualifiedErrorId echo.
+Two shapes, both diagnosed. Shape 1: the gate judges on exit code alone, so an unhandled AccessViolationException reads as FAILED (exit -1073741819) -- a crash reported as a verdict. Shape 2: the ordering assert in release-notes-page.tests.ps1 case 7 ('the recoverable route is named before the destructive one') searches PowerShell's console rendering of a throw, which hard-wraps mid-word; measured at width 120 the phrase is absent from the message body and the assert survives only on the FullyQualifiedErrorId echo. Cited by name rather than by line: it sat at :305 when this branch was opened, and this branch's own edit moved it.
 
 #### What the report inferred, and what the tree actually says
 
@@ -62,6 +62,10 @@ from the tree before anything was built.
       `FAILED (exit -1073741819)` and does not enter the suite in `$failedNames`.
 - [x] Shape 1 -- a crashed suite is re-run ALONE, once, after the pool has emptied, and the
       green verdict names the crash so the quoted line is not the one place it is invisible.
+- [x] Shape 1 -- narrow the discriminator from the sign bit to NTSTATUS's own error window
+      (`0xC0000000..0xCFFFFFFF`), on Sebastian's security review: `exit -1` is a line any
+      `.tests.ps1` may write and arrives as `0xFFFFFFFF`, so the sign-bit test let a suite hand
+      ITSELF the re-run that the promise beside it exists to deny.
 - [~] Shape 1 -- change the seam-probe idiom that faulted. Dropped from this branch: one
       sighting of a 5.1 engine fault, unreproduced, against 68 call sites. Filed as
       [#1729](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1729) with the
@@ -77,12 +81,19 @@ from the tree before anything was built.
       deterministic and carry no console -- they hold the measured wrapped literal, assert that
       `IndexOf` really does miss it, that `Test-Says` finds it, and that a genuinely absent
       phrase stays absent.
-- [x] `test-suite-gate.tests.ps1`: case 8, 21 asserts. A suite that crashes once and passes
+- [x] `test-suite-gate.tests.ps1`: case 8, 31 asserts. A suite that crashes once and passes
       alone (gate green, crash named on the verdict), one that crashes both times (gate red,
       called a crash), and the guard that matters most -- a suite exiting 1 runs **exactly
       once**, counted through a fixture that appends to a file.
-- [x] The discriminator's own asserts: `0xC0000005` and `0xC00000FD` read as crashes, `exit 0`,
-      `exit 1` and a `$null` code do not.
+- [x] The discriminator's own asserts: `0xC0000005`, `0xC00000FD` and `0xC0000409` read as crashes;
+      `exit 0`, `exit 1`, a `$null` code, `0xFFFFFFFF`, `0xFFFFFFFE` and `0x80000000` do not.
+- [x] The forged-crash case as a live fixture: a suite that writes `exit -1` and would pass on a
+      second invocation fails the gate, is not called a crash, and is proved by a run counter to
+      have been invoked exactly once. Plus a tree-wide assert that no script under `scripts/`
+      exits negative at all, which is the measurement the docstring cites.
+- [x] Shape 2's mechanism, measured rather than argued: sweeping the interpolated path's length
+      over 130 values, 9 of them (a contiguous band, which is a wrap boundary sliding through the
+      phrase) make the OLD assert fail. The assert's verdict was a function of a temp path's length.
 - [x] Lint gate + all suites via `open-pr.ps1`.
 
 ### DEPLOY: fix/1723-gate-crash-vs-verdict
@@ -93,10 +104,15 @@ The 30-lane test gate stops reporting two things that were never failures as fai
 alone, so a child killed by an unhandled `AccessViolationException` inside the PowerShell engine
 came back as `FAILED (exit -1073741819)` -- which reads as a suite that ran and said no. It did
 not run: it wrote no `[FAIL]` line and no summary, so every minute spent looking for the failing
-assert was spent on an assert that does not exist. The discriminator is the sign bit, which is
-exact rather than a list of known codes: a killed process exits with its exception's NTSTATUS
-(high bit set, so a negative `Int32`), and a suite's own verdict never can. Such a suite is now
-reported as CRASHED with the code as hex, and re-run ALONE once after the pool empties -- which
+assert was spent on an assert that does not exist. The discriminator is NTSTATUS's own error
+window, `0xC0000000..0xCFFFFFFF`, which is exact without being a list of known codes: every
+unhandled structured exception exits with a status in that window -- access violation, stack
+overflow, heap corruption, stack buffer overrun -- and nothing inside the family has to be
+enumerated. It is deliberately narrower than "any negative exit code", which was the first
+version and was forgeable by the very content the gate judges: `exit -1` arrives as `0xFFFFFFFF`
+and would have bought that suite the free re-run the promise below exists to deny it. Such a
+suite is now reported as CRASHED with the code as hex, and re-run ALONE once after the pool
+empties -- which
 is what the gate's own docstring already told a reader to do by hand. Green on the re-run leaves
 the gate green and still names the crash on the verdict line; a second crash, or a real failure
 the crash was hiding, is red. **An ordinary failure is never retried**: an `exit 1` has measured
@@ -107,7 +123,10 @@ a `Write-Warning` reach a capture through PowerShell's error formatter, which ha
 host's buffer column *inside a word* -- so at width 120 `-InitToken for a fresh path` arrives as
 `-InitToken fo` + newline + `r a fresh path` and the phrase is absent from the message body. The
 assert had been passing on a `FullyQualifiedErrorId` echo further down the same rendering, a
-coincidence of arithmetic between the width and the length of a temp path. Fifteen asserts in that
+coincidence of arithmetic between the width and the length of a temp path -- and that is measured
+rather than argued: sweeping the interpolated path's length over 130 values, 9 of them fail the old
+assert, in one contiguous band, which is what a wrap boundary sliding through a 27-character phrase
+looks like. Fifteen asserts in that
 suite now go through the `Test-Says` helper seven other suites have carried since #1512, and the
 ordering assert requires both phrases to be found rather than accepting `-1` for either.
 

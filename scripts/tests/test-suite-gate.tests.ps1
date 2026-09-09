@@ -687,15 +687,53 @@ exit 1
     Assert-Says $r.Flat 'FAILED (exit 1)' 'and is reported as a failure, not as a crash'
     Assert-True ($r.Flat -notmatch 'CRASHED') 'with no crash wording anywhere in the run'
 
-    # 8d. The discriminator itself, in-process: the sign bit, not a list of known codes.
+    # 8e. A NEGATIVE EXIT CODE IS NOT ENOUGH -- the window is NTSTATUS's, not the sign bit's.
+    #
+    # WHY THIS CASE EXISTS (Sebastian's security review of #1723). The first version of the
+    # discriminator tested the sign bit alone, and `exit -1` is a line any .tests.ps1 may write: it
+    # arrives as 0xFFFFFFFF, so under that test a suite could hand ITSELF the free re-run that the
+    # neighbouring promise -- an ordinary verdict is never retried -- exists to deny it. The fixture
+    # below is that exact suite, and it must be treated as an honest red.
+    $negOne  = Join-Path $Fixture 'suites-exit-minus-one'
+    $negRuns = Join-Path $Fixture 'neg-runs.txt'
+    New-FakeSuite -Dir $negOne -Name 'sneaky.tests.ps1' -Body @"
+Add-Content -LiteralPath '$negRuns' -Value 'run'
+if ((@(Get-Content -LiteralPath '$negRuns')).Count -ge 2) { Write-Host 'MARKER-SECOND-CHANCE'; exit 0 }
+Write-Host 'MARKER-NEGATIVE-ONE'
+exit -1
+"@
+    $r = Invoke-Gate -TestsDir $negOne
+    if ($r.CaptureDir) { $script:KeptCaptureDirs += $r.CaptureDir }
+    Assert-True ($r.Text -match 'GATE-RESULT: False') 'a suite exiting -1 fails the gate -- a negative code is not a crash claim'
+    Assert-Equal 1 (@(Get-Content -LiteralPath $negRuns)).Count 'and it got NO second chance, so a suite cannot hand itself one'
+    Assert-True ($r.Flat -notmatch 'CRASHED') 'and nothing calls it a crash'
+    Assert-True ($r.Text -notmatch 'MARKER-SECOND-CHANCE') 'the pass it had waiting was never reached'
+
+    # 8f. The discriminator itself, in-process: the NTSTATUS window, not a list of known codes.
     . $LibPath
     Assert-True (Test-GateSuiteCrashed -ExitCode -1073741819) '0xC0000005 (access violation) reads as a crash'
     Assert-True (Test-GateSuiteCrashed -ExitCode -1073741571) '0xC00000FD (stack overflow) reads as one too -- no code is enumerated'
+    Assert-True (Test-GateSuiteCrashed -ExitCode -1073740791) '0xC0000409 (stack buffer overrun) as well -- the whole facility, not four literals'
+    Assert-True (-not (Test-GateSuiteCrashed -ExitCode -1)) '0xFFFFFFFF is NOT a crash: severity ERROR, but not NT'"'"'s own facility'
+    Assert-True (-not (Test-GateSuiteCrashed -ExitCode -2)) 'nor is any other small negative a script would choose'
+    Assert-True (-not (Test-GateSuiteCrashed -ExitCode -2147483648)) 'nor 0x80000000, whose severity is WARNING'
     Assert-True (-not (Test-GateSuiteCrashed -ExitCode 1)) "a suite's own 'exit 1' is a verdict"
     Assert-True (-not (Test-GateSuiteCrashed -ExitCode 0)) 'and so is exit 0'
     Assert-True (-not (Test-GateSuiteCrashed -ExitCode $null)) 'an empty exit code is not claimed as a crash'
     Assert-Equal '0xC0000005' (Format-GateExitCode -ExitCode -1073741819) 'a crash code is printed as hex'
+    Assert-Equal '0xFFFFFFFF' (Format-GateExitCode -ExitCode -1) 'a negative that is not a crash still prints as hex -- the formatter judges nothing'
     Assert-Equal '1' (Format-GateExitCode -ExitCode 1) 'an ordinary one is printed as itself'
+
+    # AND THE REPO ITSELF MUST NOT HOLD ONE, which is the measurement the docstring cites. A suite or
+    # lib exiting negative would land in the window's blind spot by accident rather than by design.
+    $negOffenders = @()
+    foreach ($f in @(Get-ChildItem (Join-Path $RepoRoot 'scripts') -Recurse -Filter *.ps1 -File)) {
+        if ($f.FullName -eq $PSCommandPath) { continue }   # this file's own fixtures say `exit -1` on purpose
+        foreach ($m in [regex]::Matches((Get-Content -LiteralPath $f.FullName -Raw), '(?m)^\s*exit\s+-\d')) {
+            $negOffenders += $f.Name
+        }
+    }
+    Assert-Equal 0 $negOffenders.Count ("no script under scripts/ exits negative (offenders: " + ($negOffenders -join ', ') + ")")
 }
 finally {
     if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture -ErrorAction SilentlyContinue }

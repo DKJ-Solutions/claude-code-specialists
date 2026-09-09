@@ -91,6 +91,14 @@ function Test-Says {
        the 30-lane gate and green standalone. `Write-Host` is NOT affected: a 295-character line came
        back whole, which is why the Write-Host-fed asserts here are left as Assert-Match.
 
+       THE COINCIDENCE IS MEASURED, NOT ARGUED, because "it depends on the width" is the kind of
+       explanation that sounds sufficient and proves nothing. Holding the width fixed and sweeping the
+       ONE quantity this suite actually varies -- the length of the interpolated token path, which
+       moves with $PID's digit count here and with $env:TEMP on another machine -- over 130 values:
+       9 of them fail the old assert, in ONE CONTIGUOUS BAND. A band is the signature; it is a wrap
+       boundary sliding through a 27-character phrase, and it is why a green run on this machine was
+       never evidence about a run on any other.
+
        Strips ALL whitespace from both sides. Normalizing '\s+' to a single space repairs a wrap
        BETWEEN words and does nothing for a wrap INSIDE one. Which asserts straddle a break is
        decided by the width, so a green run is not evidence.
@@ -121,6 +129,7 @@ function Assert-Says {
         $script:fail++; Write-Host "  [FAIL] $Name`n         wanted to find: '$Phrase'" -ForegroundColor Red
     }
 }
+
 function Write-FixtureFile {
     param([string]$Path, [string]$Content)
     $dir = Split-Path -Parent $Path
