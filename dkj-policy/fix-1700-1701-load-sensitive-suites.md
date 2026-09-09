@@ -103,4 +103,3 @@ exactly what it printed before. The two suites are this repo's own gate and are 
 
 Two suites stop racing a wall-clock bound under the gate's own load
 
-Plugins: dkj-policy
