@@ -209,7 +209,7 @@ It asserts strictly less than `-match` does, and it destroys any assert that car
 #### The three flatteners are not equally safe, and the ranking is measured
 
 A suite that captures a child also has to flatten the records before it matches. Three ways of doing
-that are in the tree and their docstrings disagreed about which is safe. Measured by padding a
+that were in the tree and their docstrings disagreed about which is safe. Measured by padding a
 `Write-Error` until its break swept every column of a 120-wide render -- 120 wrap positions x 4
 phrases, 480 checks per variant:
 
@@ -239,6 +239,27 @@ defect named above.
 **Say which of the two you did.** A green suite before and after is the expected result of a hardening,
 so a commit that claims a fix and shows no failing assert is unreadable a month later. State the
 measurement, and say plainly that nothing was letting a phrase through when that is what you found.
+
+**The top row is no longer in the tree** ([#1742](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1742),
+September 9, 2026). Two copies of it were found and both are gone: `find-specialist-mentions.tests.ps1`
+was a **hardening** — it asserts no formatter-emitted phrase, so all 480 checks were moot there and its
+safety was an accident of what it happens to read — and `shared-scripts.tests.ps1`, which collapsed the
+break inline at one call site rather than in a named helper, was a **repair**. That second one is the
+lesson worth carrying, and it has three parts:
+
+- **The issue's own inventory named one copy and there were two**, because a search for the *helper*
+  (`Get-FlatOutput`) cannot see a substitution typed at a call site. Search for the substitution.
+- **It was the exposed one**, and by both conditions at once: its three positive asserts read an
+  `open-pr` **`Write-Warning`**, which is exactly the formatter path the 68-in-480 was measured on.
+- **Its comment argued the case that had already been disproved** — *"wrapping only ever inserts a
+  newline where a space was, so collapsing whitespace restores the sentence verbatim"* — written after a
+  red CI run, which is what made it read as settled. A break inside a word is the counter-example, and
+  the phrases it guarded are long enough to meet one.
+
+And the negative assert beside them is the sharpest reason this class is worth removing rather than
+ranking: **a mangled phrase makes a `-notmatch` pass**. That assert existed to prove `open-pr` stays
+quiet on the ordinary path, and under the collapse variant it would have reported exactly that for a
+warning which was printed and merely wrapped.
 
 In short: the **how** (automated tests, regression guarding) is portable; the **what** (the
 PowerShell scripts as the test surface, and building out a suite once the lint gate warrants it)

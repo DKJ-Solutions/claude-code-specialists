@@ -117,6 +117,13 @@ function Get-FlatOutput {
         their summary lines described the other variant; both were corrected alongside this one. No
         suite in the tree was found to be letting a wrapped phrase through.
 
+        AND SINCE #1742 NO SUITE IS ON THE FAILING VARIANT EITHER (September 9, 2026). The two
+        paragraphs above are left as written -- they are dated measurements -- but the sentence they
+        end on has moved: find-specialist-mentions.tests.ps1 now joins with '' like this file. It was
+        changed while nothing was failing there, precisely because the safety was an accident of what
+        that suite happens to assert, and the first refusal assert added to it would have inherited the
+        68-in-480 variant.
+
         WHICH MAKES THE ASSERT-SAYS CONVERSION BELOW A HARDENING, NOT A FIX, and it is worth saying so
         plainly. Joining with '' reconstructs a mid-word split exactly, and survives a split on a space
         only because PowerShell keeps that space at the end of the line it wrapped -- a property of the
