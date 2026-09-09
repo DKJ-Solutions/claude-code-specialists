@@ -1236,13 +1236,37 @@ Write-Host "  Open that second terminal in a lane: scripts\task\worktree-lane.ps
 # that lands in the stretch between the last REQUIRED check and the last check of any kind voids a
 # certificate that was valid the moment before -- and it costs a whole further CI lap on a refusal
 # that is, on the gate's own terms, correct. Measured on 99 ci.yml pull_request laps,
-# 2026-09-05..2026-09-08 (issue #1602, refused laps included, which is why it is per-lap and not per
-# merged PR -- a merged PR's `gh pr checks` reports only its final head):
+# 2026-09-05 17:58Z .. 2026-09-08 10:51Z (issue #1602, refused laps included, which is why it is
+# per-lap and not per merged PR -- a merged PR's `gh pr checks` reports only its final head):
 #
 #   a non-required check governed the wait                 21 of 99 (21.2%)   median tail 191s, max 753s
 #   certificate voided, after #1592's fold discount        25 of 99 (25.3%)
 #   voided ONLY inside that non-required tail               5 of 99  (5.1%)  <- what this removes
 #   voided inside the tail AND before it                    0 of 99
+#
+# THE PREDICATE, BESIDE THE NUMBER (issue #1750). A rate whose window and population are unstated
+# cannot be re-measured, only argued with. Population: every `ci.yml` `pull_request` run in that
+# range, one row per LAP. Window per lap: [run.created_at, last_check.completed_at] -- it ends at the
+# LAST CHECK OF ANY KIND, not at the required one's conclusion and not at the run's own `updated_at`,
+# which is what makes the two 'tail' rows above meaningful at all. Voided = 'main' gained a
+# first-parent commit inside that window; the discount is Test-IsFoldOnlyCommit itself, re-run over
+# the same 99 laps with this repo's own seams and reported identical (#1602's second comment).
+#
+# AND THE VOIDING ROW IS UNRECONCILED, which is why the predicate is written down here rather than
+# left in the thread (issue #1750). A re-measurement over the same four days scored 3 of 193 laps
+# (1.6%) against this row's 25.3%. The window is the obvious suspect -- that pass ended its own at
+# `run.updated_at`, inside the tail -- but THE ROWS ABOVE BOUND THE WINDOW'S SHARE AT 5: tail-only is
+# 5 and tail-and-before is 0, so narrowing this window to the required check's conclusion moves 25.3%
+# to 20.2% and no further. The residual sits in the DISCOUNT: this sample discounted 12 of its 37 raw
+# voidings (32%), the re-measurement 39 of 42 (93%), against a trunk that ran 114 folds in 255
+# first-parent commits (44.7%) over those same four days by the real classifier. Neither pass has been
+# shown wrong, and the direction is identical in both -- which is all #1602's decision rests on. But a
+# decision SIZED off 25.3% is being sized off the half that is still open.
+#
+# WHAT #1715 DID AND DID NOT MOVE, since the inference is easy and wrong. Dropping ship-pr's third
+# local gate run shortens the stretch between a green certificate and the merge attempt, so it lowers
+# how often this gate ACTUALLY refuses. It does not touch the rows above: those count commits inside a
+# window bounded by CI's own check timestamps, and the run #1715 removed ran after the last of them.
 #
 # 21.2% reconfirms #831's own n=100 finding of 23% for a third time. The 5.1% is the whole benefit
 # and it is small -- but all five sit on ONE day, the busiest in the sample: 5 of the 8 tail-governed
