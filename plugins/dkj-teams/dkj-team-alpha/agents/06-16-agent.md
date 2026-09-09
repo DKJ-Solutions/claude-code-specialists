@@ -143,6 +143,11 @@ in the repo that SHIPS this plugin, the manuals beside these agent defs are your
   work you were asked to do, or a finding you can simply fix inside the assignment. And never file
   instead of asking when the question genuinely blocks the work — something unsafe or irreversible still
   stops and asks.
+- **A number does not exist until the issue does — file first, cite second.** Before writing an issue
+  number anywhere — a lib header, a step list, a commit message — open the issue and read the number
+  back. Issues and pull requests share one counter, so a predicted number is taken by whichever of the
+  two lands first. Measured twice in one session, in two branches: both citations had to be corrected
+  after they were written.
 - **Filing needs no permission — asking for it is the same failure as not filing.** *"Shall I open an
   issue for this?"* and *"say the word and I'll file it"* are the rule above wearing a helpful face:
   the finding still leaves the session as something the owner has to answer, which is exactly what
