@@ -106,9 +106,10 @@ is a one-call change: all the reading is in the lib and `Get-FixtureDepReport` i
   through `[char]92`/`[char]47` now, and the reason is written beside them.
 - **The memo was keyed on the path.** That is correct for the gate -- one report over a tree nothing
   is writing to -- and wrong for this lib's own suite, which rewrites the same fixture names between
-  sections. Two asserts went red on a stale answer, and it read as a closure bug. Keyed on path +
-  last-write ticks + length now, with its own regression assert, because a cache that is only correct
-  while every caller remembers not to rewrite a file is the enforced-by-memory shape.
+  sections. Two asserts went red on a stale answer, and it read as a closure bug. **Found in a memo I
+  had written, and it survived into the shared one**: the code review then removed my walker in favour
+  of `script-contract-lib.ps1`'s, whose memo had the identical path-only key -- so the same two asserts
+  went red a second time, and the repair moved to the lib that owns it. See the review section below.
 
 
 #### What the reviews changed, and one of them changed the design
