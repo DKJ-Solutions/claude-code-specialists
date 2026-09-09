@@ -17,31 +17,38 @@
     park-cycle.tests.ps1 went 10 of 91 asserts red, while park-branch (31) and park-commit (28)
     exercised the same lib and stayed green because neither asserts that note.
 
-    THE DEPENDENCY IS READ THROUGH THE VARIABLE, NOT OFF THE DOT-SOURCE LINE, and that is the whole
-    reason this is a lib rather than three regexes in a suite. The shape this repo actually uses is:
+    THE DEPENDENCY IS READ THROUGH THE VARIABLE, NOT OFF THE DOT-SOURCE LINE. The shape this repo
+    actually uses is:
 
         $parkPorcelainLib = Join-Path $PSScriptRoot 'git-porcelain-lib.ps1'
         if (Test-Path -LiteralPath $parkPorcelainLib -PathType Leaf) { . $parkPorcelainLib }
 
     so the dot-source command's own text is `. $parkPorcelainLib` and carries NO filename at all. A
     reader that matches on the dot-source's extent finds nothing -- measured against
-    origin/fix/1682-porcelain-line-parse, the only real instance of the class, where it missed it
-    outright. So a variable is resolved to its assignment in the same file and the literal is taken
-    from there.
+    origin/fix/1682-porcelain-line-parse, the only real instance of the class, where the first version
+    of this lib missed it outright.
 
-    A LITERAL IS NOT ENOUGH ON ITS OWN, EITHER, WHICH IS WHY THE DOT-SOURCE GATES THE READ. Naming a
-    '.ps1' in a string is not the same as depending on it: shared-scripts-lib.ps1's registry names
-    every mirrored script in the tree, and a reader that took every '.ps1' literal would report all of
-    them. Only a literal that some dot-source actually reaches counts.
+    AND THAT READING IS NOT DONE HERE. script-contract-lib.ps1 already resolves it --
+    Get-ScriptDotSourceTargets, with Get-AstPathHints doing the variable half -- so this lib delegates
+    and converts the answer to bare leaves. The first version did not, and a second AST walker is
+    exactly the "second literal" defect its own sibling issue (#1682) is about; the code review on this
+    branch is what caught it. Get-DotSourcedLibName carries the whole argument.
 
-    COMMENTS CANNOT REACH ANY OF IT, and that is a property rather than an accident. park-lib.ps1's
-    own header carries `. (Join-Path $PSScriptRoot '..\lib\park-lib.ps1')` as an .EXAMPLE; the AST
-    does not see comments, so it cannot be mistaken for a self-dependency. This is the same reason
-    check-plugin-integrity.ps1's fixture-git check reads the AST rather than the line text.
+    WHAT IS GENUINELY THIS LIB'S OWN is the other half of the question: which libs a SUITE copies into
+    its fixture, which nothing else in the tree reads. That is Get-FixtureCopiedLibName, and it is
+    where the two false findings a naive version produced were repaired.
 
     Pure ASCII (repo convention for .ps1). No Set-StrictMode: dot-sourcing would change the strict
     mode of the calling script.
 #>
+
+# THE SHARED DOT-SOURCE WALKER, AND THIS LOAD IS DELIBERATELY UNGUARDED. Every sibling dot-source in
+# this tree is wrapped in `if (Test-Path ...)` because those libs travel to consumers, where a mirror
+# may predate the file. This one does not travel: it is repo-local, read by one repo-local suite, and a
+# missing sibling here is a broken checkout rather than an older consumer -- so it must fail loudly on
+# load instead of leaving Get-DotSourcedLibName undefined, which is precisely the silence this whole
+# lib exists to remove. Dot-sourcing it twice is harmless if a caller has already loaded it.
+. (Join-Path $PSScriptRoot 'script-contract-lib.ps1')
 
 # Separators are normalised through these rather than through a '\\' in a pattern. Written as code
 # points because a backslash pair does not survive every layer this repo's scripts get written by --
@@ -73,9 +80,6 @@ $script:FixtureDepLeafPattern = '(?:^|/)([A-Za-z0-9_.-]+\.ps1)$'
 # purpose; see Get-FixtureCopiedLibName for why that needs an opt-out on the suite instead.
 $script:FixtureDepRepoOwnedSeam = @('branch-info.ps1')
 
-# Get-DotSourcedLibName's per-path memo. Declared here rather than on first use: see that function for
-# why the lazy form cannot work under Set-StrictMode.
-$script:FixtureDepDotSourceCache = @{}
 
 function Get-FixtureDepRepoOwnedSeam {
     <# The repo-owned seam files a fixture does not owe a copy of. Exposed so a suite can assert the
@@ -119,96 +123,49 @@ function Get-DotSourcedLibName {
     <#
         Every sibling lib ONE .ps1 dot-sources, as bare '<name>.ps1' leaves.
 
-        Two shapes are read, and the second is the one that matters here:
-          - a literal              `. (Join-Path $PSScriptRoot 'x-lib.ps1')`
-          - a variable             `. $someLib`, resolved to its assignment in the SAME file
+        THIS DELEGATES, AND THAT IS THE POINT OF IT. The first version of this function was a second
+        AST walker: it found dot-source commands, resolved a variable to its last assignment, and read
+        the '.ps1' literal out of the right-hand side. All of that already existed in
+        script-contract-lib.ps1 -- Get-ScriptDotSourceTargets, with Get-AstPathHints doing the variable
+        resolution -- and that lib's own docstring says why: '$VarMap carries the same shape per
+        variable name so ". $configPath" resolves through its assignment, which is how three of the
+        four dot-source shapes in this tree are written'.
 
-        Resolution is deliberately file-local and takes the LAST assignment before the dot-source. A
-        real data-flow analysis would be a different kind of thing entirely, and the pattern in this
-        tree is one assignment immediately above one guarded dot-source -- so anything cleverer would
-        be answering a question nobody here asks. A variable this file never assigns yields nothing
-        rather than a guess.
+        SO THE SECOND ENGINE WAS THE DEFECT THIS BRANCH'S SIBLING ISSUE IS ABOUT. #1682 is "the git
+        porcelain line parse is a second literal", and writing a rival dot-source resolver in the same
+        week would have been the same mistake with a citation attached. Found by the code review on
+        this branch rather than by me, which is worth recording: the duplication was invisible from
+        inside the file, because both halves read correctly on their own.
+
+        WHAT DELEGATING GAINED, beyond one engine instead of two. Get-ScriptDotSourceTargets already
+        handles two shapes the hand-rolled reader did not: a path built from the REPO ROOT rather than
+        $PSScriptRoot, and the `& { . $args[0] }` idiom. It also drops a target that resolves to no
+        existing file, which is the same judgement Get-FixtureDepFinding was making one layer later.
+
+        WHAT IS LEFT HERE IS THE SHAPE CONVERSION, and it is the whole reason this wrapper exists at
+        all rather than the callers calling through: that function answers in absolute paths, and every
+        question this lib asks is about a bare leaf, because a fixture's copy list is a list of leaves.
+        Split-Path -Leaf is the entire difference.
+
+        -RepoRoot is passed through because that function needs it to try the repo-root base. A caller
+        with no repo (this lib's own suite, working in a sandbox) passes the sandbox root, which is the
+        honest answer for that tree.
     #>
-    param([Parameter(Mandatory = $true)][string]$Path)
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [Parameter(Mandatory = $true)][string]$RepoRoot
+    )
 
-    # MEMOISED PER PATH, AND IT IS NOT A MICRO-OPTIMISATION. Get-FixtureDepFinding asks this per
-    # (suite, lib) pair, so a lib every fixture copies -- native-capture-lib.ps1 is in seven of the
-    # twelve -- was parsed and walked once per suite. Measured on the tree, three runs each: 11.0-13.2s
-    # for the suite that drives this, against 8.2-8.7s with the cache and the two targeted walks below,
-    # on a gate whose whole budget is ~230s across 30 lanes. What is left is PowerShell's own start-up
-    # plus parsing each of the 84 suites once, which no cache can remove.
-    #
-    # The table is declared at the top of this file rather than initialised here on first use: under
-    # Set-StrictMode the `if ($null -eq $script:...)` test IS a read of an unset variable and throws,
-    # so the lazy form fails on the very first call it exists to serve.
-    #
-    # THE KEY IS THE FILE'S IDENTITY, NOT ITS PATH, and that was measured rather than anticipated. A
-    # path-only key is correct for the gate -- one report over a tree nothing is writing to -- and
-    # wrong for this lib's own suite, which rewrites the same fixture names between sections to make a
-    # lib mean something different. Two asserts went red on a stale answer, and the shape of the fix
-    # matters: a cache that is only correct while every caller remembers not to rewrite a file is the
-    # enforced-by-memory shape, so the timestamp and the length do the remembering.
-    $item = Get-Item -LiteralPath $Path
-    $key = "$Path|$($item.LastWriteTimeUtc.Ticks)|$($item.Length)"
-    if ($script:FixtureDepDotSourceCache.ContainsKey($key)) {
-        return @($script:FixtureDepDotSourceCache[$key])
-    }
+    # THE PARSE FAILURE IS STILL THIS LIB'S OPINION, NOT THE SHARED WALKER'S. Get-ScriptDotSourceTargets
+    # returns @() for a file it cannot parse, which is right for its own caller -- a contract check
+    # asking "is this lib reachable" must not fall over on a syntax error elsewhere. Here an empty
+    # answer means "this lib needs nothing copied", which is the exact silence the gate exists to
+    # remove, so a file that does not parse is thrown on before the walk is asked.
+    $null = Get-FixtureDepAst -Path $Path
 
-    $ast = Get-FixtureDepAst -Path $Path
-
-    # TWO TARGETED WALKS RATHER THAN ONE FindAll({ $true }). The predicate-true form materialises every
-    # node in the file into an array -- for a 2,000-line lib that is the bulk of the cost, and both
-    # loops below then filter it down again by type.
-    $assignments = @($ast.FindAll({
-        $args[0] -is [System.Management.Automation.Language.AssignmentStatementAst] }, $true))
-    $commands = @($ast.FindAll({
-        $args[0] -is [System.Management.Automation.Language.CommandAst] }, $true))
-
-    # Assignments first: $name -> the .ps1 leaf its right-hand side names, keyed by the offset it sits
-    # at, so a later reassignment can win over an earlier one.
-    $assigned = @{}
-    foreach ($node in $assignments) {
-        $left = $node.Left
-        if (-not ($left -is [System.Management.Automation.Language.VariableExpressionAst])) { continue }
-        $name = $left.VariablePath.UserPath
-        $leaf = ''
-        foreach ($lit in @($node.Right.FindAll({
-                    $args[0] -is [System.Management.Automation.Language.StringConstantExpressionAst] }, $true))) {
-            $candidate = Get-FixtureDepPs1Leaf -Value $lit.Value
-            if ($candidate) { $leaf = $candidate }
-        }
-        if (-not $leaf) { continue }
-        if (-not $assigned.ContainsKey($name)) { $assigned[$name] = @() }
-        $assigned[$name] += [pscustomobject]@{ Offset = $node.Extent.StartOffset; Leaf = $leaf }
-    }
-
-    $found = @()
-    foreach ($node in $commands) {
-        if ($node.InvocationOperator -ne [System.Management.Automation.Language.TokenKind]::Dot) { continue }
-
-        # Shape one: the path is written out inside the dot-source itself.
-        $literalLeaf = ''
-        foreach ($lit in @($node.FindAll({
-                    $args[0] -is [System.Management.Automation.Language.StringConstantExpressionAst] }, $true))) {
-            $candidate = Get-FixtureDepPs1Leaf -Value $lit.Value
-            if ($candidate) { $literalLeaf = $candidate }
-        }
-        if ($literalLeaf) { $found += $literalLeaf; continue }
-
-        # Shape two: the path is in a variable assigned earlier in this same file.
-        foreach ($v in @($node.FindAll({
-                    $args[0] -is [System.Management.Automation.Language.VariableExpressionAst] }, $true))) {
-            $name = $v.VariablePath.UserPath
-            if (-not $assigned.ContainsKey($name)) { continue }
-            $before = @($assigned[$name] | Where-Object { $_.Offset -lt $node.Extent.StartOffset } |
-                        Sort-Object Offset)
-            if ($before.Count -gt 0) { $found += $before[-1].Leaf }
-        }
-    }
-
-    $result = @($found | Sort-Object -Unique)
-    $script:FixtureDepDotSourceCache[$key] = $result
-    return $result
+    return @(Get-ScriptDotSourceTargets -Path $Path -RepoRoot $RepoRoot |
+                ForEach-Object { Split-Path -Path $_ -Leaf } |
+                Sort-Object -Unique)
 }
 
 # Copy-Item's SWITCH parameters -- the ones that consume no following element. Everything else that
@@ -216,9 +173,16 @@ function Get-DotSourcedLibName {
 # walk below can tell 'Copy-Item -LiteralPath $a $b' (one positional) from 'Copy-Item $a $b -Force'
 # (two). The set is closed and small because the command is fixed; a name missing from it costs one
 # skipped positional, which under-reports rather than accuses.
+# -ErrorAction, -WarningAction and -InformationAction are NOT in this list and must not be added: they
+# are common parameters that take a VALUE (-ErrorAction Stop), unlike -Verbose and -Debug, which are
+# switches. They were here, and the code review caught it: `Copy-Item -ErrorAction Stop $src (Join-Path
+# $dir 'scripts\lib\a-lib.ps1')` lost its destination entirely -- measured, the reader returned nothing
+# at all -- because 'Stop' was counted as the first positional and the real destination became the
+# second. No suite in the tree writes that today, which is exactly why it needed a review to find and
+# an assert to keep.
 $script:FixtureDepCopyItemSwitch = @(
     'Recurse', 'Force', 'PassThru', 'Container', 'Confirm', 'WhatIf', 'UseTransaction', 'Verbose',
-    'Debug', 'ErrorAction', 'WarningAction', 'InformationAction'
+    'Debug'
 )
 
 function Get-CopyItemDestinationAst {
@@ -296,6 +260,18 @@ function Get-FixtureCopiedLibName {
     #>
     param([Parameter(Mandatory = $true)][string]$Path)
 
+    # THE PREFILTER IS FREE AND IT IS NOT A MICRO-OPTIMISATION EITHER. This runs over EVERY suite in the
+    # directory to decide which ones are subjects, and only 18 of 84 files contain the string
+    # 'Copy-Item' at all -- so 66 of them were being parsed to prove they have no Copy-Item in them.
+    # Measured by the cost review: 725 ms for parse-plus-walk over all 84, against 275-281 ms with this
+    # line, a 2.6x cut for one substring test. It cannot change the answer: a file with no occurrence of
+    # the string cannot hold a Copy-Item CommandAst, and a file that only mentions it in a comment costs
+    # one harmless parse.
+    if (([System.IO.File]::ReadAllText($Path)).IndexOf('Copy-Item', [System.StringComparison]::Ordinal) -lt 0) {
+        return @()
+    }
+
+
     $ast = Get-FixtureDepAst -Path $Path
     $found = @()
     foreach ($node in @($ast.FindAll({
@@ -329,13 +305,28 @@ function Get-FixtureDepFinding {
         A DEPENDENCY THAT DOES NOT EXIST IN -LibDirectory IS NOT A FINDING. The guarded dot-source is
         there precisely because a lib may legitimately not be present yet, and this lib is not the
         place to have an opinion about a name the tree does not carry.
+
+        -CopiedLib LETS A CALLER THAT ALREADY ASKED HAND THE ANSWER IN. Get-FixtureDepReport computes
+        the copy list to decide whether a suite is a subject at all, and then called this, which read
+        the same file again -- measured by the cost review at 447 ms against 257 ms over the twelve real
+        subjects, so ~190 ms of every run went on parsing each subject twice. Omitted, it reads the
+        list itself, which keeps this function usable on its own.
+
+        -RepoRoot is the base Get-ScriptDotSourceTargets needs for a dot-source built from the repo root
+        rather than from $PSScriptRoot; it is not used for anything else here.
     #>
     param(
         [Parameter(Mandatory = $true)][string]$SuitePath,
-        [Parameter(Mandatory = $true)][string]$LibDirectory
+        [Parameter(Mandatory = $true)][string]$LibDirectory,
+        [Parameter(Mandatory = $true)][string]$RepoRoot,
+        [string[]]$CopiedLib
     )
 
-    $copied = @(Get-FixtureCopiedLibName -Path $SuitePath)
+    # @() AROUND THE WHOLE if, not inside its branches: an if-expression assigned to a variable is
+    # unwrapped, so a single-element result arrives as a bare string and .Count below then throws under
+    # Set-StrictMode. The inner @() are not enough and it looked like they were.
+    $copied = @(if ($PSBoundParameters.ContainsKey('CopiedLib')) { $CopiedLib }
+                else { Get-FixtureCopiedLibName -Path $SuitePath })
     if ($copied.Count -eq 0) { return @() }
 
     $suiteName = Split-Path -Path $SuitePath -Leaf
@@ -352,7 +343,7 @@ function Get-FixtureDepFinding {
         $libPath = Join-Path $LibDirectory $lib
         if (-not (Test-Path -LiteralPath $libPath -PathType Leaf)) { continue }
 
-        foreach ($dep in (Get-DotSourcedLibName -Path $libPath)) {
+        foreach ($dep in (Get-DotSourcedLibName -Path $libPath -RepoRoot $RepoRoot)) {
             if ($dep -eq $lib) { continue }
 
             # A REPO-OWNED SEAM IS NEITHER REPORTED NOR WALKED. Not reported because the fixture does
@@ -379,22 +370,29 @@ function Get-FixtureDepReport {
         Returns { Suites, Subjects, Findings }: how many suites were read, how many of them copy a lib
         at all, and the flat finding list. SUBJECTS IS RETURNED BECAUSE A SILENT PASS NEEDS IT: zero
         findings over zero subjects is a reader that found nothing to read, and zero findings over
-        thirteen is the tree being clean. The two must never print the same line -- the same reason
+        twelve is the tree being clean. The two must never print the same line -- the same reason
         check-plugin-integrity.ps1's span checks print both figures.
+
+        -RepoRoot is passed through to the dot-source walker; -LibDirectory is where a dependency is
+        looked for. They are separate parameters because this lib's own suite points them at a sandbox
+        whose layout is not a repo's.
     #>
     param(
         [Parameter(Mandatory = $true)][string]$TestsDirectory,
-        [Parameter(Mandatory = $true)][string]$LibDirectory
+        [Parameter(Mandatory = $true)][string]$LibDirectory,
+        [Parameter(Mandatory = $true)][string]$RepoRoot
     )
 
     $suites = @(Get-ChildItem -Path $TestsDirectory -Filter '*.tests.ps1' -File | Sort-Object Name)
     $subjects = 0
     $findings = @()
     foreach ($s in $suites) {
+        # Read ONCE and handed on -- see Get-FixtureDepFinding's -CopiedLib for the measurement.
         $copied = @(Get-FixtureCopiedLibName -Path $s.FullName)
         if ($copied.Count -eq 0) { continue }
         $subjects++
-        $findings += @(Get-FixtureDepFinding -SuitePath $s.FullName -LibDirectory $LibDirectory)
+        $findings += @(Get-FixtureDepFinding -SuitePath $s.FullName -LibDirectory $LibDirectory `
+                                             -RepoRoot $RepoRoot -CopiedLib $copied)
     }
 
     return [pscustomobject]@{

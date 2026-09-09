@@ -38,8 +38,25 @@
          repo-owned seams. This repo declines a findings-list check on its false-positive rate (the
          stale-path check, 124 findings, all false), so shipping this without those two would have been
          proposing exactly what it turns down.
-      4. AFTER BOTH: 83 suites read, 12 subjects, 0 findings -- and the reconstructed pre-repair state
-         of that real branch yields exactly 1, naming park-lib.ps1 -> git-porcelain-lib.ps1.
+      4. AFTER BOTH: 84 suites read (this file included), 12 subjects, 0 findings -- and the
+         reconstructed pre-repair state of that real branch yields exactly 1, naming
+         park-lib.ps1 -> git-porcelain-lib.ps1. The asserts below deliberately do NOT pin those two
+         counts (they test `-gt 50` and `-ge 10`), because a number in an assert goes stale on the day
+         somebody adds a suite -- which this file did to itself.
+
+    AND THE READING IS NOT DONE IN THIS BRANCH'S OWN LIB. The dot-source half delegates to
+    script-contract-lib.ps1's Get-ScriptDotSourceTargets: the first version was a second AST walker,
+    which is the "second literal" defect this branch's sibling issue (#1682) is about. The code review
+    caught it. What that also bought was the walker's own memo, and what it cost was fixing that memo's
+    key -- it was path-only, so this suite's deliberate rewrites of one fixture lib were served a stale
+    answer and two asserts went red.
+
+    WALL-CLOCK, THREE RUNS EACH, BECAUSE THE COST REVIEW ASKED FOR IT: 11.0-13.2s for the first
+    working version, 8.2-8.7s after memoising and splitting the AST walk, and 2.51-2.54s as it stands
+    -- the last cut coming from delegating (one shared memo instead of two engines), skipping the parse
+    of any suite whose text has no 'Copy-Item' in it at all (18 of 84 do), and reading each subject's
+    copy list once rather than twice. For scale, the gate's own slowest suites run 155-237s, so none of
+    this was ever visible there; it is taken because it is correct and free, not because it was urgent.
 
     THE SYNTHETIC FIXTURES BELOW ARE NOT DECORATION. On this tree the gate is silent, so nothing here
     would notice if the reader stopped reading: the shape asserts are what prove it still fires. Each
@@ -121,12 +138,12 @@ function Get-A { 'a' }
 '@
     Set-Lib -Name 'b-lib.ps1' -Body "function Get-B { 'b' }`n"
 
-    Assert-Equal 'b-lib.ps1' ((Get-DotSourcedLibName -Path (Join-Path $LibDir 'a-lib.ps1')) -join ',') `
+    Assert-Equal 'b-lib.ps1' ((Get-DotSourcedLibName -Path (Join-Path $LibDir 'a-lib.ps1') -RepoRoot $SandRoot) -join ',') `
         'a dependency dot-sourced through a variable is read -- the #1682 shape, which the first reader missed'
 
     # The literal shape, which is what a synthetic-only suite would have tested and passed on.
     Set-Lib -Name 'c-lib.ps1' -Body ". (Join-Path `$PSScriptRoot 'b-lib.ps1')`nfunction Get-C { 'c' }`n"
-    Assert-Equal 'b-lib.ps1' ((Get-DotSourcedLibName -Path (Join-Path $LibDir 'c-lib.ps1')) -join ',') `
+    Assert-Equal 'b-lib.ps1' ((Get-DotSourcedLibName -Path (Join-Path $LibDir 'c-lib.ps1') -RepoRoot $SandRoot) -join ',') `
         'and so is one written out inside the dot-source itself'
 
     # A COMMENT CANNOT REACH IT. park-lib.ps1's own header carries a dot-source of itself as an
@@ -138,13 +155,13 @@ function Get-A { 'a' }
 #>
 function Get-D { 'd' }
 '@
-    Assert-Equal '' ((Get-DotSourcedLibName -Path (Join-Path $LibDir 'd-lib.ps1')) -join ',') `
+    Assert-Equal '' ((Get-DotSourcedLibName -Path (Join-Path $LibDir 'd-lib.ps1') -RepoRoot $SandRoot) -join ',') `
         'a dot-source inside a docstring is not a dependency -- the AST cannot see comments'
 
     # NAMING A .ps1 IS NOT DEPENDING ON IT. shared-scripts-lib.ps1's registry names every mirrored
     # script in the tree; a reader that took every literal would report all of them.
     Set-Lib -Name 'e-lib.ps1' -Body "`$script:Registry = @('b-lib.ps1', 'x-lib.ps1')`nfunction Get-E { 'e' }`n"
-    Assert-Equal '' ((Get-DotSourcedLibName -Path (Join-Path $LibDir 'e-lib.ps1')) -join ',') `
+    Assert-Equal '' ((Get-DotSourcedLibName -Path (Join-Path $LibDir 'e-lib.ps1') -RepoRoot $SandRoot) -join ',') `
         'a .ps1 named in a string but never dot-sourced is not a dependency'
 
     # ---------------------------------------------------------------------------------------------
@@ -200,7 +217,7 @@ if (Test-Path -LiteralPath $bDep -PathType Leaf) { . $bDep }
     $onlyA = Set-Suite -Name 'onlya.tests.ps1' -Body @'
 Copy-Item -LiteralPath $x -Destination (Join-Path $dir 'scripts\lib\a-lib.ps1') -Force
 '@
-    $f = @(Get-FixtureDepFinding -SuitePath $onlyA -LibDirectory $LibDir)
+    $f = @(Get-FixtureDepFinding -SuitePath $onlyA -LibDirectory $LibDir -RepoRoot $SandRoot)
     Assert-Equal 2 $f.Count 'the CLOSURE is walked in one pass: copying only a-lib reports b AND c, not b alone'
     # @() around each filter, not for tidiness: under Set-StrictMode a Where-Object that matches ONE
     # object hands back that object rather than a list, and reading .Count off it throws.
@@ -214,7 +231,7 @@ Copy-Item -LiteralPath $x -Destination (Join-Path $dir 'scripts\lib\a-lib.ps1') 
 Copy-Item -LiteralPath $x -Destination (Join-Path $dir 'scripts\lib\b-lib.ps1') -Force
 Copy-Item -LiteralPath $x -Destination (Join-Path $dir 'scripts\lib\c-lib.ps1') -Force
 '@
-    Assert-Equal 0 @(Get-FixtureDepFinding -SuitePath $allThree -LibDirectory $LibDir).Count `
+    Assert-Equal 0 @(Get-FixtureDepFinding -SuitePath $allThree -LibDirectory $LibDir -RepoRoot $SandRoot).Count `
         'a complete list is silent -- the assert that keeps this from being a check that always fires'
 
     # A DEPENDENCY THE TREE DOES NOT CARRY IS NOT A FINDING. The guarded dot-source exists precisely
@@ -227,7 +244,7 @@ if (Test-Path -LiteralPath $gDep -PathType Leaf) { . $gDep }
     $ghost = Set-Suite -Name 'ghost.tests.ps1' -Body @'
 Copy-Item -LiteralPath $x -Destination (Join-Path $dir 'scripts\lib\g-lib.ps1') -Force
 '@
-    Assert-Equal 0 @(Get-FixtureDepFinding -SuitePath $ghost -LibDirectory $LibDir).Count `
+    Assert-Equal 0 @(Get-FixtureDepFinding -SuitePath $ghost -LibDirectory $LibDir -RepoRoot $SandRoot).Count `
         'a dot-source of a lib the tree does not have is not a finding'
 
     # A CYCLE MUST NOT SPIN. Two libs dot-sourcing each other is not a shape in this tree, and the
@@ -243,7 +260,7 @@ if (Test-Path -LiteralPath $qDep -PathType Leaf) { . $qDep }
     $cycle = Set-Suite -Name 'cycle.tests.ps1' -Body @'
 Copy-Item -LiteralPath $x -Destination (Join-Path $dir 'scripts\lib\p-lib.ps1') -Force
 '@
-    $cf = @(Get-FixtureDepFinding -SuitePath $cycle -LibDirectory $LibDir)
+    $cf = @(Get-FixtureDepFinding -SuitePath $cycle -LibDirectory $LibDir -RepoRoot $SandRoot)
     Assert-Equal 1 $cf.Count 'a cycle terminates and reports once rather than spinning'
 
     # ---------------------------------------------------------------------------------------------
@@ -261,7 +278,7 @@ if (Test-Path -LiteralPath $rSeam -PathType Leaf) { . $rSeam }
     $seamSuite = Set-Suite -Name 'seam.tests.ps1' -Body @'
 Copy-Item -LiteralPath $x -Destination (Join-Path $dir 'scripts\lib\r-lib.ps1') -Force
 '@
-    Assert-Equal 0 @(Get-FixtureDepFinding -SuitePath $seamSuite -LibDirectory $LibDir).Count `
+    Assert-Equal 0 @(Get-FixtureDepFinding -SuitePath $seamSuite -LibDirectory $LibDir -RepoRoot $SandRoot).Count `
         'a repo-owned seam the caller supplies is not a debt the fixture owes -- internal-note.tests.ps1 is why'
 
     # And the exemption is narrow: the same shape with a non-seam lib IS reported, so the list is doing
@@ -273,7 +290,7 @@ if (Test-Path -LiteralPath $sDep -PathType Leaf) { . $sDep }
     $nonSeam = Set-Suite -Name 'nonseam.tests.ps1' -Body @'
 Copy-Item -LiteralPath $x -Destination (Join-Path $dir 'scripts\lib\s-lib.ps1') -Force
 '@
-    Assert-Equal 1 @(Get-FixtureDepFinding -SuitePath $nonSeam -LibDirectory $LibDir).Count `
+    Assert-Equal 1 @(Get-FixtureDepFinding -SuitePath $nonSeam -LibDirectory $LibDir -RepoRoot $SandRoot).Count `
         'while an ordinary sibling in the same position is still reported'
 
     # ---------------------------------------------------------------------------------------------
@@ -290,12 +307,12 @@ Copy-Item -LiteralPath $x -Destination (Join-Path $dir 'scripts\lib\s-lib.ps1') 
 $cacheDep = Join-Path $PSScriptRoot 'c-lib.ps1'
 if (Test-Path -LiteralPath $cacheDep -PathType Leaf) { . $cacheDep }
 '@
-    Assert-Equal 'c-lib.ps1' ((Get-DotSourcedLibName -Path (Join-Path $LibDir 'cache-lib.ps1')) -join ',') `
+    Assert-Equal 'c-lib.ps1' ((Get-DotSourcedLibName -Path (Join-Path $LibDir 'cache-lib.ps1') -RepoRoot $SandRoot) -join ',') `
         'the first read of a lib answers from the file'
 
     Start-Sleep -Milliseconds 20   # so the rewrite lands on a different last-write tick
     Set-Lib -Name 'cache-lib.ps1' -Body "function Get-Cache { 'nothing dot-sourced now' }`n"
-    Assert-Equal '' ((Get-DotSourcedLibName -Path (Join-Path $LibDir 'cache-lib.ps1')) -join ',') `
+    Assert-Equal '' ((Get-DotSourcedLibName -Path (Join-Path $LibDir 'cache-lib.ps1') -RepoRoot $SandRoot) -join ',') `
         'and a rewrite at the SAME path is read again rather than served from the memo'
 
     # ---------------------------------------------------------------------------------------------
@@ -306,7 +323,7 @@ if (Test-Path -LiteralPath $cacheDep -PathType Leaf) { . $cacheDep }
     # a file that cannot be parsed must fail loudly instead of passing quietly.
     Set-Lib -Name 'broken-lib.ps1' -Body "function Get-Broken { `n"
     $threw = $false
-    try { $null = Get-DotSourcedLibName -Path (Join-Path $LibDir 'broken-lib.ps1') } catch { $threw = $true }
+    try { $null = Get-DotSourcedLibName -Path (Join-Path $LibDir 'broken-lib.ps1') -RepoRoot $SandRoot } catch { $threw = $true }
     Assert-True $threw 'an unparseable lib throws, so a parse failure can never read as a clean dependency set'
 
     # ---------------------------------------------------------------------------------------------
@@ -314,7 +331,8 @@ if (Test-Path -LiteralPath $cacheDep -PathType Leaf) { . $cacheDep }
     Write-Host 'THE GATE: this repo own suites, held against what their copied libs dot-source' -ForegroundColor Cyan
 
     $report = Get-FixtureDepReport -TestsDirectory (Join-Path $RepoRoot 'scripts\tests') `
-                                  -LibDirectory   (Join-Path $RepoRoot 'scripts\lib')
+                                   -LibDirectory   (Join-Path $RepoRoot 'scripts\lib') `
+                                   -RepoRoot       $RepoRoot
 
     # BOTH FIGURES, BECAUSE A SILENT PASS NEEDS BOTH. Zero findings over zero subjects is a reader that
     # found nothing to read; zero over twelve is the tree being clean. The two must never print the

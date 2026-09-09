@@ -110,18 +110,83 @@ is a one-call change: all the reading is in the lib and `Get-FixtureDepReport` i
   last-write ticks + length now, with its own regression assert, because a cache that is only correct
   while every caller remembers not to rewrite a file is the enforced-by-memory shape.
 
+
+#### What the reviews changed, and one of them changed the design
+
+**Victor #19 found a bug and a duplication, and the duplication is the bigger of the two.**
+
+- **The bug.** `-ErrorAction`, `-WarningAction` and `-InformationAction` were in the switch list the
+  positional walk uses to tell a switch from a value-taking parameter. They are not switches, unlike
+  `-Verbose` and `-Debug`. Reproduced before repairing: `Copy-Item -ErrorAction Stop $src (Join-Path
+  $dir 'scripts\lib\a-lib.ps1')` lost its destination **entirely** -- the reader returned nothing --
+  because `Stop` was counted as the first positional. No suite writes that today, which is exactly why
+  it needed a review to find and now has an assert to keep.
+- **The duplication, which was the actual defect.** `script-contract-lib.ps1` already resolves a
+  dot-source through a variable -- `Get-ScriptDotSourceTargets`, with `Get-AstPathHints` doing the
+  variable half -- and its own docstring says why it exists: *"so '. $configPath' resolves through its
+  assignment, which is how three of the four dot-source shapes in this tree are written"*. I had built
+  a second AST walker beside it, in the same week as a sibling issue titled *"the git porcelain line
+  parse is a second literal"*. That is the same mistake with a citation attached. So the reader now
+  **delegates** and keeps only the shape conversion (absolute path to bare leaf), which is the whole
+  difference between the two questions. It also gained two shapes the hand-rolled version never had:
+  a dot-source built from the repo root, and the `& { . $args[0] }` idiom.
+
+  **And delegating forced a repair in the shared lib, which is the part worth knowing.** That walker's
+  memo was keyed on `"$Path|$RepoRoot"` with no file identity -- correct for its only caller so far, a
+  SessionStart check reading files nothing rewrites, and wrong the moment a caller rewrites one. This
+  suite does exactly that, deliberately, to make one fixture lib mean something different between
+  sections. On the path-only key two asserts went red on a stale answer, reading as a bug in the walk.
+  The key now carries the last-write ticks and the length, which costs one stat (~0.13 ms) against a
+  re-parse of thousands of lines and turns a memo that is only correct while every caller remembers not
+  to rewrite a file -- the enforced-by-memory shape -- into one that is correct by construction.
+  `script-contract-lib.ps1` is in the shared registry, so that repair travels to consumers.
+
+**Nolan #25 answered the cost question and produced two more cuts.** His headline is that none of this
+was ever visible on the gate: the recorded suite durations run to 237s and nine suites already sit above
+100s, so an 8s suite is 15-30x smaller than what sets a shard's critical path. Taken anyway, because
+both cuts are correct and free:
+
+- **Skip the parse of a suite whose text has no `Copy-Item` in it.** Only 18 of 84 files contain the
+  string, so 66 were being parsed to prove they have none: 725 ms to 275-281 ms for the subject scan.
+- **Read each subject's copy list once.** `Get-FixtureDepReport` computed it to decide whether a suite
+  is a subject and then `Get-FixtureDepFinding` re-parsed the same file to compute it again: 447 ms
+  against 257 ms over the twelve real subjects.
+
+He also corrected an attribution I had written into the lib: the memo supplied ~97% of the first
+round's saving and the typed-`FindAll` split ~3%, where my comment implied comparable weight.
+
+**Wall-clock, three runs each, end to end:** 11.0-13.2s for the first working version, 8.2-8.7s after
+the first round, **2.51-2.54s** as it stands. The report itself is 1,737 ms of that.
+
+**Two more slips of my own, both from the same escaping trap.** A `\t` in a `sed` replacement became a
+literal tab and broke a measurement script, after `[\\/]` had already reached a file as `[\/]` earlier
+on this branch. Both are recorded beside the code that avoids them, because the pattern is the same one
+`.claude/rules/language-layers.md` already warns about for `sed` and `\u`.
+
+**One thing Nolan flagged that is NOT repaired here, and is not a defect.** This suite is one of
+nineteen with no entry in `scripts/tests/suite-durations.json`, so the shard packer charges it the
+maximum recorded value until `record-suite-durations.ps1` next runs against a CI run that includes it.
+That is the documented fallback for any new suite, self-correcting, and shared with eighteen others --
+not something this branch introduced or should fix.
 ### CREATE
 
 - [x] Measure the subject before building: 12 suites, not 5; the five named counts all correct
 - [x] Measure the real dependency shape -- a variable, not a literal -- against `origin`'s copy of the
       #1682 branch, read-only
-- [x] `scripts/lib/fixture-dep-lib.ps1`: the dot-source reader (both shapes, variable resolved to its
-      assignment), the `-Destination` reader (named and positional), the closure walk, and the
-      repo-owned seam exemption
+- [x] `scripts/lib/fixture-dep-lib.ps1`: the `-Destination` reader (named and positional), the closure
+      walk, and the repo-owned seam exemption -- the half of the question nothing else in the tree asks
 - [x] Bind the copy reader to `-Destination` -- the first of the two false findings
 - [x] The one-entry `branch-info.ps1` exemption -- the second, with the rule for a second entry stated
       and `repo-config.ps1` deliberately left out of it as a rule with nothing under it
 - [x] Prove the gate fires on the reconstructed pre-repair state and is silent on the repair
+- [x] **Delete the second AST walker** and delegate the dot-source half to
+      `script-contract-lib.ps1`'s `Get-ScriptDotSourceTargets` -- the duplication the code review found,
+      which is the defect this branch's own sibling issue is about
+- [x] Repair that shared walker's memo key, which delegating exposed: path-only, so a caller that
+      rewrites a file is served a stale answer. It now carries the last-write ticks and the length, and
+      the mirror is rebuilt because that lib travels
+- [x] Remove `-ErrorAction`/`-WarningAction`/`-InformationAction` from the switch list -- they take a
+      value, and with them there a `Copy-Item -ErrorAction Stop $src $dst` lost its destination entirely
 
 ### TEST
 
@@ -132,10 +197,15 @@ is a one-call change: all the reading is in the lib and `Get-FixtureDepReport` i
       exemption and its narrowness, the memo key, an unparseable file throwing, and the tree-wide gate
 - [x] Both figures asserted at the gate (suites read AND subjects), so a silent pass cannot be a
       reader that found nothing to read
+- [x] `scripts/tests/script-contract.tests.ps1` -- two asserts on the SHARED walker's memo key, from
+      that lib's own side: whoever edits that memo next reads that file, and an assert two libs away is
+      one nobody finds (295 pass, 0 fail)
 - [x] The lint gate (`check-plugin-integrity.ps1`) -- 0 errors
-- [x] Wall-clock measured and reduced: 11.0-13.2s to 8.2-8.7s, by memoising the per-lib read and
-      replacing one `FindAll({ $true })` with two type-targeted walks
-- [ ] Code review (Victor #19) and cost review (Nolan #25) on the diff
+- [x] Wall-clock measured and reduced across two rounds: 11.0-13.2s to 8.2-8.7s to **2.51-2.54s**, by
+      delegating to the shared walker (one memo instead of two engines), skipping the parse of a suite
+      whose text has no `Copy-Item` at all, and reading each subject copy list once rather than twice
+- [x] Code review (Victor #19) and cost review (Nolan #25) on the diff -- one bug, one duplication
+      that changed the design, and two further cost cuts
 
 ### DEPLOY: feat/1693-fixture-lib-dep-check
 
