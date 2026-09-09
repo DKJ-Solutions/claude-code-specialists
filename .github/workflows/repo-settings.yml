@@ -1,0 +1,83 @@
+# The repo-settings drift detector: does GitHub still hold what this tree declares? (issue #1726)
+#
+# WHAT IT CATCHES. A ruleset and a repo's merge switches are GitHub-side state, so nothing in this tree
+# changes when they change -- no commit, no gate, no session. The docs record them anyway, because they
+# are load-bearing for the three direct-on-`main` exceptions, for the fold, and for ship-pr's staleness
+# guard, so a record and the live state can disagree indefinitely with nothing saying so. Three drifts
+# in eight days is what turned that into a build: the transfer emptying `bypass_actors` (#1244, folds
+# dead for a day), `merge_queue` added and removed with no trace (#1499, #1720), and `allow_auto_merge`
+# left on against four records in the tree saying otherwise (#1730).
+#
+# WHY A SCHEDULE AND NOT A SessionStart HOOK (Dave's call, September 9, 2026, on #1726's menu). A hook
+# reaches a drift sooner and costs a `gh api` round trip at every session start, on top of the seven
+# hooks already there. What decided it is the half a hook cannot do at all: a scheduled run leaves a
+# DATED record. #1720's own complaint is that the `merge_queue` removal "has no date anywhere, because
+# September 9 is when it was measured, not when it happened" -- a hook reports to whoever happens to
+# open a session, and if nobody does, nothing is written down. A daily run bounds every future answer
+# to 24 hours, and the run's own timestamp is the date.
+#
+# WHY A SEPARATE WORKFLOW AND NOT A JOB IN ci.yml. Its subject is not the commit. ci.yml answers "is
+# this tree sound", runs per push and per PR, and is the required check; this answers "did somebody
+# change a setting", which is true or false regardless of what was pushed. Putting it in ci.yml would
+# either run it on every PR (noise: the same answer, dozens of times a day) or make the required check
+# red for a reason the PR author cannot fix. A trigger belongs to a workflow rather than to a job --
+# the same reasoning unfolded-entry.yml and branch-entry.yml each state for their own case.
+#
+# NOT IN THE main RULESET, deliberately, exactly like those two. Making a check required is a
+# repo-settings change and therefore Dave's -- and it would be self-referential here: a check whose
+# whole subject is the ruleset, enforced by that ruleset. Worse, it would block every merge on a switch
+# only the owner can flip, so a drift would stop the trunk instead of reporting. A red run plus
+# GitHub's failure e-mail is the signal.
+#
+# workflow_dispatch IS NOT DECORATION. It is how the answer is obtained on the day a setting is
+# deliberately changed, without waiting for the next cron -- and it is the one trigger that still works
+# if the schedule is disabled. GitHub suspends scheduled workflows after 60 days without repo activity;
+# that has never been near true here, but a detector whose only trigger can be switched off silently
+# should say so rather than be assumed.
+#
+# ONE FIELD IS EXPECTED TO READ AS UNREADABLE HERE, and that is not a failure: `bypass_actors` is
+# returned to repo administrators only, so the job-scoped GITHUB_TOKEN cannot see it. The script
+# reports it as a distinct third verdict rather than as green, precisely because that is the field
+# whose emptying was #1244 -- run the script locally to compare that one. Everything else comes from
+# /rules/branches/main and the repo object, both readable with `contents: read`.
+#
+# LEAST PRIVILEGE, AND THE READ IS THE WHOLE JOB. `contents: read` is all it holds: the script never
+# writes to GitHub, because repo settings are the owner's surface under this repo's constitution --
+# the same rule adopt-merge-queue.ps1 follows when it composes its ruleset command and stops. No
+# standing token, unlike fold-on-merge.yml, and nothing to borrow one for.
+#
+# WINDOWS, like ci.yml, branch-entry.yml and unfolded-entry.yml, and for the same reason: the scripts
+# target Windows PowerShell 5.1, so they run under `shell: powershell` (5.1) rather than pwsh.
+name: Repo settings
+
+permissions:
+  contents: read
+
+on:
+  schedule:
+    # 06:30 UTC daily. Early enough that a drift introduced yesterday is named before the day's work is
+    # built on top of it, and off the hour because GitHub's cron queue is busiest there.
+    - cron: '30 6 * * *'
+  workflow_dispatch:
+
+concurrency:
+  # A shared group with cancel-in-progress, like unfolded-entry.yml: two runs of this answer the same
+  # question about the same live state, so a newer one always supersedes an older, and a cancelled run
+  # loses nothing. It gates no commit and is required by nothing.
+  group: repo-settings
+  cancel-in-progress: true
+
+jobs:
+  repo-settings:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: GitHub-side settings still match what the tree declares
+        shell: powershell
+        env:
+          # gh reads GH_TOKEN; `contents: read` is what the two non-admin endpoints need.
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          powershell -NoProfile -ExecutionPolicy Bypass -File scripts/lint/check-repo-settings.ps1
+          exit $LASTEXITCODE

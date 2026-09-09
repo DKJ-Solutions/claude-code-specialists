@@ -1025,3 +1025,97 @@ function Get-ReleasePageTheme {
        in build-release-notes-page.ps1 for what passes and why. #>
     return $script:ReleasePageTheme
 }
+
+# --- The GitHub-side settings this repo DECLARES, for check-repo-settings.ps1 (issue #1726) --------
+#
+# WHAT THIS SEAM IS FOR. A ruleset and a repo's merge switches are GitHub-side state: nothing in this
+# tree changes when they change, no commit records it, and no gate read one until this seam existed.
+# The docs record them anyway -- they have to, because they are load-bearing for the direct-on-`main`
+# exceptions, for the fold, and for ship-pr's staleness guard -- so the record and the live state can
+# disagree indefinitely with nothing saying so.
+#
+# THREE DRIFTS IN EIGHT DAYS, which is what turned this from a hypothetical into a build (#1726):
+#   Sept 2-3   the org transfer emptied `bypass_actors`, killing all three direct-on-`main`
+#              exceptions and blocking every fold (#1244). Found by a failing push, a day later.
+#   Sept 6-9   `merge_queue` was added to the ruleset (#1499) and gone again by the 9th (#1720).
+#              Neither event left a trace, so CLAUDE.md's always-on prose handed out the wrong answer
+#              for a stretch nobody can now put a length on.
+#   Sept 9     `allow_auto_merge` read `true` against four records in this tree saying `false`
+#              (#1730) -- found by the first run of the check this seam serves.
+#
+# EACH RECORD CARRIES ITS OWN PROVENANCE, and that is the part worth copying rather than the values.
+# `Where` names the file and line in this tree that states the fact, so a report says which document
+# to repair when the drift turns out to be the intended change; `Recorded` is the date that statement
+# was last measured, so a stale declaration is visible as a stale declaration. Without those two a
+# red run would say only "these differ" and leave the reader to work out which side is wrong.
+#
+# WHAT IT DOES *NOT* DO: nothing here changes a setting, and the checker never writes to GitHub.
+# Repo settings are the owner's surface under this repo's constitution, exactly as
+# adopt-merge-queue.ps1 states for the ruleset command it composes and refuses to run.
+#
+# TO REPAIR A REPORTED DRIFT, decide which side is wrong FIRST. If the live value is wrong, change it
+# at GitHub. If the declaration is wrong -- the setting was changed deliberately -- update the value
+# here, the `Recorded` date with it, AND the document `Where` points at, because that document is
+# what a session actually reads.
+#
+# AN UNSTATED FIELD IS NOT CHECKED. Adding a record is how a fact becomes watched; there is no
+# implicit list, deliberately, so nothing here can go stale for a field nobody chose to declare.
+$script:ExpectedRepoSettings = @(
+    @{
+        Field    = 'ruleset.rules'
+        Expected = @('deletion', 'non_fast_forward', 'required_status_checks')
+        Recorded = '2026-09-09'
+        Where    = '.claude/specialists/lenses/05-15-extension.md (the ruleset bullet)'
+        Why      = 'every record in that lens names required_status_checks as THE rule the three direct-on-main exceptions are bypassed for, and a rejected push reports one line per rule -- a fourth rule makes an extra line read as an unexplained second cause (#1499, #1720)'
+    },
+    @{
+        Field    = 'ruleset.required_checks'
+        Expected = @('lint-en-tests')
+        Recorded = '2026-09-09'
+        Where    = 'scripts/repo-config.ps1 (Get-CiTestCheckName) and .claude/specialists/lenses/05-15-extension.md'
+        Why      = 'ship-pr dates a PR certificate from the run behind a REQUIRED check and skips its staleness guard entirely when none is named; open-pr skips the local test gate on this same context going green (#1715)'
+    },
+    @{
+        Field    = 'ruleset.strict_required_status_checks_policy'
+        Expected = $false
+        Recorded = '2026-09-09'
+        Where    = '.claude/specialists/lenses/05-15-extension.md (the #1325 block)'
+        Why      = 'strict was on for ~45 minutes on #1325 and reverted: GitHub performs no server-side base-sync outside a merge queue, so strict converts the ~44% behind-at-merge rate into a hard block with no automatic resolution and no valve -- PR #1316 had to be landed with --admin'
+    },
+    @{
+        Field    = 'repo.allow_auto_merge'
+        Expected = $false
+        Recorded = '2026-09-09'
+        Where    = '.claude/specialists/lenses/05-15-extension.md, .github/workflows/ci.yml, scripts/tests/merge-queue-prereq.tests.ps1'
+        Why      = 'with strict off, "up to date" is not a merge requirement, so auto-merge lands a stale-but-green certificate unattended -- #1292 exactly, and ship-pr step 3b cannot see it because an auto-merge happens without a shipping session (#1730)'
+    },
+    @{
+        Field    = 'repo.allow_update_branch'
+        Expected = $false
+        Recorded = '2026-09-09'
+        Where    = '.claude/specialists/lenses/05-15-extension.md (the #1325 block)'
+        Why      = 'reverted with strict on #1325; it only shows a UI button to a human with write access and acts on nothing, so it buys no convergence and its being on misreports that it does'
+    },
+    @{
+        Field    = 'repo.visibility'
+        Expected = 'public'
+        Recorded = '2026-09-09'
+        Where    = 'CLAUDE.md (the repo slot: "This repo is public")'
+        Why      = 'deliberate, so the remote github marketplace source can be read without gh auth -- and it is the clause this repo qualifies for a merge queue through, which most consumers do not (#1540). Going private silently breaks every consumer install and makes the no-secrets rule read as over-caution'
+    },
+    @{
+        Field    = 'ruleset.bypass_actor_types'
+        Expected = @('OrganizationAdmin', 'RepositoryRole')
+        Recorded = '2026-09-09'
+        Where    = '.claude/specialists/lenses/05-15-extension.md (the #1284 and #1244 blocks)'
+        Why      = 'the bypass list is the only thing between a green main-ci-gate and three exceptions that cannot satisfy it -- a required status check can never be satisfied by a direct push. The transfer emptied it for a day and nothing reported that (#1244). Read only by a token that can administer the repo, so a CI run reports this one as unreadable rather than green'
+    }
+)
+
+function Get-ExpectedRepoSettings {
+    <# The GitHub-side ruleset and repo settings this repo declares, as records carrying Field,
+       Expected, Recorded (the date the tree's statement was last measured), Where (the document
+       stating it) and Why. Read by scripts/lint/check-repo-settings.ps1; an empty list means
+       nothing is watched. #>
+    return $script:ExpectedRepoSettings
+}

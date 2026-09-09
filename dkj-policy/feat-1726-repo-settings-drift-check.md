@@ -38,21 +38,106 @@
 
 Declared expectation in scripts/repo-config.ps1 (Get-ExpectedRepoSettings), comparator scripts/lint/check-repo-settings.ps1, advisory daily workflow .github/workflows/repo-settings.yml. Dave chose the CI-leg-only shape over a SessionStart hook (issue #1726 menu, Sept 9 2026).
 
+#### What the verification changed about the assignment
+
+#1726 is written as a question, and it argues for doing nothing: this repo's no-pre-emptive-fixes rule,
+plus *"one occurrence is not a rate."* That premise is the first thing that got checked, and it did not
+survive the tree -- there are **three** GitHub-side drifts in eight days, and two had mechanical
+consequences rather than only costing a session the wrong sentence:
+
+| drift | detected by | damage |
+|---|---|---|
+| `bypass_actors` emptied by the org transfer, Sept 2-3 (#1244) | a failing push, a day later | all three direct-on-`main` exceptions dead; folds blocked; branch documents accumulating on the trunk |
+| `merge_queue` added Sept 6 (#1499), gone by Sept 9 (#1720) | a measurement nobody scheduled | always-on prose wrong for a stretch nobody can date |
+| `allow_auto_merge` live `true` against four records saying `false` | **the first run of the check built here** | latent stale-but-green auto-merge, invisible to ship-pr's 3b guard |
+
+Two more things the verification settled before any code was written. The issue's third proposed home --
+a `-Verify` mode on `adopt-merge-queue.ps1` -- is **structurally dead**: that script refuses in the
+source repo (`Test-IsWorkflowSourceRepo`, `scripts/task/adopt-merge-queue.ps1:148`), which is where all
+three drifts happened. And the field the third drift sits on is a **repo-object flag**, not a ruleset
+rule, which is what settled the scope: the declaration covers the whole recorded settings surface
+rather than the rule list #1726's title names.
+
+#### What is deliberately NOT in this branch
+
+- **Repairing `allow_auto_merge`.** It is a repo-settings change and therefore Dave's, and it is a
+  distinct subject from the missing detector -- filed as
+  [#1730](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1730) with both ways out and the
+  one-line verification. This branch declares `false` because that is what the tree records; the check
+  therefore reports the drift on arrival, which is the intended state until #1730 is decided.
+- **A portable mirror.** `shared-scripts-lib.ps1`'s registry is not extended and the check stays
+  repo-local. A consumer's answer to this class is their own ruleset with their own values; #1726 asked
+  about this repo, and the values already sit behind a seam if it ever does travel.
+- **Making the check required.** Self-referential (a check on the ruleset, enforced by that ruleset) and
+  it would block every merge on a switch only Dave can flip.
+
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [x] `Get-ExpectedRepoSettings` in `scripts/repo-config.ps1` -- seven declared facts, each carrying
+      `Recorded` (the date the tree's statement was last measured), `Where` (the document stating it) and
+      `Why`. Those three are what make a red run actionable rather than merely true.
+- [x] `scripts/lint/check-repo-settings.ps1` -- reads `rules/branches/main` and the repo object (no admin
+      needed) plus the rulesets detail for `bypass_actors` (admin only), and reports three verdicts:
+      match, drift, and **not read**. The third is the point: collapsing it into "match" would make the
+      check silent about the one field whose emptying was #1244.
+- [x] `.github/workflows/repo-settings.yml` -- daily at 06:30 UTC plus `workflow_dispatch`,
+      `contents: read`, no standing credential, not in `main-ci-gate`.
+- [x] The variable-collision trap recorded in the portable manual
+      (`plugins/dkj-teams/dkj-team-alpha/manuals/05-15-manual.md`) -- it is PowerShell's behaviour, not this
+      repo's, so it belongs in the source rather than in a lens. Heading count and the one inbound anchor
+      in `.claude/rules/language-layers.md` updated with it.
+- [x] Sylvester's lens: the new runner under what he owns, and a line on the ruleset bullet that states
+      this gap in prose, saying what the detector does and does not change about those dated blocks.
 
 ### TEST
 
+- [x] `scripts/tests/repo-settings-gate.tests.ps1` -- 46 asserts, no live `gh`. Every case feeds the
+      three payloads from fixture files, because a suite that let a real read through would go red for
+      exactly the reason the check exists to report.
+- [x] The suite found two defects before the gates did. An empty live list collapsed to `$null` through
+      `Sort-Object`, so the **emptied bypass list -- the #1244 state itself -- printed as `(none)` and
+      read as "unset"** rather than as "present and empty"; the comparison had been failing correctly all
+      along, so only an assert on the report could have caught it. And `New-Payload` rejected an empty
+      `-Json`, which is one of the states under test.
+- [x] Verified against the live repo: six declared facts match, one drift reported -- `allow_auto_merge`,
+      i.e. #1730, found by the check rather than by a person.
+- [x] Lint gate + all suites green.
+- [~] No assert on the scheduled trigger actually firing. It needs a cron GitHub controls, so the suite
+      asserts the workflow's *shape* -- schedule present, dispatch present, `contents: read`, no
+      `secrets.`, and that it runs this check. Named here rather than papered over.
+
 ### DEPLOY: feat/1726-repo-settings-drift-check
 
-**Score:**
+A daily CI leg now reports when GitHub-side repo settings drift from what this tree declares -- the
+class behind #1720, where `main-ci-gate` gained and lost a `merge_queue` rule with nothing in the repo
+recording either event. `Get-ExpectedRepoSettings` in [`../scripts/repo-config.ps1`](../scripts/repo-config.ps1)
+declares seven load-bearing facts (the trunk's rules, its required check, `strict`, `allow_auto_merge`,
+`allow_update_branch`, visibility, the bypass actor types), each with the document that states it and
+the date it was last measured; `scripts/lint/check-repo-settings.ps1` compares them and names which
+document to repair when the drift turns out to be deliberate.
+
+Built rather than written down because #1726's own premise -- *"one occurrence is not a rate"* -- turned
+out to be wrong: three drifts in eight days, two of them mechanical. The emptied bypass list killed
+every fold for a day (#1244) and was found by a failing push; `allow_auto_merge` was found live `true`
+against four records saying `false` by this check's first run, and is filed as #1730.
+
+Scheduled rather than a SessionStart hook, on Dave's call: a hook reaches a drift sooner and costs a
+`gh api` round trip at every session start, but only a scheduled run leaves a **dated** record -- which
+is exactly what #1720 says is missing, since "September 9 is when it was measured, not when it
+happened". Advisory and not in `main-ci-gate`, and it writes nothing to GitHub: repo settings stay
+Dave's surface. One field, `bypass_actors`, is admin-only and reports as **not read** in CI rather than
+as green, because reporting the #1244 field as passing would be the worst possible silence.
+
+**Score:** 3
 
 #### What makes this deploy extra special
 
-**Score:**
+N/A -- this is a maintenance-repo detector over this repo's own GitHub settings. Nothing ships to a
+consumer: the check is deliberately not mirrored into the plugin, and the one portable half is a
+PowerShell trap added to the system-administration manual.
+
+**Score:** N/A
 
 #### Pull Request
 
 A scheduled runner that reports GitHub-side repo settings drifting from what the tree declares
-
