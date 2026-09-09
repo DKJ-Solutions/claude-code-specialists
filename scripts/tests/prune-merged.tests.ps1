@@ -52,7 +52,7 @@ $WorktreeLibSrc    = Join-Path $RepoRoot 'scripts\lib\worktree-lib.ps1'
 # without the other builds a repo whose scripts die on a missing function.
 $RefPrintLibSrc    = Join-Path $RepoRoot 'scripts\lib\ref-print-lib.ps1'
 # And for the merged-PR proof itself (issue #1194): the map and the two-part test every proof-(b) case
-# below is decided by, shared with dkj-team-shopify's sync-main.ps1 since the same mechanism turned out to
+# below is decided by, shared with dkj-subagents-shopify's sync-main.ps1 since the same mechanism turned out to
 # have been repaired twice in one day. Same reason as worktree-lib above -- and it was rediscovered the
 # same way the moment the dot-source was added and this line was not.
 $MergedPrLibSrc    = Join-Path $RepoRoot 'scripts\lib\merged-pr-lib.ps1'
@@ -98,11 +98,79 @@ function Get-FlatOutput {
         than this helper rather than older than it. (session-status.tests.ps1 did carry one, until #957
         removed it with the script it covered.)
 
-        All five are green, so they are deliberately left alone rather than repaired pre-emptively --
-        the risk is named here, which is what this repo does with a risk that has not bitten yet.
+        THAT INVENTORY WAS RIGHT ABOUT THE MECHANISM AND WRONG ABOUT WHO IS EXPOSED (#1736,
+        September 9, 2026). Exposure is not a property of a suite's flattener. It needs TWO things: the
+        capture has to carry the child's error stream, AND the phrase an assert reads has to be emitted
+        into it -- through throw, Write-Error or Write-Warning. Write-Host never reaches the formatter,
+        and most asserts in these suites read Write-Host.
+
+        Re-measuring the three variants settled both halves. Over 120 wrap positions x 4 phrases (480
+        checks each), padding a Write-Error until its break swept every column of a 120-wide render:
+
+          * collapse to a space:      68 of 480 fail -- e.g. 'dirty working tre e'
+          * no flattening at all:     68 of 480 fail
+          * join with '' (this one):   0 of 480 fail
+
+        So the ranking above is confirmed and the exposure list is not. find-specialist-mentions is the
+        only suite on the failing variant, and it asserts NO formatter-emitted phrase -- so it is exposed
+        on neither count, not "on both". park-branch and worktree-lane join with '' like this file, and
+        their summary lines described the other variant; both were corrected alongside this one. No
+        suite in the tree was found to be letting a wrapped phrase through.
+
+        AND SINCE #1742 NO SUITE IS ON THE FAILING VARIANT EITHER (September 9, 2026). The two
+        paragraphs above are left as written -- they are dated measurements -- but the sentence they
+        end on has moved: find-specialist-mentions.tests.ps1 now joins with '' like this file. It was
+        changed while nothing was failing there, precisely because the safety was an accident of what
+        that suite happens to assert, and the first refusal assert added to it would have inherited the
+        68-in-480 variant.
+
+        WHICH MAKES THE ASSERT-SAYS CONVERSION BELOW A HARDENING, NOT A FIX, and it is worth saying so
+        plainly. Joining with '' reconstructs a mid-word split exactly, and survives a split on a space
+        only because PowerShell keeps that space at the end of the line it wrapped -- a property of the
+        renderer that nothing here controls or tests. Assert-Says strips ALL whitespace from both sides
+        and needs neither property, so the eleven asserts that read one of this script's three
+        Write-Error/Write-Warning messages go through it. The rest keep -match, deliberately: they read
+        Write-Host lines, and routing those through a whitespace-blind reader would assert LESS than
+        -match does.
     #>
     param($Captured)
     return (($Captured | ForEach-Object { [string]$_ }) -join '')
+}
+
+function Test-Says {
+    <# Does captured child output contain this phrase, whatever the console did to it? Strips ALL
+       whitespace from both sides, which is the only form immune to a break at either kind of position
+       -- see the reasoning in Get-FlatOutput above.
+
+       Literal (IndexOf), so a phrase carrying '(', ')', '-' or a path separator needs no escaping,
+       which is why the call sites below lost their [regex]::Escape(). OrdinalIgnoreCase keeps the
+       case-insensitivity -match had at those sites. #>
+    param([string]$Text, [string]$Phrase)
+    $haystack = ($Text -replace '\s', '')
+    $needle = ($Phrase -replace '\s', '')
+    return ($haystack.IndexOf($needle, [System.StringComparison]::OrdinalIgnoreCase) -ge 0)
+}
+
+function Assert-Says {
+    param([string]$Text, [string]$Phrase, [string]$Name)
+    if (Test-Says -Text $Text -Phrase $Phrase) {
+        $script:pass++; Write-Host "  [PASS] $Name" -ForegroundColor Green
+    } else {
+        $script:fail++; Write-Host "  [FAIL] $Name`n         wanted to find: '$Phrase'`n         in:             '$Text'" -ForegroundColor Red
+    }
+}
+
+function Assert-DoesNotSay {
+    <# The negative direction, which is the one that fails SILENTLY: a bare -notmatch reports absence
+       and has measured a line break, so it goes green for the wrong reason and no run ever shows it.
+       Both call sites below assert that the dirty-tree refusal did NOT fire, which is exactly the
+       claim a wrap would counterfeit. #>
+    param([string]$Text, [string]$Phrase, [string]$Name)
+    if (-not (Test-Says -Text $Text -Phrase $Phrase)) {
+        $script:pass++; Write-Host "  [PASS] $Name" -ForegroundColor Green
+    } else {
+        $script:fail++; Write-Host "  [FAIL] $Name`n         did NOT want to find: '$Phrase'" -ForegroundColor Red
+    }
 }
 
 function Assert-Equal {
@@ -152,6 +220,9 @@ function New-Fixture {
     Copy-Item -LiteralPath $PruneMergedSrc   -Destination (Join-Path $dir 'scripts\task\prune-merged.ps1')       -Force
     Copy-Item -LiteralPath $NativeCaptureSrc -Destination (Join-Path $dir 'scripts\lib\native-capture-lib.ps1')  -Force
     Copy-Item -LiteralPath $EntryScaffoldSrc -Destination (Join-Path $dir 'scripts\lib\entry-scaffold-lib.ps1')  -Force
+    # command-probe-lib.ps1 is a sibling of a sibling (#1729): the three libs above dot-source it for
+    # Test-FunctionDefined, so the fixture owes it exactly as it owes ref-print-lib.
+    Copy-Item -LiteralPath (Join-Path $RepoRoot 'scripts\lib\command-probe-lib.ps1') -Destination (Join-Path $dir 'scripts\lib\command-probe-lib.ps1') -Force
     Copy-Item -LiteralPath $WorktreeLibSrc   -Destination (Join-Path $dir 'scripts\lib\worktree-lib.ps1')        -Force
     Copy-Item -LiteralPath $RefPrintLibSrc   -Destination (Join-Path $dir 'scripts\lib\ref-print-lib.ps1')       -Force
     Copy-Item -LiteralPath $MergedPrLibSrc   -Destination (Join-Path $dir 'scripts\lib\merged-pr-lib.ps1')       -Force
@@ -395,10 +466,13 @@ try {
     [System.IO.File]::WriteAllText((Join-Path $dirD 'uncommitted.txt'), "in progress`n", (New-Object System.Text.UTF8Encoding $false))
     $rD = Invoke-PruneMerged -Dir $dirD
     Assert-Equal 1 $rD.Code 'dirty on a branch: exit 1'
-    Assert-True ($rD.Out -match 'dirty working tree') 'dirty on a branch: the refusal names what is wrong'
-    Assert-True ($rD.Out -match 'feat/standing-here') 'dirty on a branch: and names the branch that makes the step-off reachable, which is the whole ground of the refusal'
-    Assert-True ($rD.Out -match 'park-branch') 'dirty on a branch: and points at the ways out rather than only refusing'
-    Assert-True ($rD.Out -match '-DryRun') 'dirty on a branch: including the read-only way out, which costs the caller nothing'
+    # All four read the ONE Write-Error that carries the dirty-tree refusal, so all four sit in the
+    # formatter's output and go through Assert-Says (#1736). It is a long message interpolating the
+    # fixture's branch name, which is precisely the sort that wraps somewhere different on every run.
+    Assert-Says $rD.Out 'dirty working tree' 'dirty on a branch: the refusal names what is wrong'
+    Assert-Says $rD.Out 'feat/standing-here' 'dirty on a branch: and names the branch that makes the step-off reachable, which is the whole ground of the refusal'
+    Assert-Says $rD.Out 'park-branch' 'dirty on a branch: and points at the ways out rather than only refusing'
+    Assert-Says $rD.Out '-DryRun' 'dirty on a branch: including the read-only way out, which costs the caller nothing'
     Assert-True ((Get-LocalBranches -Dir $dirD) -contains 'feat/would-have-gone') 'dirty on a branch: NOTHING was deleted -- a branch that was reapable a line earlier is untouched'
     Assert-Equal 'feat/standing-here' (Get-HeadName -Dir $dirD) 'dirty on a branch: and the caller is left exactly where the refusal found them'
 
@@ -420,7 +494,9 @@ try {
     [System.IO.File]::WriteAllText((Join-Path $dirD2 'uncommitted.txt'), "in progress`n", (New-Object System.Text.UTF8Encoding $false))
     $rD2 = Invoke-PruneMerged -Dir $dirD2
     Assert-Equal 0 $rD2.Code 'dirty on the trunk: exit 0 -- the step-off it would refuse for is unreachable from here'
-    Assert-True ($rD2.Out -notmatch 'refuses on a dirty working tree') 'dirty on the trunk: no refusal'
+    # The refusal is a Write-Error, so its ABSENCE is what a wrap would counterfeit -- hence
+    # Assert-DoesNotSay. The two lines under it read Write-Host and keep -match.
+    Assert-DoesNotSay $rD2.Out 'refuses on a dirty working tree' 'dirty on the trunk: no refusal'
     Assert-True ($rD2.Out -match 'uncommitted change') 'dirty on the trunk: the dirty tree is REPORTED, not passed over in silence'
     Assert-True ($rD2.Out -match 'no branch to step off') 'dirty on the trunk: with the reason it was harmless, so the guard does not read as removed'
     Assert-True (-not ((Get-LocalBranches -Dir $dirD2) -contains 'feat/landed-anyway')) 'dirty on the trunk: and the run did its actual work'
@@ -438,7 +514,7 @@ try {
     [System.IO.File]::WriteAllText((Join-Path $dirD3 'uncommitted.txt'), "in progress`n", (New-Object System.Text.UTF8Encoding $false))
     $rD3 = Invoke-PruneMerged -Dir $dirD3 -DryRun
     Assert-Equal 0 $rD3.Code 'dirty under -DryRun: exit 0 -- on a branch, where the same run without -DryRun refuses'
-    Assert-True ($rD3.Out -notmatch 'refuses on a dirty working tree') 'dirty under -DryRun: no refusal'
+    Assert-DoesNotSay $rD3.Out 'refuses on a dirty working tree' 'dirty under -DryRun: no refusal'
     Assert-True ($rD3.Out -match 'DryRun deletes nothing') 'dirty under -DryRun: and it says which of the reasons made the tree its own business'
     Assert-True ($rD3.Out -match 'Would delete feat/would-be-reaped') 'dirty under -DryRun: the report the caller came for is actually produced'
     Assert-True ((Get-LocalBranches -Dir $dirD3) -contains 'feat/would-be-reaped') 'dirty under -DryRun: and nothing was deleted'
@@ -454,8 +530,10 @@ try {
     Invoke-FixtureGit -Arguments @('-C', $dirE, 'branch', '-q', '-D', 'main')
     $rE = Invoke-PruneMerged -Dir $dirE
     Assert-Equal 1 $rE.Code 'no trunk: exit 1'
-    Assert-True ($rE.Out -match "no local branch 'main'") 'no trunk: the refusal names the branch it looked for'
-    Assert-True ($rE.Out -match 'Get-TrunkBranchName') 'no trunk: and the seam that decides it, so a repo on another trunk knows where to answer'
+    # The no-trunk refusal is the exact message the flattener's own docstring above cites as having
+    # measured green in CI and red on a developer machine. Both sites are Write-Error.
+    Assert-Says $rE.Out "no local branch 'main'" 'no trunk: the refusal names the branch it looked for'
+    Assert-Says $rE.Out 'Get-TrunkBranchName' 'no trunk: and the seam that decides it, so a repo on another trunk knows where to answer'
     Assert-True ((Get-LocalBranches -Dir $dirE) -contains 'feat/orphan') 'no trunk: and it deleted nothing'
 
     # --- (e2) A second worktree holding the trunk is NAMED -- and no longer STOPS the run -----------
@@ -480,9 +558,12 @@ try {
     Invoke-FixtureGit -Arguments @('-C', $dirE2, 'worktree', 'add', '-q', $trunkLane, 'main')
     $rE2 = Invoke-PruneMerged -Dir $dirE2
     Assert-Equal 0 $rE2.Code 'trunk held: exit 0 -- a fast-forward that cannot happen is not worth losing the run over'
-    Assert-True ($rE2.Out -match 'another worktree holds it') 'trunk held: the warning says what is actually wrong'
-    Assert-True ($rE2.Out -match [regex]::Escape((Split-Path -Leaf $trunkLane))) 'trunk held: and names the directory, which git own message does not'
-    Assert-True ($rE2.Out -match 'HandBack') 'trunk held: with the way out, not only the verdict'
+    # A Write-Warning, and the longest of the three: it interpolates the holder's absolute path twice,
+    # so where it wraps moves with the length of the fixture's temp directory. The middle site loses its
+    # [regex]::Escape() because Test-Says compares literally.
+    Assert-Says $rE2.Out 'another worktree holds it' 'trunk held: the warning says what is actually wrong'
+    Assert-Says $rE2.Out (Split-Path -Leaf $trunkLane) 'trunk held: and names the directory, which git own message does not'
+    Assert-Says $rE2.Out 'HandBack' 'trunk held: with the way out, not only the verdict'
     Assert-True (-not ((Get-LocalBranches -Dir $dirE2) -contains 'feat/would-have-gone-too')) 'trunk held: and the run STILL REAPED -- the held trunk costs the fast-forward, not the tidy-up'
     Assert-Equal 'feat/standing-here' (Get-HeadName -Dir $dirE2) 'trunk held: with the caller left exactly where it was -- nothing was ever checked out'
     Invoke-FixtureGit -Arguments @('-C', $dirE2, 'worktree', 'remove', '--force', $trunkLane)

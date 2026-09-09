@@ -5,7 +5,7 @@ group: 06
 
 # Tessa 📜 · claude-code-specialists addendum
 
-> Repo-lens (claude-code-specialists) accompanying the portable playbook in the `dkj-team-alpha` plugin (`plugins/dkj-teams/dkj-team-alpha/manuals/06-16-manual.md`). This file does not describe the craft, but what Tessa does in this repo.
+> Repo-lens (claude-code-specialists) accompanying the portable playbook in the `dkj-subagents-alpha` plugin (`plugins/dkj-subagents/dkj-subagents-alpha/manuals/06-16-manual.md`). This file does not describe the craft, but what Tessa does in this repo.
 
 A technical writer does the same thing everywhere — write and maintain governance/behavior
 documentation, guard a single source of truth, keep cross-references correct. **What is
@@ -23,7 +23,7 @@ the governance of the entire specialists system live here.
   the two `@`-imports `CLAUDE.md` reaches them through.
 - **The manuals in the plugins** (`<plugin>/manuals/<group>-<id>-manual.md`) and the **repo lenses**
   in `.claude/specialists/lenses/`: creating, updating, restructuring.
-- **The agent-def *texts*** (`<plugin>/agents/*.md`) — the textual core, not the frontmatter config
+- **The agent-def *texts*** (`<plugin>/subagents/*.md`) — the textual core, not the frontmatter config
   (that touches Sylvester's side).
 
 ### The conventions she guards
@@ -189,7 +189,7 @@ otherwise be false about her own manual. The citations belong here:
   and its corollary, that the portable text is never softened to pre-empt a consumer.** Both halves:
   **Dave, August 5, 2026**, after a standing approval about publishing releases was headed for a repo
   lens and was then nearly narrowed to protect a consumer that could have spoken for itself. The rule
-  itself is in [her manual](../../../plugins/dkj-teams/dkj-team-alpha/manuals/06-16-manual.md); only the
+  itself is in [her manual](../../../plugins/dkj-subagents/dkj-subagents-alpha/manuals/06-16-manual.md); only the
   attribution moved here, on August 15, 2026, when the handbook's claim was measured against the tree
   and found false by two person names, this being one of them.
 - **"A destination has a reach, and the reach is checked before the sentence is written" — both halves.**
@@ -200,7 +200,7 @@ otherwise be false about her own manual. The citations belong here:
   `skillOverrides` states outright that plugin skills are not affected by it. **The other two failed on
   reach rather than on content**, and that is what turned the observation into a rule:
   - **Wrong plugin root.** Derek's and Rendall's portable personas were the natural owners of a chain
-    command, and they are `dkj-team-alpha` — a plugin that ships neither `dkj-policy`'s scripts nor a
+    command, and they are `dkj-subagents-alpha` — a plugin that ships neither `dkj-policy`'s scripts nor a
     dependency on it, so `${CLAUDE_PLUGIN_ROOT}` written there resolves into the wrong root.
   - **Right owner, wrong reach.** `dkj-policy/CLAUDE.md` *is* the correct owner -- that page has
     since merged into the folder's `CONTRIBUTING.md` (#886, August 26, 2026), and the argument reads the same
@@ -214,7 +214,7 @@ otherwise be false about her own manual. The citations belong here:
   halves then lived **only in that branch's folded changelog entry** — a published record nobody reads when
   deciding where to put a fix. That is precisely the gap `CLAUDE.md`'s "lessons are secured in the docs,
   not just in memory" rule exists to close, so the rule moved to
-  [her manual](../../../plugins/dkj-teams/dkj-team-alpha/manuals/06-16-manual.md) and the instance stayed here.
+  [her manual](../../../plugins/dkj-subagents/dkj-subagents-alpha/manuals/06-16-manual.md) and the instance stayed here.
 
 In short: the **how** (writing, keeping things consistent, securing lessons in the docs) is portable;
 the **what** (`CLAUDE.md`, `README.md`, this specialists system with its portable-vs-lens split and
@@ -245,3 +245,77 @@ and counted.
 is wrong when typed and wrong again after the next edit.** Neither claim needed one — *throughout* and
 *elsewhere in this file* are true without maintenance. Before writing a count into prose, ask what the
 next edit does to it; and never take `grep -c` for an occurrence count, which is `grep -o | wc -l`.
+
+### A dated measurement keeps the name it was written with, and a rename sweep is where that is lost
+
+The rule is #952's and this tree has applied it at every rename since — the `#1437` commit
+(`17149edb`) states it in so many words: *"Dated measurements keep the name they were written with,"*
+which is why the release archive's prose, the folded changelog entries and `connectors/` are left
+alone and only link **targets** are repointed. **Until
+[#1743](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1743) it was written down
+nowhere but in commit messages**, which is the one place a rule cannot be read before the work rather
+than after it.
+
+**Why it is a rule and not a preference.** A dated figure whose subject carries a later spelling
+cannot be re-verified against the tag it was taken at. A reader who goes looking for
+`dkj-team-alpha@v3.x` finds nothing, and the number then reads as unsourced — so the sweep converts a
+measurement into a claim.
+
+**The measured instance, and it took two sweeps.** `README.md`'s *"Measured on August 8, 2026, the
+`team-alpha` plugin shipped 1,973,691 bytes"* had its subject renamed by
+[#1480](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1480) (the `dkj-` prefix,
+September 5, 2026) and again by [#1698](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1698),
+so it dated a measurement to a day four weeks before the name existed. Each sweep was correct for the
+great majority of its hits, and each carried this one along.
+
+**Three things to take from it:**
+
+- **A sweep's blind spot is the dated sentence, so read those hits by hand.** They are a small
+  minority and they are the only ones where a correct substitution produces a wrong statement.
+- **Say what it is called now, in the same breath.** The repair is not merely reverting the name —
+  a reader meeting `team-alpha` needs to know it is today's `dkj-subagents-alpha`, or the citation is
+  precise and unusable.
+- **No gate**, deliberately. Deciding whether a name inside a dated sentence is historical or current
+  needs the sentence's meaning, and a matcher flagging every dated paragraph that contains a plugin
+  name would fire on every correct one too. This was found by reading, and the count of one is a floor.
+
+### A conditional in always-on prose needs a detector behind it, or it is not written as a conditional
+
+Behind the `merge_queue` paragraph in
+[`CLAUDE.md`](../../../CLAUDE.md#claude-code-specialistss-safety-implementation). Measured
+September 9, 2026 ([#1720](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1720)).
+
+**What stood there was a sentence waiting on somebody else's act**: taking the `merge_queue` rule off
+`main-ci-gate` was Dave's to do, so the paragraph told every session to *read the queue as live here
+until he has made it*. That is a correct instruction and an honest one — right up to the moment the act
+happens. Then it silently inverts: the condition is satisfied, nothing in the tree changed, and a
+document loaded on **every turn** goes on handing out precisely the answer it was written to stop
+handing out. Neither the date it inverted nor how long it stood that way can now be recovered.
+
+**The reason this shape is worse than an ordinary stale claim** is that it reads as diligent. A flat
+wrong statement is somebody's error and a reader may doubt it; a conditional announces that its author
+thought about the future, so a reader trusts it *more* the older it gets. And its subject here was
+GitHub-side state — a ruleset — which no commit records, no gate reads and no session is told about, so
+there was never going to be a signal.
+
+**So the test before writing one: what, in this repo, will notice the day the condition flips?** Three
+answers, in order of preference.
+
+1. **A detector, and then the prose points at it rather than predicting.** This is what the repo already
+   does everywhere it can — `check-unfolded-entry.ps1`, the floor checks, the roster sync. If a check can
+   hold the fact, the sentence's job is to name the check.
+2. **Write the state that holds, dated, and let the next measurement supersede it.** The form the
+   specialist lenses use: each block is what was true on its date, newest last, and the command is
+   printed so a reader can re-measure rather than trust. Nothing goes stale silently, because nothing
+   claims to be permanent.
+3. **A conditional — only where the condition is one the reader can evaluate themselves on the spot.**
+   *"while the merge queue is live on `main-ci-gate`"* survives the same repair untouched, and that is
+   the distinction: it qualifies a mechanism a consumer checks against their own trunk, rather than
+   waiting on an event in this repo that no reader is positioned to observe.
+
+**Nothing mechanical was misled here, and that is the measurement worth keeping.** `ship-pr.ps1` reads
+the trunk's own rules before it merges and adapts whatever the prose says, so no gate failed and no merge
+went wrong. What the sentence corrupted was a **session's reasoning** — it would expect the script to
+enqueue and the fold to arrive from `fold-on-merge.yml`, when in fact this session's own step 5 folds.
+That is the class of defect an always-on document is uniquely able to cause and uniquely unable to
+report, which is why the bar for a forward-looking sentence is highest exactly there.

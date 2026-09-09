@@ -177,7 +177,7 @@ if (-not $branch -or $branch -eq 'HEAD') {
 # here would be one more place that has to keep agreeing with it -- exactly the shape park-lib was
 # extracted to end. (check-branch-entry.ps1 carries that older two-step; it is not a defect there, it is
 # just a layer this one does not need.)
-$trunk = if (Get-Command Get-BranchTrunkName -ErrorAction SilentlyContinue) {
+$trunk = if (Test-FunctionDefined 'Get-BranchTrunkName') {
     $t = ([string](Get-BranchTrunkName)).Trim(); if ($t) { $t } else { 'main' }
 } else { 'main' }
 

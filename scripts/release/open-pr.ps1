@@ -598,13 +598,27 @@ if ($Title) {
 $resolveList = @(ConvertTo-IssueNumberList -Value $Resolves)
 $resolveIssues = @()
 if (-not $NoResolves -or $resolveList.Count -gt 0) {
-    # What the branch itself mentions: the WHOLE development document (always present on a branch) plus a
-    # -Body the caller supplied, since either can carry the reference. Deliberately not narrowed to the
-    # DEPLOY section the way the two gates are -- an issue named in a step is a mention of that issue, and
-    # this is the one reader of this file whose subject is the branch rather than the entry.
+    # What the branch itself mentions: the branch's OWN text out of the development document (always
+    # present on a branch) plus a -Body the caller supplied, since either can carry the reference.
+    # Deliberately not narrowed to the DEPLOY section the way the two gates are -- an issue named in a step
+    # is a mention of that issue, and this is the one reader of this file whose subject is the branch
+    # rather than the entry.
+    #
+    # AND FOR THE SAME REASON IT IS NARROWED AT THE OTHER END, from the first phase heading (issue #1718).
+    # It read the whole file until September 9, 2026, guidance block included -- and that block is where
+    # this workflow records why its shape rules exist, so every issue it cites was a mention on EVERY
+    # branch in every repo. Measured on feat/1703-test-gate-cost: the already-done check reported '#1650 is
+    # already CLOSED, and it is already resolved by PR #1661 (merged)' on a branch with no connection to
+    # #1650, from StepsGuidance's own 'refused since #1650'. The same run also warned about #1464, which
+    # was a real context citation, and nothing in the output separated the two.
+    #
+    # The guidance cites CLOSED issues today, so what it produced was noise in this advisory check; a
+    # citation of an OPEN one would have blocked every branch at the refusal above. Get-DevelopmentBranchText
+    # carries why the split is safe -- #899's preamble rule already refuses branch content in that region,
+    # in every repo, before this push.
     $mentionText = ''
     if (Test-Path $entryPath) {
-        $mentionText = [System.IO.File]::ReadAllText($entryPath, [System.Text.Encoding]::UTF8)
+        $mentionText = Get-DevelopmentBranchText -Text ([System.IO.File]::ReadAllText($entryPath, [System.Text.Encoding]::UTF8))
     }
     if ($Body) { $mentionText = $mentionText + "`n" + $Body }
 
@@ -756,7 +770,7 @@ Both are honest answers; the gate only refuses to guess.
 # Get-MachineLocalPaths, or an empty return, means the check is silent. Get-BranchMachineLocalFindings
 # degrades to Known = $false when it cannot read the diff, which is silent too.
 $machineLocalNote = ''
-if (Get-Command -Name Get-MachineLocalPaths -ErrorAction SilentlyContinue) {
+if (Test-FunctionDefined 'Get-MachineLocalPaths') {
     $mlPaths = @(Get-MachineLocalPaths)
     if ($mlPaths.Count -gt 0) {
         $mlFinding = Get-BranchMachineLocalFindings -RepoRoot $repoRoot -Trunk (Get-BranchTrunkName) -MachineLocalPaths $mlPaths
@@ -1525,7 +1539,7 @@ if ($existingPr -and -not $SkipTests) {
     # A red required check simply lands in the not-passing list below and refuses the skip.
     # The seam is read defensively: a consumer whose repo-config predates it has no such function, and
     # a missing name is the safe answer (no certificate, the gate runs) rather than an error.
-    $ciCheckName = if (Get-Command -Name 'Get-CiTestCheckName' -ErrorAction SilentlyContinue) { Get-CiTestCheckName } else { '' }
+    $ciCheckName = if (Test-FunctionDefined 'Get-CiTestCheckName') { Get-CiTestCheckName } else { '' }
     $cert = Get-CiTestCertificate -HeadSha ($headSha.Output -join '') `
                                   -PrHeadSha ($prHead.Output -join '') `
                                   -RequiredChecksJson ($reqJson.Output -join "`n") `
@@ -1576,7 +1590,7 @@ if ($push.ExitCode -ne 0) {
 # in order to tell a description heading from a form heading (see below), and a second copy of this
 # resolution is how this repo's accumulation bugs start.
 $descPlaceholderSource = 'the built-in list'
-$descPlaceholders = if (Get-Command -Name Get-PrDescriptionPlaceholder -ErrorAction SilentlyContinue) {
+$descPlaceholders = if (Test-FunctionDefined 'Get-PrDescriptionPlaceholder') {
     $descPlaceholderSource = 'Get-PrDescriptionPlaceholder in scripts/repo-config.ps1'
     @(Get-PrDescriptionPlaceholder)
 } else {
@@ -1858,7 +1872,7 @@ if (-not $Body) {
         # $descPlaceholders / $descPlaceholderSource are resolved once above both paths -- see the block
         # before the "Already open?" branch. #101's approval pattern is still resolved here, because only
         # this path ticks boxes.
-        $approvalPattern = if (Get-Command -Name Get-PrApprovalPattern -ErrorAction SilentlyContinue) {
+        $approvalPattern = if (Test-FunctionDefined 'Get-PrApprovalPattern') {
             Get-PrApprovalPattern
         } else {
             '^- \[ \] (Aangevraagd door Dave|Requested by Dave)'
@@ -1940,8 +1954,8 @@ $bodyFile = New-ScratchPath -Label 'open-pr-body' -Extension '.md'
 # flag is simply omitted -- current behavior, unchanged (the workshop defines neither). Collected
 # as a splatted array of EXTRA args (kept separate from the fixed `gh pr create ...` call below) so
 # the #107 stderr-capture guard keeps its literal, single-line `gh pr create ... 2>&1` shape.
-$assignee = if (Get-Command -Name Get-PrAssignee -ErrorAction SilentlyContinue) { "$(Get-PrAssignee)".Trim() } else { '' }
-$milestone = if (Get-Command -Name Get-PrMilestone -ErrorAction SilentlyContinue) { "$(Get-PrMilestone)".Trim() } else { '' }
+$assignee = if (Test-FunctionDefined 'Get-PrAssignee') { "$(Get-PrAssignee)".Trim() } else { '' }
+$milestone = if (Test-FunctionDefined 'Get-PrMilestone') { "$(Get-PrMilestone)".Trim() } else { '' }
 $extraGhArgs = @()
 if ($assignee) { $extraGhArgs += @('--assignee', $assignee) }
 if ($milestone) { $extraGhArgs += @('--milestone', $milestone) }

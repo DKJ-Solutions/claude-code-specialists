@@ -104,7 +104,7 @@ $PluginRoots = @(Get-RepoPluginRoots -RepoRoot $RepoRoot)
 #
 # IT ASKS THE MARKETPLACE INSTEAD OF JOINING A PATH. This used to be Join-Path <plugins root> <name>,
 # which answers "is there a folder with this name" -- a different question, and one that gives the wrong
-# answer in both directions: a folder that is not a published plugin resolved happily (agent-shared/
+# answer in both directions: a folder that is not a published plugin resolved happily (subagent-shared/
 # would have -- it sat directly under plugins/ then, and has since moved down beside the teams it
 # feeds), while a plugin whose folder is not named after it, or does not sit exactly one level down,
 # resolved to nothing.
@@ -150,7 +150,7 @@ function Get-PluginDir([string]$PluginId) {
 # Ids (<group>-<id>) owned by a plugin: agents/ + personas/.
 function Get-PluginIds([string]$PluginDir) {
     $ids = @()
-    foreach ($sub in @('agents', 'personas')) {
+    foreach ($sub in @('subagents', 'agents', 'personas')) {
         $dir = Join-Path $PluginDir $sub
         if (Test-Path -LiteralPath $dir) {
             $ids += Get-ChildItem -LiteralPath $dir -Filter '*.md' -File |

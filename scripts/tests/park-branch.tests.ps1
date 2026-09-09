@@ -40,23 +40,84 @@ $script:fail = 0
 
 function Get-FlatOutput {
     <#
-        Captured child output, whitespace collapsed to single spaces, so a phrase assert cannot fail on
-        line breaks that the behaviour under test does not decide. A native child's stderr captured with
-        2>&1 arrives as a NativeCommandError, which PowerShell renders with a 'powershell.exe : ' prefix
-        and WRAPS at the host width -- so the wrap point moves with the console width and with the length
-        of the fixture's temp path, neither of which park-branch.ps1 decides.
+        Captured child output with the line breaks REMOVED, so a phrase assert cannot fail on a wrap
+        point that park-branch.ps1 does not decide. A native child's stderr captured with 2>&1 arrives
+        as a NativeCommandError, which PowerShell renders with a 'powershell.exe : ' prefix and WRAPS at
+        the host width -- so the wrap point moves with the console width and with the length of the
+        fixture's temp path, neither of which park-branch.ps1 decides.
 
         Applied here for the same reason it was applied to new-branch.tests.ps1 on August 3, 2026, where
         a 176-column window split "must not be 'main'" MID-WORD and failed an assert about correct
-        behaviour. This suite's own asserts ('on main', 'parked on origin', 'nothing new to commit') sit
-        in exactly the same records and are one window width away from the same failure.
+        behaviour. This suite's own asserts sit in exactly the same records and are one window width
+        away from the same failure.
 
-        The newlines are removed rather than collapsed to a space, because a mid-word break leaves
-        'mus' + 't not be' and a space between them matches nothing. Precedent:
-        shared-scripts.tests.ps1's Test-OutputContains.
+        THE SUMMARY LINE ABOVE SAID "collapsed to single spaces" UNTIL #1736, and the code below removes
+        the break outright. The two are opposite repairs, so that was not a wording slip: collapsing to a
+        space is the ONE variant in this tree measured to fail, and the docstring named this suite as
+        using it.
+
+        MEASURED, September 9, 2026, over 120 wrap positions x 4 phrases (480 checks per variant), by
+        padding a Write-Error until its break swept every column of a 120-wide render:
+
+          * `-replace "`r?`n", ' '` (collapse):  68 of 480 fail -- e.g. 'dirty working tre e'
+          * `-replace "`r?`n", ''`  (this one):   0 of 480 fail
+          * no flattening at all:                68 of 480 fail
+
+        So this field is not currently letting anything through, and the conversion below is NOT a bug
+        fix. What it buys is that the immunity stops being incidental: joining with '' survives a
+        mid-word break by reconstruction, and survives a break on a space only because PowerShell keeps
+        that space at the end of the line it wrapped -- a property of the renderer, not of this helper.
+        Assert-Says strips ALL whitespace from both sides and is immune by construction either way. This
+        field stays because a FAILING assert still has to print one readable line -- the same division
+        park-cycle.tests.ps1 draws.
     #>
     param($Captured)
     return (($Captured | Out-String) -replace "`r?`n", '')
+}
+
+function Test-Says {
+    <# Does captured child output contain this phrase, whatever the console did to it?
+
+       WHICH ASSERTS NEED IT is decided by the stream the phrase comes out of, not by its wording --
+       that is #1736's classification, and it is the half of this that is worth keeping whatever the
+       flattener does. Invoke-Script below captures the child with 2>&1, so its ERROR stream is in .Out,
+       and a throw, a Write-Error or a Write-Warning reaches a capture through PowerShell's error
+       formatter, which hard-wraps INSIDE a word. Write-Host does not go through it at all, which is why
+       'parked on origin' and 'nothing new to commit' below keep -match: they are park-lib's Write-Host
+       lines and cannot wrap, so routing them through here would assert less than -match does, not more.
+
+       Only three asserts in this file read the formatter, and all three are on refusals: the main-branch
+       pointer, and the two on the push-failure message park-lib composes.
+
+       Strips ALL whitespace from both sides -- see the measurement in Get-FlatOutput above. Literal
+       (IndexOf), so a phrase carrying '(', ')' or '[' needs no escaping; OrdinalIgnoreCase keeps the
+       case-insensitivity that -match had at these call sites. #>
+    param([string]$Text, [string]$Phrase)
+    $haystack = ($Text -replace '\s', '')
+    $needle = ($Phrase -replace '\s', '')
+    return ($haystack.IndexOf($needle, [System.StringComparison]::OrdinalIgnoreCase) -ge 0)
+}
+
+function Assert-Says {
+    param([string]$Text, [string]$Phrase, [string]$Name)
+    if (Test-Says -Text $Text -Phrase $Phrase) {
+        $script:pass++; Write-Host "  [PASS] $Name" -ForegroundColor Green
+    } else {
+        $script:fail++; Write-Host "  [FAIL] $Name`n         wanted to find: '$Phrase'`n         in:             '$Text'" -ForegroundColor Red
+    }
+}
+
+function Assert-DoesNotSay {
+    <# The NEGATIVE direction, and the one that fails silently rather than loudly: a bare -notmatch
+       reports absence and has measured a line break, so it goes GREEN for the wrong reason and no run
+       ever shows it. That is why it gets a helper of its own instead of a `-not (Test-Says ...)` at the
+       call site -- the shape has to be as easy to reach for as the positive one. #>
+    param([string]$Text, [string]$Phrase, [string]$Name)
+    if (-not (Test-Says -Text $Text -Phrase $Phrase)) {
+        $script:pass++; Write-Host "  [PASS] $Name" -ForegroundColor Green
+    } else {
+        $script:fail++; Write-Host "  [FAIL] $Name`n         did NOT want to find: '$Phrase'" -ForegroundColor Red
+    }
 }
 
 function Assert-Equal {
@@ -93,6 +154,9 @@ function New-Fixture {
     New-Item -ItemType Directory -Path (Join-Path $dir 'scripts\lib')  -Force | Out-Null
     Copy-Item -LiteralPath $ParkBranchSrc    -Destination (Join-Path $dir 'scripts\task\park-branch.ps1')        -Force
     Copy-Item -LiteralPath $NativeCaptureSrc -Destination (Join-Path $dir 'scripts\lib\native-capture-lib.ps1')  -Force
+    # command-probe-lib.ps1 is a sibling of a sibling (#1729): the three libs above dot-source it for
+    # Test-FunctionDefined, so the fixture owes it exactly as it owes ref-print-lib.
+    Copy-Item -LiteralPath (Join-Path $RepoRoot 'scripts\lib\command-probe-lib.ps1') -Destination (Join-Path $dir 'scripts\lib\command-probe-lib.ps1') -Force
     Copy-Item -LiteralPath $ParkLibSrc       -Destination (Join-Path $dir 'scripts\lib\park-lib.ps1')            -Force
     Copy-Item -LiteralPath $PorcelainSrc     -Destination (Join-Path $dir 'scripts\lib\git-porcelain-lib.ps1')   -Force
 
@@ -180,7 +244,7 @@ try {
     $fixtureA = New-Fixture -Label 'a'
     $rMain = Invoke-ParkBranch -Dir $fixtureA
     Assert-Equal 1 $rMain.Code "on main: exit 1 (guardrail)"
-    Assert-True ($rMain.Out -match 'on main') "on main: pointer names the main rule"
+    Assert-Says $rMain.Out 'on main' "on main: pointer names the main rule"
     Assert-Equal 1 (Get-CommitCount -Dir $fixtureA) "on main: no commit added"
     & git -C "$fixtureA.git" rev-parse --verify --quiet 'refs/heads/main' | Out-Null
     Assert-True ($LASTEXITCODE -ne 0) "on main: nothing pushed to origin"
@@ -300,8 +364,11 @@ try {
     [System.IO.File]::WriteAllText((Join-Path $fixtureE 'second.txt'), "two`n", (New-Object System.Text.UTF8Encoding $false))
     $rNff = Invoke-ParkBranch -Dir $fixtureE
     Assert-Equal 1 $rNff.Code 'rejected push: exit 1 (the caller still stops)'
-    Assert-True ($rNff.Out -match 'origin already has commits this branch does not') 'rejected push: the summary names the real cause'
-    Assert-True (-not ($rNff.Out -match 'configured and reachable')) 'rejected push: and does not send the reader to check the remote'
+    # Both read the Write-Error that park-lib's Get-GitPushFailureMessage composes, so both go through
+    # the formatter. The second one is the direction that fails silently: as a -notmatch it reported
+    # absence and would have measured a line break.
+    Assert-Says $rNff.Out 'origin already has commits this branch does not' 'rejected push: the summary names the real cause'
+    Assert-DoesNotSay $rNff.Out 'configured and reachable' 'rejected push: and does not send the reader to check the remote'
 
     # And the three arms from their own text, so a reworded message is a one-place change here too --
     # asserted on the function rather than by staging three different remote failures.

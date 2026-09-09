@@ -38,6 +38,12 @@
     content is arbitrary stand-in text for contributor-authored PR entries; it is English for repo-wide
     consistency, not because its language is what is under test here.
 #>
+
+# Test-FunctionDefined (issue #1729): the seam probes below read the function table directly rather
+# than through Get-Command, which parses the name as a wildcard pattern and pays a full PATH scan on
+# every miss -- and a miss is the normal case for an optional seam. $PSScriptRoot-relative, so it
+# resolves in the plugin mirror as well as here.
+. (Join-Path $PSScriptRoot '..\lib\command-probe-lib.ps1')
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot '..\lib\release-lib.ps1')
 
@@ -212,7 +218,7 @@ Assert-Throws { Get-LockstepVersion -ManifestContents @{ a = '{"name": "x"}' } }
 # everything below, so a difference in output is a difference in the call rather than in the input.
 $e22 = New-FlatEntry -Heading "#22 $midDot Consumer feature" -Body 'Body twenty-two.' `
     -Rows @('| 2 | 5 | consumers must re-add the marketplace |', '| 1 | 4 | the team stops doing it by hand |') `
-    -Type 'Feat' -Plugins 'dkj-team-alpha' -Pr 22
+    -Type 'Feat' -Plugins 'dkj-subagents-alpha' -Pr 22
 $e21 = New-FlatEntry -Heading "#21 $midDot For colleagues only" -Body 'Body twenty-one.' `
     -Rows @('| 1 | 2 | a small convenience |') -Type 'Fix' -Pr 21
 $e20 = New-FlatEntry -Heading "#20 $midDot Repo housekeeping" -Body 'Body twenty.' `
@@ -239,9 +245,13 @@ Write-Host "Get-FencedLineFlags -- one owner, reached from here through the lib 
 # lib's recognised '~~~', so an entry with tilde fences had its quoted content read as STRUCTURE by every
 # reader in entry-scaffold-lib while the readers here handled it correctly. The tilde behaviour and the
 # absence of a second definition are asserted in that lib's own suite, where the owner now lives.
+# NOT Test-FunctionDefined, and this is the exception the helper's own docstring points at (#1729): this
+# assert does not ask WHETHER the function is defined but WHICH FILE defines it, and it reads
+# .ScriptBlock.File off the CommandInfo to answer that. A boolean cannot carry it, so the expensive call
+# is the only one that works here -- and it is a hit rather than a miss, which is the cheap direction.
 Assert-Equal $null (Get-Command Get-FencedLineFlags -CommandType Function -ErrorAction SilentlyContinue |
     Where-Object { $_.ScriptBlock.File -and $_.ScriptBlock.File.EndsWith('release-lib.ps1') }) 'the fence reader is no longer defined by release-lib itself'
-Assert-Equal $true ($null -ne (Get-Command Get-FencedLineFlags -ErrorAction SilentlyContinue)) 'but dot-sourcing release-lib still brings it into scope, so no call site changed'
+Assert-Equal $true (Test-FunctionDefined 'Get-FencedLineFlags') 'but dot-sourcing release-lib still brings it into scope, so no call site changed'
 $fenceLines = @('## real', 'text', '```', '## QUOTED', '---', '```', '---', '## real2')
 $fenceFlags = Get-FencedLineFlags -Lines $fenceLines
 Assert-Equal $false $fenceFlags[0] 'flags: a heading outside a fence is not fenced'
@@ -298,13 +308,13 @@ Assert-Match $pendReset ('(?m)^' + [regex]::Escape((Get-ChangelogUnreleasedHeadi
 Assert-NoMatch $pendReset ('(?m)^' + $EntryH + ' #22 ') 'and the entries it released are gone from it'
 # THE SEAM IS GONE, not merely unused: there is no map left to ask which headings count.
 Assert-NoParameter -Command 'Split-Changelog' -Names @('TierSections', 'FallbackHeading', 'TierHeadings')
-Assert-Equal $null (Get-Command 'Resolve-ChangelogTierSections' -ErrorAction SilentlyContinue) 'Resolve-ChangelogTierSections is retired with the sections it resolved'
+Assert-Equal $false (Test-FunctionDefined 'Resolve-ChangelogTierSections') 'Resolve-ChangelogTierSections is retired with the sections it resolved'
 
 # AN ENTRY'S OWN SECTIONS STAY INSIDE IT. This is the assert that catches "one entry rendering as
 # four", which is well-formed markdown and therefore invisible to an eye.
 Assert-Equal 3 (@([regex]::Matches($s.Entries[0], ('(?m)^' + $EntryS + ' '))).Count) "the entry keeps its three sections at the section level rather than being split at them"
 Assert-Match $s.Entries[0] '(?m)^\[PR #22\]' 'and its PR footer'
-Assert-Match $s.Entries[0] '(?m)^Plugins: dkj-team-alpha$' 'and its Plugins line'
+Assert-Match $s.Entries[0] '(?m)^Plugins: dkj-subagents-alpha$' 'and its Plugins line'
 # The '---' separators between entries are structure, not content.
 Assert-NoMatch $s.Entries[0] '(?m)^---\s*$' 'the separator between entries is not carried into an entry'
 
@@ -552,7 +562,7 @@ Write-Host "Format-RankedEntries -- one flat list, no categories" -ForegroundCol
 # third under 'Maintenance'. Asserted on absence for the same reason as the retired HTML renderer --
 # re-adding it should turn a test red rather than pass unnoticed.
 foreach ($gone in @('Format-CategorizedEntries', 'Get-ReleaseCategories')) {
-    Assert-Equal $null (Get-Command $gone -ErrorAction SilentlyContinue) "release-lib no longer defines $gone"
+    Assert-Equal $false (Test-FunctionDefined $gone) "release-lib no longer defines $gone"
 }
 $flat = Format-RankedEntries -Entries @($e22, $e21) -EntryLevel 2
 Assert-Match $flat '(?m)^## #22 ' 'the first entry sits at the requested level'
@@ -1198,7 +1208,7 @@ Assert-NoMatch $bodyAll 'attached' 'no pointer is invented when the caller passe
 Assert-NoMatch $bodyAll '(?m)^\s*$\r?\n\s*$\r?\n\s*$' 'and its absence leaves no gap where the sentence was'
 # AN ENTRY WITH NO PR LINK IS LISTED WITHOUT ONE, never dropped -- a hand-filed entry, or one whose fold
 # could not reach the PR, would otherwise vanish from the only COMPLETE list, and vanish silently.
-$noPr = "## ``fix/nolink`` changelog`n`n### Branch title`n`nNo link for this one`n`n### Pull Request`n`nPlugins: dkj-team-alpha"
+$noPr = "## ``fix/nolink`` changelog`n`n### Branch title`n`nNo link for this one`n`n### Pull Request`n`nPlugins: dkj-subagents-alpha"
 $bodyNoPr = Build-GitHubReleaseBody -Entries @($noPr) -Version '4.3.0'
 Assert-Match $bodyNoPr '(?m)^- No link for this one$' 'an entry with no PR link is still listed, unlinked'
 # A nameless entry falls back to its own heading rather than to nothing, for the same reason.
@@ -1233,7 +1243,7 @@ Write-Host "the consumer tier produces markdown ONLY (no HTML renderer)" -Foregr
 # than simply deleting the old asserts: a partial HTML renderer is exactly the kind of thing that gets
 # helpfully reintroduced, and re-adding it should turn a test red rather than pass unnoticed.
 foreach ($gone in @('ConvertTo-ReleaseHtml', 'Format-InlineMarkdown')) {
-    Assert-Equal $null (Get-Command $gone -ErrorAction SilentlyContinue) "release-lib no longer defines $gone"
+    Assert-Equal $false (Test-FunctionDefined $gone) "release-lib no longer defines $gone"
 }
 # THE SUBJECT IS A TAG, NOT A COMMENT (issue #1370). This scanned the retired consumer document, which
 # carried neither. The draft that replaced it as the one outward-travelling document carries its guidance
@@ -1309,33 +1319,33 @@ Write-Host "Get-TouchedPlugins" -ForegroundColor Cyan
 # than a comment.
 $flatRoots = @(Get-PluginRoots -RepoRoot $fakeRoot -MarketplaceJson (@'
 {"plugins": [
-  {"name": "dkj-team-alpha",         "source": "./plugins/dkj-team-alpha"},
-  {"name": "dkj-team-lifehub", "source": "./plugins/dkj-team-lifehub"}
+  {"name": "dkj-subagents-alpha",         "source": "./plugins/dkj-subagents-alpha"},
+  {"name": "dkj-subagents-lifehub", "source": "./plugins/dkj-subagents-lifehub"}
 ]}
 '@))
 $touchedFiles = @(
-    'plugins/dkj-team-alpha/agents/01-01-chris.md',
-    'plugins/dkj-team-alpha/manuals/01-01-manual.md',
-    'plugins/dkj-team-lifehub/agents/foo.md',
-    'plugins/agent-shared/inbound-behaviour.md',
+    'plugins/dkj-subagents-alpha/agents/01-01-chris.md',
+    'plugins/dkj-subagents-alpha/manuals/01-01-manual.md',
+    'plugins/dkj-subagents-lifehub/agents/foo.md',
+    'plugins/subagent-shared/inbound-behaviour.md',
     'connectors/some-repo.json',
     'README.md',
     'scripts/lib/release-lib.ps1'
 )
 $touched = @(Get-TouchedPlugins -Files $touchedFiles -PluginRoots $flatRoots)
 Assert-Equal 2 $touched.Count 'two touched plugins (deduplicated + sorted)'
-Assert-Equal 'dkj-team-alpha' $touched[0] 'first plugin name alphabetically'
-Assert-Equal 'dkj-team-lifehub' $touched[1] 'second plugin name alphabetically'
+Assert-Equal 'dkj-subagents-alpha' $touched[0] 'first plugin name alphabetically'
+Assert-Equal 'dkj-subagents-lifehub' $touched[1] 'second plugin name alphabetically'
 # The two non-plugin directories, one on each side of the plugins root after the #405 flattening:
-# agent-shared/ sits INSIDE it, connectors/ at the ROOT. Both are asserted, so neither half can quietly
+# subagent-shared/ sits INSIDE it, connectors/ at the ROOT. Both are asserted, so neither half can quietly
 # regress into counting as a plugin. Neither needs excluding by name any more -- a directory that is not
 # in the marketplace is not a plugin, which is what makes the pair of assertions cheap to keep.
 #
 # THIS BLOCK'S LAYOUT IS THE FLAT ONE and is deliberately left that way: $flatRoots is a synthetic fixture
-# for the shape this repo used to have, not a picture of the tree. The live position of agent-shared/ --
-# one level further down, inside plugins/dkj-teams/ -- is asserted in the nested block below, which is the
+# for the shape this repo used to have, not a picture of the tree. The live position of subagent-shared/ --
+# one level further down, inside plugins/dkj-subagents/ -- is asserted in the nested block below, which is the
 # one that describes the repo as it is.
-Assert-Equal $false ([bool]($touched -contains 'agent-shared')) 'agent-shared is plugin source, not a plugin'
+Assert-Equal $false ([bool]($touched -contains 'subagent-shared')) 'subagent-shared is plugin source, not a plugin'
 Assert-Equal $false ([bool]($touched -contains 'connectors')) 'connectors folder does not count as a plugin'
 Assert-Equal 0 (@(Get-TouchedPlugins -Files @('connectors/life-hub.json') -PluginRoots $flatRoots)).Count 'connectors at the repo root is under no plugin root'
 Assert-Equal 0 (@(Get-TouchedPlugins -Files @())).Count 'empty input -> empty set'
@@ -1343,62 +1353,62 @@ Assert-Equal 0 (@(Get-TouchedPlugins -Files $touchedFiles)).Count 'no roots give
 Assert-Equal 0 (@(Get-TouchedPlugins -Files @('README.md', 'scripts/lib/release-lib.ps1') -PluginRoots $flatRoots)).Count 'non-plugin paths ignored'
 Assert-Equal 0 (@(Get-TouchedPlugins -Files @('plugins/Team-Alpha/agents/x.md') -PluginRoots $flatRoots)).Count 'a differently-cased folder does not count (ordinal comparison)'
 # The prefix match is on a whole path SEGMENT, so a sibling whose name merely STARTS WITH a declared
-# plugin's name is not swallowed by it. 'plugins/dkj-team-alpha-extra' begins with 'plugins/dkj-team-alpha'.
+# plugin's name is not swallowed by it. 'plugins/dkj-subagents-alpha-extra' begins with 'plugins/dkj-subagents-alpha'.
 #
 # BOTH OF THESE HAD TO BE REWRITTEN WITH THE RENAME, and the reason is worth a line: they are the two
 # asserts here whose subject is a RELATIONSHIP between two strings, not a string. The rename swept
-# 'specialists-shopify' to 'dkj-team-shopify' and 'specialists' to 'dkj-team-alpha' -- each correct on its own,
+# 'specialists-shopify' to 'dkj-subagents-shopify' and 'specialists' to 'dkj-subagents-alpha' -- each correct on its own,
 # and together they left this pair comparing names that no longer share a prefix and no longer differ
 # only in case. Both kept passing, testing nothing. A mechanical rename cannot see that; only reading
 # what an assert is FOR can.
-Assert-Equal 0 (@(Get-TouchedPlugins -Files @('plugins/dkj-team-alpha-extra/agents/x.md') -PluginRoots $flatRoots)).Count 'an unregistered sibling sharing a name prefix does not count as that plugin'
+Assert-Equal 0 (@(Get-TouchedPlugins -Files @('plugins/dkj-subagents-alpha-extra/agents/x.md') -PluginRoots $flatRoots)).Count 'an unregistered sibling sharing a name prefix does not count as that plugin'
 $dedupFiles = @(
-    'plugins/dkj-team-alpha/agents/a.md',
-    'plugins/dkj-team-alpha/agents/b.md',
-    'plugins/dkj-team-alpha/manuals/c.md'
+    'plugins/dkj-subagents-alpha/agents/a.md',
+    'plugins/dkj-subagents-alpha/agents/b.md',
+    'plugins/dkj-subagents-alpha/manuals/c.md'
 )
 $dedupTouched = @(Get-TouchedPlugins -Files $dedupFiles -PluginRoots $flatRoots)
 Assert-Equal 1 $dedupTouched.Count 'same plugin across multiple files -> once in the set'
-Assert-Equal 'dkj-team-alpha' $dedupTouched[0] 'deduplicated name correct'
+Assert-Equal 'dkj-subagents-alpha' $dedupTouched[0] 'deduplicated name correct'
 
 Write-Host "Get-TouchedPlugins -- a nested plugin tree" -ForegroundColor Cyan
 # The layout this repo is moving to: plugins grouped by kind, so a plugin root sits TWO levels down and
 # is no longer named after its parent directory. Asserted before that move happens, which is the whole
 # reason the derivation landed on its own branch first.
 #
-# AND SINCE AUGUST 17, 2026 THE NON-PLUGIN SIBLING IS NESTED TOO. agent-shared/ moved from directly under
-# plugins/ into plugins/dkj-teams/, beside the only plugins that consume its blocks -- so the file below is
+# AND SINCE AUGUST 17, 2026 THE NON-PLUGIN SIBLING IS NESTED TOO. subagent-shared/ moved from directly under
+# plugins/ into plugins/dkj-subagents/, beside the only plugins that consume its blocks -- so the file below is
 # no longer a path that merely fails to reach a plugin root, it is a path that shares a PREFIX with the
 # grouping directory the real plugins sit in. That is the harder case, and it is the one this repo now
-# has: the old '^plugins/([a-z0-9][a-z0-9-]*)/' regex would have read it as a plugin called 'dkj-teams'.
+# has: the old '^plugins/([a-z0-9][a-z0-9-]*)/' regex would have read it as a plugin called 'dkj-subagents'.
 $nestedRoots = @(Get-PluginRoots -RepoRoot $fakeRoot -MarketplaceJson (@'
 {"plugins": [
-  {"name": "dkj-team-alpha",         "source": "./plugins/dkj-teams/dkj-team-alpha"},
+  {"name": "dkj-subagents-alpha",         "source": "./plugins/dkj-subagents/dkj-subagents-alpha"},
   {"name": "dkj-policy", "source": "./plugins/dkj-policy"}
 ]}
 '@))
 $nestedTouched = @(Get-TouchedPlugins -PluginRoots $nestedRoots -Files @(
-    'plugins/dkj-teams/dkj-team-alpha/agents/06-16-agent.md',
+    'plugins/dkj-subagents/dkj-subagents-alpha/agents/06-16-agent.md',
     'plugins/dkj-policy/skills/open-pr/SKILL.md',
-    'plugins/dkj-teams/agent-shared/inbound-behaviour.md',
+    'plugins/dkj-subagents/subagent-shared/inbound-behaviour.md',
     'README.md'
 ))
 Assert-Equal 2 $nestedTouched.Count 'a plugin two levels down is found'
 # THE ORDER IS ALPHABETICAL, NOT INSERTION ORDER, and the #886 rename is what made that visible:
-# 'dkj-policy' sorted after 'dkj-team-alpha' and 'dkj-policy' sorts before it, so these
+# 'dkj-policy' sorted after 'dkj-subagents-alpha' and 'dkj-policy' sorts before it, so these
 # two asserts swapped places without Get-TouchedPlugins changing at all. Left as index asserts rather
 # than turned into a set comparison: the ordering IS part of what the function returns, and a set
 # comparison would have passed through the rename and told nobody.
 Assert-Equal 'dkj-policy' $nestedTouched[0] 'the NAME comes from the marketplace, not from the folder above it'
-Assert-Equal 'dkj-team-alpha' $nestedTouched[1] 'and so does the second'
-Assert-Equal $false ([bool]($nestedTouched -contains 'dkj-teams')) 'plugin source nested INSIDE a grouping directory is not read as a plugin named after that directory'
-Assert-Equal 0 (@(Get-TouchedPlugins -PluginRoots $nestedRoots -Files @('plugins/dkj-teams/agent-shared/lens-optional.md'))).Count 'agent-shared beside the teams it feeds is still under no plugin root'
-Assert-Equal 0 (@(Get-TouchedPlugins -PluginRoots $nestedRoots -Files @('plugins/dkj-teams/README.md'))).Count 'a file in the grouping directory itself belongs to no plugin'
+Assert-Equal 'dkj-subagents-alpha' $nestedTouched[1] 'and so does the second'
+Assert-Equal $false ([bool]($nestedTouched -contains 'dkj-subagents')) 'plugin source nested INSIDE a grouping directory is not read as a plugin named after that directory'
+Assert-Equal 0 (@(Get-TouchedPlugins -PluginRoots $nestedRoots -Files @('plugins/dkj-subagents/subagent-shared/lens-optional.md'))).Count 'subagent-shared beside the teams it feeds is still under no plugin root'
+Assert-Equal 0 (@(Get-TouchedPlugins -PluginRoots $nestedRoots -Files @('plugins/dkj-subagents/README.md'))).Count 'a file in the grouping directory itself belongs to no plugin'
 
 Write-Host "Get-PluginRoots" -ForegroundColor Cyan
-Assert-Equal 'plugins\dkj-teams\dkj-team-alpha' $nestedRoots[0].RelativeRoot 'RelativeRoot is repo-relative and separator-normalized'
-Assert-Equal 'C:\fake-repo\plugins\dkj-teams\dkj-team-alpha\.claude-plugin\plugin.json' $nestedRoots[0].ManifestPath 'ManifestPath sits under the plugin root'
-Assert-Equal './plugins/dkj-teams/dkj-team-alpha' $nestedRoots[0].Source 'Source is kept exactly as the marketplace wrote it'
+Assert-Equal 'plugins\dkj-subagents\dkj-subagents-alpha' $nestedRoots[0].RelativeRoot 'RelativeRoot is repo-relative and separator-normalized'
+Assert-Equal 'C:\fake-repo\plugins\dkj-subagents\dkj-subagents-alpha\.claude-plugin\plugin.json' $nestedRoots[0].ManifestPath 'ManifestPath sits under the plugin root'
+Assert-Equal './plugins/dkj-subagents/dkj-subagents-alpha' $nestedRoots[0].Source 'Source is kept exactly as the marketplace wrote it'
 Assert-Throws { Get-PluginRoots -RepoRoot $fakeRoot -MarketplaceJson '{"plugins": [{"name": "x", "source": "../outside"}]}' } 'source with a ..-path outside the repo throws (containment)'
 Assert-Throws { Get-PluginRoots -RepoRoot $fakeRoot -MarketplaceJson '{"plugins": [{"name": "x", "source": "C:\\elsewhere"}]}' } 'absolute source throws (containment)'
 
@@ -1406,14 +1416,14 @@ Write-Host "Get-PluginRootByName" -ForegroundColor Cyan
 Assert-Equal 'plugins\dkj-policy' (Get-PluginRootByName -PluginRoots $nestedRoots -Name 'dkj-policy').RelativeRoot 'resolves a name to its root'
 Assert-Equal $null (Get-PluginRootByName -PluginRoots $nestedRoots -Name 'workflow-nobody') 'an unknown name resolves to $null rather than a guessed path'
 Assert-Equal $null (Get-PluginRootByName -PluginRoots $nestedRoots -Name 'Team-Alpha') 'the lookup is case-sensitive -- a name is a path segment and an install id'
-Assert-Equal $null (Get-PluginRootByName -PluginRoots @() -Name 'dkj-team-alpha') 'an empty set resolves to $null, it does not throw'
+Assert-Equal $null (Get-PluginRootByName -PluginRoots @() -Name 'dkj-subagents-alpha') 'an empty set resolves to $null, it does not throw'
 
 Write-Host "Get-EntryPlugins" -ForegroundColor Cyan
 $entryWithPlugins = New-FlatEntry -Heading "#4 $midDot Something" -Rows @('| 1 | 3 | fine |') `
-    -Plugins 'dkj-team-alpha, dkj-team-lifehub' -Pr 4
+    -Plugins 'dkj-subagents-alpha, dkj-subagents-lifehub' -Pr 4
 $plugs = @(Get-EntryPlugins -EntryText $entryWithPlugins)
 Assert-Equal 2 $plugs.Count 'two plugins from the Plugins line'
-Assert-Equal 'dkj-team-alpha' $plugs[0] 'first plugin name correct'
+Assert-Equal 'dkj-subagents-alpha' $plugs[0] 'first plugin name correct'
 Assert-Equal 0 (@(Get-EntryPlugins -EntryText "## #5 x`n`nBody.")).Count 'no Plugins line -> empty list'
 
 Write-Host "Remove-EntryPluginsLine" -ForegroundColor Cyan
@@ -1425,7 +1435,7 @@ Assert-Equal "## #5 x`n`nBody." (Remove-EntryPluginsLine -EntryText "## #5 x`n`n
 # hand-copied line -- and the doubled line 8 cuts shipped -- must not survive. Both a repeated identical
 # line and two lines that disagree are removed entirely: the fold owns the value, so it does not try to
 # keep either candidate.
-$dblSame = "## #6 y`n`nBody.`n`nPlugins: dkj-team-alpha`n`nPlugins: dkj-team-alpha`n`n[PR #6](u)`n"
+$dblSame = "## #6 y`n`nBody.`n`nPlugins: dkj-subagents-alpha`n`nPlugins: dkj-subagents-alpha`n`n[PR #6](u)`n"
 Assert-NoMatch (Remove-EntryPluginsLine -EntryText $dblSame) '(?m)^Plugins:' 'a doubled identical Plugins line is removed, both copies'
 $dblDiff = "## #7 z`n`nBody.`n`nPlugins: a, b, c`n`nPlugins: b, c`n`n[PR #7](u)`n"
 $dblDiffClean = Remove-EntryPluginsLine -EntryText $dblDiff
@@ -1536,7 +1546,7 @@ Assert-Equal "3" ((Get-OverviewSectionHeading -ReadmeContent $tiers) -replace '^
 $liveReadme = Join-Path $PSScriptRoot ('..\..\' + ((& {
     Set-StrictMode -Off
     . (Join-Path $PSScriptRoot '..\repo-config.ps1')
-    if (Get-Command Get-ReleaseHistoryPath -ErrorAction SilentlyContinue) { Get-ReleaseHistoryPath } else { 'releases/README.md' }
+    if (Test-FunctionDefined 'Get-ReleaseHistoryPath') { Get-ReleaseHistoryPath } else { 'releases/README.md' }
 }) -replace '/', '\'))
 if (Test-Path -LiteralPath $liveReadme) {
     Assert-Equal '4' (Get-OverviewTargetMajor -ReadmeContent (Get-Content -LiteralPath $liveReadme -Raw -Encoding UTF8)) "this repo's own overview now targets 4.x -- a 4.0.0 cut lands under its own major, and a 3.x cut would be refused"

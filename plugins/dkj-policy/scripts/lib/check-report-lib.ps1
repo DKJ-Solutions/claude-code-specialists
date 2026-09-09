@@ -732,7 +732,7 @@ function Get-EnabledPlugins {
     # bootstrap walks its plugins in.
     #
     # THE PAIR THAT MEASUREMENT WAS TAKEN ON NO LONGER DEMONSTRATES IT. Those two plugins were renamed to
-    # 'dkj-team-alpha' and 'dkj-team-lifehub' on August 9, 2026, and for that pair the two collations agree --
+    # 'dkj-subagents-alpha' and 'dkj-subagents-lifehub' on August 9, 2026, and for that pair the two collations agree --
     # so anyone re-checking the claim against today's plugin names will find no difference and conclude
     # this sort is pointless. It is not: the divergence needs a name that is a prefix of another with
     # punctuation between, which the next plugin added here may well be. The property is asserted on a
@@ -1076,6 +1076,41 @@ function Get-RecordShape {
     }
 }
 
+function Get-SubagentDirName {
+    <# The leaf name of the directory a plugin keeps its subagent definitions in -- 'subagents' where the
+       plugin ships one, 'agents' where it ships the pre-rename shape, and '' where it ships neither.
+
+       BOTH ARE READ AND ONE IS WRITTEN, which is this tree's standing rule for a renamed shape and is
+       load-bearing here rather than a courtesy. This family's own plugins moved agents/ to subagents/ on
+       September 9, 2026 (#1698), but the readers built on this function run against a CONSUMER'S PLUGIN
+       CACHE, which holds whatever version that machine last installed -- including a pre-rename one, and
+       including somebody else's plugin that never renamed anything. A reader that knew only the new leaf
+       would report those as shipping no subagents at all, which is the one answer that is false in both
+       directions: Resolve-PluginDir would skip the plugin, and the roster check would then read no roster
+       while saying it had.
+
+       The order is new-first so a cache dir carrying both -- which nothing writes, but a hand-copied
+       directory can produce -- resolves to the one the manifest's "agents": "./subagents/" key points at.
+
+       THE LEAF HAS ONE OWNER, for the same reason Get-CachedPluginDirs gives for the path shape: a second
+       spelling of it in a caller can disagree with the one the resolver used, and the two answers are only
+       ever compared by a person reading a finding. #>
+    param([Parameter(Mandatory = $true)][string]$PluginDir)
+    foreach ($leaf in @('subagents', 'agents')) {
+        if (Test-Path -LiteralPath (Join-Path $PluginDir $leaf) -PathType Container) { return $leaf }
+    }
+    return ''
+}
+
+function Get-SubagentDirPath {
+    <# The full path of that directory, or '' when the plugin ships neither shape. The convenience half of
+       Get-SubagentDirName, so a caller that only wants to enumerate the files does not re-join the leaf. #>
+    param([Parameter(Mandatory = $true)][string]$PluginDir)
+    $leaf = Get-SubagentDirName -PluginDir $PluginDir
+    if (-not $leaf) { return '' }
+    return (Join-Path $PluginDir $leaf)
+}
+
 function Resolve-PluginDir {
     <# Resolve the versioned plugin dir for Name+Marketplace under CacheRoot, in three steps:
 
@@ -1135,14 +1170,14 @@ function Resolve-PluginDir {
             foreach ($rec in @($record.RecordsById[$recId])) {
                 if (-not $rec.InstallPath) { continue }
                 if (-not (Test-Path -LiteralPath $rec.InstallPath -PathType Container)) { continue }
-                if (-not (Test-Path -LiteralPath (Join-Path $rec.InstallPath 'agents') -PathType Container)) { continue }
+                if (-not (Get-SubagentDirName -PluginDir $rec.InstallPath)) { continue }
                 return (Resolve-Path -LiteralPath $rec.InstallPath).Path
             }
         }
     }
 
     foreach ($v in (Get-CachedPluginDirs -Name $Name -Marketplace $Marketplace -CacheRoot $CacheRoot)) {
-        if (Test-Path -LiteralPath (Join-Path $v 'agents') -PathType Container) {
+        if (Get-SubagentDirName -PluginDir $v) {
             return (Resolve-Path -LiteralPath $v).Path
         }
     }

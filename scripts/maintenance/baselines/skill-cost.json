@@ -1,20 +1,20 @@
 {
-    "dkj-team-alpha/orchestrator":  {
+    "dkj-subagents-alpha/orchestrator":  {
                                     "AlwaysOn":  160,
                                     "OnInvoke":  1300,
                                     "Version":  "4.17.0"
                                 },
-    "dkj-team-alpha/specialists-init":  {
+    "dkj-subagents-alpha/specialists-init":  {
                                         "AlwaysOn":  200,
                                         "OnInvoke":  13700,
                                         "Version":  "4.17.0"
                                     },
-    "dkj-team-alpha/specialists-teardown":  {
+    "dkj-subagents-alpha/specialists-teardown":  {
                                             "AlwaysOn":  190,
                                             "OnInvoke":  12400,
                                             "Version":  "4.17.0"
                                         },
-    "dkj-team-alpha/sync-roster":  {
+    "dkj-subagents-alpha/sync-roster":  {
                                    "AlwaysOn":  150,
                                    "OnInvoke":  2600,
                                    "Version":  "4.17.0"

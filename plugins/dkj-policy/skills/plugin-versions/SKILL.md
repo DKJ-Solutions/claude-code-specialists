@@ -71,11 +71,11 @@ dkj-policy@claude-code-specialists
   verdict            up to date -- your install is at the clone's HEAD
                      -> the clone advances only on: claude plugin marketplace update claude-code-specialists
 
-dkj-team-alpha@claude-code-specialists
+dkj-subagents-alpha@claude-code-specialists
   installed here     4.32.0  3e13000b3fbe  project
   marketplace clone  4.32.0  HEAD 437366a44132
   verdict            the clone is AHEAD of your install (same version string 4.32.0, newer commit)
-                     -> claude plugin update dkj-team-alpha@claude-code-specialists --scope project
+                     -> claude plugin update dkj-subagents-alpha@claude-code-specialists --scope project
 ```
 
 **Before pasting this output into a public issue, redact the paths.** The checkout root, the
@@ -128,7 +128,7 @@ cannot run -- `check-connectors.ps1` is source-only and is not plugin-carried --
 *"check skipped"* and a session got no version signal at all.
 
 ```text
-[ERROR] dkj-team-ecomm@claude-code-specialists: the clone is AHEAD of your install (4.31.0 -> 4.32.0) -- claude plugin update dkj-team-ecomm@claude-code-specialists --scope project
+[ERROR] dkj-subagents-ecomm@claude-code-specialists: the clone is AHEAD of your install (4.31.0 -> 4.32.0) -- claude plugin update dkj-subagents-ecomm@claude-code-specialists --scope project
 [INFO] some-other@another-marketplace: cannot determine -- the clone's marketplace.json could not be read
 [SUMMARY] 7 plugin(s) enabled here: 1 behind, 1 undetermined, 5 up to date.
 ```

@@ -125,7 +125,7 @@ Assert-Equal 'path with spaces.txt' $e.Path 'quoted path: quotes stripped, inner
 $accented = 'caf' + [char]0x00E9 + '.txt'
 $e = ConvertFrom-GitPorcelainLine -Line ' M "caf\303\251.txt"'
 Assert-Equal $accented $e.Path 'quoted non-ASCII: the escape decodes back to the real filename'
-Assert-True ($null -ne (Get-Command Convert-GitQuotedPath -ErrorAction SilentlyContinue)) 'and the decoder that did it is defined by THIS lib (#1689), not reached across from sync-rules'
+Assert-True (Test-FunctionDefined 'Convert-GitQuotedPath') 'and the decoder that did it is defined by THIS lib (#1689), not reached across from sync-rules'
 # The rename halves go through the same path, so both sides of an arrow decode.
 $e = ConvertFrom-GitPorcelainLine -Line 'R  "caf\303\251.txt" -> "the\303\251.txt"'
 Assert-Equal ('the' + [char]0x00E9 + '.txt') $e.Path 'rename, escaped: the new path decodes'

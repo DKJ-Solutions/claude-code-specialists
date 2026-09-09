@@ -51,6 +51,12 @@
 # it safe to load first.
 . (Join-Path $PSScriptRoot 'ref-print-lib.ps1')
 
+# THE FUNCTION-TABLE PROBE (issue #1729). Same unconditional, $PSScriptRoot-relative shape as
+# ref-print-lib above and for the same reason -- it has to resolve in the plugin mirror as well as
+# here -- and it is likewise a leaf with no dependencies of its own. This lib carries ten seam probes,
+# more than any other file in the tree, and Get-ReleaseAudienceTier's is the frame #1723 faulted in.
+. (Join-Path $PSScriptRoot 'command-probe-lib.ps1')
+
 # The English fallbacks, and the ONLY copy of them. new-branch.ps1 held these literals until
 # the gate needed the same list; it now reads them from here.
 #
@@ -105,7 +111,7 @@ function Get-EntryScaffoldWording {
     foreach ($key in @('Title', 'BodyHeading', 'BodyPlaceholder')) {
         $value = $script:EntryScaffoldDefaults[$key]
         $getter = $map[$key]
-        if (Get-Command $getter -ErrorAction SilentlyContinue) {
+        if (Test-FunctionDefined $getter) {
             $v = & $getter
             if ($v) { $value = $v }
         }
@@ -425,7 +431,7 @@ function Get-EntryAudienceTier {
         a seam returning 7 would otherwise have the scaffolder write a section no validator accepts, and a
         gate that refuses every entry in the repo is worse than a gate nobody configured.
     #>
-    if (-not (Get-Command Get-ReleaseAudienceTier -ErrorAction SilentlyContinue)) { return $null }
+    if (-not (Test-FunctionDefined 'Get-ReleaseAudienceTier')) { return $null }
     $v = & Get-ReleaseAudienceTier
     if ($null -eq $v) { return $null }
     if ("$v" -notmatch '^\d+$') { return $null }
@@ -1561,7 +1567,7 @@ function Merge-WordingOverrides {
     $out = [ordered]@{}
     foreach ($key in $Defaults.Keys) { $out[$key] = $Defaults[$key] }
 
-    if (-not (Get-Command $OverrideCommand -ErrorAction SilentlyContinue)) { return [pscustomobject]$out }
+    if (-not (Test-FunctionDefined $OverrideCommand)) { return [pscustomobject]$out }
     $overrides = & $OverrideCommand
     if (-not $overrides) { return [pscustomobject]$out }
 
@@ -1583,7 +1589,7 @@ function Get-EntryGuidance {
     #>
     $out = [ordered]@{}
     foreach ($key in $script:EntryGuidanceDefaults.Keys) { $out[$key] = $script:EntryGuidanceDefaults[$key] }
-    if (Get-Command Get-EntryGuidanceOverrides -ErrorAction SilentlyContinue) {
+    if (Test-FunctionDefined 'Get-EntryGuidanceOverrides') {
         $override = Get-EntryGuidanceOverrides
         foreach ($key in @($out.Keys)) {
             # THE READ IS SHARED, THE ANSWER RULE IS NOT (#941). Get-OverrideMapValue is the same container
@@ -1950,7 +1956,7 @@ function Get-EntrySignificanceRubric {
         # String keys throughout: an OrderedDictionary keyed by [int] is the trap documented above.
         $levels[[string]$pair.Score] = $pair.Test
     }
-    if (Get-Command Get-EntrySignificanceRubricLevels -ErrorAction SilentlyContinue) {
+    if (Test-FunctionDefined 'Get-EntrySignificanceRubricLevels') {
         $override = Get-EntrySignificanceRubricLevels
         if ($override) {
             foreach ($entry in $override.GetEnumerator()) {
@@ -2009,7 +2015,7 @@ function Test-EntrySignificanceActive {
         needs the same repair; it is left to the change that reworks the release side, because the answer
         there is about which release documents exist rather than about scoring.
     #>
-    if (Get-Command Get-EntrySignificanceEnabled -ErrorAction SilentlyContinue) {
+    if (Test-FunctionDefined 'Get-EntrySignificanceEnabled') {
         return [bool](Get-EntrySignificanceEnabled)
     }
     return $true
@@ -4278,7 +4284,7 @@ function Get-EntrySectionHeadings {
     #>
     $out = [ordered]@{}
     foreach ($key in $script:EntrySectionDefaults.Keys) { $out[$key] = $script:EntrySectionDefaults[$key] }
-    if (Get-Command Get-EntrySectionHeadingOverrides -ErrorAction SilentlyContinue) {
+    if (Test-FunctionDefined 'Get-EntrySectionHeadingOverrides') {
         $override = Get-EntrySectionHeadingOverrides
         if ($override) {
             foreach ($entry in $override.GetEnumerator()) {
@@ -4489,7 +4495,7 @@ function Get-ReleaseChangeTypes {
         Probed with Get-Command rather than taken as a parameter, the same pattern teardown.ps1 uses for
         Get-RosterIdTokenPattern.
     #>
-    if (Get-Command Get-BranchTypes -ErrorAction SilentlyContinue) { return @(Get-BranchTypes) }
+    if (Test-FunctionDefined 'Get-BranchTypes') { return @(Get-BranchTypes) }
     return @('Feat', 'Fix', 'Docs', 'Chore')
 }
 
@@ -4538,7 +4544,7 @@ function Resolve-EntryType {
     # Two lists, two jobs -- see the header. $repoTypes is empty where the repo has no table of its own, and
     # only that list may accuse an author of a wrong type; $known always has something to recognise with.
     $repoTypes = @()
-    if (Get-Command Get-BranchTypes -ErrorAction SilentlyContinue) { $repoTypes = @(Get-BranchTypes) }
+    if (Test-FunctionDefined 'Get-BranchTypes') { $repoTypes = @(Get-BranchTypes) }
     $known = @(Get-ReleaseChangeTypes)
 
     # THE ANSWER, NOT THE BODY, and the difference is the guidance comment sitting above it. Reading the raw
@@ -4648,7 +4654,7 @@ function Resolve-EntryType {
             # without a repo-config.ps1 no type at all, which is every bare consumer and every fixture:
             # strictly less than the writer used to manage, and silent about it.
             $fallback = $script:EntryFallbackTypeDefault
-            if (Get-Command Get-EntryFallbackType -ErrorAction SilentlyContinue) {
+            if (Test-FunctionDefined 'Get-EntryFallbackType') {
                 $v = Get-EntryFallbackType
                 if ($v) { $fallback = [string]$v }
             }
@@ -5606,7 +5612,7 @@ function Get-BranchTrunkName {
         in each is the shape where a consumer on 'master' gets a correct refusal and a document that
         tells them the wrong branch name.
     #>
-    if (Get-Command Get-TrunkBranchName -ErrorAction SilentlyContinue) {
+    if (Test-FunctionDefined 'Get-TrunkBranchName') {
         $v = Get-TrunkBranchName
         if ($v) { return [string]$v }
     }
@@ -7478,6 +7484,60 @@ function Get-DevelopmentShapeFindings {
     }
 }
 
+function Get-DevelopmentBranchText {
+    <#
+        The branch's OWN text out of a development document -- everything from the first phase heading to
+        the end of the file, with the title and the scaffolder's guidance block left behind.
+
+        FOR THE ONE READER WHOSE SUBJECT IS THE BRANCH RATHER THAN THE ENTRY: open-pr.ps1's mention scan,
+        which asks which issues THIS branch is about. It cannot use Split-Development, because a number
+        named in a step is a mention of that issue and the entry is only the last of the four phases -- so
+        it read the WHOLE file, guidance and all, and the guidance is where this workflow records why its
+        shape rules exist. Every citation in it is therefore a mention on every branch, in every repo.
+
+        MEASURED SEPTEMBER 9, 2026 ON feat/1703-test-gate-cost (issue #1718): the already-done check
+        warned that '#1650 is already CLOSED, and it is already resolved by PR #1661 (merged)' on a branch
+        that has nothing to do with #1650. The citation is StepsGuidance's own -- 'refused since #1650' --
+        so the warning fires unconditionally, and the same run also warned about #1464, which WAS a
+        deliberate context citation. A check whose false positives are indistinguishable from its findings
+        has stopped being read. And it grows: each new rule the guidance cites adds a permanent warning to
+        every branch that will ever be opened.
+
+        AN IGNORE-LIST OF NUMBERS IS EXPLICITLY NOT THE FIX, and #1718 said so when it was filed. It would
+        need editing every time the guidance cites a new issue, which is the same maintenance failure one
+        file further along.
+
+        THE SPLIT IS SAFE BECAUSE ANOTHER GATE ALREADY GUARANTEES IT. #899's preamble rule -- 'nothing
+        branch-specific above the first of those four headings' -- is refused by open-pr before the push,
+        in every repo, so the region this function drops is generic by construction: nothing citable by the
+        author can be lost in it. That is why the boundary is the first phase heading and not, say, the
+        end of the blockquote.
+
+        IT RE-DERIVES NOTHING, which is the reason it is three lines. Get-DevelopmentShapeFindings already
+        walks this text fence-aware, reads the title and phase levels OFF the document rather than pinning
+        them, and reports each phase heading's line -- and it is the reader of the very rule quoted above.
+        A second walk with its own level derivation is exactly the drift this file exists to prevent: the
+        levels shifted once already (August 26, 2026), and a copy free to disagree did.
+
+        NO PHASE HEADING MEANS THE WHOLE TEXT, and that fail-safe carries two cases on one rule. A legacy
+        entry-only file has no document around its entry -- Test-DevelopmentHasPlan turns it away at that
+        function's door, so PhaseHeadings comes back empty -- and a document whose phases have gone is one
+        this function must not silently empty. Erring toward the whole text errs toward the surplus
+        mention, which is the direction Get-IssueMentions itself chose: a mention too many asks the author
+        one question, a mention missed is the silent open issue the gate exists to prevent.
+    #>
+    param([Parameter(Mandatory)][AllowEmptyString()][string]$Text)
+
+    $first = @((Get-DevelopmentShapeFindings -Text $Text).PhaseHeadings)[0]
+    if ($null -eq $first) { return $Text }
+    # Line is 1-BASED, off the same '\r?\n' split as below, so the first phase heading is kept and
+    # everything above it is dropped. A heading on line 1 leaves nothing above it to drop.
+    $at = [int]$first.Line - 1
+    if ($at -le 0) { return $Text }
+    $lines = @($Text -split '\r?\n')
+    return ($lines[$at..($lines.Count - 1)] -join "`n")
+}
+
 function Test-BranchChangelogIsFilled {
     <#
         Pure: does the development file hold a branch's work, or is it still (back) in the reset state
@@ -7710,7 +7770,7 @@ function Test-BranchFoldedOnRef {
     )
 
     if (-not $Ref -or [string]::IsNullOrWhiteSpace($Branch)) { return $null }
-    if (-not (Get-Command Invoke-NativeCapture -ErrorAction SilentlyContinue)) { return $null }
+    if (-not (Test-FunctionDefined 'Invoke-NativeCapture')) { return $null }
 
     if (-not $ChangelogRel) {
         $paths = Get-BranchFilePaths

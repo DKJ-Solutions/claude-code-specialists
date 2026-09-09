@@ -83,7 +83,7 @@ $PluginRoot = Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')
 # Existence-filtered, because not every plugin carries both: only the core ships personas/.
 . (Join-Path $PSScriptRoot '..\lib\plugin-tree-lib.ps1')
 $PublishedPlugins = @(Get-RepoPluginRoots -RepoRoot $PluginRoot.Path)
-$SourceDirs = @(Get-PluginSubdirs -PluginRoots $PublishedPlugins -Leaf 'agents')
+$SourceDirs = @(Get-PluginSubdirs -PluginRoots $PublishedPlugins -Leaf 'subagents') + @(Get-PluginSubdirs -PluginRoots $PublishedPlugins -Leaf 'agents')
 if ($SourceDirs.Count -eq 0) {
     Write-Host "Cannot find any canonical agent-defs under $PluginRoot -- stopping." -ForegroundColor Red
     exit 1

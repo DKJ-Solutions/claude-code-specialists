@@ -177,13 +177,13 @@ Assert-Equal 0 (@(Get-EntryScaffoldFindings -EntryText $unclosed -Wording $wordi
 # PR's touched files and appends it at the merge; an author who copies the folded shape into the branch
 # document's '#### Pull Request' section leaves a second one, and the fold's unconditional append
 # doubled it -- 22 reached the changelog. The gate now tells the author on the branch, before the merge.
-$withPlugins = "## A real title`n`n### What does this change do?`n`nReal prose about the change.`n`n#### Pull Request`n`nA real title`n`nPlugins: dkj-team-alpha`n"
+$withPlugins = "## A real title`n`n### What does this change do?`n`nReal prose about the change.`n`n#### Pull Request`n`nA real title`n`nPlugins: dkj-subagents-alpha`n"
 $pluginFindings = @(Get-EntryScaffoldFindings -EntryText $withPlugins -Wording $wording)
 Assert-Equal 1 $pluginFindings.Count 'a hand-written Plugins: line is a finding'
 Assert-True ($pluginFindings[0].Label -like "*Plugins*") 'and it is named as a Plugins: line, not one of the scaffold markers'
-Assert-True ($pluginFindings[0].Marker -eq 'Plugins: dkj-team-alpha') 'the finding quotes the line it matched'
+Assert-True ($pluginFindings[0].Marker -eq 'Plugins: dkj-subagents-alpha') 'the finding quotes the line it matched'
 # Same fence rule as the scaffold markers: an entry documenting the format may quote the line.
-$pluginQuoted = "## Document the fold $midDot Docs $midDot 2026-08-03`n`nThe fold appends:`n`n" + '```' + "`nPlugins: dkj-team-alpha`n" + '```' + "`n`nThat line is machine-written.`n"
+$pluginQuoted = "## Document the fold $midDot Docs $midDot 2026-08-03`n`nThe fold appends:`n`n" + '```' + "`nPlugins: dkj-subagents-alpha`n" + '```' + "`n`nThat line is machine-written.`n"
 Assert-Equal 0 (@(Get-EntryScaffoldFindings -EntryText $pluginQuoted -Wording $wording)).Count 'a Plugins: line inside a fence is illustration, not a finding'
 # A written entry with no Plugins: line is still clean -- the check adds nothing to the happy path.
 Assert-Equal 0 (@(Get-EntryScaffoldFindings -EntryText $written -Wording $wording)).Count 'the Plugins: check does not fire on an entry that has no such line'
@@ -202,6 +202,9 @@ Copy-Item -LiteralPath $BranchInfoSrc -Destination (Join-Path $fixture 'scripts\
 Copy-Item -LiteralPath $LibSrc -Destination (Join-Path $fixture 'scripts\lib\entry-scaffold-lib.ps1') -Force
 Copy-Item -LiteralPath $SeamLibSrc -Destination (Join-Path $fixture 'scripts\lib\seam-lib.ps1') -Force
 Copy-Item -LiteralPath $NativeCaptureSrc -Destination (Join-Path $fixture 'scripts\lib\native-capture-lib.ps1') -Force
+# command-probe-lib.ps1 is a sibling of a sibling (#1729): the three libs above dot-source it for
+# Test-FunctionDefined, so the fixture owes it exactly as it owes ref-print-lib.
+Copy-Item -LiteralPath (Join-Path $RepoRoot 'scripts\lib\command-probe-lib.ps1') -Destination (Join-Path $fixture 'scripts\lib\command-probe-lib.ps1') -Force
 Copy-Item -LiteralPath $ParkLibSrc -Destination (Join-Path $fixture 'scripts\lib\park-lib.ps1') -Force
 Copy-Item -LiteralPath $PorcelainSrc -Destination (Join-Path $fixture 'scripts\lib\git-porcelain-lib.ps1') -Force
 Copy-Item -LiteralPath $PrIssuesLibSrc -Destination (Join-Path $fixture 'scripts\lib\pr-issues-lib.ps1') -Force
@@ -3033,6 +3036,75 @@ Assert-True ($shapePrSrc -match '(?s)Get-DevelopmentShapeFindings.*?if \(\$Force
     'shape: with -Force honoured, matching both siblings above it'
 Assert-True ($shapePrSrc -match '(?s)Test-DevelopmentEntryMissing.*?Get-EntryScaffoldFindings.*?Get-DevelopmentShapeFindings') `
     'shape: and it runs in CI''s order -- is there an entry, has it been written, does the document hold its form'
+
+# --- Get-DevelopmentBranchText: the mention scan reads the branch, not the guidance (#1718) --------
+# WHAT THIS BLOCK GUARDS. open-pr's mention scan asks which issues THIS branch is about, and it read the
+# whole development document -- so the guidance block's own citations were mentions on every branch in
+# every repo. Measured on feat/1703-test-gate-cost: 'already-done check: issue #1650 is already CLOSED'
+# on a branch with no connection to #1650, from StepsGuidance's own 'refused since #1650'.
+#
+# THE LOAD-BEARING ASSERT IS THE ROUND TRIP, not the split. A split that is right about lines and wrong
+# about which numbers survive it fixes nothing -- and the guidance is written by the same scaffolder these
+# asserts call, so the citation is read out of the real text rather than typed here. A future rule citing
+# a new issue is then covered on the day it is written, which is the growth #1718 was filed about.
+Write-Host ''
+Write-Host 'Get-DevelopmentBranchText (#1718)'
+
+$ownWhole = (Format-Development -Branch 'feat/mentions') -join "`n"
+$ownText  = Get-DevelopmentBranchText -Text $ownWhole
+Assert-Equal $shapePhase (@($ownText -split '\r?\n')[0]) 'branch text: it begins AT the first phase heading, which is kept'
+Assert-True ($ownText -notmatch '(?m)^\s*>') 'branch text: and the guidance blockquote is gone -- that region is identical in every document'
+Assert-True ($ownText -match ('(?m)^' + [regex]::Escape(('#' * (Get-BranchCycleSectionLevel)) + ' DEPLOY:'))) 'branch text: DEPLOY survives -- this is not Split-Development, which drops everything above it'
+Assert-True ($ownWhole.Length -gt $ownText.Length) 'branch text: something was actually dropped'
+
+# THE ROUND TRIP, through the one reader this exists for. pr-issues-lib is dot-sourced here and nowhere
+# else in this suite: the property is not "the text was cut" but "the guidance's issue numbers are no
+# longer mentions of this branch", and only Get-IssueMentions can say that.
+. (Join-Path $PSScriptRoot '..\lib\pr-issues-lib.ps1')
+$ownLines = @($ownWhole -split '\r?\n')
+$ownCut   = [System.Array]::IndexOf($ownLines, $shapePhase)
+Assert-True ($ownCut -gt 0) 'branch text: (the first phase heading is a line of its own -- what the split is anchored to)'
+$ownGuidanceCites = @(Get-IssueMentions -Text (($ownLines[0..($ownCut - 1)]) -join "`n"))
+Assert-True ($ownGuidanceCites.Count -gt 0) 'branch text: (the scaffolder''s guidance really does cite issue numbers -- the premise of this block)'
+Assert-Equal $ownGuidanceCites.Count @($ownGuidanceCites | Where-Object { @(Get-IssueMentions -Text $ownWhole) -contains $_ }).Count 'branch text: and the whole document reports every one of them as a mention -- the defect, reproduced'
+Assert-Equal 0 @(Get-IssueMentions -Text $ownText).Count 'branch text: while the branch''s own text mentions nothing at all -- a fresh scaffold is about no issue yet'
+
+# AND A NUMBER THE AUTHOR WROTE IS UNTOUCHED, under each of the four headings. Narrowing at the wrong end
+# is the failure mode with teeth: a missed mention is the silent open issue the resolves gate exists to
+# prevent, which is why this is asserted per phase rather than once.
+$ownPhaseList = @(@((Get-BranchFileWording).StepPhases) + @('DEPLOY'))
+$ownAuthored = $ownWhole
+for ($pi = 0; $pi -lt $ownPhaseList.Count; $pi++) {
+    $ownMark = ('#' * (Get-BranchCycleSectionLevel)) + ' ' + $ownPhaseList[$pi]
+    $ownAuthored = $ownAuthored -replace ('(?m)^' + [regex]::Escape($ownMark) + '.*$'), ('$0' + "`n`nSee #90" + $pi + '.')
+}
+$ownAuthoredMentions = @(Get-IssueMentions -Text (Get-DevelopmentBranchText -Text $ownAuthored))
+for ($pi = 0; $pi -lt $ownPhaseList.Count; $pi++) {
+    Assert-True ($ownAuthoredMentions -contains [int]"90$pi") "branch text: a number written under $($ownPhaseList[$pi]) survives the narrowing"
+}
+
+# NO PHASE HEADING MEANS THE WHOLE TEXT, and the fallback carries two cases on one rule: a legacy
+# entry-only file has no document around its entry, and a document whose phases have gone must not be
+# silently emptied. Both err toward the surplus mention, which is the direction Get-IssueMentions itself
+# chose -- one question for the author against a silent open issue.
+Assert-Equal $shapeLegacyEntry (Get-DevelopmentBranchText -Text $shapeLegacyEntry) 'branch text: a legacy entry-only file comes back whole -- it has no plan to split'
+# PR #1644'S DOCUMENT IS THE OTHER WAY ROUND, AND THAT IS THE HONEST ANSWER RATHER THAN THE FALLBACK.
+# Its phases were cut but DEPLOY survived, so there IS a first phase heading and the split lands on it --
+# dropping the branch prose that was glued into the guidance region, 'Issue #1625' with it. What makes
+# that safe is the ORDER in open-pr: the shape gate refuses exactly that document, a few lines below this
+# scan, so a mention lost there is lost on a push that is not going to happen. Asserted rather than
+# reasoned about, because it is the one case where the narrowing does drop something an author wrote.
+Assert-True ((Get-DevelopmentBranchText -Text $shapeBroken) -notmatch 'Issue #1625') 'branch text: PR #1644''s document splits at its surviving DEPLOY -- the prose above it goes'
+Assert-True (@((Get-DevelopmentShapeFindings -Text $shapeBroken).Findings).Count -gt 0) 'branch text: and that is safe because the shape gate refuses that same document, in every repo, before the push'
+Assert-Equal '' (Get-DevelopmentBranchText -Text '') 'branch text: empty text comes back empty'
+Assert-Equal "no headings here`n" (Get-DevelopmentBranchText -Text "no headings here`n") 'branch text: nor does a headingless file lose anything'
+
+# FENCE-AWARE, inherited rather than re-implemented: the split point comes off the heading list
+# Get-DevelopmentShapeFindings already walks, so a phase heading quoted inside a fence is not a split
+# point either -- it stays above the cut, with the guidance it illustrates.
+$ownFenced = Get-DevelopmentBranchText -Text $shapeFenced
+Assert-Equal $shapePhase (@($ownFenced -split '\r?\n')[0]) 'branch text: the fenced document splits at its real first phase, not at the quoted one'
+Assert-True ($ownFenced -notmatch '``````') 'branch text: so the illustration is dropped with the region around it'
 
 Write-Host ""
 # A BROKEN FIXTURE IS SAID BEFORE THE VERDICT AND FAILS THE RUN (issue #1635) -- including when every

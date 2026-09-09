@@ -65,9 +65,52 @@ function Get-FlatOutput {
         NativeCommandError, which PowerShell WRAPS at the host width -- and the fixture's temp path
         length moves that wrap point. Same reasoning, and same removal-rather-than-collapse, as
         park-branch.tests.ps1 and new-branch.tests.ps1.
+
+        AND IT IS MEASURABLY THE RIGHT ONE OF THE THREE VARIANTS IN THIS TREE (#1736, September 9, 2026).
+        Over 120 wrap positions x 4 phrases, by padding a Write-Error until its break swept every column
+        of a 120-wide render: collapsing the break to a space failed 68 of 480 checks ('dirty working tre
+        e'), no flattening at all failed the same 68, and removing the break -- this variant -- failed 0.
+
+        SO THE ASSERT-SAYS CONVERSION BELOW IS NOT A BUG FIX, and nothing here was letting a wrapped
+        phrase through. What it buys is that the immunity stops depending on the renderer: removing the
+        break reconstructs a mid-word split exactly, and survives a split on a space only because
+        PowerShell keeps that space at the end of the line it wrapped. Assert-Says strips ALL whitespace
+        from both sides and needs neither property. This field stays because a FAILING assert still has
+        to print one readable line.
     #>
     param($Captured)
     return (($Captured | Out-String) -replace "`r?`n", '')
+}
+
+function Test-Says {
+    <# Does captured child output contain this phrase, whatever the console did to it?
+
+       WORKTREE-LANE CARRIES THE MOST OF #1736's CLASS in this tree: Invoke-WorktreeLane below captures
+       the child with 2>&1, so its error stream is in .Out, and worktree-lane.ps1 refuses through
+       Write-Error twenty times over. Every refusal assert in this file therefore reads text the
+       formatter has hard-wrapped at the host's buffer column -- inside a word or on a space, whichever
+       character sat there -- while the fixture's temp path, which carries $PID and a guid, moves that
+       column from run to run. That is why the reader wants to be indifferent to the column, even though
+       the flattener above is measured to cope with it today.
+
+       Write-Host does not go through the formatter at all, which is why the 'ship-pr' assert below
+       keeps -match: that line is Write-Host and cannot wrap.
+
+       Strips ALL whitespace from both sides. Literal (IndexOf), so a phrase carrying '(' or '.' needs
+       no escaping; OrdinalIgnoreCase keeps the case-insensitivity that -match had at these call sites. #>
+    param([string]$Text, [string]$Phrase)
+    $haystack = ($Text -replace '\s', '')
+    $needle = ($Phrase -replace '\s', '')
+    return ($haystack.IndexOf($needle, [System.StringComparison]::OrdinalIgnoreCase) -ge 0)
+}
+
+function Assert-Says {
+    param([string]$Text, [string]$Phrase, [string]$Name)
+    if (Test-Says -Text $Text -Phrase $Phrase) {
+        $script:pass++; Write-Host "  [PASS] $Name" -ForegroundColor Green
+    } else {
+        $script:fail++; Write-Host "  [FAIL] $Name`n         wanted to find: '$Phrase'`n         in:             '$Text'" -ForegroundColor Red
+    }
 }
 
 function Assert-Equal {
@@ -140,6 +183,9 @@ function New-Fixture {
     Copy-Item -LiteralPath $ParkLibSrc       -Destination (Join-Path $dir 'scripts\lib\park-lib.ps1')            -Force
     Copy-Item -LiteralPath $PorcelainSrc     -Destination (Join-Path $dir 'scripts\lib\git-porcelain-lib.ps1')   -Force
     Copy-Item -LiteralPath $SeamLibSrc       -Destination (Join-Path $dir 'scripts\lib\seam-lib.ps1')            -Force
+    # command-probe-lib.ps1 is a sibling of a sibling (#1729): the three libs above dot-source it for
+    # Test-FunctionDefined, so the fixture owes it exactly as it owes ref-print-lib.
+    Copy-Item -LiteralPath (Join-Path $RepoRoot 'scripts\lib\command-probe-lib.ps1') -Destination (Join-Path $dir 'scripts\lib\command-probe-lib.ps1') -Force
     Copy-Item -LiteralPath $PrIssuesLibSrc   -Destination (Join-Path $dir 'scripts\lib\pr-issues-lib.ps1')       -Force
     Copy-Item -LiteralPath $RemoteAheadLibSrc -Destination (Join-Path $dir 'scripts\lib\remote-ahead-lib.ps1')   -Force
     Copy-Item -LiteralPath $RefPrintLibSrc    -Destination (Join-Path $dir 'scripts\lib\ref-print-lib.ps1')      -Force
@@ -265,7 +311,7 @@ try {
     [System.IO.File]::WriteAllText((Join-Path $occupied 'in-the-way.txt'), "x`n")
     $rC = Invoke-WorktreeLane -Dir $fc -From $fc -Arguments @('-Name', 'feat/taken')
     Assert-Equal 1 $rC.Code "occupied path: exit 1"
-    Assert-True ($rC.Out -match 'already exists') "occupied path: message names the cause"
+    Assert-Says $rC.Out 'already exists' "occupied path: message names the cause"
     Assert-Equal 1 (Get-WorktreeCount -Dir $fc) "occupied path: nothing registered"
 
     # --- (d) HandBack refuses while the LANE is dirty ----------------------------------------------
@@ -285,7 +331,7 @@ try {
     [System.IO.File]::WriteAllText((Join-Path $laneD 'work-in-progress.txt'), "half-finished`n", (New-Object System.Text.UTF8Encoding $false))
     $rD = Invoke-WorktreeLane -Dir $fd -From $fd -Arguments @('-HandBack', '-Lane', $laneD)
     Assert-Equal 1 $rD.Code "dirty lane: exit 1"
-    Assert-True ($rD.Out -match 'uncommitted work') "dirty lane: message names the cause"
+    Assert-Says $rD.Out 'uncommitted work' "dirty lane: message names the cause"
     Assert-Equal 2 (Get-WorktreeCount -Dir $fd) "dirty lane: the lane survives"
 
     # --- (e) HandBack refuses while the PRIMARY is dirty -------------------------------------------
@@ -295,7 +341,7 @@ try {
     [System.IO.File]::WriteAllText((Join-Path $fd 'dirty.txt'), "x`n")
     $rE = Invoke-WorktreeLane -Dir $fd -From $fd -Arguments @('-HandBack', '-Lane', $laneD)
     Assert-Equal 1 $rE.Code "dirty primary: exit 1"
-    Assert-True ($rE.Out -match 'primary checkout has uncommitted work') "dirty primary: message names the cause"
+    Assert-Says $rE.Out 'primary checkout has uncommitted work' "dirty primary: message names the cause"
     Assert-Equal 2 (Get-WorktreeCount -Dir $fd) "dirty primary: the lane survives"
     Assert-Equal 'main' (Get-HeadBranch -Dir $fd) "dirty primary: no checkout happened"
 
@@ -308,6 +354,7 @@ try {
     Assert-Equal 0 $rF.Code "hand back: exit 0"
     Assert-Equal 1 (Get-WorktreeCount -Dir $fd) "hand back: the lane is deregistered"
     Assert-Equal 'feat/lane-d' (Get-HeadBranch -Dir $fd) "hand back: the branch is checked out in the primary"
+    # -match, deliberately: this is a Write-Host line, so the formatter never touches it (#1736).
     Assert-True ($rF.Out -match 'ship-pr') "hand back: names the next step"
     Assert-True (Test-BranchExists -Dir $fd -Name 'feat/lane-d') "hand back: the branch itself survives"
 
@@ -315,7 +362,7 @@ try {
     Write-Host "worktree-lane.ps1 -HandBack -- refuses to hand back the primary" -ForegroundColor Cyan
     $rG = Invoke-WorktreeLane -Dir $fd -From $fd -Arguments @('-HandBack', '-Lane', $fd)
     Assert-Equal 1 $rG.Code "primary as target: exit 1"
-    Assert-True ($rG.Out -match 'primary checkout, not a lane') "primary as target: message names the cause"
+    Assert-Says $rG.Out 'primary checkout, not a lane' "primary as target: message names the cause"
 
     # --- (h) HandBack refuses a path that is not a worktree of this repo --------------------------
     Write-Host "worktree-lane.ps1 -HandBack -- refuses a foreign path" -ForegroundColor Cyan
@@ -324,7 +371,7 @@ try {
     $script:fixtures += $foreign
     $rH = Invoke-WorktreeLane -Dir $fd -From $fd -Arguments @('-HandBack', '-Lane', $foreign)
     Assert-Equal 1 $rH.Code "foreign path: exit 1"
-    Assert-True ($rH.Out -match 'Not a registered worktree') "foreign path: message names the cause"
+    Assert-Says $rH.Out 'Not a registered worktree' "foreign path: message names the cause"
 
     # --- (i) Structural: the hand-back removal is never forced ------------------------------------
     # The mirror image of prune-merged.tests.ps1's "no --delete anywhere" assert, and for the same

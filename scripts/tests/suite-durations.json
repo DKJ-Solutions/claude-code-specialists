@@ -25,7 +25,7 @@
                     "adopt-merge-queue.tests.ps1":  22.7,
                     "adopt-shopify-floor.tests.ps1":  7.7,
                     "adopt-workflow-folder.tests.ps1":  32.6,
-                    "agent-shared.tests.ps1":  54,
+                    "subagent-shared.tests.ps1":  54,
                     "backing-gate.tests.ps1":  6.3,
                     "bootstrap-drift.tests.ps1":  111.1,
                     "branch-document-path.tests.ps1":  9.1,

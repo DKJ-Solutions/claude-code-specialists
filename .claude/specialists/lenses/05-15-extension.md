@@ -5,7 +5,7 @@ group: 05
 
 # Sylvester ⚙️ · claude-code-specialists addendum
 
-> Repo-lens (claude-code-specialists) accompanying the portable playbook in the `dkj-team-alpha` plugin (`plugins/dkj-teams/dkj-team-alpha/manuals/05-15-manual.md`). This file does not describe the craft, but what Sylvester does in this repo.
+> Repo-lens (claude-code-specialists) accompanying the portable playbook in the `dkj-subagents-alpha` plugin (`plugins/dkj-subagents/dkj-subagents-alpha/manuals/05-15-manual.md`). This file does not describe the craft, but what Sylvester does in this repo.
 
 A system administrator does the same thing everywhere — manage the harness and the tooling the team
 works in: scripts, config, the safety guards. **What is repo-specific in claude-code-specialists is not
@@ -46,7 +46,7 @@ infrastructure.
   scans for dead links (in `README.md`, `CHANGELOG.md`, the manuals, `SKILL.md`s, and `releases/**`),
   checks that every `scripts/**/*.ps1` parses without errors (catching syntax errors in the
   orchestration that would only break at runtime), and guards (check 7) that every shared-block
-  region in an agent def still equals its source in `agent-shared/`. **Check 28 reads that same
+  region in an agent def still equals its source in `subagent-shared/`. **Check 28 reads that same
   scan set a second time for `@`-imports** (August 26, 2026, issue #874), because an import is a
   different syntax and the link scan matched none of it. It is worth separating from its sibling by
   what being wrong costs: a dead link costs a reader one click, a dead import costs the session **the
@@ -96,7 +96,7 @@ infrastructure.
   [Derek #05](05-05-extension.md)'s `open-pr.ps1` runs before every push — and that `cut-release.ps1`
   runs before a release. **Check 23, `[plugin-kind]`, added August 9, 2026, and its reason was replaced on
   August 26, 2026 rather than left standing:** every published plugin must be `team-*` under
-  `plugins/dkj-teams/` or a way of working by name, and a name carrying neither shape is an
+  `plugins/dkj-subagents/` or a way of working by name, and a name carrying neither shape is an
   error rather than a style note. Since
   [#1467](https://github.com/DaveKJohn/claude-code-specialists/issues/1467) only `*-policy` /
   `*-policy-*` still carry a directory rule on the workflow side — `plugins/dkj-policy/`, the government,
@@ -110,7 +110,23 @@ infrastructure.
   it switches the check off for itself, silently.
 - **`.github/workflows/ci.yml`** — the CI gate on GitHub: runs the same lint gate + all test suites
   (`scripts/tests/*.tests.ps1`) on every PR and every push to `main`, so the guard also applies to
-  work that comes about outside `open-pr.ps1`. **"The same" is literal since August 7, 2026** — the step
+  work that comes about outside `open-pr.ps1`.
+
+  **AND "THE SAME GATE" IS NOT "THE SAME ANSWER", BECAUSE THE TWO RUN ON DIFFERENT TREES**
+  (measured September 9, 2026, on this lens's own branch). The local gate runs on **your branch**; CI
+  runs on the **merge** of your branch with the trunk. The suite list is a glob, so a suite the trunk
+  gained while your branch was open **does not exist locally** — the local gate cannot run it, reports
+  green, and CI then runs it against your change and fails. Measured exactly here: `feat/1726-…` passed
+  all 86 suites locally twice, and `lint-en-tests` went red on
+  `command-probe-lib.tests.ps1` — a rule (#1729, *no `Get-Command` function probe*) that landed on `main`
+  hours earlier and that the new script broke three times over. After `git merge origin/main` the same
+  command reported **87** suites, and the count is the only thing that said anything was different.
+
+  **Read the count, then: a local gate pass is evidence about your branch and NOT a prediction about CI.**
+  This is not what ship-pr's staleness guard is for — that dates a CI certificate against commits the
+  trunk gained *after* the run (#1292), and it fires at the merge, which is well after the red run has
+  already happened. The cheap habit is the fix: `git fetch` and merge the trunk **before** the gates, so
+  the tree you prove is the tree CI will build. **"The same" is literal since August 7, 2026** — the step
   dot-sources `native-capture-lib.ps1` and calls `Invoke-TestSuiteGate`, the one function `open-pr.ps1`
   and `cut-release.ps1` also call. It held its own inline `foreach` until then, which is how a gate
   improvement can land in both local callers and miss the only one that actually blocks a merge; the
@@ -135,7 +151,7 @@ infrastructure.
   gated at all.** The block used to key one group on `github.ref`, i.e. one group for the whole trunk,
   and leaned on `cancel-in-progress: ${{ github.event_name == 'pull_request' }}` to keep the fold commit
   from cancelling the merge commit's run. It did not, and could not — the portable half of why is a hard
-  rule in [Sylvester's manual](../../../plugins/dkj-teams/dkj-team-alpha/manuals/05-15-manual.md#sylvesters-hard-rules):
+  rule in [Sylvester's manual](../../../plugins/dkj-subagents/dkj-subagents-alpha/manuals/05-15-manual.md#sylvesters-hard-rules):
   the field governs the *in-progress* run, while a group also drops a **pending** one when a third
   arrives. **What made it bite here is this repo's own trunk rhythm**, which is the repo-specific half:
   `ship-pr` pushes twice per branch 6s apart, a run takes ~15 minutes, and `windows-latest` queues for
@@ -206,6 +222,43 @@ infrastructure.
   hunting for a second cause. **The bypass answers both in one move**, because a bypass actor bypasses the
   ruleset rather than a rule, so nothing about the remedy changes. What changes is the diagnosis, and that
   is the half a session actually reads a red run with.
+
+  **AND THE FOURTH ENTRY IS GONE AGAIN — THE LIST IS BACK TO THREE** (measured September 9, 2026,
+  [#1720](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1720)). The same command on the
+  same ruleset id:
+
+  ```
+  $ gh api repos/DKJ-Solutions/claude-code-specialists/rulesets/19008062 --jq '[.rules[].type]'
+      ["deletion","non_fast_forward","required_status_checks"]
+  ```
+
+  So the three-rule list above is the live one again, `required_status_checks` is once more the only rule
+  a direct push has to be bypassed for, and a rejected push reports **one** line rather than two. The
+  September 6 block stays exactly where it is: it is what a reader needs the day a run from that window is
+  being read back, and deleting it would leave run 34020828593's two-line refusal unexplained. **Read this
+  pair as the shape of the whole section** — each block is what was true on its date, and the newest one is
+  the answer to "what does the ruleset hold *now*".
+
+  **AND THE ONE THING TO CHECK BEFORE TRUSTING ANY OF THEM: a ruleset is GitHub-side state, so nothing in
+  this tree changes when it changes.** No commit records it, no gate reads it, and no session is told. That
+  is why every block here carries the command rather than only its output — the record is a dated
+  measurement, not a fact the repo maintains, and the way to know which block is current is to run the
+  command again. The removal above has no date of its own for exactly that reason — September 9 is when it
+  was *measured*, not when it happened, and nobody can now say which. That gap is why the always-on
+  sentence in [`CLAUDE.md`](../../../CLAUDE.md#claude-code-specialistss-safety-implementation) went on
+  handing out the wrong answer for a stretch nobody can now put a length on (#1720).
+
+  **EVERY SENTENCE ABOVE STILL HOLDS, AND SINCE SEPTEMBER 9, 2026 SOMETHING ACTS ON IT**
+  ([#1726](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1726)):
+  `.github/workflows/repo-settings.yml` runs `check-repo-settings.ps1` daily against
+  `Get-ExpectedRepoSettings`, so a change to this ruleset now produces a dated red run within 24 hours
+  instead of nothing at all. **It does not make these blocks maintained facts, and reading them as such
+  is the one mis-reading to avoid** — each is still what was true on its date, and the way to know
+  which is current is still to run the command. What the detector adds is narrower and is the half that
+  was missing: it says *when* a block stopped being current, which is precisely what the `merge_queue`
+  removal above has no answer for. Its own bullet is further down, under
+  [what Sylvester owns here](#what-sylvester-owns-here); the three-rule list above is one of the seven
+  facts it now compares, so a fourth entry appearing is reported rather than discovered.
 
   **AND THE BYPASS THAT ANSWERS BOTH CANNOT BE GRANTED TO THE ACTOR THAT NEEDS IT** (September 6, 2026,
   [#1506](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1506)). The paragraph above is
@@ -790,6 +843,64 @@ infrastructure.
   form says the same thing in characters that survive, and a suite assert reads the *recorded arguments*
   for a quote rather than the behaviour, since a fake `gh` would answer either form happily.
 
+- **`.github/workflows/repo-settings.yml` + `scripts/lint/check-repo-settings.ps1`** — the one runner
+  here whose subject is **not** this tree (issue
+  [#1726](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1726), September 9, 2026). Every
+  other check on this page reads the repo or a machine-local record; this one reads **GitHub**, and
+  compares it against `Get-ExpectedRepoSettings` in
+  [`scripts/repo-config.ps1`](../../../scripts/repo-config.ps1) — seven declared facts, each carrying the
+  document in this tree that states it and the date that statement was last measured.
+
+  **The gap it closes is the one the ruleset bullet above states in prose and could not act on**:
+  *"a ruleset is GitHub-side state, so nothing in this tree changes when it changes."* That sentence is
+  still exactly right, and it is now the only half that was ever missing — a detector.
+
+  **THREE DRIFTS IN EIGHT DAYS, which is why this was built rather than written down.** #1726 was filed
+  arguing for doing nothing, on this repo's own no-pre-emptive-fixes rule and the words *"one occurrence
+  is not a rate"* — and that premise did not survive the tree. `bypass_actors` emptied by the transfer
+  (#1244): every direct-on-`main` exception dead, every fold blocked, found by a failing push a day
+  later. `merge_queue` added and removed with no trace (#1499, #1720). And `allow_auto_merge` live
+  `true` against four records here saying `false`
+  ([#1730](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1730)) — **found by this check's
+  own first run**, while that premise was being checked. Two of the three had mechanical consequences,
+  not merely a session reading a wrong sentence.
+
+  **SCHEDULED, NOT A SessionStart HOOK, and the reason is the date** (Dave's call on #1726's menu). A
+  hook reaches a drift sooner and costs a `gh api` round trip at every session start. What decided it is
+  the half a hook cannot do at all: a scheduled run leaves a **dated** record. #1720's own complaint is
+  that the removal has no date anywhere, *"because September 9 is when it was measured, not when it
+  happened"* — a hook reports to whoever happens to open a session, and if nobody does, nothing is
+  written down. Daily at 06:30 UTC bounds every future answer to 24 hours; `workflow_dispatch` is how
+  the answer is had on the day a setting is changed on purpose, and the one trigger that survives
+  GitHub suspending a schedule after 60 days of repo inactivity.
+
+  **NOT in `main-ci-gate`**, like `unfolded-entry.yml` and `branch-entry.yml` — the two that state that
+  reasoning for themselves — and for a sharper version of it: a
+  check whose subject *is* the ruleset, required *by* that ruleset, would be self-referential — and it
+  would stop the trunk over a switch only Dave can flip, so a drift would block every merge instead of
+  reporting one. **And it writes nothing to GitHub**, ever: repo settings are Dave's surface, the same
+  rule `adopt-merge-queue.ps1` follows when it composes its ruleset command and refuses to run it. It
+  holds `contents: read` and borrows no standing credential, which is the whole difference from
+  `fold-on-merge.yml` two bullets up.
+
+  **ONE FIELD READS AS UNREADABLE IN CI, AND THAT IS A THIRD VERDICT RATHER THAN A PASS.**
+  `bypass_actors` is returned to repo administrators only, so the job-scoped `GITHUB_TOKEN` cannot see
+  the one field whose emptying was #1244 — collapsing that into "matches" would make the check silent
+  about the drift with the worst consequences. So it prints `[?]`, says why, and does not fail the run;
+  run the script locally to compare that one. Everything else comes from
+  `repos/<repo>/rules/branches/main` and the repo object, both readable with `contents: read` — and the
+  branch endpoint is deliberately preferred over `rulesets/<id>` for the rest: no admin, no id to go
+  stale when a ruleset is re-created, and it reports the rules **effective** on the trunk, which is what
+  every document here is actually about.
+
+  **What it costs to add a fact, and what it costs not to.** An unstated field is not checked, so
+  nothing in the declaration can go stale for a fact nobody chose to declare — but the converse is that
+  a load-bearing setting nobody declares stays exactly as invisible as all seven of these were before
+  September 9. `scripts/tests/repo-settings-gate.tests.ps1` holds the declaration to shape rather than
+  to values (46 asserts): every `Field` must be one the check knows how to read, and every record must
+  carry its `Recorded`, `Where` and `Why`, because a `Field` typo is this check's own failure mode
+  arriving from the inside — a declared fact silently ceasing to be watched.
+
   **BOTH RUNNERS ABOVE NOW HAVE A CONSUMER-SHAPED TWIN, AND NOTHING HOLDS THE TWO IN SYNC** (issue
   [#1516](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1516), September 6, 2026).
   The queue became this workflow's policy for every repo running it, and a queue reaches a consumer as
@@ -1082,16 +1193,16 @@ infrastructure.
   that [`cut-release.ps1`](../../../scripts/release/cut-release.ps1) dot-sources; deliberately
   pure so [Tycho #18](04-18-extension.md) can test them in isolation. The release *process* is
   [Rendall #06](05-06-extension.md)'s domain; Sylvester guards the script mechanics underneath.
-- **`scripts/agents/build-agent-defs.ps1` + `scripts/lib/agent-shared-lib.ps1`** — the generator
+- **`scripts/agents/build-agent-defs.ps1` + `scripts/lib/subagent-shared-lib.ps1`** — the generator
   that fills the verbatim-shared bullets from
-  `plugins/dkj-teams/agent-shared/<name>.md` into all agent defs (between
+  `plugins/dkj-subagents/subagent-shared/<name>.md` into all agent defs (between
   `<!-- BEGIN/END shared:… -->` sentinels). Change a shared block →
   run `build-agent-defs.ps1` → all agent defs updated; `-Check` (and the lint gate, check 7) fails
   on drift. The pure expansion logic lives in the lib, so [Tycho #18](04-18-extension.md) can test
   it in isolation — mirroring the `release-lib` setup. **Never edit between the sentinels by hand.**
 - **`.claude/settings.json`** — this repo's harness config: the `extraKnownMarketplaces` (the
   `github` source `DKJ-Solutions/claude-code-specialists`) and `enabledPlugins` with which the repo enables
-  its own `dkj-team-alpha` plugin (the core team).
+  its own `dkj-subagents-alpha` plugin (the core team).
 - **The manifests** `.claude-plugin/marketplace.json` and every `<plugin>/.claude-plugin/plugin.json`
   (structure + `version`) — their *structure/config*; the descriptive *texts* he coordinates with
   [Tessa #16](06-16-extension.md).
@@ -1101,7 +1212,7 @@ infrastructure.
 The **`simplify`** skill applies quality fixes — reuse, simplification, efficiency — and applying is the
 **author's** act, never the reviewer's: [Victor #19](06-19-extension.md) may report those same findings
 and is forbidden from applying them, which is why the portable layer gives the skill to
-[Cody #13](../../../plugins/dkj-teams/dkj-team-alpha/manuals/04-13-manual.md) rather than to a reviewer. Here
+[Cody #13](../../../plugins/dkj-subagents/dkj-subagents-alpha/manuals/04-13-manual.md) rather than to a reviewer. Here
 the code is `scripts/**` and **those are Sylvester's**, so here he is that author: he runs the tidy pass
 over what he changed before the diff goes to review, and never over somebody else's change.
 
@@ -1136,7 +1247,7 @@ authorship for him in consumers that never granted it.
     caught the loud half within minutes.
 - **The shared-scripts registry spans TWO plugins since August 8, 2026, and the plugin is read off the
   mirror path rather than declared.** `Get-SharedScriptPairs` maps each source to a mirror in either
-  `plugins/dkj-teams/dkj-team-alpha/` (the core: `check-roster-sync`, `check-report-lib`) or
+  `plugins/dkj-subagents/dkj-subagents-alpha/` (the core: `check-roster-sync`, `check-report-lib`) or
   `plugins/dkj-policy/` (everything branch- and release-shaped). Three things to
   know before touching it:
   - **`SkillRel` is derived from `MirrorRel`, not stored.** Check 18 and `shared-scripts.tests.ps1`
@@ -1205,11 +1316,11 @@ authorship for him in consumers that never granted it.
   be done.** The convention for the four is in [Tycho #18](04-18-extension.md#the-lint-gate-suite-is-four-files-august-16-2026).
 - **Do not hand-roll a second parallel runner — and re-run a red suite alone before believing its assert.**
   Measured August 12, 2026: a `Start-Job` fan-out over all **31** suites reported **6** failures —
-  `agent-shared`, `bootstrap-drift`, `config-blueprint`, `fix-mojibake`, `roster-sync`,
+  `subagent-shared`, `bootstrap-drift`, `config-blueprint`, `fix-mojibake`, `roster-sync`,
   `verify-resolved-issues` — two of them asserting *"lint gate green on the repo"* in as many words, which
   reads like a finding about the repo rather than about the runner. **Every one of the six passes when run
   alone**, and `open-pr` then ran all 31 green in **218s**. What the six share is that they scan the **live
-  repo**: three (`agent-shared`, `bootstrap-drift`, `fix-mojibake`) by invoking the lint gate over it, the
+  repo**: three (`subagent-shared`, `bootstrap-drift`, `fix-mojibake`) by invoking the lint gate over it, the
   other three by running their own repo-wide scanner — `build-config-blueprint.ps1`,
   `check-roster-sync.ps1`, `verify-resolved-issues.ps1`. So 31 at once collide over one tree, which is the
   same collision the paragraph above describes, in its strongest form to date. **Read that list before
@@ -1239,7 +1350,7 @@ authorship for him in consumers that never granted it.
   test suite"* now states no number under its August 7 stamp. It read `26` there for five days — wrong on the
   day it was written, since there were 27, and wronger every suite since. **And a bare `26` is still correct
   in two other senses**: the lint's own checks (`CHANGELOG.md`) and the agent-def count
-  ([`README.md`](../../../README.md), [`agent-shared`](../../../plugins/dkj-teams/agent-shared/README.md)). Establish
+  ([`README.md`](../../../README.md), [`subagent-shared`](../../../plugins/dkj-subagents/subagent-shared/README.md)). Establish
   which noun a `26` governs before touching it; a find-and-replace here breaks correct statements to repair
   one.
 - **Renaming or moving this checkout unlinks its own plugin install — plan the re-install into the same
@@ -1251,7 +1362,7 @@ authorship for him in consumers that never granted it.
   [`check-roster-sync.ps1`](../../../scripts/sync/check-roster-sync.ps1) reporting
   `[NOT-INSTALLED-HERE]` — the session-start hook cannot report it, because that hook ships in the
   plugin that did not load. The repair is `claude plugin marketplace update claude-code-specialists`
-  followed by `claude plugin install dkj-team-alpha@claude-code-specialists --scope project` from the new
+  followed by `claude plugin install dkj-subagents-alpha@claude-code-specialists --scope project` from the new
   root, after which a leftover record naming the old folder is expected and inert. The mechanism, the
   other two ways a record goes missing, and why that leftover is not a stray duplicate are in the
   family's [INSTALL.md](../../../INSTALL.md#staying-up-to-date);
@@ -1475,7 +1586,7 @@ authorship for him in consumers that never granted it.
   the content was *written* in, not which file it ends up in.
 - **A check that scans a file for a token can be satisfied by a *path* containing that token.**
   `check-roster-sync` looks for each `<group>-<id>` in the roster file, and the bootstrap wrote
-  `@.claude/plugins/claude-specialists/dkj-team-alpha/01-01-extension.md` into `CLAUDE.md` (the pre-seam
+  `@.claude/plugins/claude-specialists/dkj-subagents-alpha/01-01-extension.md` into `CLAUDE.md` (the pre-seam
   lens path of the time; since #253 it writes the one seam line instead). That import
   line contains `01-01`, so Chris counts as rostered without a roster row ever existing — measured
   July 29, 2026: 18 ids reported missing after a bootstrap, not 19, with `01-01` the one silently
@@ -1558,7 +1669,7 @@ instance means adopting a rule born with 349.
 **The reason is structural, and it is about what this repo is.** Being a plugin source, most paths it
 names correctly describe *somebody else's* repo: `.claude/extensions/…` is the legacy lens location this
 family deliberately still documents for unmigrated consumers, `config/settings_data.json` is a Shopify
-store's file named in `dkj-team-shopify`'s manual, `PRETTY/[Emotie]/README.md` is a life-hub folder. All three
+store's file named in `dkj-subagents-shopify`'s manual, `PRETTY/[Emotie]/README.md` is a life-hub folder. All three
 answer "no such file here", exactly as the stale title does — and **the difference is whose repo the line
 is about, which the line never says**. An existence check reads "describes a consumer" as "stale", and no
 regex recovers that distinction. Do not revive it behind an exemption list: that is the shape this repo has
@@ -1652,7 +1763,7 @@ plugin is read.
 proposed the rule as *"must resolve to a target also under `plugins/`, because that is the subtree the
 plugin cache contains."* The cache contains no such subtree, and the weaker rule passes the one link that
 had **already shipped dead** — `cut-release/SKILL.md:123` pointing at
-`../../../../teams/dkj-team-alpha/manuals/06-25-manual.md`, verified against the installed v4.22.0 copy. So
+`../../../../teams/dkj-subagents-alpha/manuals/06-25-manual.md`, verified against the installed v4.22.0 copy. So
 the boundary is the **plugin root**, not `plugins/`, and scenario 37 of
 `check-plugin-integrity-links.tests.ps1` exists to pin exactly that difference. The report also argued
 from an expected count of **zero** (*"which is itself the reason not to build it yet"*) and stated that
@@ -1898,7 +2009,7 @@ plausible, it was cheap to fix, and it was **wrong**. The runner's own diagnosti
 
 The actual cause: **CI tests the pull request's MERGE commit, not the branch.** While this branch was
 open, [#1480](https://github.com/DaveKJohn/claude-code-specialists/issues/1480) renamed
-`plugins/teams/team-alpha` to `plugins/dkj-teams/dkj-team-alpha` on the trunk. The suite's fixture builds
+`plugins/teams/team-alpha` to `plugins/dkj-subagents/dkj-subagents-alpha` on the trunk. The suite's fixture builds
 its marketplace to match the real one, so on the merge commit the mirrors landed under the new name while
 the test's **hardcoded** `plugins\teams\team-alpha\scripts` pointed at a directory that no longer existed.
 Locally, on a base predating the rename, both agreed. A branch open across a rename sees this and a branch
@@ -2071,7 +2182,7 @@ Two things rule that shape out here:
   for being. And the lint gate could not hold anyone to it either, there being no committed writes to
   check.
 - **A command-string guard cannot see it.** The `PreToolUse` shape that works for
-  [`guard-live-theme.ps1`](../../../plugins/dkj-teams/dkj-team-shopify/hooks/guard-live-theme.ps1) reads
+  [`guard-live-theme.ps1`](../../../plugins/dkj-subagents/dkj-subagents-shopify/hooks/guard-live-theme.ps1) reads
   the command a session is about to run; here that command was `powershell -File <temp>/dbg.ps1` and the
   write lived inside the file. Inspecting the **heredoc that wrote the script** is a real vector and is
   the one worth revisiting if this recurs — but the false-positive surface is exactly the one
@@ -2261,7 +2372,7 @@ grounds, each measured rather than argued:
    Excluding the path from them buys nothing a caller can reach — and what is past the refusal is
    `-SkipLint`, the switch that already means *this run did not measure*.
 2. **The price was quoted one suite too high.** #1678 names three root-walking suites; measured, there are
-   two. `agent-shared.tests.ps1` (the `*-agent.md` and `*-persona.md` walks) and `shared-scripts.tests.ps1`
+   two. `subagent-shared.tests.ps1` (the `*-agent.md` and `*-persona.md` walks) and `shared-scripts.tests.ps1`
    (the `*.ps1` scan) do walk `$RepoRoot` and do double. `template-selfcontained.tests.ps1` walks
    `Join-Path $RepoRoot 'plugins'`, and a worktree under `.claude/` is not inside that subtree: its
    templates count stayed at 1 with the probe standing. This does not change the verdict, but a declined

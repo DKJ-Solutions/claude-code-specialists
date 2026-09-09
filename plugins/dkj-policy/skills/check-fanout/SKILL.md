@@ -14,7 +14,7 @@ description: >-
 # check-fanout -- the detection half of the working-copy boundary
 
 A dispatched specialist is told the checkout is not its own to move. That rule is
-[`working-copy-boundary`](https://github.com/DKJ-Solutions/claude-code-specialists/blob/main/plugins/dkj-teams/agent-shared/working-copy-boundary.md),
+[`working-copy-boundary`](https://github.com/DKJ-Solutions/claude-code-specialists/blob/main/plugins/dkj-subagents/subagent-shared/working-copy-boundary.md),
 carried by every
 agent def that holds `Bash`, and **nothing about it was ever detectable.** This skill is the other
 half: it does not stop anything, it tells you whether something already happened.

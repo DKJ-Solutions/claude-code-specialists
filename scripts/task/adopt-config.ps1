@@ -63,6 +63,12 @@ $ErrorActionPreference = 'Stop'
 $guardLib = Join-Path $PSScriptRoot '..\lib\source-repo-guard-lib.ps1'
 if (Test-Path -LiteralPath $guardLib -PathType Leaf) { . $guardLib; Assert-OwnCopy -ScriptPath $PSCommandPath }
 
+# Test-FunctionDefined (issue #1729): the seam probes below read the function table directly rather
+# than through Get-Command, which parses the name as a wildcard pattern and pays a full PATH scan on
+# every miss -- and a miss is the normal case for an optional seam. $PSScriptRoot-relative, so it
+# resolves in the plugin mirror as well as here.
+. (Join-Path $PSScriptRoot '..\lib\command-probe-lib.ps1')
+
 # Dual-context repo root: a consumer running the plugin mirror gets it from CLAUDE_PROJECT_DIR, the
 # workshop root copy falls back to the git root. Same resolution as every other mirrored script, which
 # is what lets both copies stay byte-identical.
@@ -149,7 +155,7 @@ function Get-PresentFunctions {
         $present = @{}
         try { . $args[0] } catch { return $present }
         foreach ($fn in $args[1]) {
-            $present[$fn] = [bool](Get-Command -Name $fn -ErrorAction SilentlyContinue)
+            $present[$fn] = [bool](Test-FunctionDefined $fn)
         }
         return $present
     } $LibPath $Names
@@ -176,7 +182,7 @@ if ($missingLibs.Count -gt 0) {
     # NAMES THE COMMAND AND WHO TYPES IT (inbound #1093 / #1096 / #1104). Not a SessionStart hook like
     # the roster check, but the same trap: a model that reached this [STOP] is told to run a skill the
     # harness will refuse it. Reasoning in full at check-roster-sync.ps1's [BOOTSTRAP] marker.
-    Write-Host '         job, not this one: run /dkj-team-alpha:specialists-init first. That command must be'
+    Write-Host '         job, not this one: run /dkj-subagents-alpha:specialists-init first. That command must be'
     Write-Host '         TYPED by the repo owner -- the skill is reserved for explicit user invocation'
     Write-Host '         and an agent cannot start it. It lays those files down as scaffolds, and this'
     Write-Host '         command then fills in the answers.'

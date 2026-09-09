@@ -854,7 +854,7 @@ $defaultLegacy = Get-PrDescription -EntryText $legacyDeploy
 $defaultFenced = Get-PrDescription -EntryText $fencedDeploy
 
 . (Join-Path $PSScriptRoot '..\lib\entry-scaffold-lib.ps1')
-Assert-True ($null -ne (Get-Command -Name Get-DevelopmentEntryPattern -ErrorAction SilentlyContinue)) `
+Assert-True (Test-FunctionDefined 'Get-DevelopmentEntryPattern') `
     'the real matcher is reachable once the scaffold lib is loaded'
 Assert-Equal $defaultMerged (Get-PrDescription -EntryText $merged)       'the two readers agree on today DEPLOY shape'
 Assert-Equal $defaultLegacy (Get-PrDescription -EntryText $legacyDeploy) 'and on the previous one'

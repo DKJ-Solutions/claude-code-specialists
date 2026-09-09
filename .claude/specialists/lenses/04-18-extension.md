@@ -5,7 +5,7 @@ group: 04
 
 # Tycho 🧪 · claude-code-specialists addendum
 
-> Repo-lens (claude-code-specialists) accompanying the portable playbook in the `dkj-team-alpha` plugin (`plugins/dkj-teams/dkj-team-alpha/manuals/04-18-manual.md`). This file does not describe the craft, but what Tycho does in this repo.
+> Repo-lens (claude-code-specialists) accompanying the portable playbook in the `dkj-subagents-alpha` plugin (`plugins/dkj-subagents/dkj-subagents-alpha/manuals/04-18-manual.md`). This file does not describe the craft, but what Tycho does in this repo.
 
 A test engineer (SDET) does the same thing everywhere — write and maintain automated tests, guard
 against regressions, secure reliability with a suite instead of manual checking. **What is
@@ -27,7 +27,7 @@ logic in `release-lib.ps1` (version bump, CHANGELOG transformation, release-note
   exit-1-on-first-failure style now runs across the suite under `scripts/tests/`, which covers most
   of what Sylvester's lens lists: the lint gate (`check-plugin-integrity-*.tests.ps1`, four of them —
   see [the split below](#the-lint-gate-suite-is-four-files-august-16-2026)), the shared
-  agent-def blocks (`agent-shared.tests.ps1`), the branch/changelog/release chain
+  agent-def blocks (`subagent-shared.tests.ps1`), the branch/changelog/release chain
   (`branch-info.tests.ps1`, `new-branch.tests.ps1`, `fold-changelog.tests.ps1`,
   `cut-release-guardrail.tests.ps1`, `park-branch.tests.ps1`), the connectors + roster machinery
   (`connectors.tests.ps1`, `roster-sync.tests.ps1`, `sync-roster.tests.ps1`), the shared-scripts
@@ -133,6 +133,133 @@ consequences:
   siblings now call the shared lib, and `verify-resolved-issues.tests.ps1` was changed **without a
   failing assert to point at**, deliberately: "it passes here today" is a fact about one checkout, and
   leaving the old capture in the file others copy from is what makes the next instance.
+
+### Which suites need `Test-Says` -- read the capture, then the emitter (September 9, 2026)
+
+The section above says how to CAPTURE. This one says when the captured text has to be READ
+whitespace-insensitively, because the two questions were being answered as one and the answer was
+coming out far too large.
+
+**The mechanism** ([#1512](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1512)): a
+`throw`, a `Write-Error` or a `Write-Warning` reaches a capture through PowerShell's error formatter,
+which hard-wraps at the host's buffer column **inside a word** -- so the phrase the script composed is
+not the phrase the capture carries. `Write-Host` does not go through that formatter and is unaffected.
+`Test-Says` strips all whitespace from both sides and compares literally, which repairs a wrap inside a
+word; normalizing `\s+` to one space does not.
+
+**Two conditions, and BOTH must hold before a suite needs the helper:**
+
+1. **the capture can carry the error stream** -- `2>&1`, a `StandardError.ReadToEnd()` concatenated
+   onto stdout, or `Invoke-NativeCapture` without `-DiscardStderr` (it merges err into `Output`); and
+2. **the script under test emits the asserted phrase through the formatter** -- a `throw`,
+   `Write-Error` or `Write-Warning`, rather than `Write-Host`.
+
+**Measured against the eight suites
+[#1728](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1728) named, whose 358 assert
+sites it called the exposure:**
+
+| suites | sites | condition 1 | genuinely exposed |
+|---|---:|---|---:|
+| `roster-sync`, `connectors`, `script-contract`, `sync-roster`, `adopt-workflow-folder`, `config-blueprint` | 311 | **no** -- stdout only | **0** |
+| `cut-release-drive` | 4 | yes | 0 today, structurally reachable |
+| `publish-to-business` | 13 | yes (`2>&1`) | **3** |
+
+The six are immune **by construction rather than by luck**: each captures stdout only (checked against
+`2>&1`, `StandardError` and `Invoke-NativeCapture` alike) from a script with zero `throw`,
+`Write-Error` and `Write-Warning`. Converting them would have been 311 edits with no defect behind any
+of them -- and #1728 said so itself, in the sentence that is easiest to read past: *"That is the
+exposure, not the defect count."*
+
+**Condition 2 has a trap worth naming**, because it is what shrinks `publish-to-business` from 13 to 3:
+a script may deliberately `Write-Host` the readable part and `throw` only a summary. That one does,
+with the reason in its own code -- *"PowerShell renders a multi-line error message on one line, and the
+whole point of this check is that you can read the list."* So the phrase an assert reads can be
+formatter-free even where the failure that produced it was a `throw`.
+
+**NO TREE-WIDE GATE, and this is the measurement that decided it.** 37 of this repo's suites satisfy
+condition 1. A gate demanding `Test-Says` of all of them would be born with 33 findings, nearly all of
+them about `Write-Host` phrases that cannot wrap -- which is the false-positive rate this repo already
+turned down once, in the stale-path check declined at 124 findings. Condition 2 is what separates them
+and it cannot be read off a suite: it lives in the script under test, one process away.
+
+**The reason this class recurred at all is a documentation defect, not a test defect.** Before this
+section the mechanism was recorded seven times -- once in each suite that had already been repaired --
+and nowhere a person writing an eighth suite would look. `grep Test-Says` finds the fix only if you
+already suspect the problem.
+
+#### Condition 2 is a property of the ASSERT, not of the script (#1736, September 9, 2026)
+
+The section above establishes the two conditions. Applying them to the rest of the tree -- the eight
+suites #1736 nominated on a script-level emission count, plus the thirteen it could not resolve --
+moved the answer again, and in the same direction: **a script carrying twenty `Write-Error` calls says
+nothing about a suite whose asserts all read its `Write-Host` report.** The `publish-to-business` trap
+named above is not a special case; it is the normal one.
+
+Of the eight nominated, **four read no formatter-emitted phrase at all**: `gate-lib` (which starts no
+child process -- its `2>&1` is on the fixture's own `git` calls), `fanout-lib`,
+`find-specialist-mentions` and `measure-always-on`. A fifth, `verify-pushed-merges`, already carried
+the helper and no `Assert-Match` at all. **All thirteen unresolved suites resolve to zero** -- their
+scripts emit one or two formatter lines each, almost always on a `repo-config.ps1` load failure that no
+suite asserts.
+
+**Routing a `Write-Host` assert through the whitespace-blind reader is a LOSS, not a neutral tidy-up.**
+It asserts strictly less than `-match` does, and it destroys any assert that cares about line structure
+-- `round-tally`'s `(?m)^\| v10 \| A2 extra \|` reads a generated markdown row and must keep `-match`.
+
+#### The three flatteners are not equally safe, and the ranking is measured
+
+A suite that captures a child also has to flatten the records before it matches. Three ways of doing
+that were in the tree and their docstrings disagreed about which is safe. Measured by padding a
+`Write-Error` until its break swept every column of a 120-wide render -- 120 wrap positions x 4
+phrases, 480 checks per variant:
+
+| what the suite does with the captured records | failed |
+|---|---:|
+| collapse the break to a space (`-replace "\r?\n", ' '`) | 68 / 480 |
+| join the records with a newline, or leave them alone | 51-68 / 480 |
+| join with nothing between them (`''`) | **0 / 480** |
+
+The formatter breaks **inside a word**, so collapsing to a space cannot repair the break it exists for
+-- `dirty working tre e`. Joining with `''` reconstructs it exactly.
+
+**But that immunity is incidental, and this is the part to carry forward.** Joining with `''` survives
+a break that landed *on* a space only because PowerShell keeps that space at the end of the line it
+wrapped -- a property of the renderer that nothing here controls or tests. `Test-Says` needs neither
+property. So converting a suite that already joins with `''` is a **hardening**; converting one that
+does not is a **repair**.
+
+**Exactly one suite in that queue was genuinely exposed:** `round-tally.tests.ps1`, which joins its
+records with a newline (`-match` is single-line by default) and measured 51 of 480. It had already met
+this in [#1242](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1242) and answered it by
+rejoining the lines at **one** call site by hand, leaving two `Write-Warning` asserts beside it
+untouched -- and that hand-rolled form only worked because the phrase it guarded was a single token. A
+local fix to a class defect is how the class survives, which is the same lesson as the documentation
+defect named above.
+
+**Say which of the two you did.** A green suite before and after is the expected result of a hardening,
+so a commit that claims a fix and shows no failing assert is unreadable a month later. State the
+measurement, and say plainly that nothing was letting a phrase through when that is what you found.
+
+**The top row is no longer in the tree** ([#1742](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1742),
+September 9, 2026). Two copies of it were found and both are gone: `find-specialist-mentions.tests.ps1`
+was a **hardening** — it asserts no formatter-emitted phrase, so all 480 checks were moot there and its
+safety was an accident of what it happens to read — and `shared-scripts.tests.ps1`, which collapsed the
+break inline at one call site rather than in a named helper, was a **repair**. That second one is the
+lesson worth carrying, and it has three parts:
+
+- **The issue's own inventory named one copy and there were two**, because a search for the *helper*
+  (`Get-FlatOutput`) cannot see a substitution typed at a call site. Search for the substitution.
+- **It was the exposed one**, and by both conditions at once: its three positive asserts read an
+  `open-pr` **`Write-Warning`**, which is exactly the formatter path the 68-in-480 was measured on.
+- **Its comment argued the case that had already been disproved** — *"wrapping only ever inserts a
+  newline where a space was, so collapsing whitespace restores the sentence verbatim"* — written after a
+  red CI run, which is what made it read as settled. A break inside a word is the counter-example, and
+  the phrases it guarded are long enough to meet one.
+
+And the negative assert beside them is the sharpest reason this class is worth removing rather than
+ranking: **a mangled phrase makes a `-notmatch` pass**. That assert existed to prove `open-pr` stays
+quiet on the ordinary path, and under the collapse variant it would have reported exactly that for a
+warning which was printed and merely wrapped.
 
 In short: the **how** (automated tests, regression guarding) is portable; the **what** (the
 PowerShell scripts as the test surface, and building out a suite once the lint gate warrants it)

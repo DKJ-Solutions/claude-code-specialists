@@ -274,10 +274,10 @@ $configPath = Join-Path $repoRoot 'scripts\repo-config.ps1'
 if (Test-Path -LiteralPath $configPath) {
     try {
         . $configPath
-        if (Get-Command Get-EntryFallbackType -ErrorAction SilentlyContinue) {
+        if (Test-FunctionDefined 'Get-EntryFallbackType') {
             $v = Get-EntryFallbackType; if ($v) { $stubFallbackType = $v }
         }
-        if (Get-Command Get-RepoName -ErrorAction SilentlyContinue) {
+        if (Test-FunctionDefined 'Get-RepoName') {
             $ghRepoName = Get-RepoName
         }
     } catch {

@@ -43,7 +43,581 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**34 / 77 minor entries** <!-- pending-tally -->
+**38 / 93 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1753-ship-pr-fold-dirty-tree · 20260909-212943
+
+`ship-pr.ps1` no longer loses the fold to an uncommitted file. Step 5 used to run `git checkout main`
+whenever HEAD was where the script had left it -- the same checkout step 2b had already declined one
+step earlier because the tree was unclean -- so an unrelated uncommitted path was carried onto the trunk
+and `git merge --ff-only origin/main` then failed on it, leaving the PR merged and the changelog
+unfolded. It now chooses the tree it folds in on the tree's cleanliness as well as on HEAD's location:
+an unclean checkout folds in the throwaway worktree #1069 already built, so the fold completes, the
+uncommitted path stays where its author left it, and nothing is refused. A tree already standing on the
+trunk stays on the in-place arm, because git refuses a second worktree on a branch the primary holds.
+The three failures that can still land after the merge now all say so -- the `ff-only` arm, the one that
+actually fired, said only `git merge --ff-only of origin/main failed.` while its neighbour one branch up
+carried the full merged-but-unfolded sentence and the by-hand fold command.
+
+**Score:** 4
+
+#### What makes this deploy extra special
+
+`ship-pr.ps1` and `worktree-lib.ps1` are both shipped by `dkj-policy`, so every repo running this
+workflow gets the repair. It matters more there than here: this repo recovers a skipped fold through
+`fold-on-merge.yml` (#1493), and a consumer that has not adopted that runner is left with the entry
+stranded on the trunk with nothing saying so until the next session's check reports it.
+
+**Score:** 3
+
+#### Pull Request
+
+ship-pr folds a dirty tree in a worktree instead of dragging it to the trunk
+
+Plugins: dkj-policy
+
+[PR #1755](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1755)
+
+---
+
+### DEPLOY: docs/1749-readme-domain-skills · 20260909-202504
+
+The root `README.md` no longer points a reader at the wrong plugin when they go looking for a domain
+skill. The sentence about which add-on teams may carry one named two of the three teams — from before
+`dkj-subagents-ecomm` existed — and attributed skills to `dkj-subagents-lifehub`, which ships none. It now names
+`dkj-subagents-shopify`, the only add-on team that ships any, and sits below the session-hook thread instead
+of wedged inside it, where it had been stealing the referent of the sentence after it. The same stale
+count is corrected in the plugin table and in `plugins/dkj-subagents/README.md`.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+N/A — a documentation correction in this repo's own README. No consumer behaviour, no plugin payload
+and no script changes; a reader of the marketplace README gets a correct pointer, which is not a
+release note for a subscriber.
+
+**Score:** N/A
+
+#### Pull Request
+
+Name the add-on team that actually ships domain skills
+
+[PR #1751](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1751)
+
+---
+
+### DEPLOY: fix/1750-certificate-void-predicate · 20260909-201739
+
+`ship-pr.ps1`'s step-3b measurement now states the predicate beside the number -- population, window
+start, window end, what counts as voided, and which classifier applied the fold discount -- so the
+next re-measurement of the certificate-voiding rate is a comparison rather than a fresh argument. The
+values were never lost: they are in
+[#1602](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1602)'s thread and only the
+block was silent, which is the whole defect.
+
+It also records that the `25 of 99 (25.3%)` row is **unreconciled** with a re-measurement scoring
+`3 of 193 (1.6%)` over the same four days, and narrows where the disagreement lives. The window is the
+obvious suspect, and the table bounds its share at 5 -- tail-only is 5, tail-and-before is 0 -- so
+narrowing to the required check's conclusion moves 25.3% to 20.2% and no further. The residual is in
+the fold discount: 12 of 37 raw voidings discounted here (32%) against 39 of 42 there (93%), measured
+against a trunk that ran **114 folds in 255 first-parent commits (44.7%)** over those same four days
+by the real `Test-IsFoldOnlyCommit`. Neither pass is shown wrong and the direction is identical in
+both, which is all #1602's decision rested on -- but a decision *sized* off 25.3% is being sized off
+the open half, and the block now says which half that is.
+
+One inference in the report is answered rather than transcribed. It read
+[#1715](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1715) as having retired the
+window these rows describe; read against #1715, it has not. Dropping ship-pr's third local gate run
+shortens the stretch between a green certificate and the merge attempt, so it does lower how often
+the gate *actually* refuses -- but the rows count commits inside a window bounded by CI's own check
+timestamps, and the run #1715 removed happens after the last of them. Repairing on the reported reason
+would have put a wrong claim into the block with a citation attached.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+N/A -- `ship-pr.ps1` reaches a consumer through the plugin mirror, but the change is entirely inside a
+comment block: no behaviour moves, no gate changes its verdict, and nothing a consumer runs reads it.
+What travels is the reasoning a maintainer meets when they next open step 3b.
+
+**Score:** N/A
+
+#### Pull Request
+
+Record the certificate-voiding measurement's predicate beside the number
+
+Plugins: dkj-policy
+
+[PR #1752](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1752)
+
+---
+
+### DEPLOY: feat/1698-rename-to-dkj-subagents · 20260909-200051
+
+The four team plugins are renamed from `dkj-team-*` to `dkj-subagents-*`, their directory from
+`plugins/dkj-teams/` to `plugins/dkj-subagents/`, each team's payload directory from `agents/` to
+`subagents/` (declared by a new `"agents": "./subagents/"` key in each manifest), and
+`agent-shared/` to `subagent-shared/`. *Team* is this family's own word for a group of specialists;
+*subagent* is Claude Code's word for what those plugins actually ship, so the four now say what is in
+the box in the vocabulary of the thing that opens it. Every reader of that payload directory reads
+both leaf names, new first, so a machine holding a pre-rename version in its plugin cache keeps
+resolving, and the lint keeps `dkj-team-*` as an accepted retired shape. `dkj-policy` and
+`dkj-policy-bwj` are unchanged, and `skills/` is deliberately not renamed -- the plugin format always
+scans the default `skills/` directory in addition to any custom one, so a custom skills directory can
+only add, never move.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+**A plugin rename is not a `claude plugin update`.** Every consumer must uninstall the four
+`dkj-team-*` ids and install the `dkj-subagents-*` ones -- which rewrites their `enabledPlugins` for
+them, as this page already documents -- and then fix the two things the CLI leaves behind: the
+`@`-import in their `SPECIALISTS.md`, which carries the full marketplace path and both halves of it
+moved, and their `connectors/` register if they keep one, where an unresolvable id makes
+`check-connectors.ps1` skip that plugin's whole drift check silently. `INSTALL.md` carries the command
+sequence and both, as its third migration section.
+
+**Score:** 5
+
+#### Pull Request
+
+Rename the team side of the marketplace to dkj-subagents
+
+Plugins: dkj-policy, dkj-policy-bwj, dkj-subagents-alpha
+
+[PR #1747](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1747)
+
+---
+
+### DEPLOY: docs/1744-handbook-enabled-plugins · 20260909-194757
+
+The specialists handbook no longer tells a session the add-on teams are off here. Six places on
+[`../.claude/specialists/README.md`](../.claude/specialists/README.md) carried the same stale premise --
+that `dkj-team-alpha` is the only plugin enabled -- and the reported sentence was the one a reader used
+to explain the empty lenses, so the repair carries the distinction over instead of striking it: the six
+core-team scaffolds are waiting, the eleven from the add-on teams will stay empty, and Chris routes to
+none of the eleven. The index table now says it is the core team's rather than claiming to be complete,
+which it was not -- 19 rows against 30 files in `lenses/`.
+
+Two of the six were stale COUNTS rather than stale claims (*"the fifteen specialists"*, `enabledPlugins`
+spelled as one entry) and both were replaced with a pointer to the file that holds the answer. That is
+this page's own rule about measurements going stale silently, applied to the page -- and it is the half
+that keeps the next plugin from reopening this issue.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A -- `.claude/specialists/README.md` is this repo's own handbook and ships in no plugin, so nothing
+here travels to a consumer. What a consumer holds is `SPECIALISTS.md`'s wording, which was already
+correct and is what this page was reconciled TO.
+
+**Score:** N/A
+
+#### Pull Request
+
+Reconcile the specialists handbook with every plugin being enabled here
+
+[PR #1748](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1748)
+
+---
+
+### DEPLOY: docs/1743-dated-plugin-name · 20260909-193257
+
+`README.md`'s one dated measurement names its subject as it was spelled on the day it was taken --
+`team-alpha`, not the `dkj-team-alpha` two later rename sweeps left there -- and says what it is
+called today, so the figure can still be re-verified against the tag it came from. The rule behind it
+(#952: a dated measurement keeps the name it was written with) is now in Tessa's lens, where a sweep
+can meet it beforehand; until now it existed only in the commit messages of the renames that observed
+it.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+N/A -- this repo's own README and one repo lens. A consumer receives neither.
+
+**Score:** N/A
+
+#### Pull Request
+
+Name the plugin in README's August 8 measurement as it was spelled on that date
+
+[PR #1746](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1746)
+
+---
+
+### DEPLOY: fix/1742-test-flattener · 20260909-192047
+
+The one flattener variant measured to drop wrapped phrases is out of the test tree. Two copies were
+found where the issue named one: the second, in `shared-scripts.tests.ps1`, was typed inline at a call
+site and was genuinely exposed -- its asserts read an `open-pr` `Write-Warning`, and the negative
+assert beside them would have reported "no warning on the ordinary path" for a warning that was
+printed and merely wrapped mid-word. Nothing was failing before this change, which is the point: the
+silence sat where the next assert anyone added would have inherited it.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+N/A -- a test-suite flattener reaches no consumer of this marketplace. The suites are green before and
+after; what changed is what a future assert inherits.
+
+**Score:** N/A
+
+#### Pull Request
+
+Match find-specialist-mentions.tests.ps1 to the flattener variant that measured zero failures
+
+[PR #1745](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1745)
+
+---
+
+### DEPLOY: feat/1726-repo-settings-drift-check · 20260909-190954
+
+A daily CI leg now reports when GitHub-side repo settings drift from what this tree declares -- the
+class behind #1720, where `main-ci-gate` gained and lost a `merge_queue` rule with nothing in the repo
+recording either event. `Get-ExpectedRepoSettings` in [`../scripts/repo-config.ps1`](../scripts/repo-config.ps1)
+declares seven load-bearing facts (the trunk's rules, its required check, `strict`, `allow_auto_merge`,
+`allow_update_branch`, visibility, the bypass actor types), each with the document that states it and
+the date it was last measured; `scripts/lint/check-repo-settings.ps1` compares them and names which
+document to repair when the drift turns out to be deliberate.
+
+Built rather than written down because #1726's own premise -- *"one occurrence is not a rate"* -- turned
+out to be wrong: three drifts in eight days, two of them mechanical. The emptied bypass list killed
+every fold for a day (#1244) and was found by a failing push; `allow_auto_merge` was found live `true`
+against four records saying `false` by this check's first run, and is filed as #1730.
+
+Scheduled rather than a SessionStart hook, on Dave's call: a hook reaches a drift sooner and costs a
+`gh api` round trip at every session start, but only a scheduled run leaves a **dated** record -- which
+is exactly what #1720 says is missing, since "September 9 is when it was measured, not when it
+happened". Advisory and not in `main-ci-gate`, and it writes nothing to GitHub: repo settings stay
+Dave's surface. One field, `bypass_actors`, is admin-only and reports as **not read** in CI rather than
+as green, because reporting the #1244 field as passing would be the worst possible silence.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A -- this is a maintenance-repo detector over this repo's own GitHub settings. Nothing ships to a
+consumer: the check is deliberately not mirrored into the plugin, and the one portable half is a
+PowerShell trap added to the system-administration manual.
+
+**Score:** N/A
+
+#### Pull Request
+
+A scheduled runner that reports GitHub-side repo settings drifting from what the tree declares
+
+Plugins: dkj-team-alpha
+
+[PR #1741](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1741)
+
+---
+
+### DEPLOY: fix/1736-says-classification-swept · 20260909-184930
+
+The `Test-Says` classification is now measured across every suite that captures a child's error stream,
+and the reader is applied where an assert actually reads a formatter-emitted phrase. Four suites gained
+it; the four #1736 nominated that read only `Write-Host` were measured and deliberately left alone, as
+were all thirteen it left unresolved.
+
+The classification is the durable half. It is recorded in Tycho's lens as two conditions that fail
+independently, with the correction that matters: condition 2 is a property of the **assert**, not of the
+script under test -- a script carrying twenty `Write-Error` calls says nothing about a suite whose
+asserts all read its report. That distinction is what took the queue from 8 candidates to 1 real defect,
+and it is what stops the next sweep from converting `Write-Host` asserts into weaker ones.
+
+The three flatteners in the tree are now ranked by measurement rather than by argument, so the next
+suite to be written can copy the one that measured 0 instead of the one whose docstring sounded most
+confident.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A -- test-suite internals. No consumer of this marketplace runs these suites or sees their output;
+the scripts under test are unchanged.
+
+**Score:** N/A
+
+#### Pull Request
+
+The whitespace-stripping reader reaches the four suites whose asserts read a formatter-emitted phrase
+
+[PR #1740](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1740)
+
+---
+
+### DEPLOY: feat/1717-gate-progress-index · 20260909-181938
+
+The test gate now reports its own progress. It prints one line as each lane opens and one as each
+suite leaves one -- `test gate: progress [depth 1] 37/84 started, 30 done, 7 running (+412.6s) --
+started roster-sync.tests.ps1` -- so a 15-30 minute local run no longer goes silent between walls of
+completion-order output. Started is reported as well as done because the queue dequeues longest-first
+(#1358): a done-count alone sits at 0 through exactly the window an operator is asking the question
+in. The `[depth N]` marker is what makes the count dedupable -- the gate's own suite drives the gate
+over a fixture, so a nested run is unavoidable here, and every external way of deriving this number
+failed on it (#1717 measured three, each differently). The `== <suite> ==` header is untouched, and
+no remaining-time estimate is printed: the duration hints are CI's seconds, and #1713 established
+they do not convert to another machine.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A -- the gate is a maintainer's tool. A subscriber of this system never watches it run; what
+reaches them is a release, and this changes nothing about one.
+
+**Score:** N/A
+
+#### Pull Request
+
+Report the test gate's own progress: started, done and running, per suite
+
+Plugins: dkj-policy, dkj-team-shopify
+
+[PR #1739](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1739)
+
+---
+
+### DEPLOY: fix/1728-says-on-merged-captures · 20260909-180707
+
+The two test suites whose capture carries the child's error stream now read it with `Test-Says`, which
+strips whitespace from both sides and compares literally -- so a phrase the error formatter hard-wrapped
+mid-word is still found. 22 asserts converted across `publish-to-business.tests.ps1` and
+`cut-release-drive.tests.ps1`, including the negative direction, where the old form went **green for the
+wrong reason**: it reported absence and had actually measured a line break.
+
+The other six suites #1728 named are left exactly as they are, and that is the finding rather than a
+shortcut. A wrapped phrase needs two conditions together -- a capture that carries the error stream, and
+a script that emits the asserted phrase through `throw`/`Write-Error`/`Write-Warning` rather than
+`Write-Host`. Those six capture stdout only, from scripts with none of the three, so they are immune by
+construction; 311 of the report's 358 sites had no defect behind them. What made the difference
+measurable is written into the test engineer's lens beside the capture rule it completes, because the
+mechanism had until now been recorded only inside the seven suites already repaired -- where nobody
+writing an eighth would find it.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+Nothing here ships to a consumer: both files are this repo's own test suites, and the lens is
+repo-local. A consumer's own suites are subject to the same mechanism, and the rule that now describes
+it lives in a lens rather than in the portable manual -- so this reaches them only if the classification
+is later promoted.
+
+**Score:** N/A
+
+#### Pull Request
+
+Read merged child captures with Test-Says where the error formatter can reach them
+
+[PR #1738](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1738)
+
+---
+
+### DEPLOY: fix/1731-gate-tolerant-capture-read · 20260909-175551
+
+Closes #1731. The test gate now reads each suite's capture files through `Read-NativeCaptureFile`, the
+tolerant reader this same lib built for a writer that still holds one, instead of a plain
+`Get-Content` -- and prints a visible `[short read]` note naming the file when one was still held.
+Both sites are covered: the pool's reap and the crash re-run added by #1723.
+
+The defect being closed is a silent one. `Get-Content -Raw` does not fail on a held capture file; it
+returns whatever was flushed, so a truncated suite block printed under a correct `== suite ==` header
+with the exit code intact, and nothing said so. That is not a failure a reader could have caught by
+looking harder.
+
+For a session reading a gate run: nothing changes on an ordinary green run. What is new is that a
+short block can no longer arrive looking complete.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+Nothing a subscriber of this repo's plugins sees. The test gate is a maintainer's tool, and a
+consumer's run behaves identically unless a suite of theirs leaves a grandchild holding a capture
+file -- in which case they get a note where they previously got a quietly short block.
+
+**Score:** N/A
+
+#### Pull Request
+
+Read a suite's capture files with the tolerant reader, and say when a block may be short
+
+Plugins: dkj-policy, dkj-team-shopify
+
+[PR #1737](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1737)
+
+---
+
+### DEPLOY: fix/1729-seam-probe-wildcard · 20260909-173557
+
+The optional-seam probe stops going through PowerShell's command searcher. `Test-FunctionDefined`
+(`scripts/lib/command-probe-lib.ps1`) reads the function table directly, and 93 of the 102 call sites
+that used `Get-Command <name> -ErrorAction SilentlyContinue` now call it instead. #1729 counted 68 of
+those, having counted one of the three spellings; the other 9 keep `Get-Command` with a reason each.
+
+The reason is the **miss**, which is what an optional seam normally is: `Get-Command` answers one by
+scanning every `PATH` directory for an executable of that name, measured at **32.5 ms** against
+**0.084 ms** for the replacement, with nothing caching the negative. `sync-main.ps1` makes 10 such
+probes in a row and `build-release-notes-page.ps1` 8, so a consumer that has configured no seams was
+paying roughly a third of a second per run to be told "no" -- a cost that fell hardest on the repos
+that had answered the least. The same call is also the frame that faulted in #1723, and it parses the
+name it is given as a wildcard pattern rather than as a literal; neither of those is what the change
+rests on, and both are recorded with the evidence in the lib's own docstring.
+
+Probes for an EXTERNAL command (`gh`, `git`) deliberately keep `Get-Command` -- it is the only call
+that answers about `PATH` -- and a tree-wide AST gate in the new suite holds the line, with each
+exception named and reasoned rather than listed.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+A consumer gets this through the plugin mirrors, and the saving lands hardest on them: the miss path
+is the default state of a repo that has answered no optional seams, which is every fresh adoption.
+Nothing they run changes shape -- same output, same exit codes, same seams -- so there is nothing to
+migrate and nothing to re-read.
+
+**Score:** 2
+
+#### Pull Request
+
+Probe the function table directly, off the command searcher's wildcard path
+
+Plugins: dkj-policy, dkj-team-alpha, dkj-team-shopify
+
+[PR #1735](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1735)
+
+---
+
+### DEPLOY: fix/1723-gate-crash-vs-verdict · 20260909-170742
+
+The 30-lane test gate stops reporting two things that were never failures as failures.
+
+**A crashed suite is no longer called a failed one.** The gate judged a suite on its exit code
+alone, so a child killed by an unhandled `AccessViolationException` inside the PowerShell engine
+came back as `FAILED (exit -1073741819)` -- which reads as a suite that ran and said no. It did
+not run: it wrote no `[FAIL]` line and no summary, so every minute spent looking for the failing
+assert was spent on an assert that does not exist. The discriminator is NTSTATUS's own error
+window, `0xC0000000..0xCFFFFFFF`, which is exact without being a list of known codes: every
+unhandled structured exception exits with a status in that window -- access violation, stack
+overflow, heap corruption, stack buffer overrun -- and nothing inside the family has to be
+enumerated. It is deliberately narrower than "any negative exit code", which was the first
+version and was forgeable by the very content the gate judges: `exit -1` arrives as `0xFFFFFFFF`
+and would have bought that suite the free re-run the promise below exists to deny it. Such a
+suite is now reported as CRASHED with the code as hex, and re-run ALONE once after the pool
+empties -- which
+is what the gate's own docstring already told a reader to do by hand. Green on the re-run leaves
+the gate green and still names the crash on the verdict line; a second crash, or a real failure
+the crash was hiding, is red. **An ordinary failure is never retried**: an `exit 1` has measured
+the tree and said no, and re-running that would mask a verdict instead of obtaining one.
+
+**And a refusal assert stops reading the console's layout instead of the message.** A `throw` and
+a `Write-Warning` reach a capture through PowerShell's error formatter, which hard-wraps at the
+host's buffer column *inside a word* -- so at width 120 `-InitToken for a fresh path` arrives as
+`-InitToken fo` + newline + `r a fresh path` and the phrase is absent from the message body. The
+assert had been passing on a `FullyQualifiedErrorId` echo further down the same rendering, a
+coincidence of arithmetic between the width and the length of a temp path -- and that is measured
+rather than argued: sweeping the interpolated path's length over 130 values, 9 of them fail the old
+assert, in one contiguous band, which is what a wrap boundary sliding through a 27-character phrase
+looks like. What was NOT identified is which length the one failing run hit, so this is a latent
+defect removed rather than a mystery closed. Fifteen asserts in that
+suite now go through the `Test-Says` helper seven other suites have carried since #1512, and the
+ordering assert requires both phrases to be found rather than accepting `-1` for either.
+
+**Score:** 4
+
+#### What makes this deploy extra special
+
+N/A. This is the test gate and one of its suites -- no consumer of the released plugin sees
+either, and nothing about a published release document changes.
+
+**Score:** N/A
+
+#### Pull Request
+
+The test gate tells a crashed suite from a failed one, and a refusal assert stops reading console wrapping
+
+Plugins: dkj-policy, dkj-team-shopify
+
+[PR #1732](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1732)
+
+---
+
+### DEPLOY: fix/1718-mentions-skip-guidance · 20260909-162729
+
+open-pr's mention scan reads the branch's own content now -- everything from the first phase heading down --
+instead of the whole development document. The scaffold's guidance block is where this workflow records why
+its shape rules exist, so every issue it cites was being read as a mention of whatever branch happened to be
+open: the already-done check reported `#1650 is already CLOSED, and it is already resolved by PR #1661` on a
+branch with no connection to it, unconditionally, in this repo and in every consumer. That warning could not
+be told apart from a real one in the same run, and it would have grown by one line every time a new rule was
+cited. The new `Get-DevelopmentBranchText` reuses the heading walk `Get-DevelopmentShapeFindings` already
+does, so the levels and the fence-awareness keep one definition; the region it drops is the one that gate
+already refuses branch content in, which is what makes it safe to drop. No ignore-list of numbers.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+Every repo running this workflow gets its ship output back: the already-done check goes quiet unless it has
+something to say, so the next warning it prints is worth reading.
+
+**Score:** 3
+
+#### Pull Request
+
+The mention scan reads the branch's own content, not the scaffold's guidance block
+
+Plugins: dkj-policy
+
+[PR #1727](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1727)
+
+---
+
+### DEPLOY: docs/1720-merge-queue-off-main-ci-gate · 20260909-161642
+
+The always-on `CLAUDE.md` told every session to *"read the queue as live here until he has made it"* --
+and he had. Measured September 9, 2026: `main-ci-gate` holds
+`["deletion","non_fast_forward","required_status_checks"]` and no `merge_queue`. The sentence is replaced
+by the state that holds, so a session now reasons correctly about how a merge lands here: `ship-pr.ps1`
+merges directly and folds in its own step 5, rather than enqueueing and waiting for `fold-on-merge.yml`.
+
+**Nothing mechanical was ever misled, which is what makes this shape dangerous.** `ship-pr.ps1` reads the
+trunk's own rules before it merges, so no gate failed and no merge went wrong -- only a reader's model of
+the repo. An always-on document is uniquely able to cause that and uniquely unable to report it.
+
+**The same fact was stale in a second place, and is repaired in the same move.** Sylvester's lens recorded
+the ruleset as holding a fourth rule and taught a reader to expect a two-line push rejection; it now
+carries the dated successor showing three, with the September 6 block kept intact so an old run stays
+explainable. The generalisable half went to Tessa's lens: **a conditional in always-on prose needs a
+detector behind it, or it is written as the dated state instead** -- and the removal above has no date of
+its own, because a ruleset is GitHub-side state that no commit records, no gate reads and no session is
+told about.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+Nothing reaches a subscriber. All three files are this repo's own governance and lens layer -- `CLAUDE.md`
+and two `.claude/specialists/lenses/` documents -- none of which ships in a plugin. A consumer's own
+merge-queue conditional is untouched, deliberately.
+
+**Score:** N/A
+
+#### Pull Request
+
+Record that the merge_queue rule is off main-ci-gate
+
+[PR #1725](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1725)
+
+---
 
 ### DEPLOY: feat/1715-ci-certificate-skips-third-gate · 20260909-160035
 

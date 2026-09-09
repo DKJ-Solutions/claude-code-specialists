@@ -74,6 +74,40 @@ function Assert-NotMatch {
     else { Write-Host "  [FAIL] $Message (pattern '$Pattern' unexpectedly found)" -ForegroundColor Red; $script:fail++ }
 }
 
+function Test-Says {
+    <# Does the child's captured output contain this phrase, whatever the console did to it?
+
+       THIS SUITE NEEDS IT AND MOST DO NOT, which is the whole of #1728's classification. Invoke-Cut
+       below returns ($out + "`n" + $err), so the child's ERROR stream is in the capture -- and a
+       'throw', a 'Write-Error' or a 'Write-Warning' reaches a capture through PowerShell's error
+       formatter, which hard-wraps at the host's buffer column INSIDE a word. cut-release.ps1 carries 29
+       Write-Error and 2 Write-Warning, so the reach is real even though the four call sites below happen
+       to read Write-Host lines today. Write-Host is unaffected, and a suite capturing stdout only never
+       meets this at all (issue #1512).
+
+       Strips ALL whitespace from both sides rather than normalizing runs of it: collapsing '\s+' to one
+       space repairs a wrap BETWEEN words and does nothing for a wrap INSIDE one. Which asserts straddle
+       a break is decided by the render width and by the length of whatever path the message
+       interpolates, so A GREEN RUN IS NOT EVIDENCE -- #1723's site passed for months.
+
+       Literal (IndexOf), so a phrase carrying '.', '(' or '[' needs no escaping -- which is why the
+       call sites below lost their backslashes. #>
+    param([string]$Text, [string]$Phrase)
+    $haystack = ($Text -replace '\s', '')
+    $needle = ($Phrase -replace '\s', '')
+    return ($haystack.IndexOf($needle, [System.StringComparison]::OrdinalIgnoreCase) -ge 0)
+}
+
+function Assert-Says {
+    <# PHRASE FIRST, TEXT SECOND -- deliberately NOT the ($Text, $Phrase) order the other suites carrying
+       this helper use. It matches Assert-Match and Assert-NotMatch in THIS file, which its call sites sit
+       beside. Both parameters are strings, so a mismatched order between neighbours is a silent swap
+       rather than an error, and the neighbour is what a reader copies from. #>
+    param([string]$Phrase, [string]$Text, [string]$Message)
+    if (Test-Says -Text $Text -Phrase $Phrase) { Write-Host "  [PASS] $Message" -ForegroundColor Green; $script:pass++ }
+    else { Write-Host "  [FAIL] $Message (phrase '$Phrase' not found)" -ForegroundColor Red; $script:fail++ }
+}
+
 function Write-Utf8 {
     param([string]$Path, [string]$Text)
     $dir = Split-Path -Parent $Path
@@ -148,13 +182,13 @@ function New-CutFixture {
   "name": "claude-code-specialists",
   "owner": { "name": "fixture" },
   "plugins": [
-    { "name": "team-fixture",     "source": "./plugins/dkj-teams/team-fixture" },
+    { "name": "team-fixture",     "source": "./plugins/dkj-subagents/team-fixture" },
     { "name": "workflow-fixture", "source": "./plugins/workflows/workflow-fixture" }
   ]
 }
 "@
     foreach ($p in @(
-        @{ Path = 'plugins\dkj-teams\team-fixture';         Name = 'team-fixture' },
+        @{ Path = 'plugins\dkj-subagents\team-fixture';         Name = 'team-fixture' },
         @{ Path = 'plugins\workflows\workflow-fixture'; Name = 'workflow-fixture' })) {
         Write-Utf8 (Join-Path $root "$($p.Path)\.claude-plugin\plugin.json") @"
 {
@@ -289,7 +323,7 @@ try {
 
     # Lockstep is the property a consumer depends on: team-fixture and workflow-fixture must move
     # together, because a consumer running both needs matching versions.
-    $v1 = (Get-Content -LiteralPath (Join-Path $root 'plugins\dkj-teams\team-fixture\.claude-plugin\plugin.json') -Raw | ConvertFrom-Json).version
+    $v1 = (Get-Content -LiteralPath (Join-Path $root 'plugins\dkj-subagents\team-fixture\.claude-plugin\plugin.json') -Raw | ConvertFrom-Json).version
     $v2 = (Get-Content -LiteralPath (Join-Path $root 'plugins\workflows\workflow-fixture\.claude-plugin\plugin.json') -Raw | ConvertFrom-Json).version
     Assert-Equal '1.4.1' $v1 'happy path: the team plugin was bumped to the patch version'
     Assert-Equal '1.4.1' $v2 'happy path: the workflow plugin moved with it -- lockstep, not per plugin'
@@ -319,8 +353,8 @@ try {
     # THE TWO NUMBERS THE LABELLING HANGS ON, on the -NoPush path (inbound #802). The push path has always
     # closed with them; this branch exits before it and printed neither -- so the flag whose entire purpose
     # is inspecting a release before it is public was the one path that concealed the baseline.
-    Assert-Match '1\.4\.0 -> 1\.4\.1' $r.Out '-NoPush: the closing line names the baseline and the new version'
-    Assert-Match 'Patch' $r.Out '-NoPush: and the bump type it derived from them'
+    Assert-Says '1.4.0 -> 1.4.1' $r.Out '-NoPush: the closing line names the baseline and the new version'
+    Assert-Says 'Patch' $r.Out '-NoPush: and the bump type it derived from them'
 
     # --- 2. The bump gate: tier 0 alone does not earn a minor -------------------------------------
     Write-Host ""
@@ -328,7 +362,7 @@ try {
     $root2 = New-CutFixture -Name 'unearned'
     $r2 = Invoke-Cut -Root $root2 -Arguments @('-Bump', 'minor', '-NoPush', '-SkipLint', '-SkipTests')
     Assert-True ($r2.Code -ne 0) 'unearned minor: refused with a non-zero exit'
-    $v3 = (Get-Content -LiteralPath (Join-Path $root2 'plugins\dkj-teams\team-fixture\.claude-plugin\plugin.json') -Raw | ConvertFrom-Json).version
+    $v3 = (Get-Content -LiteralPath (Join-Path $root2 'plugins\dkj-subagents\team-fixture\.claude-plugin\plugin.json') -Raw | ConvertFrom-Json).version
     Assert-Equal '1.4.0' $v3 'unearned minor: NOTHING was written -- the gate runs before the first write'
     Assert-Equal '' (Get-GitOut -Root $root2 -GitArgs @('tag','--list')).Trim() 'unearned minor: and no tag was created'
 
@@ -341,7 +375,7 @@ try {
     $r3 = Invoke-Cut -Root $root3 -Arguments @('-Version', '2.0.0', '-NoPush', '-SkipLint', '-SkipTests', '-SkipTierGate')
     Assert-True ($r3.Code -ne 0) 'new major: refused with a non-zero exit'
     Assert-Equal '' (Get-GitOut -Root $root3 -GitArgs @('tag','--list')).Trim() 'new major: no tag was created'
-    $v4 = (Get-Content -LiteralPath (Join-Path $root3 'plugins\dkj-teams\team-fixture\.claude-plugin\plugin.json') -Raw | ConvertFrom-Json).version
+    $v4 = (Get-Content -LiteralPath (Join-Path $root3 'plugins\dkj-subagents\team-fixture\.claude-plugin\plugin.json') -Raw | ConvertFrom-Json).version
     Assert-Equal '1.4.0' $v4 'new major: and no version was bumped -- the refusal leaves the tree untouched'
 
     # --- 4. The audience section follows the repo's tier, not the literal 2 (inbound #747) ---------
@@ -419,9 +453,9 @@ try {
     Assert-True ($r6.Code -ne 0) 'baseline: refused with a non-zero exit'
     # BOTH NUMBERS IN THE MESSAGE, because the point of the refusal is telling the reader WHICH of the two
     # is behind -- a refusal naming one of them leaves exactly the question that caused the defect.
-    Assert-Match '1\.4\.0' $r6.Out 'baseline: the message names the baseline it read'
-    Assert-Match '1\.9\.9' $r6.Out 'baseline: and the version the overview records'
-    $v6 = (Get-Content -LiteralPath (Join-Path $root6 'plugins\dkj-teams\team-fixture\.claude-plugin\plugin.json') -Raw | ConvertFrom-Json).version
+    Assert-Says '1.4.0' $r6.Out 'baseline: the message names the baseline it read'
+    Assert-Says '1.9.9' $r6.Out 'baseline: and the version the overview records'
+    $v6 = (Get-Content -LiteralPath (Join-Path $root6 'plugins\dkj-subagents\team-fixture\.claude-plugin\plugin.json') -Raw | ConvertFrom-Json).version
     Assert-Equal '1.4.0' $v6 'baseline: nothing was written -- the check runs with the other guardrails, before the first write'
     Assert-Equal '' (Get-GitOut -Root $root6 -GitArgs @('tag','--list')).Trim() 'baseline: and no tag was created'
 

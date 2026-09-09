@@ -50,7 +50,7 @@ function Assert-True {
 Assert-True (Test-Path -LiteralPath $LibPath) 'park-lib.ps1 exists at its registered source path'
 . (Join-Path $RepoRoot 'scripts\lib\native-capture-lib.ps1')
 . $LibPath
-Assert-True ([bool](Get-Command -Name 'Invoke-GitParkCommit' -ErrorAction SilentlyContinue)) 'Invoke-GitParkCommit is exported by the lib'
+Assert-True ((Test-FunctionDefined 'Invoke-GitParkCommit')) 'Invoke-GitParkCommit is exported by the lib'
 
 $script:fixtures = @()
 

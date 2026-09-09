@@ -79,7 +79,7 @@ function Get-SharedScriptPairs {
         @{
             Name   = 'check-roster-sync'
             Source = 'scripts\sync\check-roster-sync.ps1'
-            Plugin = 'dkj-team-alpha'
+            Plugin = 'dkj-subagents-alpha'
             Skill  = 'sync-roster'
             # All three exist so the test suite can point the check at a fixture instead of the real
             # machine. A consumer never types them, and documenting them would invite someone to.
@@ -368,7 +368,7 @@ function Get-SharedScriptPairs {
         @{
             Name    = 'check-report-lib'
             Source  = 'scripts\lib\check-report-lib.ps1'
-            Plugin  = 'dkj-team-alpha'
+            Plugin  = 'dkj-subagents-alpha'
             LibOnly = $true
         },
         @{
@@ -437,17 +437,17 @@ function Get-SharedScriptPairs {
             # up -- read its two banners for why a second entry rather than a list of mirrors, and why the
             # name carries the plugin. Nothing here needs restating.
             #
-            # WHY dkj-team-shopify NEEDS ITS OWN COPY (inbound #1181, September 1, 2026): sync-main.ps1 became
+            # WHY dkj-subagents-shopify NEEDS ITS OWN COPY (inbound #1181, September 1, 2026): sync-main.ps1 became
             # a caller. Its five git network calls ran unguarded and unbounded -- the same hang #1179
             # measured, in the script that pushes a commit holding a third party's in-flight edits -- and
-            # the guard lives in this lib. dkj-team-shopify and dkj-policy are separately
+            # the guard lives in this lib. dkj-subagents-shopify and dkj-policy are separately
             # versioned and separately installed, and a Shopify consumer may run the first without the
             # second, so reaching into the workflow plugin's cache would be a dependency a version
             # mismatch breaks silently. sync-main.ps1's dot-source is UNGUARDED for the matching reason:
             # a payload missing this file must fail at load, not push unbounded.
             Name    = 'native-capture-lib-shopify'
             Source  = 'scripts\lib\native-capture-lib.ps1'
-            Plugin  = 'dkj-team-shopify'
+            Plugin  = 'dkj-subagents-shopify'
             LibOnly = $true
         },
         @{
@@ -477,7 +477,7 @@ function Get-SharedScriptPairs {
             # dkj-policy's cache would be a dependency a version mismatch breaks silently.
             Name    = 'hook-check-lib-alpha'
             Source  = 'scripts\lib\hook-check-lib.ps1'
-            Plugin  = 'dkj-team-alpha'
+            Plugin  = 'dkj-subagents-alpha'
             LibOnly = $true
         },
         @{
@@ -506,7 +506,7 @@ function Get-SharedScriptPairs {
             # arrived the way the argument for sharing is usually only made in hindsight: the same
             # mechanism was repaired TWICE on one day, in two neighbouring scripts, by two branches that
             # were open at the same time and did not know about each other -- inbound #1190 in
-            # dkj-team-shopify's sync-main.ps1 and #1191 in the workflow plugin's prune-merged.ps1. Both
+            # dkj-subagents-shopify's sync-main.ps1 and #1191 in the workflow plugin's prune-merged.ps1. Both
             # repairs were correct. By the evening the copies had already diverged, over the comparer the
             # map is keyed with: one ordinal with a comment saying why git refs are case-sensitive, the
             # other a bare '@{}'. That is #81's and #815's argument arriving from the inside, so it is
@@ -522,7 +522,7 @@ function Get-SharedScriptPairs {
             LibOnly = $true
         },
         @{
-            # The second mirror of merged-pr-lib. dkj-team-shopify and dkj-policy are separately
+            # The second mirror of merged-pr-lib. dkj-subagents-shopify and dkj-policy are separately
             # versioned and separately installed, and a Shopify consumer may run the first without the
             # second, so reaching into the workflow plugin's cache would be a dependency a version
             # mismatch breaks silently -- the same reason native-capture-lib is registered twice five
@@ -531,7 +531,7 @@ function Get-SharedScriptPairs {
             # standing.
             Name    = 'merged-pr-lib-shopify'
             Source  = 'scripts\lib\merged-pr-lib.ps1'
-            Plugin  = 'dkj-team-shopify'
+            Plugin  = 'dkj-subagents-shopify'
             LibOnly = $true
         },
         @{
@@ -600,7 +600,37 @@ function Get-SharedScriptPairs {
             # measured drifting within a day.
             Name    = 'ref-print-lib-shopify'
             Source  = 'scripts\lib\ref-print-lib.ps1'
-            Plugin  = 'dkj-team-shopify'
+            Plugin  = 'dkj-subagents-shopify'
+            LibOnly = $true
+        },
+        @{
+            # THE FUNCTION-TABLE PROBE (issue #1729). A leaf with no dependencies of its own, like
+            # ref-print-lib above, which is what makes it safe for the three libs below it to load
+            # first. It is mirrored because those three are: entry-scaffold-lib, native-capture-lib and
+            # seam-lib all dot-source it, and a consumer runs the mirror -- so an unmirrored source
+            # would leave Test-FunctionDefined undefined in exactly the repos that never see this one.
+            Name    = 'command-probe-lib'
+            Source  = 'scripts\lib\command-probe-lib.ps1'
+            Plugin  = 'dkj-policy'
+            LibOnly = $true
+        },
+        @{
+            # THE SECOND MIRROR OF THE SAME SOURCE, on ref-print-lib-shopify's precedent above -- read
+            # native-capture-lib-shopify's banner for why a second entry rather than a list of mirrors.
+            # The caller here is that plugin's own native-capture-lib copy, which dot-sources this one.
+            Name    = 'command-probe-lib-shopify'
+            Source  = 'scripts\lib\command-probe-lib.ps1'
+            Plugin  = 'dkj-subagents-shopify'
+            LibOnly = $true
+        },
+        @{
+            # THE THIRD MIRROR OF THE SAME SOURCE. check-roster-sync.ps1 lives in the core team plugin
+            # rather than in the workflow one, and it probes two seams (Get-RosterPath,
+            # Get-RosterIgnoredIds) -- so the lib has to travel there too, exactly as check-report-lib
+            # already does for the same caller.
+            Name    = 'command-probe-lib-alpha'
+            Source  = 'scripts\lib\command-probe-lib.ps1'
+            Plugin  = 'dkj-subagents-alpha'
             LibOnly = $true
         },
         @{
@@ -657,7 +687,7 @@ function Get-SharedScriptPairs {
             # THE SECOND MIRROR OF THE SAME SOURCE (issue #1689, September 9, 2026), on
             # native-capture-lib-shopify's and merged-pr-lib-shopify's precedent -- read either of those for
             # the argument in full. Convert-GitQuotedPath moved in here from sync-rules.ps1, and sync-main.ps1
-            # dot-sources this file directly and unguarded for it, so dkj-team-shopify needs its own copy:
+            # dot-sources this file directly and unguarded for it, so dkj-subagents-shopify needs its own copy:
             # the two plugins are separately versioned and separately installed, and a cross-plugin path is a
             # dependency a version mismatch breaks silently.
             #
@@ -667,7 +697,7 @@ function Get-SharedScriptPairs {
             # id. It never called the function it defined, so losing it cost that file nothing.
             Name    = 'git-porcelain-lib-shopify'
             Source  = 'scripts\lib\git-porcelain-lib.ps1'
-            Plugin = 'dkj-team-shopify'
+            Plugin = 'dkj-subagents-shopify'
             LibOnly = $true
         },
         @{
@@ -879,13 +909,13 @@ function Get-SharedScriptPairs {
             # clone into the plugin cache and writes nothing into a repo. So every refreshed consumer met
             # a standing [ERROR] and a guard with a known hole in it.
             #
-            # IT TRAVELS IN dkj-team-shopify RATHER THAN IN THE CORE TEAM, and that is the same call issue
-            # #776 argued from both directions: specialists-init is dkj-team-alpha's skill, so teaching it the
+            # IT TRAVELS IN dkj-subagents-shopify RATHER THAN IN THE CORE TEAM, and that is the same call issue
+            # #776 argued from both directions: specialists-init is dkj-subagents-alpha's skill, so teaching it the
             # two Shopify seam functions would give the core team knowledge of an add-on it must not
             # depend on. The plugin that owns the guard owns the answer to the guard.
             Name   = 'adopt-shopify-floor'
             Source = 'scripts\task\adopt-shopify-floor.ps1'
-            Plugin = 'dkj-team-shopify'
+            Plugin = 'dkj-subagents-shopify'
             Skill  = 'adopt-shopify-floor'
             # A fixture root, so the suite can adopt into a scratch tree instead of a real Shopify repo --
             # and so the marketplace refusal can be bypassed in a repo that is one. A consumer never types
@@ -893,14 +923,14 @@ function Get-SharedScriptPairs {
             SkillParamsExempt = @('RootOverride')
         },
         @{
-            # THE GUARD LIB HAS TO REACH dkj-team-shopify TOO, now that a shared script travels there. It only
+            # THE GUARD LIB HAS TO REACH dkj-subagents-shopify TOO, now that a shared script travels there. It only
             # ever fires from inside the copy a reader wrongly ran, so a version that stayed behind in
             # dkj-policy's mirror could never fire for adopt-shopify-floor. Registered per plugin
             # rather than per script for the same reason check-report-lib is: the pair names a destination,
             # and one destination cannot serve two.
             Name    = 'source-repo-guard-lib'
             Source  = 'scripts\lib\source-repo-guard-lib.ps1'
-            Plugin  = 'dkj-team-shopify'
+            Plugin  = 'dkj-subagents-shopify'
             LibOnly = $true
         },
         @{
@@ -1108,7 +1138,7 @@ function Get-SharedScriptPairs {
             # repeat would be exactly as invisible as the first.
             #
             # IT TRAVELS IN dkj-policy for the reason claim-issue does, and it is the same split: the
-            # RULE lives in the orchestrator's manual in dkj-team-alpha (Chris owes a reconciliation
+            # RULE lives in the orchestrator's manual in dkj-subagents-alpha (Chris owes a reconciliation
             # step after a fan-out), the MECHANISM sits here with the other git mechanics -- new-branch,
             # park-cycle, prune-merged. Nothing in it knows what a specialist is.
             #
@@ -1150,14 +1180,14 @@ function Get-SharedScriptPairs {
             # has done since. One consumer recorded that procedure reverting merged work three times in
             # one week.
             #
-            # IT TRAVELS IN dkj-team-shopify, like adopt-shopify-floor and for the same reason: the plugin
+            # IT TRAVELS IN dkj-subagents-shopify, like adopt-shopify-floor and for the same reason: the plugin
             # that owns the live theme owns the step that reads from it. It depends on NO workflow plugin
             # at all -- every seam it reads is fetched through Get-Command, so a consumer that enables no
             # workflow gets identical behaviour. That was written when a second workflow existed to name
             # as the comparison; the guarantee is the same one, stated against the case that remains.
             Name   = 'sync-main'
             Source = 'scripts\task\sync-main.ps1'
-            Plugin = 'dkj-team-shopify'
+            Plugin = 'dkj-subagents-shopify'
             Skill  = 'sync-main'
             # A fixture root, so the suite can drive the script against a scratch tree instead of a real
             # store -- and so the marketplace refusal can be bypassed in a repo that is one. A consumer
@@ -1179,11 +1209,11 @@ function Get-SharedScriptPairs {
             # script and passed in.
             Name    = 'sync-rules'
             Source  = 'scripts\lib\sync-rules.ps1'
-            Plugin  = 'dkj-team-shopify'
+            Plugin  = 'dkj-subagents-shopify'
             LibOnly = $true
         },
         @{
-            # The preview push (inbound #805, August 21, 2026). IT TRAVELS IN dkj-team-shopify for the same
+            # The preview push (inbound #805, August 21, 2026). IT TRAVELS IN dkj-subagents-shopify for the same
             # reason sync-main does: the plugin that owns the live theme owns the estate around it. It
             # depends on NEITHER workflow plugin -- every seam it reads, the branch-name flattening
             # included, is fetched through Get-Command.
@@ -1201,7 +1231,7 @@ function Get-SharedScriptPairs {
             # theme at all, so what is left to share is a push, which is the same call everywhere.
             Name   = 'push-preview'
             Source = 'scripts\task\push-preview.ps1'
-            Plugin = 'dkj-team-shopify'
+            Plugin = 'dkj-subagents-shopify'
             Skill  = 'push-preview'
             # A fixture root, as for sync-main: a consumer never types it, and documenting it would invite
             # someone to.
@@ -1219,7 +1249,7 @@ function Get-SharedScriptPairs {
             # questions would give two different answers to the same one.
             Name    = 'preview-theme'
             Source  = 'scripts\lib\preview-theme.ps1'
-            Plugin  = 'dkj-team-shopify'
+            Plugin  = 'dkj-subagents-shopify'
             LibOnly = $true
         },
         @{
@@ -1235,7 +1265,7 @@ function Get-SharedScriptPairs {
             # cannot run the npm .ps1 shim 'shopify' actually resolves to. Reasons in the lib's header.
             Name    = 'shopify-cli-lib'
             Source  = 'scripts\lib\shopify-cli-lib.ps1'
-            Plugin  = 'dkj-team-shopify'
+            Plugin  = 'dkj-subagents-shopify'
             LibOnly = $true
         }
     )
