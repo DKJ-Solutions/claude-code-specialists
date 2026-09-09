@@ -37,6 +37,56 @@ function Assert-Equal {
     else { $script:fail++; Write-Host "  [FAIL] $Label`n         expected: '$Expected'`n         got:      '$Actual'" -ForegroundColor Red }
 }
 
+function Test-Says {
+    <# Does the child's captured output contain this phrase, whatever the console did to it?
+
+       THIS SUITE NEEDS IT AND MOST DO NOT, which is what #1736 classified. Invoke-Measure below merges
+       the child's ERROR stream into .Out -- Invoke-NativeCapture without -DiscardStderr -- and
+       round-tally.measure.ps1 reaches that stream three times: two Write-Error refusals and the
+       `foreach ($w in $warnings) { Write-Warning $w }` loop. A throw, a Write-Error or a Write-Warning
+       arrives through PowerShell's error formatter, which hard-wraps at the host's buffer column INSIDE
+       a word, so the phrase the script composed is not the phrase the capture carries (#1512).
+
+       Which asserts here go through it is decided by WHICH STREAM emits the phrase, not by the wording.
+       The report body -- the tally table, the markerless listing -- is Write-Output, which the formatter
+       never touches, so those asserts keep -match and their line anchors: they are about the document's
+       structure, and stripping whitespace would make `(?m)^\| v10 \| ...` meaningless.
+
+       Strips ALL whitespace from both sides rather than normalizing runs of it. Measured over 120 wrap
+       positions x 4 phrases (480 checks per variant), padding a Write-Error until its break swept every
+       column of a 120-wide render: collapsing '\s+' to one space failed 68, and joining the records with
+       nothing between them failed 0 -- it repairs the mid-word break the formatter actually makes.
+
+       INVOKE-MEASURE BELOW JOINS THEM WITH A NEWLINE, WHICH REPAIRS NOTHING: 51 of 480. -match is
+       single-line by default, so a phrase the formatter split across two records matches nothing at all.
+       That makes this suite the one member of #1736's queue that was genuinely exposed rather than
+       incidentally safe -- the three sibling suites repaired alongside it all join with '' and measured
+       0. The capture itself is sound: it comes from Invoke-NativeCapture, which reads the child's
+       streams from files, so none of the decoration Out-String interleaves is in play here. What was
+       missing was only the reader.
+
+       Case 6 below is the proof it had already bitten here: #1242 met exactly this and rejoined the
+       lines at that ONE call site by hand, leaving the two Write-Warning sites above it untouched. That
+       hand-rolled form only ever worked because the phrase it guards is a single token; on a two-word
+       phrase it would have failed for the mirror-image reason. This is that repair made once, in the
+       form that survives both breaks, and reachable from every site.
+
+       Literal (IndexOf), so a phrase carrying '(' or ')' needs no escaping -- which is why the call
+       sites below lost their backslashes. #>
+    param([string]$Text, [string]$Phrase)
+    $haystack = ($Text -replace '\s', '')
+    $needle = ($Phrase -replace '\s', '')
+    return ($haystack.IndexOf($needle, [System.StringComparison]::OrdinalIgnoreCase) -ge 0)
+}
+
+function Assert-Says {
+    <# Text first, then the phrase, then the label -- the ($Expected, $Actual, $Label) shape of
+       Assert-Equal above, which is what a reader copies from when adding a case here. #>
+    param([string]$Text, [string]$Phrase, [string]$Label)
+    if (Test-Says -Text $Text -Phrase $Phrase) { $script:pass++; Write-Host "  [PASS] $Label" -ForegroundColor Green }
+    else { $script:fail++; Write-Host "  [FAIL] $Label`n         wanted to find: '$Phrase'" -ForegroundColor Red }
+}
+
 # The round's scoring vocabulary, by code point. The script has no opinion about these -- that is the
 # property under test -- so the suite is free to pick any symbols it likes.
 $RED    = [char]::ConvertFromUtf32(0x1F534)   # blocked
@@ -156,7 +206,9 @@ try {
         "| B7 | $RED geblokkeerd | $GREEN groen |"
     )
     $r3 = Invoke-Measure -ScriptArgs @('-Path', $f3)
-    Assert-True ($r3.Out -match '2 cell\(s\) carry no marker') 'bare: the run warns about the markerless cells'
+    # WARNING stream -- through the formatter, so read with Test-Says. The next two lines read the report
+    # BODY (Write-Output), which the formatter never touches, and stay on -match.
+    Assert-Says $r3.Out '2 cell(s) carry no marker' 'bare: the run warns about the markerless cells'
     Assert-True ($r3.Out -match 'niet opgetreden') 'bare: and each one is listed with its own text'
     Assert-True ($r3.Out -match '(?m)^\| v10 \| A2 extra \| niet gemeten \|') 'bare: named by column and by row'
     $v10 = Get-Row -Text $r3.Out -Column 'v10'
@@ -194,7 +246,7 @@ try {
         "| A2 | $GREEN green |"
     )
     $r5 = Invoke-Measure -ScriptArgs @('-Path', $f5)
-    Assert-True ($r5.Out -match 'is used with more than one label') 'labels: the divergence is warned about'
+    Assert-Says $r5.Out 'is used with more than one label' 'labels: the divergence is warned about'
     Assert-True ($r5.Out -match '\|\s*column\s*\|\s*\S+\s+groen\s*\|') 'labels: the most frequent label heads the column'
 
     # --- 6. Nothing to count is an error, not an empty table ----------------------------------------
@@ -211,9 +263,15 @@ try {
     # continuation indent. The break point moves with the absolute paths the rendering carries (the
     # measure script's and the fixture's), so the naive match is green on a short home directory and red
     # on a long one while the message is byte-identical: a gate refusing work it has not measured, and
-    # invisible to CI, whose runner path happens to be short. Rejoin the wrapped lines first -- the
-    # assert is "the message names the parameter", never "the formatter left this line whole".
-    Assert-True ((($r6.Out -replace "`r?`n\s*", '') -match 'ColumnPattern')) 'none: and points at the parameter that would fix it'
+    # invisible to CI, whose runner path happens to be short. The assert is "the message names the
+    # parameter", never "the formatter left this line whole".
+    #
+    # This site rejoined the lines by hand until #1736. That repaired the mid-word break and nothing
+    # else: deleting the newline glues the words either side of a break that landed ON a space, so the
+    # same one-line fix would have failed a two-word phrase for the mirror-image reason. It only ever
+    # worked here because 'ColumnPattern' is a single token. Test-Says is the form that survives both,
+    # and it is now what the two Write-Warning sites above use as well.
+    Assert-Says $r6.Out 'ColumnPattern' 'none: and points at the parameter that would fix it'
 
     # --- 7. -ColumnPattern really is the knob ------------------------------------------------------
     $r7 = Invoke-Measure -ScriptArgs @('-Path', $f6, '-ColumnPattern', '^status$')

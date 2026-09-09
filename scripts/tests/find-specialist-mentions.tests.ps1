@@ -56,10 +56,34 @@ function Assert-Equal {
 }
 
 function Get-FlatOutput {
-    <# Whitespace collapsed, so a phrase assert cannot fail on a line break the script does not
-       decide -- the console-width lesson from park-branch.tests.ps1 and new-branch.tests.ps1. #>
+    <#
+        Line breaks removed, so a phrase assert cannot fail on a break the script does not decide --
+        the console-width lesson from park-branch.tests.ps1 and prune-merged.tests.ps1, which carries
+        the full reasoning.
+
+        JOIN WITH NOTHING, not collapse to a space (#1742, September 9, 2026). This file collapsed the
+        break until then, citing park-branch.tests.ps1 and new-branch.tests.ps1 -- neither of which
+        uses that substitution. #1736 measured all three variants over 120 wrap positions x 4 phrases
+        (480 checks each), padding a Write-Error until its break swept every column of a 120-wide
+        render: collapsing to a space failed 68 of 480, because the formatter breaks INSIDE a word and
+        a space cannot repair the split it exists for ('dirty working tre e'). Joining with '' failed
+        0 of 480, and is what the other suites in this tree use.
+
+        NOTHING WAS FAILING HERE, and that is the reason this was worth changing. The script under test
+        reaches the error stream exactly once and no assert below reads it -- every phrase asserted
+        here is Write-Host output, which never touches the formatter. So all 480 checks were moot, and
+        the silence sat in exactly the wrong place: the first assert anyone adds on a refusal would have
+        landed on the one variant measured to drop phrases, failing at some console widths and not
+        others.
+
+        NOT Test-Says, for the same reason prune-merged.tests.ps1 keeps -match on its Write-Host lines:
+        stripping ALL whitespace from both sides is immune by construction, but it would assert LESS
+        than the phrases below do -- '2 specialists', '11 live mentions' and '2 x link text' are read
+        for their spacing. Route a refusal assert through Test-Says when one is added; do not weaken
+        these.
+    #>
     param($Captured)
-    return (($Captured | Out-String) -replace "`r?`n", ' ')
+    return (($Captured | ForEach-Object { [string]$_ }) -join '')
 }
 
 function New-Fixture {

@@ -125,7 +125,12 @@ That gives one test question, and it applies to everything added to a plugin fro
 > A way of working belongs to whoever authored it, and is therefore opt-in.
 
 **Why it had to be written down: the core did not pass its own test.** Measured on August 8, 2026, the
-`dkj-subagents-alpha` plugin shipped 1,973,691 bytes, of which the personas, agent defs and manuals — the craft
+`team-alpha` plugin — `dkj-subagents-alpha` today, by way of
+[#1480](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1480), which put the `dkj-` prefix
+on the four teams on September 5, 2026, and
+[#1698](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1698), which renamed them again on
+September 9 — shipped 1,973,691 bytes, of which the
+personas, agent defs and manuals — the craft
 itself — were 175,672, or **9%**. Against that, the shared scripts, the seven workflow skills and the
 session hooks together came to 923,277 bytes, or **47%**: machinery that implements one particular way
 of working. The persona layer itself was clean, and that is worth stating precisely, because it locates

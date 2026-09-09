@@ -84,7 +84,23 @@ infrastructure.
   it switches the check off for itself, silently.
 - **`.github/workflows/ci.yml`** — the CI gate on GitHub: runs the same lint gate + all test suites
   (`scripts/tests/*.tests.ps1`) on every PR and every push to `main`, so the guard also applies to
-  work that comes about outside `open-pr.ps1`. **"The same" is literal since August 7, 2026** — the step
+  work that comes about outside `open-pr.ps1`.
+
+  **AND "THE SAME GATE" IS NOT "THE SAME ANSWER", BECAUSE THE TWO RUN ON DIFFERENT TREES**
+  (measured September 9, 2026, on this lens's own branch). The local gate runs on **your branch**; CI
+  runs on the **merge** of your branch with the trunk. The suite list is a glob, so a suite the trunk
+  gained while your branch was open **does not exist locally** — the local gate cannot run it, reports
+  green, and CI then runs it against your change and fails. Measured exactly here: `feat/1726-…` passed
+  all 86 suites locally twice, and `lint-en-tests` went red on
+  `command-probe-lib.tests.ps1` — a rule (#1729, *no `Get-Command` function probe*) that landed on `main`
+  hours earlier and that the new script broke three times over. After `git merge origin/main` the same
+  command reported **87** suites, and the count is the only thing that said anything was different.
+
+  **Read the count, then: a local gate pass is evidence about your branch and NOT a prediction about CI.**
+  This is not what ship-pr's staleness guard is for — that dates a CI certificate against commits the
+  trunk gained *after* the run (#1292), and it fires at the merge, which is well after the red run has
+  already happened. The cheap habit is the fix: `git fetch` and merge the trunk **before** the gates, so
+  the tree you prove is the tree CI will build. **"The same" is literal since August 7, 2026** — the step
   dot-sources `native-capture-lib.ps1` and calls `Invoke-TestSuiteGate`, the one function `open-pr.ps1`
   and `cut-release.ps1` also call. It held its own inline `foreach` until then, which is how a gate
   improvement can land in both local callers and miss the only one that actually blocks a merge; the
@@ -205,6 +221,18 @@ infrastructure.
   was *measured*, not when it happened, and nobody can now say which. That gap is why the always-on
   sentence in [`CLAUDE.md`](../../../CLAUDE.md#claude-code-specialistss-safety-implementation) went on
   handing out the wrong answer for a stretch nobody can now put a length on (#1720).
+
+  **EVERY SENTENCE ABOVE STILL HOLDS, AND SINCE SEPTEMBER 9, 2026 SOMETHING ACTS ON IT**
+  ([#1726](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1726)):
+  `.github/workflows/repo-settings.yml` runs `check-repo-settings.ps1` daily against
+  `Get-ExpectedRepoSettings`, so a change to this ruleset now produces a dated red run within 24 hours
+  instead of nothing at all. **It does not make these blocks maintained facts, and reading them as such
+  is the one mis-reading to avoid** — each is still what was true on its date, and the way to know
+  which is current is still to run the command. What the detector adds is narrower and is the half that
+  was missing: it says *when* a block stopped being current, which is precisely what the `merge_queue`
+  removal above has no answer for. Its own bullet is further down, under
+  [what Sylvester owns here](#what-sylvester-owns-here); the three-rule list above is one of the seven
+  facts it now compares, so a fourth entry appearing is reported rather than discovered.
 
   **AND THE BYPASS THAT ANSWERS BOTH CANNOT BE GRANTED TO THE ACTOR THAT NEEDS IT** (September 6, 2026,
   [#1506](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1506)). The paragraph above is
@@ -788,6 +816,64 @@ infrastructure.
   it answers `accepts 1 arg(s), received 3`, with nothing about quoting in it. The bracket-plus-`@tsv`
   form says the same thing in characters that survive, and a suite assert reads the *recorded arguments*
   for a quote rather than the behaviour, since a fake `gh` would answer either form happily.
+
+- **`.github/workflows/repo-settings.yml` + `scripts/lint/check-repo-settings.ps1`** — the one runner
+  here whose subject is **not** this tree (issue
+  [#1726](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1726), September 9, 2026). Every
+  other check on this page reads the repo or a machine-local record; this one reads **GitHub**, and
+  compares it against `Get-ExpectedRepoSettings` in
+  [`scripts/repo-config.ps1`](../../../scripts/repo-config.ps1) — seven declared facts, each carrying the
+  document in this tree that states it and the date that statement was last measured.
+
+  **The gap it closes is the one the ruleset bullet above states in prose and could not act on**:
+  *"a ruleset is GitHub-side state, so nothing in this tree changes when it changes."* That sentence is
+  still exactly right, and it is now the only half that was ever missing — a detector.
+
+  **THREE DRIFTS IN EIGHT DAYS, which is why this was built rather than written down.** #1726 was filed
+  arguing for doing nothing, on this repo's own no-pre-emptive-fixes rule and the words *"one occurrence
+  is not a rate"* — and that premise did not survive the tree. `bypass_actors` emptied by the transfer
+  (#1244): every direct-on-`main` exception dead, every fold blocked, found by a failing push a day
+  later. `merge_queue` added and removed with no trace (#1499, #1720). And `allow_auto_merge` live
+  `true` against four records here saying `false`
+  ([#1730](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1730)) — **found by this check's
+  own first run**, while that premise was being checked. Two of the three had mechanical consequences,
+  not merely a session reading a wrong sentence.
+
+  **SCHEDULED, NOT A SessionStart HOOK, and the reason is the date** (Dave's call on #1726's menu). A
+  hook reaches a drift sooner and costs a `gh api` round trip at every session start. What decided it is
+  the half a hook cannot do at all: a scheduled run leaves a **dated** record. #1720's own complaint is
+  that the removal has no date anywhere, *"because September 9 is when it was measured, not when it
+  happened"* — a hook reports to whoever happens to open a session, and if nobody does, nothing is
+  written down. Daily at 06:30 UTC bounds every future answer to 24 hours; `workflow_dispatch` is how
+  the answer is had on the day a setting is changed on purpose, and the one trigger that survives
+  GitHub suspending a schedule after 60 days of repo inactivity.
+
+  **NOT in `main-ci-gate`**, like `unfolded-entry.yml` and `branch-entry.yml` — the two that state that
+  reasoning for themselves — and for a sharper version of it: a
+  check whose subject *is* the ruleset, required *by* that ruleset, would be self-referential — and it
+  would stop the trunk over a switch only Dave can flip, so a drift would block every merge instead of
+  reporting one. **And it writes nothing to GitHub**, ever: repo settings are Dave's surface, the same
+  rule `adopt-merge-queue.ps1` follows when it composes its ruleset command and refuses to run it. It
+  holds `contents: read` and borrows no standing credential, which is the whole difference from
+  `fold-on-merge.yml` two bullets up.
+
+  **ONE FIELD READS AS UNREADABLE IN CI, AND THAT IS A THIRD VERDICT RATHER THAN A PASS.**
+  `bypass_actors` is returned to repo administrators only, so the job-scoped `GITHUB_TOKEN` cannot see
+  the one field whose emptying was #1244 — collapsing that into "matches" would make the check silent
+  about the drift with the worst consequences. So it prints `[?]`, says why, and does not fail the run;
+  run the script locally to compare that one. Everything else comes from
+  `repos/<repo>/rules/branches/main` and the repo object, both readable with `contents: read` — and the
+  branch endpoint is deliberately preferred over `rulesets/<id>` for the rest: no admin, no id to go
+  stale when a ruleset is re-created, and it reports the rules **effective** on the trunk, which is what
+  every document here is actually about.
+
+  **What it costs to add a fact, and what it costs not to.** An unstated field is not checked, so
+  nothing in the declaration can go stale for a fact nobody chose to declare — but the converse is that
+  a load-bearing setting nobody declares stays exactly as invisible as all seven of these were before
+  September 9. `scripts/tests/repo-settings-gate.tests.ps1` holds the declaration to shape rather than
+  to values (46 asserts): every `Field` must be one the check knows how to read, and every record must
+  carry its `Recorded`, `Where` and `Why`, because a `Field` typo is this check's own failure mode
+  arriving from the inside — a declared fact silently ceasing to be watched.
 
   **BOTH RUNNERS ABOVE NOW HAVE A CONSUMER-SHAPED TWIN, AND NOTHING HOLDS THE TWO IN SYNC** (issue
   [#1516](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1516), September 6, 2026).

@@ -1307,6 +1307,18 @@ returns 175 of 84, since `test-suite-gate.tests.ps1` prints the same header over
 against the suites that actually exist — the identical trap `record-suite-durations.ps1` documents for its
 duration rows.
 
+**Repaired under [#1717](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1717) itself**
+(September 9, 2026) -- the issue rather than its pull request, because the number is the one that was
+knowable while this sentence was being written; the changelog entry carries the PR. The measurement above is
+kept as written because it is what the repair was built from. The gate
+now prints one line as each lane opens and one as each suite leaves one -- started, done and running out of
+the run's own total, plus its own elapsed clock -- so the counter this paragraph describes writing no longer
+has to exist. **The dedup problem did not go away; it moved into the gate, which is the only party that can
+solve it**: each line carries a `[depth N]`, so a fixture's own nested run is filtered out by
+`progress \[depth 1\]` instead of by knowing which suites exist on disk. What is deliberately still absent
+is a remaining-time estimate: it would have to come from `suite-durations.json`, and that is the CI-seconds
+file the #1713 paragraph above says does not convert to this machine at all.
+
 ### Boundaries with the other roles
 
 - A duplication finding is still a duplication first: Nolan may flag the token cost, but the dedup

@@ -43,7 +43,166 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**36 / 83 minor entries** <!-- pending-tally -->
+**36 / 88 minor entries** <!-- pending-tally -->
+
+### DEPLOY: docs/1743-dated-plugin-name · 20260909-193257
+
+`README.md`'s one dated measurement names its subject as it was spelled on the day it was taken --
+`team-alpha`, not the `dkj-team-alpha` two later rename sweeps left there -- and says what it is
+called today, so the figure can still be re-verified against the tag it came from. The rule behind it
+(#952: a dated measurement keeps the name it was written with) is now in Tessa's lens, where a sweep
+can meet it beforehand; until now it existed only in the commit messages of the renames that observed
+it.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+N/A -- this repo's own README and one repo lens. A consumer receives neither.
+
+**Score:** N/A
+
+#### Pull Request
+
+Name the plugin in README's August 8 measurement as it was spelled on that date
+
+[PR #1746](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1746)
+
+---
+
+### DEPLOY: fix/1742-test-flattener · 20260909-192047
+
+The one flattener variant measured to drop wrapped phrases is out of the test tree. Two copies were
+found where the issue named one: the second, in `shared-scripts.tests.ps1`, was typed inline at a call
+site and was genuinely exposed -- its asserts read an `open-pr` `Write-Warning`, and the negative
+assert beside them would have reported "no warning on the ordinary path" for a warning that was
+printed and merely wrapped mid-word. Nothing was failing before this change, which is the point: the
+silence sat where the next assert anyone added would have inherited it.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+N/A -- a test-suite flattener reaches no consumer of this marketplace. The suites are green before and
+after; what changed is what a future assert inherits.
+
+**Score:** N/A
+
+#### Pull Request
+
+Match find-specialist-mentions.tests.ps1 to the flattener variant that measured zero failures
+
+[PR #1745](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1745)
+
+---
+
+### DEPLOY: feat/1726-repo-settings-drift-check · 20260909-190954
+
+A daily CI leg now reports when GitHub-side repo settings drift from what this tree declares -- the
+class behind #1720, where `main-ci-gate` gained and lost a `merge_queue` rule with nothing in the repo
+recording either event. `Get-ExpectedRepoSettings` in [`../scripts/repo-config.ps1`](../scripts/repo-config.ps1)
+declares seven load-bearing facts (the trunk's rules, its required check, `strict`, `allow_auto_merge`,
+`allow_update_branch`, visibility, the bypass actor types), each with the document that states it and
+the date it was last measured; `scripts/lint/check-repo-settings.ps1` compares them and names which
+document to repair when the drift turns out to be deliberate.
+
+Built rather than written down because #1726's own premise -- *"one occurrence is not a rate"* -- turned
+out to be wrong: three drifts in eight days, two of them mechanical. The emptied bypass list killed
+every fold for a day (#1244) and was found by a failing push; `allow_auto_merge` was found live `true`
+against four records saying `false` by this check's first run, and is filed as #1730.
+
+Scheduled rather than a SessionStart hook, on Dave's call: a hook reaches a drift sooner and costs a
+`gh api` round trip at every session start, but only a scheduled run leaves a **dated** record -- which
+is exactly what #1720 says is missing, since "September 9 is when it was measured, not when it
+happened". Advisory and not in `main-ci-gate`, and it writes nothing to GitHub: repo settings stay
+Dave's surface. One field, `bypass_actors`, is admin-only and reports as **not read** in CI rather than
+as green, because reporting the #1244 field as passing would be the worst possible silence.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A -- this is a maintenance-repo detector over this repo's own GitHub settings. Nothing ships to a
+consumer: the check is deliberately not mirrored into the plugin, and the one portable half is a
+PowerShell trap added to the system-administration manual.
+
+**Score:** N/A
+
+#### Pull Request
+
+A scheduled runner that reports GitHub-side repo settings drifting from what the tree declares
+
+Plugins: dkj-team-alpha
+
+[PR #1741](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1741)
+
+---
+
+### DEPLOY: fix/1736-says-classification-swept · 20260909-184930
+
+The `Test-Says` classification is now measured across every suite that captures a child's error stream,
+and the reader is applied where an assert actually reads a formatter-emitted phrase. Four suites gained
+it; the four #1736 nominated that read only `Write-Host` were measured and deliberately left alone, as
+were all thirteen it left unresolved.
+
+The classification is the durable half. It is recorded in Tycho's lens as two conditions that fail
+independently, with the correction that matters: condition 2 is a property of the **assert**, not of the
+script under test -- a script carrying twenty `Write-Error` calls says nothing about a suite whose
+asserts all read its report. That distinction is what took the queue from 8 candidates to 1 real defect,
+and it is what stops the next sweep from converting `Write-Host` asserts into weaker ones.
+
+The three flatteners in the tree are now ranked by measurement rather than by argument, so the next
+suite to be written can copy the one that measured 0 instead of the one whose docstring sounded most
+confident.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A -- test-suite internals. No consumer of this marketplace runs these suites or sees their output;
+the scripts under test are unchanged.
+
+**Score:** N/A
+
+#### Pull Request
+
+The whitespace-stripping reader reaches the four suites whose asserts read a formatter-emitted phrase
+
+[PR #1740](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1740)
+
+---
+
+### DEPLOY: feat/1717-gate-progress-index · 20260909-181938
+
+The test gate now reports its own progress. It prints one line as each lane opens and one as each
+suite leaves one -- `test gate: progress [depth 1] 37/84 started, 30 done, 7 running (+412.6s) --
+started roster-sync.tests.ps1` -- so a 15-30 minute local run no longer goes silent between walls of
+completion-order output. Started is reported as well as done because the queue dequeues longest-first
+(#1358): a done-count alone sits at 0 through exactly the window an operator is asking the question
+in. The `[depth N]` marker is what makes the count dedupable -- the gate's own suite drives the gate
+over a fixture, so a nested run is unavoidable here, and every external way of deriving this number
+failed on it (#1717 measured three, each differently). The `== <suite> ==` header is untouched, and
+no remaining-time estimate is printed: the duration hints are CI's seconds, and #1713 established
+they do not convert to another machine.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A -- the gate is a maintainer's tool. A subscriber of this system never watches it run; what
+reaches them is a release, and this changes nothing about one.
+
+**Score:** N/A
+
+#### Pull Request
+
+Report the test gate's own progress: started, done and running, per suite
+
+Plugins: dkj-policy, dkj-team-shopify
+
+[PR #1739](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1739)
+
+---
 
 ### DEPLOY: fix/1728-says-on-merged-captures · 20260909-180707
 

@@ -145,12 +145,12 @@ and safe hook construction.
   which arrivals are expendable, because some will be. And verify it the only way that works: read the
   conclusions of the runs the group has actually produced, not the YAML.
 
-## Ten PowerShell traps that produce well-formed wrong output
+## Eleven PowerShell traps that produce well-formed wrong output
 
-All ten were measured in this system, not read about, and they share the property that makes them
+All eleven were measured in this system, not read about, and they share the property that makes them
 expensive: **nothing errors.** The script runs, the output parses, the markdown renders — and it says
 something other than what the author meant. None is caught by a linter, so each is worth an assert.
-Nine are PowerShell's own; the last is the same class one layer out, in the tooling you reach for
+Ten are PowerShell's own; the last is the same class one layer out, in the tooling you reach for
 to repair a PowerShell file.
 
 - **`[ordered]@{ 2 = '...' }`'s indexer takes a positional index as well as a key.** For an integer the
@@ -257,6 +257,20 @@ to repair a PowerShell file.
   produced the exact evidence that would have killed the check. **Parenthesise any arithmetic inside an
   array literal** — `@($i, ($i + 1))` — and treat a measurement whose result argues against the thing you
   are building as the one most worth re-deriving before you act on it.
+- **Dot-sourcing a config file makes every `$script:` name it sets a reserved local name — case-insensitively.**
+  `. $config` runs that file's assignments in the *calling* script's scope, so a config that sets
+  `$script:RepoName` has claimed the name `$repoName` in your script too: PowerShell variable names
+  ignore case, so they are one variable. Writing `$repoName = ''` before calling the config's own
+  `Get-RepoName` therefore **overwrites the value you are about to read**, and the getter returns the
+  empty string it was just handed. Measured while building the repo-settings drift check: the run
+  reported `[SKIP] names no repo` against a config file whose value printed correctly two lines
+  earlier, and the collision survived four rounds of bisection because every isolated reproduction
+  used a differently-named local. What makes it expensive is the *shape of the symptom* — a config
+  seam reading as unconfigured is indistinguishable from a repo that genuinely has not set it, so the
+  check reports itself inapplicable, exits 0, and looks like a correct skip. **Name locals so they
+  cannot collide** — a config-derived value gets a name the config does not use (`$targetRepo`, not
+  `$repoName`) — and where a skip path exists, **assert that the happy path produced no skip**, because
+  both are exit 0 and only the assert can tell them apart.
 - **A `sed` substitution meant to write a code-point escape can silently write the wrong literal instead.**
   GNU `sed`'s replacement syntax treats `\u` as "uppercase the next character," not as a code-point escape —
   so `sed -i 's/\[-–—,\]/[-\u2013\u2014,]/'` consumed the backslash before each escape and wrote the literal
@@ -271,8 +285,8 @@ to repair a PowerShell file.
   written line back and check the code points rather than trusting the substitution. No gate can stand in
   for that read-back, because a mangled repair passes an ASCII check by construction.
 
-The general shape behind all ten, worth carrying to the next one: when a mistake cannot announce itself,
-the assert is the announcement. Prefer a test over a comment for anything in this class.
+The general shape behind all eleven, worth carrying to the next one: when a mistake cannot announce
+itself, the assert is the announcement. Prefer a test over a comment for anything in this class.
 
 ## Sylvester is lazy
 

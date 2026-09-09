@@ -246,6 +246,39 @@ is wrong when typed and wrong again after the next edit.** Neither claim needed 
 *elsewhere in this file* are true without maintenance. Before writing a count into prose, ask what the
 next edit does to it; and never take `grep -c` for an occurrence count, which is `grep -o | wc -l`.
 
+### A dated measurement keeps the name it was written with, and a rename sweep is where that is lost
+
+The rule is #952's and this tree has applied it at every rename since — the `#1437` commit
+(`17149edb`) states it in so many words: *"Dated measurements keep the name they were written with,"*
+which is why the release archive's prose, the folded changelog entries and `connectors/` are left
+alone and only link **targets** are repointed. **Until
+[#1743](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1743) it was written down
+nowhere but in commit messages**, which is the one place a rule cannot be read before the work rather
+than after it.
+
+**Why it is a rule and not a preference.** A dated figure whose subject carries a later spelling
+cannot be re-verified against the tag it was taken at. A reader who goes looking for
+`dkj-team-alpha@v3.x` finds nothing, and the number then reads as unsourced — so the sweep converts a
+measurement into a claim.
+
+**The measured instance, and it took two sweeps.** `README.md`'s *"Measured on August 8, 2026, the
+`team-alpha` plugin shipped 1,973,691 bytes"* had its subject renamed by
+[#1480](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1480) (the `dkj-` prefix,
+September 5, 2026) and again by [#1698](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1698),
+so it dated a measurement to a day four weeks before the name existed. Each sweep was correct for the
+great majority of its hits, and each carried this one along.
+
+**Three things to take from it:**
+
+- **A sweep's blind spot is the dated sentence, so read those hits by hand.** They are a small
+  minority and they are the only ones where a correct substitution produces a wrong statement.
+- **Say what it is called now, in the same breath.** The repair is not merely reverting the name —
+  a reader meeting `team-alpha` needs to know it is today's `dkj-subagents-alpha`, or the citation is
+  precise and unusable.
+- **No gate**, deliberately. Deciding whether a name inside a dated sentence is historical or current
+  needs the sentence's meaning, and a matcher flagging every dated paragraph that contains a plugin
+  name would fire on every correct one too. This was found by reading, and the count of one is a floor.
+
 ### A conditional in always-on prose needs a detector behind it, or it is not written as a conditional
 
 Behind the `merge_queue` paragraph in
