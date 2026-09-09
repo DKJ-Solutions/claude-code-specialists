@@ -711,10 +711,21 @@ Both are honest answers; the gate only refuses to guess.
         $otherPrsJson = ''
         $prSearchTerms = (($targetIssues | ForEach-Object { "$_" }) -join ' OR ') + ' in:body'
         $prSearch = Invoke-NativeCapture -Utf8 -FilePath 'gh' -Arguments @('pr', 'list', '--repo', $repo, '--state', 'all', '--search', $prSearchTerms, '--json', 'number,state,headRefName,body', '--limit', '60') -DiscardStderr
-        if ($prSearch.ExitCode -eq 0) {
+        # A SHORT READ IS NOT AN EMPTY RESULT SET (issue #1679). The -Utf8 arm can return an empty or
+        # truncated Output with ExitCode 0, and an empty $otherPrsJson reads downstream as "no rival PR"
+        # -- so the already-done warning #1409 exists to raise would silently not fire, on exactly the
+        # loaded machine where the search matters. Nothing else here could tell the two apart: gh prints
+        # '[]' when it finds nothing, so at THIS call an empty capture has no legitimate reading at all.
+        $searchUnread = ''
+        if ($prSearch.ExitCode -ne 0) {
+            $searchUnread = "exit $($prSearch.ExitCode)"
+        } elseif ($prSearch.ShortRead) {
+            $searchUnread = 'gh exited 0 but its capture was still being written when it was read, so the result may be truncated'
+        }
+        if (-not $searchUnread) {
             $otherPrsJson = ($prSearch.Output -join "`n")
         } else {
-            Write-Warning ("could not ask gh whether another PR already resolves " + (($targetIssues | ForEach-Object { "#$_" }) -join ', ') + " (exit $($prSearch.ExitCode)) -- the already-done check is skipped.")
+            Write-Warning ("could not ask gh whether another PR already resolves " + (($targetIssues | ForEach-Object { "#$_" }) -join ', ') + " ($searchUnread) -- the already-done check is skipped.")
         }
 
         foreach ($w in @(Get-TargetIssueWarnings -TargetIssues $targetIssues -OpenIssues $openAll -OtherPrsJson $otherPrsJson -CurrentBranch $branch)) {
@@ -824,8 +835,11 @@ nothing for the fold to move into the changelog. Left as it is, the fold would p
 this change's description, and the scaffold gate below cannot see that: it looks for the wording the
 scaffolder left, and a deleted section carries none of it.
 
-The usual cause is not a deliberate deletion. It is an edit that truncated the file at '### PLAN' - a string
-that also occurs INSIDE the guidance blockquote, in the line forbidding branch-specific content above it.
+The usual cause is not a deliberate deletion. It is an edit that anchored on the first phase heading as a
+plain string and truncated the file there. In a document scaffolded before #1654 that string - '### PLAN' -
+occurs TWICE, the second time inside the guidance blockquote above the real heading, so such an edit cuts
+at the wrong one. The guidance names that heading by position now, so a document scaffolded since then
+carries it once; every branch already open still carries both.
 
 The new-branch skill is idempotent: run it on this branch to restore the section, then write what the change
 does. Shipping it as it stands is -Force.

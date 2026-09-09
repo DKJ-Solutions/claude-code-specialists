@@ -251,6 +251,23 @@ if (Test-Path -LiteralPath $guardLib -PathType Leaf) { . $guardLib; Assert-OwnCo
 # fail at LOAD, not fall through to a guard that then quietly reports nothing standing.
 . (Join-Path $PSScriptRoot '..\lib\merged-pr-lib.ps1')
 
+# THE QUOTED-PATH DECODER, MOVED OUT OF sync-rules.ps1 (issue #1689, September 9, 2026). Convert-GitQuotedPath
+# is called at three sites below and was DEFINED in sync-rules.ps1, which never used it -- while a second,
+# poorer handling of the same quoting had grown up in git-porcelain-lib.ps1 for #1682. One owner now, and it
+# is the file that already owns core.quotePath.
+#
+# NOT BY HAVING sync-rules.ps1 DOT-SOURCE IT, which was #1689's own first proposal and is refused by that
+# file: it is dependency-free on purpose, because the live-theme guard dot-sources it on every command inside
+# a catch that returns no live theme id -- so anything it pulls in is a way to silently disarm a guard over a
+# revenue-serving theme. It never called the function, so it could simply lose it, and the dot-source lands
+# here instead.
+#
+# UNGUARDED, and mirrored into THIS plugin as well as dkj-policy -- both for the reasons the merged-pr block
+# above states in full: a payload missing this file must fail at LOAD rather than fall through to a path that
+# is silently mis-decoded, which is inbound #821's failure exactly; and one file mirrored into both plugins
+# beats a cross-plugin path that a version mismatch breaks without a word.
+. (Join-Path $PSScriptRoot '..\lib\git-porcelain-lib.ps1')
+
 # THE NETWORK GUARD (inbound #1181, #1184 and #1187, September 1, 2026). Every git AND gh call in this
 # script that reaches the network goes through Invoke-NativeCapture, which runs its child with
 # GIT_TERMINAL_PROMPT=0 and GCM_INTERACTIVE=never and -- where the call is given -TimeoutSeconds --

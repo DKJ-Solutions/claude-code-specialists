@@ -279,9 +279,14 @@ ones, so the wait works with no ruleset; and where nothing is required, the merg
 red check instead of proceeding. The repo without a ruleset is therefore guarded conservatively rather
 than left unguarded — you simply cannot be told which check governed, because no check governs.
 
-Five further gates judge the branch's own paperwork rather than its code, and none of them is advisory —
+Further gates judge the branch's own paperwork rather than its code, and none of them is advisory —
 the [`open-pr` skill](skills/open-pr/SKILL.md) is the full account of each:
 
+- **the entry gate** — the branch document's DEPLOY section is *gone*, so there is no entry for the fold to
+  move into the changelog. It runs **before** the scaffold gate below because that gate cannot ask this: a
+  deleted section carries none of the wording it matches on, so it passes by **absence** and the branch ships
+  with its PR description composed out of the guidance. `-Force` is honoured, and `new-branch` is idempotent —
+  run it on the branch to restore the section;
 - **the scaffold gate** — an entry still carrying the wording the scaffolder wrote, or a description, body
   or tier reason still empty once the guidance comments are stripped. `-Force` is the escape valve here,
   deliberately separate from `-SkipLint`/`-SkipTests`, because it overrules a judgement about content
@@ -298,7 +303,14 @@ the [`open-pr` skill](skills/open-pr/SKILL.md) is the full account of each:
 - **the resolves gate** — a plain `#123` in a PR body closes nothing on GitHub, so issues a PR resolves are
   passed as `-Resolves` and written as their own `Closes #<n>` lines.
 
-**All five are local, and that is the hole the CI gate closes** (inbound
+**These are the ones worth knowing before you push, not the whole set** — `open-pr` also refuses on a
+machine-local path in the entry, a link that will not survive the fold, an empty PR title, a label your seam
+names that does not exist, and a remote that has moved under you, and `ship-pr` adds the backing gate and the
+DEPLOY lock. The list above is deliberately a selection rather than an inventory: a page that tried to name
+every gate would go stale on the next one added, and the skill pages already carry each in full. What matters
+here is the property they share, which the count never was.
+
+**All of them are local, and that is the hole the CI gate closes** (inbound
 [#789](https://github.com/DaveKJohn/claude-code-specialists/issues/789)). A branch pushed by hand, or a PR
 opened in the GitHub UI, meets none of them — so the convention was enforced by whoever remembered to use
 the scripts. `check-branch-entry.ps1` ships for exactly that, and the `adopt-dkj-policy` skill's Part 1 places the six

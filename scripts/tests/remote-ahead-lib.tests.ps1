@@ -195,6 +195,94 @@ try {
     Assert-True ($note6 -match [regex]::Escape('...')) 'a subject past the cap is truncated with an ellipsis'
     Assert-True ($note6 -notmatch ('x' * 130)) 'and does not carry the whole 200-character subject verbatim'
 
+    # --- 6b. a tip this run could not read is SAID, not dropped -------------------------------
+    # ISSUE #1676. Every case above proves what the sentence says when the tip CAN be read. This one is
+    # about the other half: the `-Utf8` capture can come back empty with exit code 0 -- that arm reads its
+    # redirect files with FileShare.ReadWrite on purpose (#1252), so a grandchild still holding the handle
+    # past a clean exit yields whatever was flushed -- and the composition used to let that fall through as
+    # "no tip to report". The result was the bare count, which is the exact sentence #1439 was filed for
+    # being insufficient, produced in silence and on the loaded machine where two sessions are most likely
+    # to be racing. Observed under the test gate: the count survived and the tip did not, because the two
+    # captures take different code paths.
+    #
+    # THE CAPTURE IS STUBBED AND THE REPOSITORY IS REAL, which is a deliberate exception to this suite's
+    # own "a real git per case" rule rather than a lapse from it. What has to be produced here is a
+    # DEFECTIVE READ OF git's output, not an answer from git -- real git cannot be made to return an empty
+    # `--format=%h ...` for a commit that exists, which is precisely why an empty read is unambiguous and
+    # worth reporting. So `rev-list` still runs against the fixture (the count is genuine, and the
+    # asymmetry is the one that was observed) and only the `log` capture is replaced.
+    Write-Host "`n== 6b. an unreadable tip is reported as unread, never as the bare count ==" -ForegroundColor Cyan
+    $p6b = New-RemoteFixturePair
+    Push-FixtureCommit -Pair $p6b -Message 'park: work (all outstanding work)' -AuthorName 'Other Session'
+    Invoke-FixtureGit -Dir $p6b.Clone 'fetch' '-q' 'origin'
+    $callArgs6b = @{
+        RepoRoot = $p6b.Clone; LocalRef = 'HEAD'; RemoteRef = "refs/remotes/origin/$($p6b.Branch)"
+        BranchLabel = $p6b.Branch; FreshLabel = "origin/$($p6b.Branch)"; StaleLabel = 'stale'; Fresh = $true
+    }
+    $note6bReal = Get-RemoteAheadNote @callArgs6b
+    Assert-True ($note6bReal -match [regex]::Escape('whose tip is: ')) 'premise: with the real capture this fixture DOES yield a tip -- so the stub below is what changes the answer'
+
+    # SHADOWED AFTER THE DOT-SOURCE, the pattern native-capture-lib.ps1 documents for itself: a plain
+    # function can be redefined in the scope that dot-sourced it, and Get-RemoteAheadNote resolves the
+    # name at call time. Restored by re-dot-sourcing the lib below, so nothing after this case is stubbed.
+    $script:realNativeCapture = (Get-Command Invoke-NativeCapture -CommandType Function).ScriptBlock
+    $script:stubTipOutput = @()
+    $script:stubTipExit   = 0
+    function Invoke-NativeCapture {
+        param(
+            [Parameter(Mandatory = $true)][string]$FilePath,
+            [string[]]$Arguments = @(),
+            [switch]$DiscardStderr,
+            [switch]$Utf8,
+            [int]$TimeoutSeconds = 0
+        )
+        if ($Arguments -contains 'log') {
+            return [pscustomobject]@{ Output = $script:stubTipOutput; ExitCode = $script:stubTipExit; TimedOut = $false }
+        }
+        return & $script:realNativeCapture -FilePath $FilePath -Arguments $Arguments `
+                                           -DiscardStderr:$DiscardStderr -Utf8:$Utf8 -TimeoutSeconds $TimeoutSeconds
+    }
+    try {
+        # The observed shape: exit 0, nothing read.
+        $script:stubTipOutput = @()
+        $script:stubTipExit   = 0
+        $note6bShort = Get-RemoteAheadNote @callArgs6b
+        Assert-True ($note6bShort -match 'is 1 commit\(s\) behind') 'the warning still fires -- an unreadable tip is not a refusal to report'
+        Assert-True ($note6bShort -match [regex]::Escape('could NOT be read')) 'and the sentence SAYS the tip could not be read'
+        Assert-True ($note6bShort -match [regex]::Escape('capture came back empty')) 'naming the reason it could not: exit 0 with nothing in the capture'
+        Assert-True ($note6bShort -match [regex]::Escape('not absent from the branch')) 'and telling the reader the author and subject are missing from the WARNING, not from the branch'
+        Assert-True ($note6bShort -notmatch [regex]::Escape('whose tip is: ')) 'it does not claim a tip it never read'
+        # THE REGRESSION, ASSERTED AS THE SHAPE RATHER THAN THE WORDING: the bare count is what #1439 says
+        # is insufficient, so the one thing this must never be is a sentence that ends at the ref name.
+        Assert-True (-not $note6bShort.EndsWith("stale.")) 'and it is NOT the bare count sentence the silent drop used to produce'
+        Assert-True ($note6bShort.EndsWith('.')) 'the sentence is still terminated'
+
+        # A truncated read is the same class and gets the same treatment -- only whitespace flushed.
+        $script:stubTipOutput = @('   ')
+        $script:stubTipExit   = 0
+        $note6bBlank = Get-RemoteAheadNote @callArgs6b
+        Assert-True ($note6bBlank -match [regex]::Escape('capture came back empty')) 'a capture holding only whitespace is the same failure, not a tip'
+
+        # A non-zero git is a DIFFERENT reason and says so, because the reader's next move differs.
+        $script:stubTipOutput = @()
+        $script:stubTipExit   = 128
+        $note6bFail = Get-RemoteAheadNote @callArgs6b
+        Assert-True ($note6bFail -match [regex]::Escape('git log exited 128')) 'a non-zero git log is reported with its exit code, distinct from a short read'
+        Assert-True ($note6bFail -match 'is 1 commit\(s\) behind') 'and the count -- which came from the other capture -- still stands'
+
+        # AND A TIP MADE ENTIRELY OF FORMAT CHARACTERS strips to nothing. Unreachable while %h holds, and
+        # asserted so the composition can never print 'whose tip is: ' with nothing after it.
+        $script:stubTipOutput = @([string]([char]0x200D + [char]0x202E))
+        $script:stubTipExit   = 0
+        $note6bStripped = Get-RemoteAheadNote @callArgs6b
+        Assert-True ($note6bStripped -match [regex]::Escape('no printable characters')) 'a tip that strips to nothing is named as such, not printed as an empty tip'
+        Assert-True ($note6bStripped -notmatch [regex]::Escape('whose tip is: ')) 'and never reaches the tip arm with an empty value'
+    } finally {
+        . (Join-Path $RepoRoot 'scripts\lib\native-capture-lib.ps1')
+    }
+    $note6bRestored = Get-RemoteAheadNote @callArgs6b
+    Assert-True ($note6bRestored -match 'Other Session') 'the real capture is restored -- the stub did not leak into the cases below'
+
     # --- 7. a rev-list that cannot answer reports nothing, never throws ------------------------
     Write-Host "`n== 7. an unanswerable comparison is silence, not a throw ==" -ForegroundColor Cyan
     $p7 = New-RemoteFixturePair

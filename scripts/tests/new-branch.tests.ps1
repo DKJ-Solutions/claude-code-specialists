@@ -40,6 +40,9 @@ $NativeCaptureSrc = Join-Path $RepoRoot 'scripts\lib\native-capture-lib.ps1'
 # the stage/commit/push that used to be written out here AND in park-branch.ps1, in two copies that had
 # drifted into writing the same commit message for different scopes.
 $ParkLibSrc       = Join-Path $RepoRoot 'scripts\lib\park-lib.ps1'
+# park-lib dot-sources this one (#1682), guarded -- so a fixture that omits it loses Get-GitParkBacking
+# silently rather than crashing. park-cycle.tests.ps1 is where that cost ten asserts.
+$PorcelainSrc     = Join-Path $RepoRoot 'scripts\lib\git-porcelain-lib.ps1'
 # new-branch.ps1 dot-sources this for the entry format -- the single source it shares with open-pr.ps1's
 # scaffold gate. Without it in the fixture, every entry-writing case here dies on a raw path-not-found
 # instead of testing anything.
@@ -217,6 +220,7 @@ function New-Fixture {
     Copy-Item -LiteralPath $BranchInfoSrc    -Destination (Join-Path $dir 'scripts\lib\branch-info.ps1')             -Force
     Copy-Item -LiteralPath $NativeCaptureSrc -Destination (Join-Path $dir 'scripts\lib\native-capture-lib.ps1')      -Force
     Copy-Item -LiteralPath $ParkLibSrc       -Destination (Join-Path $dir 'scripts\lib\park-lib.ps1')               -Force
+    Copy-Item -LiteralPath $PorcelainSrc     -Destination (Join-Path $dir 'scripts\lib\git-porcelain-lib.ps1')      -Force
     Copy-Item -LiteralPath $EntryScaffoldSrc -Destination (Join-Path $dir 'scripts\lib\entry-scaffold-lib.ps1')      -Force
     Copy-Item -LiteralPath $SeamLibSrc       -Destination (Join-Path $dir 'scripts\lib\seam-lib.ps1')                -Force
     Copy-Item -LiteralPath $PrIssuesLibSrc   -Destination (Join-Path $dir 'scripts\lib\pr-issues-lib.ps1')           -Force
@@ -865,11 +869,17 @@ try {
     # refuses. So the placement is measured against the same boundary the gate reads, derived from the
     # wording rather than from a literal '###', because a consumer may translate or re-level either.
     # BY LINE, NOT BY IndexOf, AND THE FIRST DRAFT OF THIS ASSERT GOT IT WRONG IN THE WAY THIS REPO KEEPS
-    # PAYING FOR: a MENTION read as a USE. The guidance block a few lines up quotes the heading it is
+    # PAYING FOR: a MENTION read as a USE. The guidance block a few lines up quoted the heading it is
     # talking about -- "NOTHING BRANCH-SPECIFIC ABOVE `### PLAN`" -- so a substring search for '### PLAN'
-    # lands inside the preamble, which is the exact region this assert exists to prove the note is NOT in.
+    # landed inside the preamble, which is the exact region this assert exists to prove the note is NOT in.
     # It failed loudly, but only because of the third assert; the second one had passed for the wrong
     # reason. A whole-line match cannot confuse the two: a quoted heading is never a line of its own.
+    #
+    # #1654 REMOVED THAT PARTICULAR MENTION -- the guidance names the first phase by position now -- and the
+    # whole-line match STAYS, because it is not what the collision bought. The guidance still quotes other
+    # markers, a consumer may write their own wording into this seam, and the class of defect is a mention
+    # read as a use rather than that one sentence. Narrowing an assert back to a substring on the strength
+    # of one removed string is how a regression written down once gets paid for twice.
     $planHeadingH = ('#' * (Get-BranchCycleSectionLevel)) + ' ' + @((Get-BranchFileWording).StepPhases)[0]
     $cycleLinesH  = [regex]::Split($progressTextH, '\r?\n')
     $planLineH    = [array]::IndexOf($cycleLinesH, $planHeadingH)

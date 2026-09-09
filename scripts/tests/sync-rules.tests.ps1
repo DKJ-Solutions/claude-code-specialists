@@ -44,6 +44,16 @@ $ErrorActionPreference = 'Stop'
 
 $RepoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
 . (Join-Path $RepoRoot 'scripts\lib\sync-rules.ps1')
+# Convert-GitQuotedPath MOVED TO git-porcelain-lib.ps1 (issue #1689) and its asserts stayed here, so this
+# suite loads that lib too. They stayed because the comment above them explains why they are UNIT asserts
+# IN THIS SUITE: the property they pin is one sync-main.tests.ps1 cannot pin without mutating the shared
+# console state, and moving them would separate that reasoning from the sibling suite that produced the
+# flakiness. git-porcelain-lib.tests.ps1 owns the decoder's other half -- that ConvertTo-GitPorcelainPath
+# now returns the decoded path -- rather than a second copy of these ten.
+#
+# A SUITE MAY DOT-SOURCE WHAT sync-rules.ps1 ITSELF MUST NOT. That file is dependency-free because the
+# live-theme guard loads it on every command; a test script is not in that path.
+. (Join-Path $RepoRoot 'scripts\lib\git-porcelain-lib.ps1')
 # JUDGING THIS SUITE'S OWN FIXTURE git CALLS -- issue #1635. See the lib for why an unjudged fixture
 # command is worse than an unjudged production one, and why the count decides the exit code.
 . (Join-Path $PSScriptRoot '..\lib\fixture-git-lib.ps1')
