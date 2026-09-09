@@ -399,6 +399,40 @@ function Get-SharedScriptPairs {
             LibOnly = $true
         },
         @{
+            # THE FALSE-POSITIVE MACHINERY A PreToolUse COMMAND GUARD NEEDS (issue #1669), dot-sourced
+            # by hooks/guard-working-copy.ps1. It exists as a lib rather than inside that hook because
+            # this repo already ships a second command guard -- dkj-subagents-shopify's guard-live-theme.ps1 --
+            # whose header records what learning these exemptions the hard way cost it, and #1669's
+            # point is that the second guard must not pay that price again.
+            #
+            # NO SECOND MIRROR YET, and the absence is deliberate rather than an oversight. The route
+            # for guard-live-theme to dot-source this instead of carrying its own copy is exactly the
+            # second entry check-report-lib-workflow demonstrates. It is not taken in the branch that
+            # introduces the lib: that guard protects a live customer-facing theme, so its refactor is
+            # its own change with its own review -- #1734.
+            #
+            # NO CONTRACT ROW FOLLOWS: nothing in it is repo-owned. It reads a payload it is handed and
+            # takes its exempt-command set from its caller, so there is no seam a consumer answers.
+            Name    = 'command-guard-lib'
+            Source  = 'scripts\lib\command-guard-lib.ps1'
+            Plugin  = 'dkj-policy'
+            LibOnly = $true
+        },
+        @{
+            # THE JUDGEMENT BEHIND hooks/guard-working-copy.ps1 (issue #1669), split off from the hook
+            # for the reason fanout-lib.ps1 states for its own split: it can then be tested -- and
+            # MEASURED over a corpus of thousands of real commands -- without a payload and a process
+            # per case. #1669 asks for a measured false-positive rate, and the measuring script has to
+            # run the SAME decision the hook makes rather than a second copy of it.
+            #
+            # It dot-sources command-guard-lib.ps1 as a $PSScriptRoot-relative sibling, which the entry
+            # above mirrors into the same directory.
+            Name    = 'working-copy-guard-lib'
+            Source  = 'scripts\lib\working-copy-guard-lib.ps1'
+            Plugin  = 'dkj-policy'
+            LibOnly = $true
+        },
+        @{
             # THE SECOND MIRROR OF THE SAME SOURCE, on check-report-lib-workflow's precedent five entries
             # up -- read its two banners for why a second entry rather than a list of mirrors, and why the
             # name carries the plugin. Nothing here needs restating.

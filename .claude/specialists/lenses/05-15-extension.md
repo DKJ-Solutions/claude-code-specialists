@@ -15,6 +15,32 @@ infrastructure.
 
 ### What Sylvester owns here
 
+- **`plugins/dkj-policy/hooks/guard-working-copy.ps1`** — the second `PreToolUse` guard in this
+  marketplace, and the one that answers
+  [#1669](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1669): a dispatched subagent
+  may not run the git commands that discard the checkout it was dispatched into. Its judgement is
+  `scripts/lib/working-copy-guard-lib.ps1` and its false-positive machinery
+  `scripts/lib/command-guard-lib.ps1`, both mirrored into the plugin.
+
+  **Three things about it are worth knowing before touching it, and each was measured rather than
+  argued.** First, **the gate is `agent_id`, never `agent_type`** — Claude Code's shipped hook-input
+  schema documents the second as present on the main thread of an `--agent` session, so keying on it
+  would refuse the orchestrator in exactly that configuration. Second, **the cost is per tool call and
+  not per session**, which makes it a different animal from the seven SessionStart checks below: 8089
+  of the 9084 `Bash`/`PowerShell` calls in this project's transcripts are the main thread's, and they
+  pay the hook while never being judged by it. That is why the `agent_id` question is asked as a
+  string test on the raw payload *before* any lib is dot-sourced — 675 ms to 437 ms on that 89%, of
+  which ~397 ms is the bare `powershell` launch a command hook cannot avoid. Third, **the
+  false-positive rate is 0 of those 995 subagent calls**, and the one refusal that had to be
+  answered was a test engineer working in its own fixture repo under `/tmp` — which is why the
+  judgement takes a project root at all, and why `.claude/worktrees/agent-<id>` is carved out of it:
+  an agent granted worktree isolation owns that tree, and the harness puts it *inside* the repo.
+
+  **The corpus is reproducible and is not in the tree.** Dispatched-subagent turns are not in the
+  session transcript: they live in `~/.claude/projects/<project>/<session>/subagents/agent-<id>.jsonl`
+  and carry `isSidechain: true` plus `agentId`, which is the same distinction the guard gates on. A
+  measurement that walks only `*.jsonl` at the top of the project directory reads **zero** subagent
+  calls and looks complete while answering the wrong question.
 - **`scripts/lint/check-plugin-integrity.ps1`** — the PR lint gate: validates `marketplace.json` +
   every `plugin.json` and the agent-def/manual frontmatter (`name`/`id`/`group` + filename match),
   scans for dead links (in `README.md`, `CHANGELOG.md`, the manuals, `SKILL.md`s, and `releases/**`),
