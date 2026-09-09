@@ -43,7 +43,38 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**30 / 67 minor entries** <!-- pending-tally -->
+**30 / 68 minor entries** <!-- pending-tally -->
+
+### DEPLOY: docs/file-before-you-cite-the-number · 20260909-114616
+
+The filing rules now say that an issue's number does not exist until the issue does: file first, read
+the number back, then write it into the header, the step list or the commit message. Issues and pull
+requests share one counter, so a predicted number is taken by whichever of the two lands first —
+measured twice in one session, in two branches, both times as a citation that had to be corrected after
+it was already written.
+
+It goes in the shared `findings-become-issues` block rather than in a lens, so it reaches every
+consuming repo through the same release as the rules it sits beside. Thirty-one files carry it; one of
+them is on the always-on path, and the bullet was trimmed 25% on a cost measurement before it landed.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+N/A — a consumer receives one more bullet in a boundaries block they already carry, worth ~110 tokens
+on the one always-on body. It changes no behaviour they can observe and no command they run.
+
+**Score:** N/A
+
+#### Pull Request
+
+A finding's issue number does not exist until the issue does
+
+Plugins: dkj-team-alpha, dkj-team-ecomm, dkj-team-lifehub, dkj-team-shopify
+
+[PR #1706](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1706)
+
+---
 
 ### DEPLOY: fix/1664-fixture-temp-path-guid · 20260909-112851
 
