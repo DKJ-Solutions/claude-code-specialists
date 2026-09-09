@@ -43,7 +43,37 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**31 / 71 minor entries** <!-- pending-tally -->
+**32 / 72 minor entries** <!-- pending-tally -->
+
+### DEPLOY: docs/1697-vocabulary-glossary · 20260909-130337
+
+The README now states where these plugins sit inside an agent -- Claude Code is the harness, every plugin
+here is scaffold, `dkj-team-*` is the half that says who acts and `dkj-policy` the half that says what
+follows -- with each term quoted from the source that defines it. It also records why none of that renamed
+a plugin: `dkj-agent` is the one name the source rules out, `scaffold` is a constant across every plugin
+here and already means two narrower things in this tree, and `dkj-scaffold-core` could not have reached
+its own content across a `${CLAUDE_PLUGIN_ROOT}` boundary. Each plugin's `displayName` carries the same
+vocabulary to the place a person actually chooses from.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+A consumer sees the six plugins under new labels in their own plugin listing -- `(subagent scaffold)` and
+`(policy scaffold)` -- and can now place them against the vocabulary they already use for agents.
+Nothing to migrate: no plugin id changed, so no install, no `enabledPlugins` key and no `@`-import moved.
+
+**Score:** 2
+
+#### Pull Request
+
+A glossary for the agent anatomy, and the plugin labels that carry it
+
+Plugins: dkj-policy, dkj-policy-bwj, dkj-team-alpha, dkj-team-ecomm, dkj-team-lifehub, dkj-team-shopify
+
+[PR #1708](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1708)
+
+---
 
 ### DEPLOY: docs/1705-findings-block-granularity · 20260909-123952
 
