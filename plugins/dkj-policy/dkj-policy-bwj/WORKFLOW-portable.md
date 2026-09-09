@@ -274,6 +274,18 @@ one, so a ticket rescored from 2.5 to 4.2 loses `low` as it gains `very high` ra
 priorities at once. Where the issue already reads correctly nothing is written, so a daily re-run is
 quiet.
 
+**The source repo's own tracker uses a different set on purpose, and `gh` refusing one of these labels
+there is the expected answer rather than a broken setup.**
+`DKJ-Solutions/claude-code-specialists` ranks its issues `prio-1` (lowest) to `prio-4` (highest) -- a
+judgement typed by whoever files, because there is no Asana behind it to derive one from. The two sets
+are deliberately disjoint, measured in both directions: neither tracker carries the other's names, so a
+session moving between the two families gets a refused label rather than an issue filed at a rung that
+means something else. **Nothing here needs doing about it** -- this page's four buckets are the whole
+answer for a BWJ repo, and the rule that every issue carries a rung is deliberately NOT part of this
+workflow. Decided September 9, 2026 in
+[#1686](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1686), where the reasoning for
+both halves is written out.
+
 **No score means no label, and that is the common case.** A task whose `Prio-Score` is empty, or whose
 score falls outside 1.00-5.00, is left without a prio label rather than given a guessed one -- measured
 on the board the day this shipped, 28 of its 96 open tasks carried no score at all.
