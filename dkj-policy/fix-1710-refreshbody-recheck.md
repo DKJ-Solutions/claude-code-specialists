@@ -79,13 +79,22 @@ the body changes. One line.
 `edited` also fires on a title change and a base change. A person editing the description therefore
 pays one ~20 s job. That is the whole price. It does not fire on a comment, a label, or a review.
 
-#### One thing I could not test from here
+#### Verified live on this branch's own PR, not just asserted
 
-**The trigger only proves itself on a real PR body edit**, and this branch's own PR is the first one
-that will exercise it -- if this entry's DEPLOY section ever needs republishing, the check should go
-green again by itself rather than staying red the way #1707's did. The assert below pins the workflow's
-text, which is what a suite can hold; whether GitHub then behaves as documented is something only a
-live edit shows.
+The suite can only pin the workflow's **text**. Whether GitHub honours a `types:` list from the PR's
+own head ref -- rather than from the base branch, where this change does not exist yet -- is a
+different question, and it is the one the fix actually depends on. Measured on PR #1712:
+
+| time | event |
+|---|---|
+| `12:32:58` | `branch-entry` ran on `opened` -- the baseline, one run on this branch |
+| `12:34:00` | edited the PR **title**, which fires `pull_request: edited` and touches no body |
+| `12:34:06` | **a second `branch-entry` run appeared**, six seconds later |
+
+So the trigger takes effect from the PR that introduces it, and the fix works end to end. The title was
+edited rather than the body on purpose: a body edit would have risked drifting the DEPLOY section from
+what the PR published, which is the very finding this branch repairs -- and the title fires the same
+event. It was restored immediately afterwards.
 
 ### CREATE
 
@@ -103,6 +112,8 @@ live edit shows.
 - [x] The nesting asserted in the suite as GitHub reads it (`on`/`pull_request`/`types`/`branches` at
       columns 0/2/4/4) -- the one way this change fails silently, since every other assert passes on a
       `types:` at the wrong depth and GitHub then reads the workflow as having no list at all
+- [x] Verified live on PR #1712 rather than only asserted: a title edit at 12:34:00 produced a second
+      `branch-entry` run at 12:34:06, so GitHub honours the new `types:` list from the PR's own head ref
 - [x] The lint gate (`check-plugin-integrity.ps1`) -- 0 errors
 
 ### DEPLOY: fix/1710-refreshbody-recheck
