@@ -72,7 +72,7 @@
     here because the dependency would run the wrong way: a porcelain parse would then dot-source the
     Shopify sync rules. Unifying the two -- moving that decoder in here, where the quoting concern
     belongs, and having sync-rules dot-source it -- is issue #1689, and it is a different subject from
-    this extraction: it touches sync-main's five call sites and three suites, and it changes what a live
+    this extraction: it touches sync-main's three call sites and three suites, and it changes what a live
     Shopify theme sync compares paths against. Neither caller here needs the decoded form: park-lib
     counts, and fanout-lib compares two readings that escape identically. The escape is preserved rather
     than mangled precisely so that unification stays possible; mangling destroyed the information.

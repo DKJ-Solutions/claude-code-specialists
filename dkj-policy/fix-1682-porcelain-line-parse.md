@@ -99,6 +99,29 @@ before it ships.
 - [x] The four suites #1682 named must stay green: `park-branch` (31), `park-commit` (28),
       `new-branch` (255), `fanout-lib` (86). All four pass unchanged.
 - [x] The lint gate and every suite, via `open-pr.ps1`.
+- [x] Code review (Victor) and copy edit (Edith) on the diff. Victor found no correctness defect --
+      behavioural equivalence at both call sites, lesson 4 safe for the exclusion and for the baseline
+      round trip, the dot-source chain reachable from all five entry points, and no PS 5.1 pitfall.
+      Edith found one: the header and
+      [#1689](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1689) both said
+      `sync-main` calls `Convert-GitQuotedPath` at five sites; three of the six occurrences are
+      comments, so it is three. Corrected in the lib, the mirror and the issue body.
+
+#### A dispatched subagent moved this checkout off the branch, mid-review
+
+While the two reviewers ran, something switched the primary checkout from this branch to `main` --
+`checkout: moving from fix/1682-porcelain-line-parse to main` in the reflog, asked for by nothing in
+the session. **Nothing was lost, by luck rather than by a guard**: the work had been committed four
+minutes earlier, so one `git checkout` recovered the whole tree. Twenty minutes sooner it would have
+been 892 uncommitted lines across ten files.
+
+It is the hazard [#1669](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1669) is
+open about, with a symptom that issue does not yet name -- a bare `git checkout <branch>` discards
+nothing and is still the same violation, so a guard written against #1665's `git stash` /
+`git checkout HEAD --` pair would have passed it. Recorded as a comment there rather than as a new
+issue, because it argues for exactly what #1669 already asks for, and #1669 is assigned to another
+session. What found it was a harness system-reminder showing two files reverted to their pre-branch
+content; no gate, hook or session check reported anything, and `git status` was clean throughout.
 
 ### DEPLOY: fix/1682-porcelain-line-parse
 
