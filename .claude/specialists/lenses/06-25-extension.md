@@ -1125,8 +1125,22 @@ With 4 lanes that means queue positions 1-4. Taken by stride over the 65-suite p
 `check-plugin-integrity-*` files sit at positions 3, 3, 3 and 4 of their shards -- so **#1358's figures for
 them are exact, exactly as it claimed**. But `entry-scaffold` is 5th of 16 in its shard and `new-branch` 9th
 of 16, so both reconstructions include lane wait. Standalone here `entry-scaffold` is **17.0s**, against the
-51-59s of the suites whose CI numbers are sound; at their measured 3.6-4.0x local-to-CI ratio it predicts
-~65s, not the 189s reported. `new-branch` at 52.8s predicts ~190-210s and is plausibly a real member.
+51-59s of the suites whose CI numbers are sound; at the 3.6-4.0x local-to-CI ratio this lens then believed
+in it predicts ~65s, not the 189s reported. `new-branch` at 52.8s predicts ~190-210s and is plausibly a real
+member.
+
+**THAT RATIO TURNED OUT NOT TO EXIST, AND THIS PARAGRAPH IS WHERE IT WAS USED HARDEST**
+([#1713](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1713), September 9, 2026). The
+"3.6-4.0x faster on a developer machine" figure was stated as a fact in a shipped lib, its recorder and the
+hints file that recorder writes — and measured the other way round: one suite ran 759.1s **solo** on an
+18-thread workstation against a 290.9s mean over three 4-lane CI runs, i.e. 2.6x *slower*, while a third
+configuration (the whole pool, 32 threads, 30 lanes, ~255s wall) agrees with neither. So there is no divisor,
+and the two predictions above are arithmetic on a constant that is not one. **The conclusion they were used
+to reach still stands, and not on their strength**: the section below records that the *recorded* CI numbers
+put about a dozen suites in that band, which is what actually settled `entry-scaffold`'s membership. The
+prediction is left in place rather than deleted because it is the worked example of the trap — a
+reconstruction is only as good as its `t0` assumption, and a conversion is only as good as a ratio that
+holds.
 
 **So the plateau is four files, not five, and `entry-scaffold` should not be split.** This is
 [Chris's fifth intake pattern](01-01-extension.md#the-dave-rules) again -- the finding is real and its
@@ -1273,6 +1287,10 @@ own gate) and 1,021s, so ~10% is noise and nothing under that is a finding.
   either. Filed as [#1713](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1713) rather than
   swept: it sits in the source lib plus its two plugin mirrors under the shared-scripts drift lint, it is
   plugin payload, and replacing one wrong constant with another off n=1 is the error it is describing.
+  **Repaired in [#1722](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1722)** (September 9,
+  2026), and deliberately without a replacement number: all three copies now say there is no ratio to divide
+  out and that the sign is not fixed either. The paragraph higher up this lens keeps its two predictions as
+  the worked example of the trap.
 - **A resident-interpreter count taken mid-drain is not an orphan count.** Reading 1 opened with
   `40 powershell processes already resident` and 36 were still up seconds after it returned, which reads
   exactly like [#1464](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1464)'s leak and is

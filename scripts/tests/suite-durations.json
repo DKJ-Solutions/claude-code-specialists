@@ -5,9 +5,11 @@
                  "the largest recorded value, so a new suite starts early and can never be the one left last.",
                  "Every suite in the directory runs exactly once whether or not it appears below; delete this",
                  "file and the gate falls back to the stride, unchanged.",
-                 "MEASURED ON CI, NOT ON A WORKSTATION. These suites run 3.6-4.0x faster on a developer machine",
-                 "and the ratio is NOT uniform (entry-scaffold is ~11x), so a local reading would pack worse",
-                 "than no reading at all. Refresh with scripts/maintenance/record-suite-durations.ps1."
+                 "MEASURED ON CI, NOT ON A WORKSTATION, and a local reading does NOT convert into a CI one: there",
+                 "is no ratio to divide out and the sign is not even fixed. One suite ran 2.6x SLOWER solo on an",
+                 "18-thread workstation than on a 4-lane runner, where this note claimed 3.6-4.0x faster until",
+                 "issue #1713. So a local reading would pack worse than no reading at all. Refresh with",
+                 "scripts/maintenance/record-suite-durations.ps1."
              ],
     "recordedFrom":  {
                          "runs":  [
