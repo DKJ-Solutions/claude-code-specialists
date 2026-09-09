@@ -24,6 +24,10 @@
 $ErrorActionPreference = 'Stop'
 
 $RepoRoot  = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
+
+# JUDGING THIS SUITE'S OWN FIXTURE git CALLS -- issue #1635. See the lib for why an unjudged fixture
+# command is worse than an unjudged production one, and why the count decides the exit code.
+. (Join-Path $PSScriptRoot '..\lib\fixture-git-lib.ps1')
 $ScriptSrc = Join-Path $RepoRoot 'scripts\sync\find-specialist-mentions.ps1'
 # The script dot-sources this sibling lib unconditionally for Get-DisplayName, so the fixture must
 # carry it too -- the same arrangement park-branch.tests.ps1 makes for native-capture-lib.
@@ -155,13 +159,13 @@ function New-Fixture {
 
     Push-Location $dir
     try {
-        git init --quiet 2>$null | Out-Null
-        git config user.email 'fixture@example.com' 2>$null | Out-Null
-        git config user.name  'Fixture' 2>$null | Out-Null
+        Invoke-FixtureGitJudged @('init', '--quiet')
+        Invoke-FixtureGitJudged @('config', 'user.email', 'fixture@example.com')
+        Invoke-FixtureGitJudged @('config', 'user.name', 'Fixture')
         # gpgsign off: a locked signing agent must not fail a fixture commit for a reason unrelated to the test (#1287).
-        git config commit.gpgsign false 2>$null | Out-Null
-        git add -A 2>$null | Out-Null
-        git commit --quiet -m 'fixture' 2>$null | Out-Null
+        Invoke-FixtureGitJudged @('config', 'commit.gpgsign', 'false')
+        Invoke-FixtureGitJudged @('add', '-A')
+        Invoke-FixtureGitJudged @('commit', '--quiet', '-m', 'fixture')
     } finally {
         Pop-Location
     }
@@ -297,7 +301,14 @@ try {
 }
 
 Write-Host ''
+# ABOVE THE VERDICT AND EVEN ON A GREEN RUN: a clean sweep over a fixture repo that was never built
+# proves less than it appears to, so the count decides the exit code too (issue #1635).
+$fixtureBroken = Write-FixtureGitSummary -Subject 'find-specialist-mentions.ps1'
 Write-Host ("  {0} passed, {1} failed" -f $script:pass, $script:fail)
 Write-Host ''
 if ($script:fail -gt 0) { exit 1 }
+if ($fixtureBroken) {
+    Write-Host "FAILED: every assert passed, but $(Get-FixtureGitFailureCount) fixture git command(s) did not -- this run proves less than it appears to." -ForegroundColor Red
+    exit 1
+}
 exit 0

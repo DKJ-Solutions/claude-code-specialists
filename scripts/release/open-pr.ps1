@@ -711,10 +711,21 @@ Both are honest answers; the gate only refuses to guess.
         $otherPrsJson = ''
         $prSearchTerms = (($targetIssues | ForEach-Object { "$_" }) -join ' OR ') + ' in:body'
         $prSearch = Invoke-NativeCapture -Utf8 -FilePath 'gh' -Arguments @('pr', 'list', '--repo', $repo, '--state', 'all', '--search', $prSearchTerms, '--json', 'number,state,headRefName,body', '--limit', '60') -DiscardStderr
-        if ($prSearch.ExitCode -eq 0) {
+        # A SHORT READ IS NOT AN EMPTY RESULT SET (issue #1679). The -Utf8 arm can return an empty or
+        # truncated Output with ExitCode 0, and an empty $otherPrsJson reads downstream as "no rival PR"
+        # -- so the already-done warning #1409 exists to raise would silently not fire, on exactly the
+        # loaded machine where the search matters. Nothing else here could tell the two apart: gh prints
+        # '[]' when it finds nothing, so at THIS call an empty capture has no legitimate reading at all.
+        $searchUnread = ''
+        if ($prSearch.ExitCode -ne 0) {
+            $searchUnread = "exit $($prSearch.ExitCode)"
+        } elseif ($prSearch.ShortRead) {
+            $searchUnread = 'gh exited 0 but its capture was still being written when it was read, so the result may be truncated'
+        }
+        if (-not $searchUnread) {
             $otherPrsJson = ($prSearch.Output -join "`n")
         } else {
-            Write-Warning ("could not ask gh whether another PR already resolves " + (($targetIssues | ForEach-Object { "#$_" }) -join ', ') + " (exit $($prSearch.ExitCode)) -- the already-done check is skipped.")
+            Write-Warning ("could not ask gh whether another PR already resolves " + (($targetIssues | ForEach-Object { "#$_" }) -join ', ') + " ($searchUnread) -- the already-done check is skipped.")
         }
 
         foreach ($w in @(Get-TargetIssueWarnings -TargetIssues $targetIssues -OpenIssues $openAll -OtherPrsJson $otherPrsJson -CurrentBranch $branch)) {
@@ -787,6 +798,17 @@ keep it in the gitignored sibling of the file it belongs to, where one exists
 # no gh and no subprocess, and refusing it is a content decision rather than a tooling one. -Force is
 # the escape valve, for the rare entry that legitimately quotes the wording outside a fence.
 if (Test-Path -LiteralPath $entryPath) {
+    # ONE READ FOR THE THREE GATES BELOW, for the reason the step-list gate further down gives for its own
+    # single read: the entry gate asks whether there is an entry, the scaffold gate whether it has been
+    # written and the shape gate whether the document around it still holds its form -- three questions
+    # about one document, and reading it three times would let them answer over three different versions of
+    # it if anything wrote in between.
+    $entryFileText = [System.IO.File]::ReadAllText($entryPath, [System.Text.Encoding]::UTF8)
+    # AND ONE NAME FOR THE FILE, for the same reason. Repo-relative, not the bare leaf: the document sits
+    # under dkj-policy/, so a leaf-only name in a refusal makes the reader hunt for the file it means. The
+    # three gates below each computed this themselves, under two different variable names.
+    $entryRel = $entryPath.Substring($repoRoot.Length).TrimStart('\', '/')
+
     # AND "IS THERE AN ENTRY AT ALL" COMES FIRST (issue #1632), because the gate below cannot ask it. A
     # document whose DEPLOY SECTION HAS BEEN DELETED reaches Get-EntryScaffoldFindings as the guidance
     # PREAMBLE -- Get-DevelopmentEntryText's fallback, load-bearing for a legacy entry file and wrong here
@@ -801,13 +823,12 @@ if (Test-Path -LiteralPath $entryPath) {
     # -Force HONOURED, MATCHING ITS SIBLING BELOW rather than being absolute. There is no document this
     # house wants pushed in this state, but the predicate reads a shape, and a consumer holding one nobody
     # here has seen must have a way through a gate that is wrong about them. Loud, named, and escapable.
-    if (Test-DevelopmentEntryMissing -Text ([System.IO.File]::ReadAllText($entryPath, [System.Text.Encoding]::UTF8))) {
-        $missingRel = $entryPath.Substring($repoRoot.Length).TrimStart('\', '/')
+    if (Test-DevelopmentEntryMissing -Text $entryFileText) {
         if ($Force) {
-            Write-Warning "entry gate: $missingRel has no DEPLOY section at all, but -Force was given -- the fold will paste its guidance into the changelog."
+            Write-Warning "entry gate: $entryRel has no DEPLOY section at all, but -Force was given -- the fold will paste its guidance into the changelog."
         } else {
             Write-Error @"
-entry gate: $missingRel has no entry at all - its DEPLOY section is gone. Nothing pushed, no PR opened.
+entry gate: $entryRel has no entry at all - its DEPLOY section is gone. Nothing pushed, no PR opened.
 
 The document carries a plan - its guidance block, its phases, or both - but no DEPLOY heading, so there is
 nothing for the fold to move into the changelog. Left as it is, the fold would paste the GUIDANCE into it as
@@ -829,12 +850,9 @@ does. Shipping it as it stands is -Force.
 
     # The DEPLOY section only, for the reason stated at the first read of this file above: the plan sitting
     # over it would be accused of being an unfinished entry.
-    $entryText = Get-DevelopmentEntryText -Text ([System.IO.File]::ReadAllText($entryPath, [System.Text.Encoding]::UTF8))
+    $entryText = Get-DevelopmentEntryText -Text $entryFileText
     $scaffoldFindings = @(Get-EntryScaffoldFindings -EntryText $entryText -Wording (Get-EntryScaffoldWording))
     if ($scaffoldFindings.Count -gt 0) {
-        # Repo-relative, not the bare leaf: the document sits under dkj-policy/, so a
-        # leaf-only name in the refusal makes the reader hunt for the file it means.
-        $entryRel = $entryPath.Substring($repoRoot.Length).TrimStart('\', '/')
         $detail = ($scaffoldFindings | ForEach-Object { "  - $($_.Label): '$($_.Marker)'" }) -join "`n"
         if ($Force) {
             Write-Warning "scaffold gate: $entryRel is not finished, but -Force was given:`n$detail"
@@ -858,6 +876,53 @@ And it is about to become permanent - the fold pastes this entry into CHANGELOG.
 copies it into releases/, where nobody will look for it again.
 
 Answer them and run again. Shipping it as it stands is -Force.
+"@
+            exit 1
+        }
+    }
+
+    # Shape gate (issue #1650): the document AROUND the entry -- its phase arc and the generic block above
+    # the first phase -- and it is here because it was nowhere. Both rules were inline in
+    # check-branch-entry.ps1, which runs in CI and only ADVISORILY, so the four local gates all passed a
+    # document that had lost its first phase heading and most of its guidance: PR #1644 shipped through
+    # push, the required check, the merge and the fold with the shape rule red, and each of the four was
+    # right on its own terms -- the steps above DEPLOY were ticked, DEPLOY matched what the PR published,
+    # and there was committed work behind the plan.
+    #
+    # WHY AN ADVISORY RED WAS NOT ENOUGH, which is the part that made this worth a gate rather than a note.
+    # The fold REMOVES the branch document on success, so after a ship the red check points at a path that
+    # no longer exists and a reader following it finds nothing to look at. The evidence is destroyed by the
+    # thing whose success it was warning about. Here the refusal lands before the push, while the file is
+    # still on disk and the author is still holding it.
+    #
+    # NOTHING ABOUT CI CHANGED, deliberately: it still reports rather than refuses, and 'branch-entry' is
+    # still not a required check. Making it required is a ruleset change and Dave's own act, and it would
+    # put a check that reports significance in front of every merge.
+    #
+    # -Force HONOURED, MATCHING BOTH SIBLINGS ABOVE, and for the reason the entry gate gives: the predicate
+    # reads a shape, and a consumer holding a document nobody here has seen must have a way through a gate
+    # that is wrong about them.
+    $shape = Get-DevelopmentShapeFindings -Text $entryFileText -EnforcePhaseArc:(Test-IsWorkflowSourceRepo -RepoRoot $repoRoot)
+    if ($shape.Findings.Count -gt 0) {
+        # The first finding completes the sentence '<file> ...', exactly as it does in CI -- one composer,
+        # so the two gates cannot come to word the same defect differently.
+        $shapeDetail = (@("  $entryRel $($shape.Findings[0])") +
+                        @($shape.Findings | Select-Object -Skip 1 | ForEach-Object { "  $_" })) -join "`n"
+        if ($Force) {
+            Write-Warning "shape gate: $entryRel has lost its shape, but -Force was given:`n$shapeDetail"
+        } else {
+            Write-Error @"
+shape gate: $entryRel no longer holds the shape of a branch document - nothing pushed, no PR opened.
+
+$shapeDetail
+
+The usual cause is not a deliberate edit to the heading. It is a splice that anchored on the first phase
+heading as a string - which also occurs INSIDE the guidance blockquote, in the line forbidding
+branch-specific content above it - so the cut lands there and takes the heading with it.
+
+The new-branch skill is idempotent: run it on this branch to restore the document, then check that what you
+wrote is still under the phase it belongs to. CI reports this too, but only after the push, and the fold
+deletes the file it names - so this is the moment it can still be read. Shipping it as it stands is -Force.
 "@
             exit 1
         }
@@ -1669,7 +1734,7 @@ if ($existingPr) {
                 (($lostHeadings | ForEach-Object { "  - $_" }) -join "`n") +
                 "`nThe body on GitHub is replaced anyway - check it after this run, and reinstate anything that was answered by hand.")
         }
-        $editFile = Join-Path ([System.IO.Path]::GetTempPath()) "open-pr-body-edit-$PID.md"
+        $editFile = New-ScratchPath -Label 'open-pr-body-edit' -Extension '.md'
         [System.IO.File]::WriteAllText($editFile, $newBody, (New-Object System.Text.UTF8Encoding $false))
         try {
             $edit = Invoke-NativeCapture -FilePath 'gh' -Arguments @('pr', 'edit', "$($existingPr.number)", '--body-file', $editFile, '--repo', $repo)
@@ -1823,7 +1888,7 @@ if ($resolveIssues.Count -gt 0) {
 
 # Body via a temp file: --body $Body would let PowerShell 5.1 mangle embedded quotes on native
 # commands, causing gh to read the body as separate arguments.
-$bodyFile = Join-Path ([System.IO.Path]::GetTempPath()) "open-pr-body-$PID.md"
+$bodyFile = New-ScratchPath -Label 'open-pr-body' -Extension '.md'
 [System.IO.File]::WriteAllText($bodyFile, $Body, (New-Object System.Text.UTF8Encoding $false))
 
 # #101: optional assignee/milestone via repo-config. Not defined, or an empty return value: the

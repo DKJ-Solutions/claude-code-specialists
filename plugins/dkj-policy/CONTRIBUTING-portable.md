@@ -291,6 +291,10 @@ the [`open-pr` skill](skills/open-pr/SKILL.md) is the full account of each:
   or tier reason still empty once the guidance comments are stripped. `-Force` is the escape valve here,
   deliberately separate from `-SkipLint`/`-SkipTests`, because it overrules a judgement about content
   rather than skipping a tool;
+- **the shape gate** — the document *around* the entry: a phase heading gone, or branch content sitting in
+  the generic block above the first phase. It reads the shape rather than the words, so a guidance block you
+  translated passes and your own paragraph there does not; the heading-count half is the source repo's own
+  rule and never fires here. `-Force` for the same reason as above;
 - **the step-list gate** — any step still `- [ ]`, as in step 3 above. No `-Force`. It runs a second time at
   the merge, and there it judges the branch's own commit rather than the checkout, because the merge may be
   minutes of CI away from the moment you started it — the [`ship-pr` skill](skills/ship-pr/SKILL.md) has the
@@ -310,7 +314,7 @@ here is the property they share, which the count never was.
 [#789](https://github.com/DaveKJohn/claude-code-specialists/issues/789)). A branch pushed by hand, or a PR
 opened in the GitHub UI, meets none of them — so the convention was enforced by whoever remembered to use
 the scripts. `check-branch-entry.ps1` ships for exactly that, and the `adopt-dkj-policy` skill's Part 1 places the six
-lines of workflow that call it. **It re-uses the same two functions**, so there is one definition of
+lines of workflow that call it. **It re-uses the same functions**, so there is one definition of
 "written" rather than a second one in every repo's CI: that is not a nicety, and two consumers measured
 what the alternative costs — both wrote a gate in shell, and both refused a merge over a missing
 significance score, which is a refusal this workflow deliberately places at the **release cut** instead.

@@ -69,13 +69,20 @@ correctness fix that happens to close the collision, not only a collision fix.
 - [x] #1654: the three places carrying the now-dated diagnosis updated to stay true on both sides of the
       change -- `Test-DevelopmentEntryMissing`'s header, `open-pr.ps1`'s refusal, and the comment in
       `new-branch.tests.ps1` whose whole-line match the collision used to justify
-- [x] #1653: `dkj-policy/CONTRIBUTING.md` gains `#### 3.2.1. the entry gate`, and 3.2.2-3.2.6 renumber
+- [x] #1653: `dkj-policy/CONTRIBUTING.md` gains `#### 3.2.1. the entry gate`, and 3.2.2-3.2.7 renumber
 - [x] #1653: every cross-reference to a renumbered section repointed, each read in context first
 - [x] #1653: `plugins/dkj-policy/skills/open-pr/SKILL.md` gains `## The entry gate`, and the numbered
       step list under `## What the skill does` names it
 - [x] #1653 (second half): `CONTRIBUTING-portable.md`'s gate list gains the entry gate and stops claiming
       completeness -- it named four of the eleven gates `open-pr` and `ship-pr` actually run
 - [x] Mirrors rebuilt via `scripts/sync/build-shared-scripts.ps1`
+- [x] Merged `origin/main` mid-branch, which had gained `#### 3.2.5. the shape gate` from #1650 -- both
+      sides added a gate section, so the union is seven: the shape gate lands at 3.2.6 and the CI gate at
+      3.2.7, and every cross-reference to either was repointed after reading it in context
+- [x] The gate COUNTS in `CONTRIBUTING.md` went the way the portable half had already taken them --
+      *five gates read it on the way* and *the five above are local* are now count-free. Both were
+      already wrong on **both** sides of this merge (each side had six), and `CLAUDE.md` states the
+      count is deliberately not given there, because a wrong number reads as authority
 
 ### TEST
 

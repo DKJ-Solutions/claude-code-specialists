@@ -75,6 +75,7 @@ an absent link is a fact rather than an oversight.
 | `task/park-cycle.ps1` | the automatic half of parking: pushes the branch's development document to origin, unless a PR has already published it | documented on the [`park`](../skills/park/SKILL.md) page; run only by the `cycle-autopark` Stop hook, never by hand |
 | `task/prune-merged.ps1` | fast-forwards the trunk and deletes local branches that are provably merged; a branch without that proof is left alone | [`prune-merged`](../skills/prune-merged/SKILL.md) |
 | `task/plugin-versions.ps1` | per enabled plugin: the version installed in THIS checkout (from the install record for this path) against the marketplace clone's `plugin.json` version + git HEAD, with a verdict on whether a plugin update is due | [`plugin-versions`](../skills/plugin-versions/SKILL.md) |
+| `task/check-fanout.ps1` | `-Capture` before a fan-out and `-Compare <path>` after it: reports only what SHRANK in the working copy — a changed path that is now unchanged, a reverted worktree edit, a stash entry gone by its own id. Growth is expected and stays silent | [`check-fanout`](../skills/check-fanout/SKILL.md) |
 | `task/check-policy-drift.ps1` | lists every law-bearing document in rank order — the installed plugins' portable pages against this repo's own — so a session can read the two against each other; locates and hands over, decides nothing | [`check-policy-drift`](../skills/check-policy-drift/SKILL.md) |
 | `release/open-pr.ps1` | the gates, the push and the PR; lint gate via `Get-LintScript` in `repo-config` | [`open-pr`](../skills/open-pr/SKILL.md) |
 | `release/ship-pr.ps1` | open → wait for CI → merge → fold, in one motion | [`ship-pr`](../skills/ship-pr/SKILL.md) |
@@ -101,10 +102,12 @@ an absent link is a fact rather than an oversight.
 | `lib/pr-body-lib.ps1` | composes and refreshes the PR body from the entry | none — dot-sourced lib |
 | `lib/pr-issues-lib.ps1` | reads the issues a PR declares it closes | none — dot-sourced lib |
 | `lib/park-lib.ps1` | `Invoke-GitPark` — the one stage/commit/push behind both parking entry points | none — dot-sourced lib |
+| `lib/fanout-lib.ps1` | the working-copy snapshot and the whole shrinkage judgement as a pure function — `Get-WorkingCopySnapshot`, `Compare-WorkingCopySnapshot`, `Format-WorkingCopyShrinkage` | none — dot-sourced lib |
 | `lib/source-repo-guard-lib.ps1` | `Assert-OwnCopy` — refuses a released copy running in the repo that maintains it | none — dot-sourced lib |
 | `lib/native-capture-lib.ps1` | `Invoke-NativeCapture`, the stderr-safe native-command wrapper | none — dot-sourced lib |
 | `lib/check-report-lib.ps1` | the `[OK]`/`[INFO]`/`[ERROR]` report helper | none — dot-sourced lib |
 | `lib/hook-check-lib.ps1` | `Invoke-CheckScript` — the in-process sibling of `native-capture-lib`: it runs a session check in the hook’s own interpreter instead of spawning a second one, which is the interpreter the harness had already paid for | none — dot-sourced lib |
+| `lib/session-cache-lib.ps1` | the other half of the same cost: a verdict a SessionStart hook may compute ONCE per session instead of at every firing of the `startup|resume|clear|compact` matcher, keyed on the `session_id` the harness writes to the hook’s stdin | none — dot-sourced lib |
 | `lib/measure-skill-lib.ps1` | the parsing/formatting half of `measure-skill.ps1`: turns `claude plugin details` output into figures, with no I/O of its own | none — dot-sourced lib |
 | `lib/measure-context-lib.ps1` | the shared helpers for measuring the always-on document path: the `@`-import walk, the byte-exact section split, and the calibrated chars-per-token factor | none — dot-sourced lib |
 | `lib/consumer-check-lib.ps1` | the two things every consumer-facing lint check opens with: which tree it is operating on, and which always-on documents it may read | none — dot-sourced lib |
@@ -114,6 +117,7 @@ an absent link is a fact rather than an oversight.
 | `lib/remote-ahead-lib.ps1` | composes the "behind the remote" sentence a caller prints when a local ref has fallen behind its own remote-tracking ref | none — dot-sourced lib |
 | `lib/worktree-lib.ps1` | reads `git worktree list --porcelain`: who holds which branch, and which tree is the primary one | none — dot-sourced lib |
 | `lib/git-identity-lib.ps1` | the identity a checkout acts as on the tracker and the identity it commits as, read once for every caller that needs either | none — dot-sourced lib |
+| `lib/git-porcelain-lib.ps1` | the one reading of a git path: the `git status --porcelain` command with its two flags, the line parse into `{Path, Index, Worktree, From}`, and `Convert-GitQuotedPath`, which decodes git's C-quoted form. Dot-sourced by `park-lib` for its uncommitted count, by `fanout-lib` for its per-path snapshot, and — through a second mirror in `dkj-team-shopify` — by `sync-main` for the decoder | none — dot-sourced lib |
 | `lib/claim-issue-lib.ps1` | the two decisions `claim-issue.ps1` makes: which account this checkout claims under, and whether the issue in front of it may be claimed at all | none — dot-sourced lib |
 | `lib/ref-print-lib.ps1` | `Get-PasteableRef` — may this branch name go into a printed command a reader will run verbatim? Returns the placeholder and the explaining line when it may not, because git accepts shell metacharacters in a ref and no quoting closes that | none — dot-sourced lib |
 <!-- /shared-scripts:mirror -->

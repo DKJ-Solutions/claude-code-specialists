@@ -119,6 +119,15 @@ $script:NativeCaptureNetworkTimeoutSeconds = 120
 # real verdict -- but a caller who needs certainty reads TimedOut instead of the number.
 $script:NativeCaptureTimeoutExitCode = 124
 
+# THE BUDGET Invoke-NativeCaptureUtf8 SPENDS WAITING FOR A CAPTURE FILE TO SETTLE, on a clean exit only
+# (issue #1679). Short on purpose. It buys exactly one thing -- a grandchild being REAPED releases the
+# inherited stdout handle in milliseconds, and waiting for that turns a short read into a complete one.
+# A grandchild still RUNNING never releases inside any budget worth having, and there a reported short
+# read is the correct verdict rather than a longer stall. Measured September 9, 2026: five consecutive
+# `gh issue view --json body` captures settled on the first probe (2-8 ms), so in the normal case this
+# is not spent at all.
+$script:NativeCaptureSettleMilliseconds = 1000
+
 # THE LINE ABOVE WHICH Invoke-TestSuiteGate WARNS ABOUT RESIDENT powershell.exe PROCESSES (issue #1464,
 # September 5, 2026). A harness-killed gate run does not reap the Start-Process children it already
 # started, so they outlive it -- and an immediate retry can be OOM-killed too, even with -MaxParallel
@@ -153,6 +162,64 @@ function Format-GateSeconds {
         [int]$Decimals = 0
     )
     return [string]::Format($script:NativeCaptureInvariant, ('{0:N' + $Decimals + '}'), $Seconds)
+}
+
+function New-ScratchPath {
+    <#
+        A path under the OS temp directory that NOBODY ELSE CAN NAME IN ADVANCE -- and, with
+        -Directory, the directory itself, created here rather than by the caller.
+
+        WHY THIS EXISTS RATHER THAN A Join-Path AT EACH CALL SITE (issue #1659). Seven sites in this
+        script layer composed a temp path from a label and $PID alone, and $PID is neither secret nor
+        large: a local actor who can write to the temp directory can pre-plant a symlink or a junction
+        at the exact leaf before the script's first write. New-Item -ItemType Directory -Force and
+        [System.IO.File]::WriteAllText both FOLLOW a reparse point, so the write lands wherever the link
+        points. The content is not attacker-controlled at any of the seven, but the LOCATION is -- and
+        two of them delete recursively at that path afterwards, which turns the same window into a
+        delete primitive somewhere else.
+
+        THE GUID CLOSES IT BY REMOVING THE TARGET, NOT BY CHECKING FOR ONE. Testing the composed path
+        for a reparse point before writing was the other candidate and was declined: it is a
+        check-then-write with a window between the halves, and it cannot be applied to the temp ROOT at
+        all, because on macOS /tmp IS a symlink (to /private/tmp) -- a check there refuses a whole
+        platform for the ordinary case. Nothing can be pre-planted at a name that does not exist until
+        the moment it is used, so this function needs no such check and deliberately carries none.
+
+        $PID STAYS IN THE LEAF, in front of the GUID. It buys nothing against an attacker and is not
+        there for that: it is what makes a leftover attributable to a run that is still alive, which is
+        exactly what the retained-capture note (#1636) and ship-pr's fold-worktree line print for a
+        reader. scripts/README.md's fixture convention already names both spellings for that reason.
+
+        THE LABEL IS VALIDATED, because it is the one half a caller composes: ship-pr's carries a PR
+        number, verify-resolved-issues' an issue number and sync-main's a branch name. A segment held to
+        [A-Za-z0-9._-] with no leading dot can hold no separator and no '..', so the result is a direct
+        child of the temp directory whatever a caller passes it.
+    #>
+    param(
+        [Parameter(Mandatory = $true)][string]$Label,
+        # '.md', '.txt' -- for a FILE path. Omitted for a directory, and for a path something else
+        # creates (git worktree add makes ship-pr's).
+        [string]$Extension = '',
+        # Create the directory here, and WITHOUT -Force: at a name nothing can have reached first, an
+        # existing item means something is badly wrong and earns the throw rather than a silent reuse.
+        [switch]$Directory
+    )
+
+    if ($Label -notmatch '^[A-Za-z0-9][A-Za-z0-9._-]*$') {
+        throw "New-ScratchPath: -Label '$Label' is not a single safe path segment (letters, digits, '.', '_' and '-', not starting with a dot)."
+    }
+    if ($Extension -and $Extension -notmatch '^\.[A-Za-z0-9]+$') {
+        throw "New-ScratchPath: -Extension '$Extension' is not a plain dotted extension (e.g. '.md')."
+    }
+
+    $leaf = "$Label-$PID-" + [guid]::NewGuid().ToString('n') + $Extension
+    # The marker is what native-capture.tests.ps1's scan reads: this one line cannot carry the guid the
+    # rule asks for, because it is the line that USES the guid built above. Declared at the site rather
+    # than matched by its source text, so renaming $leaf or reflowing this line does not turn the scan
+    # against its own composer.
+    $path = Join-Path ([System.IO.Path]::GetTempPath()) $leaf # temp-path-exempt: this IS the composer
+    if ($Directory) { New-Item -ItemType Directory -Path $path | Out-Null }
+    return $path
 }
 
 function ConvertTo-NativeArgumentToken {
@@ -264,6 +331,20 @@ function Invoke-NativeCapture {
           - ExitCode : $LASTEXITCODE recorded immediately after the command ran.
           - TimedOut : $true only when -TimeoutSeconds was given AND expired. Present on every return
                        from both arms, so a caller never has to know which arm answered it.
+          - ShortRead: $true when a capture file was STILL HELD BY A WRITER when it was read, so
+                       Output may be truncated -- or empty -- with ExitCode 0. THE POINT IS THAT AN
+                       EMPTY Output IS NOW ANSWERABLE (issue #1679): before this field, a caller
+                       could not tell "the child said nothing" from "we read before the flush", and
+                       five callers in this family resolved that toward a substantive answer -- "no
+                       PR", "no issue declared", "the body does not carry the section". Always $false
+                       on the & arm, which has no capture file; see Read-NativeCaptureFile for why the
+                       flag is honest rather than defensive, and for the settle wait that removes most
+                       occurrences of it.
+                       A CALLER THAT PARSES Output MUST READ IT. Two sites in this repo can produce an
+                       empty capture LEGITIMATELY -- `git show --name-status --format=` on a commit
+                       that changed no files, and `gh --json body -q .body` on a PR with an empty body
+                       (both measured, 0 bytes, exit 0) -- so "empty means the read failed" is not a
+                       rule a caller may assume. This field is the only thing that separates them.
         EAP and the environment are always restored (finally), whether the command succeeds, fails, or
         throws.
 
@@ -351,20 +432,24 @@ function Invoke-NativeCapture {
         $ErrorActionPreference = $prevEap
     }
 
-    return [pscustomobject]@{ Output = $output; ExitCode = $code; TimedOut = $false }
+    # ShortRead IS ALWAYS $false ON THIS ARM, and that is a fact rather than a default (#1679):
+    # the & operator hands PowerShell's own pipeline reader the child's output directly, so there is no
+    # capture file for a lingering grandchild handle to truncate. A caller therefore reads one field
+    # whichever arm answered it, which is the same promise TimedOut already makes.
+    return [pscustomobject]@{ Output = $output; ExitCode = $code; TimedOut = $false; ShortRead = $false }
 }
 
-function Read-NativeCaptureFileText {
+function Read-NativeCaptureFile {
     <#
-        Read a capture file as text with the given encoding, TOLERATING A WRITE HANDLE STILL OPEN ON
-        IT. Internal to this lib; the -Utf8/timeout arm below is the only caller.
+        ONE capture file, read as text, PLUS WHETHER A WRITER STILL HELD IT: { Text; WriterHeld }.
+        Internal to this lib; the -Utf8/timeout arm below is the only caller.
 
-        WHY THIS EXISTS (issue #1252). On a timeout, Invoke-NativeCaptureUtf8 force-kills the child's
-        whole process tree with taskkill /T and then waits on the DIRECT child only. A grandchild that
-        inherited the redirected stdout handle keeps out.txt open until IT is reaped too, and the gap
-        between the kill and that moment is wall-clock -- invisible on a fast machine, a lost race on a
-        CI runner several times slower. [System.IO.File]::ReadAllText opens the file with
-        FileShare.Read, which cannot coexist with the writer handle still held, so it throws
+        WHY THE TOLERANT READ EXISTS (issue #1252). On a timeout, Invoke-NativeCaptureUtf8 force-kills
+        the child's whole process tree with taskkill /T and then waits on the DIRECT child only. A
+        grandchild that inherited the redirected stdout handle keeps out.txt open until IT is reaped
+        too, and the gap between the kill and that moment is wall-clock -- invisible on a fast machine,
+        a lost race on a CI runner several times slower. [System.IO.File]::ReadAllText opens the file
+        with FileShare.Read, which cannot coexist with the writer handle still held, so it throws
         "The process cannot access the file ... because it is being used by another process." -- and
         the exception replaces a diagnosable timeout with an unrelated IO error, on a branch whose diff
         never touched this code.
@@ -374,17 +459,93 @@ function Read-NativeCaptureFileText {
         judgement Stop-NativeProcessTree already makes when it lets its own kill attempts fail. Used
         for BOTH reads, not only the timeout path: a grandchild can outlive a clean exit too, and a
         shared read costs the normal case nothing.
+
+        WHY IT NOW ALSO REPORTS WriterHeld (issue #1679). That trade is right where it was made and is
+        unchanged -- what was wrong is that it was made SILENTLY. A caller got a possibly-truncated
+        document with ExitCode 0 and no way to tell "the child said nothing" from "we read before the
+        flush", so five callers in this family resolved the ambiguity toward a SUBSTANTIVE answer:
+        "no PR", "no issue declared", "the body does not carry the section". A short read then produces
+        a confident wrong verdict on a loaded machine, which is exactly when it happens (#1676 is the
+        first site, repaired caller-side).
+
+        THE INFORMATION WAS NEVER LOST, ONLY UNASKED FOR. #1679 recorded the lib-side answer as needing
+        "information the shared read deliberately gave up"; it does not. An open with FileShare.Read
+        FAILS precisely when a writer still holds the file, which is the whole question -- so the
+        answer is one open away, and it is free.
+
+        THE OPEN IS THE PROBE, deliberately, rather than a probe followed by a read. A separate ask
+        leaves a window in which the writer releases between the two calls, and that window fails in
+        the WRONG direction: the read would then be complete while WriterHeld said otherwise, and the
+        DEPLOY lock refusing a mergeable PR is the very failure (#1446) this exists to prevent. Reading
+        from the handle the probe opened cannot be wrong about its own stream.
+
+        -SettleMilliseconds IS SPENT ONLY WHERE WAITING IS HONEST, and the arm passes 0 on a timeout.
+        #1252 chose not to wait longer, and that reasoning is exact for a KILLED tree: a truncated tail
+        is the honest answer there, because nothing more is coming. On a CLEAN exit it is not -- the
+        child exited of its own accord, so its full output exists and a lingering handle is a
+        grandchild being reaped rather than a document that ends there. Waiting a moment for that is
+        the difference between reporting a short read and not having one.
+
+        Measured, September 9, 2026: five consecutive `gh issue view --json body` captures settled on
+        the FIRST probe, which cost 2-8 ms. So the budget below is not spent in the normal case at all;
+        it is spent only where the alternative was a wrong answer. And a grandchild that is still
+        RUNNING (rather than being reaped) never releases inside it -- there WriterHeld is the correct
+        verdict, which is why the budget is short rather than generous.
+
+        A file that is not there is NOT a sharing violation and is not retried -- it is rethrown at
+        once. FileNotFoundException derives from IOException, so without this a missing capture would
+        spend the whole budget before failing with the same error it started with.
     #>
     param(
         [Parameter(Mandatory = $true)][string]$Path,
-        [Parameter(Mandatory = $true)][System.Text.Encoding]$Encoding
+        [Parameter(Mandatory = $true)][System.Text.Encoding]$Encoding,
+        [int]$SettleMilliseconds = 0
     )
+
+    # THE TYPED CATCH IS DELIBERATELY NOT USED HERE, and it is not style: `catch
+    # [System.IO.IOException]` DOES NOT MATCH. A failing constructor comes back as a
+    # MethodInvocationException wrapping the real exception, so the sharing violation escaped the
+    # handler and surfaced as a raw New-Object error from inside this lib -- measured while writing
+    # this function, on the one case it exists to handle. The chain is unwrapped explicitly instead,
+    # which is deterministic in a way the typed catch demonstrably is not.
+    #
+    # AND ONLY A SHARING VIOLATION IS RETRIED. Anything else is rethrown at once, unchanged from the
+    # behaviour before this function reported anything: a missing capture file or a permissions
+    # problem is not something a wait can fix, and spending the budget on it would delay the same
+    # error it started with.
+    $waited = [System.Diagnostics.Stopwatch]::StartNew()
+    $settled = $false
+    while (-not $settled) {
+        try {
+            $probe = New-Object System.IO.FileStream(
+                $Path, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]::Read)
+            try {
+                $reader = New-Object System.IO.StreamReader($probe, $Encoding)
+                try { return [pscustomobject]@{ Text = $reader.ReadToEnd(); WriterHeld = $false } }
+                finally { $reader.Dispose() }
+            } finally {
+                $probe.Dispose()
+            }
+        } catch {
+            $ex = $_.Exception
+            while ($ex -is [System.Management.Automation.MethodInvocationException] -and $ex.InnerException) {
+                $ex = $ex.InnerException
+            }
+            $isSharingViolation = ($ex -is [System.IO.IOException]) -and
+                                  -not ($ex -is [System.IO.FileNotFoundException]) -and
+                                  -not ($ex -is [System.IO.DirectoryNotFoundException])
+            if (-not $isSharingViolation) { throw }
+            if ($waited.ElapsedMilliseconds -ge $SettleMilliseconds) { $settled = $true }
+            else { Start-Sleep -Milliseconds 25 }
+        }
+    }
 
     $stream = New-Object System.IO.FileStream(
         $Path, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]::ReadWrite)
     try {
         $reader = New-Object System.IO.StreamReader($stream, $Encoding)
-        try { return $reader.ReadToEnd() } finally { $reader.Dispose() }
+        try { return [pscustomobject]@{ Text = $reader.ReadToEnd(); WriterHeld = $true } }
+        finally { $reader.Dispose() }
     } finally {
         $stream.Dispose()
     }
@@ -449,7 +610,7 @@ function Invoke-NativeCaptureUtf8 {
         # until the child is actually reaped, and reading them before that returns a truncated document
         # -- which would drop the very git output a reader needs to see WHY it stalled. That wait is on
         # the DIRECT child only, though, so a killed grandchild can still hold out.txt when the read
-        # runs -- see Read-NativeCaptureFileText below (#1252) for why the read tolerates that rather
+        # runs -- see Read-NativeCaptureFile below (#1252) for why the read tolerates that rather
         # than waiting longer.
         $timedOut = $false
         if ($TimeoutSeconds -gt 0) {
@@ -471,9 +632,25 @@ function Invoke-NativeCaptureUtf8 {
         # UTF8Encoding($false) still strips one if it is there.
         $utf8 = New-Object System.Text.UTF8Encoding $false
         $text = ''
-        if (Test-Path -LiteralPath $outFile) { $text = Read-NativeCaptureFileText -Path $outFile -Encoding $utf8 }
+
+        # THE SETTLE BUDGET IS SPENT ONLY ON A CLEAN EXIT (issue #1679), and 0 on a timeout is #1252's
+        # own judgement kept intact: a killed tree's truncated tail is the honest answer, because
+        # nothing more is coming. A child that exited of its own accord is the opposite case -- see
+        # Read-NativeCaptureFile above for the full argument and the measurement.
+        $settle = if ($timedOut) { 0 } else { $script:NativeCaptureSettleMilliseconds }
+
+        # SHORT-READ IS PER-CAPTURE AND THEN OR-ED, because out.txt and err.txt are separate handles
+        # and a grandchild can hold one without the other. Either one being short makes $text short.
+        $shortRead = $false
+        if (Test-Path -LiteralPath $outFile) {
+            $readOut = Read-NativeCaptureFile -Path $outFile -Encoding $utf8 -SettleMilliseconds $settle
+            $text = $readOut.Text
+            if ($readOut.WriterHeld) { $shortRead = $true }
+        }
         if (-not $DiscardStderr -and (Test-Path -LiteralPath $errFile)) {
-            $text += Read-NativeCaptureFileText -Path $errFile -Encoding $utf8
+            $readErr = Read-NativeCaptureFile -Path $errFile -Encoding $utf8 -SettleMilliseconds $settle
+            $text += $readErr.Text
+            if ($readErr.WriterHeld) { $shortRead = $true }
         }
 
         # Lines, to match what the & path hands back. A single trailing newline is the terminator of
@@ -498,7 +675,7 @@ function Invoke-NativeCaptureUtf8 {
             )
         }
 
-        return [pscustomobject]@{ Output = $lines; ExitCode = $code; TimedOut = $timedOut }
+        return [pscustomobject]@{ Output = $lines; ExitCode = $code; TimedOut = $timedOut; ShortRead = $shortRead }
     } finally {
         Pop-NativeNonInteractiveEnv -Previous $prevEnv
         if (Test-Path -LiteralPath $capDir) {
@@ -1119,7 +1296,7 @@ function Invoke-TestSuiteGate {
         $scopeLabel = if ($ShardCount -gt 1) { "shard $Shard/$ShardCount -- $($suites.Count) of $poolTotal" } else { "all $($suites.Count)" }
         Write-Host "test gate: running $scopeLabel test suites for $Context ($modeLabel)..." -ForegroundColor Cyan
 
-        $captureDir = Join-Path ([System.IO.Path]::GetTempPath()) ("test-suite-gate-$PID")
+        $captureDir = New-ScratchPath -Label 'test-suite-gate' -Directory
         # THE FAILING SUITES' CAPTURE FILES, so the 'finally' below can keep exactly those and delete the
         # rest -- issue #1636. Collected in the reap loop because that is the only place a suite's exit code
         # and its two file paths are held at once; after $running.Remove the paths are gone, the same reason
@@ -1127,9 +1304,6 @@ function Invoke-TestSuiteGate {
         $failedCaptureFiles = New-Object System.Collections.ArrayList
 
         try {
-            if (Test-Path -LiteralPath $captureDir) { Remove-Item -Recurse -Force -LiteralPath $captureDir }
-            New-Item -ItemType Directory -Path $captureDir -Force | Out-Null
-
             $queue = New-Object System.Collections.Queue
             foreach ($s in $suites) { $queue.Enqueue($s) | Out-Null }
             $running = New-Object System.Collections.ArrayList
@@ -1213,8 +1387,10 @@ function Invoke-TestSuiteGate {
             # $retainedCaptureDir stays empty -- so the note below is printed only when there is something
             # at the other end of it.
             #
-            # $captureDir CARRIES $PID, so a retained directory cannot collide with a later run's, and the
-            # Remove-Item at the top of the try clears a stale one should a PID ever be reused.
+            # $captureDir IS UNPREDICTABLE AND PER-RUN (New-ScratchPath, issue #1659), so a retained directory
+            # cannot collide with a later run's -- not even one that reuses this PID. It used to be
+            # "test-suite-gate-$PID" and the try opened by deleting whatever stood there, a recursive delete
+            # at a name anyone could have planted a junction at; there is no stale one to clear now.
             if (Test-Path -LiteralPath $captureDir) {
                 $keep = @()
                 foreach ($f in @($failedCaptureFiles)) {

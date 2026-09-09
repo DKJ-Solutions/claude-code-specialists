@@ -324,7 +324,7 @@ The full picture, top-level folder by folder:
   `cut-release.ps1`), the connectors check (`check-connectors.ps1`), the agent-def generator
   (`build-agent-defs.ps1` — fills in the shared blocks from `plugins/dkj-teams/agent-shared/`), and the tests.
   [`scripts/README.md`](scripts/README.md) is the directory-by-directory map, with the entry points and
-  the four gates. A
+  the gates on the branch dossier. A
   mirrored copy for consumers lives inside the plugins — the sync/check scripts in `dkj-team-alpha`, the
   branch/release workflow in `dkj-policy` — see its own
   [README](plugins/dkj-policy/scripts/README.md).
@@ -700,7 +700,7 @@ function in Claude Code and in Cowork, but not in a plain Claude.ai Chat session
 `specialists-init`, `specialists-teardown`, `sync-roster`, `start-task`, `adopt-shopify-floor`,
 `cut-release`, `adopt-dkj-policy`,
 `release-notes-page`, `sync-main`, `push-preview`, `check-branch-entry`, `check-policy-drift`,
-`prune-merged`, `plugin-versions`,
+`prune-merged`, `plugin-versions`, `check-fanout`,
 `measure-skill`, `worktree-lane`, `report-issue`, `adopt-dkj-policy-bwj`, `orchestrator`)<!-- /skills:all -->
 remain available there.
 
@@ -785,15 +785,16 @@ typo there would quietly exclude the plugin it meant to keep and report success.
 `new-branch`, `claim-issue`, `park`, `fix-mojibake`, `specialists-init`, `specialists-teardown`,
 `sync-roster`, `start-task`, `adopt-dkj-policy`, `adopt-shopify-floor`,
 `release-notes-page`, `sync-main`, `push-preview`, `check-branch-entry`, `check-policy-drift`,
-`prune-merged`, `plugin-versions`, `measure-skill`, `worktree-lane`) are a thin wrapper around a script — procedural
+`prune-merged`, `plugin-versions`, `measure-skill`, `worktree-lane`, `check-fanout`) are a thin wrapper around a script — procedural
 **mechanism** (branch, claiming an issue on the tracker before the work on it starts, PR, ship, fold,
 bootstrap, teardown, roster-sync, encoding repair, reading a
 repo's own conventions, placing an add-on team's operational floor, pushing a branch to its own preview
 theme, the reading copy of the release notes, laying the repo's law-bearing documents out in rank order
 so a session can read them against each other, reaping the local branches a merge left behind, telling
 whether this checkout's installed plugin matches the marketplace clone and which command closes any
-gap, pricing what a skill costs the sessions that carry it, and giving a branch its own worktree so
-another one can ship). `cut-release`, `orchestrator`, `report-issue` and `adopt-dkj-policy-bwj`<!-- /skills:all --> are the
+gap, pricing what a skill costs the sessions that carry it, giving a branch its own worktree so
+another one can ship, and reading the working copy on both sides of a dispatched fan-out to say whether
+a subagent discarded any of it). `cut-release`, `orchestrator`, `report-issue` and `adopt-dkj-policy-bwj`<!-- /skills:all --> are the
 deliberate exceptions: a checklist with no script of its own (see below); a skill that must not have
 one — `orchestrator` reads a persona file into the conversation, and the environment it exists for is
 precisely the one where `powershell` is absent; and the two `dkj-policy-bwj` procedures, which run over

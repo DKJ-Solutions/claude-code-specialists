@@ -43,7 +43,811 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**23 / 45 minor entries** <!-- pending-tally -->
+**29 / 64 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1673-ignore-agent-worktrees · 20260909-084638
+
+A dispatched agent's worktree lands inside the repo at `.claude/worktrees/agent-<id>`, and nothing
+ignored it -- so the primary checkout read as dirty for as long as one stood, which is a refusal in
+`cut-release.ps1`, in `prune-merged.ps1` on a branch, and in `worktree-lane.ps1 -HandBack`. It is now
+ignored, anchored so it cannot silence a legitimately-named folder deeper in the tree.
+
+The larger half is one `.gitignore` cannot reach. The lint gate and three of the suites walk the tree
+with `Get-ChildItem -Recurse`, which reads the filesystem rather than git, so a nested worktree is a
+second complete copy of the repo they are standing inside: every count doubles (`*-agent.md` 26 to
+52, `*.ps1` 236 to 472) and `check-plugin-integrity.ps1` fails with 26 duplicate-id errors, each one
+accusing the **real** file and naming the worktree's copy as the legitimate claimant. An operator
+reading that has no route back to the cause. The gate now reads `git worktree list --porcelain`
+through the new `Get-NestedWorktreePath` and reports the worktree first, saying in as many words that
+the duplicate findings below it are a consequence rather than real.
+
+The path that finding prints is guarded, which is not incidental: `git worktree add` is not held to
+`check-ref-format` the way a branch name is, so a registered path may carry spaces, shell
+metacharacters or format characters that make a printed line read as something other than what it
+says -- and the finding names the path twice, once as prose and once inside a remedy the reader is
+invited to run. This repo had already answered that shape at
+[#1637](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1637) and
+[#1638](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1638); the answer is reused
+rather than re-derived, so the command reads `<path>` when the real one is unsafe to paste and a note
+says why.
+
+Whether the gate should instead *work through* a nested worktree is left open deliberately and filed
+as [#1678](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1678): it is ~20 walk sites
+plus three suites, it needs a gate of its own or it is enforced by memory, and refusing cleanly is a
+defensible permanent answer.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A. The two things that change behaviour are both repo-local -- the `.gitignore` entry and
+`check-plugin-integrity.ps1`, which is not mirrored into any plugin. A consumer receives the new
+`Get-NestedWorktreePath` in the `dkj-policy` mirror of `worktree-lib.ps1`, but nothing on their side
+calls it yet, so nobody downstream notices this release.
+
+**Score:** N/A
+
+#### Pull Request
+
+Ignore the harness's agent worktree directory
+
+Plugins: dkj-policy
+
+[PR #1684](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1684)
+
+---
+
+### DEPLOY: fix/1689-porcelain-path-decode-once · 20260909-074736
+
+Reading a git path now happens in one place. `Convert-GitQuotedPath` — which decodes git's C-quoted
+form, escape by escape, into the real filename — has moved out of `sync-rules.ps1` and into
+`git-porcelain-lib.ps1`, beside the `core.quotePath` flag that produces the form it decodes. So the
+porcelain reading no longer stops one step short: `park-lib`, `fanout-lib` and `sync-main` all get the
+readable path, and `fanout-lib` loses a limit it had written down as permanent.
+
+**The move went in the opposite direction from the one #1689 proposed, and that is the substance of the
+change.** `sync-rules.ps1` is dependency-free on purpose — the live-theme guard loads it on every
+command inside a catch that returns no live theme id — so making it dot-source anything is a way to
+disarm that guard silently. It never called the function it defined, so it could lose it instead, and
+`sync-main.ps1` takes the lib directly, unguarded, exactly as it already takes two others.
+
+**And a decode obliges a print guard**, which is the second half of the change. Since a decoded
+path can carry a live ESC byte or an RTL override, `fanout-lib`'s loss report now routes every printed
+path through `Get-DisplayPath` and every printed ref through `Get-DisplayRef` -- three sites, one of
+them older than this branch. The strip is at the report, so a finding still carries the exact path.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A — nothing a consumer of the plugins notices, provided the release carries both mirrors, which is
+what the new `sync-main.tests.ps1` assert exists to prove. A consumer running `dkj-team-shopify`
+without `dkj-policy` gets the lib from its own plugin's payload; the readable path in a sync report is
+the only visible difference, and reports are not a published surface.
+
+**Score:** N/A
+
+#### Pull Request
+
+Reading a git path lives once: the quoted-path decoder moves into git-porcelain-lib
+
+Plugins: dkj-policy, dkj-team-shopify
+
+[PR #1696](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1696)
+
+---
+
+### DEPLOY: feat/1680-synopsis-check-list · 20260909-072322
+
+The gate's `.DESCRIPTION` enumerates its checks in prose -- the summary a reader who has not opened four
+thousand lines consults, and the one a lens, a hook, a test-scenario name or a released note quotes a
+number from. It had stopped at `30.` while the code ran to `36.`, and its own item `30.` still described
+the check #1494 renumbered to `33` a month after the list was written, so grepping the list for "check 30"
+answered with a different check. Two more drifts were found on verification and neither was in the report:
+items `9.` and `17.` still read as live checks a month after they were **retired**, and `13b` had no entry
+at all.
+
+**Check 37 now holds that list to the file's own column-0 headers**, because a hand rewrite resets the
+clock rather than stopping it -- the conclusion check 32's header already records after three hand repairs
+of the mirror table. It is opt-in through the same marked-span walk checks 10, 29 and 32 use, so it
+inherits their three refusals for free and no unmarked script becomes a subject; it reads check 34's own
+header pattern, so the two cannot disagree about what a header is; and it asserts **one direction only** --
+every header needs an entry, an entry needs no header. That is what let it be born green rather than with
+an exemption list: three entries legitimately have no header of their own, the two retirement tombstones
+and the consumer-doc guard the suites call check 19. Measured after the repair: 1 span, 37 headers, 37
+claimed, 0 findings, 0 exemptions. Its own first run is the argument for it -- `13b` was reported by the
+check, not by a reader.
+
+The review round moved four things, and three were one defect in different clothes -- a rule read off the
+happy path. An entry must now **start inside the list's gutter**, so a nested enumeration in an entry's
+prose cannot satisfy a header (found by probing the check, not by measuring the tree: the list contains no
+such line today); the header comparison runs once per FILE over the union of its spans, where running it
+per span doubled the count and named one gap twice; and the coverage note now distinguishes "no marker
+anywhere" from "markers present, none of them paired", which used to print the reassuring sentence over a
+run that had just raised an error about that very file. Two bounds are named rather than closed -- a
+STALE entry still satisfies its number, and the two zero-state notes are unreachable from the suite
+because every fixture run copies this script into the fixture -- both written into the check's own header,
+because an unstated gap reads as coverage.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A. `check-plugin-integrity.ps1` is this repo's own gate and is mirrored into no plugin, so nothing here
+reaches a consumer: the repaired list, the new check and its scenarios all stay in the source tree. A
+consumer's own lint script is theirs, and the marker is opt-in, so nothing starts asserting anything on
+their side either.
+
+**Score:** N/A
+
+#### Pull Request
+
+The gate's own check list is held to its headers, and the seven it had lost are back
+
+[PR #1695](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1695)
+
+---
+
+### DEPLOY: fix/1682-porcelain-line-parse · 20260909-071236
+
+The `git status --porcelain` reading lives once, in `scripts/lib/git-porcelain-lib.ps1`, dot-sourced by
+`park-lib` for its uncommitted count and by `fanout-lib` for its per-path snapshot. Both callers had a
+near-verbatim copy of the parse, and two of the three git quirks underneath it were properties of the
+command rather than the parse — so the lib owns the command and its two flags too, with all the
+reasoning in one header instead of half in each.
+
+**It repaired a defect while consolidating, which is the argument for consolidating.** Both copies
+normalised backslashes to forward slashes over *every* path, including the ones `core.quotePath` exists
+to produce, so `"caf\303\251.txt"` read back as `caf/303/251.txt`. Latent in both callers — a count
+still counts and a comparison still matches when both sides mangle identically — and wrong for the
+first caller that looks for the file.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A — nothing a consumer notices. The lib is mirrored into `dkj-policy` because both its callers are,
+so a consumer's `park-cycle` Stop hook keeps working; the behaviour it produces is the same count and
+the same snapshot as before, minus the mangled path nobody had hit yet.
+
+**Score:** N/A
+
+#### Pull Request
+
+The git porcelain line parse lives once, in a lib both callers dot-source
+
+Plugins: dkj-policy
+
+[PR #1694](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1694)
+
+---
+
+### DEPLOY: docs/1686-priority-axis-decision · 20260909-065028
+
+The priority axis exists twice in this family and now says so on purpose. The two schemes -- `prio-1`
+to `prio-4` here, `very low` to `very high` in the BWJ store repos -- stay apart, because the names are
+the only thing that says which motor owns the rung: one is a judgement typed by whoever files, the
+other is derived from an Asana score by a daily sweep, and a single vocabulary would invite a session
+to hand-set a rung that a sweep is about to overwrite. Measured on all three trackers, the two sets are
+disjoint in both directions, so the collision the issue was filed about can only ever produce a refused
+label that names itself -- not an issue filed at a rung meaning something else. And the rule that every
+issue carries a rung stays this repo's own: nothing in the workflow reads a priority, so a portable
+version would prescribe a convention no gate enforces and hand consumers four labels they never asked
+for.
+
+**One thing the decision deliberately does not close, and it is now named rather than implied.** The
+same measurement that clears the names indicts the **colours**: `0E8A16` is the floor here and one rung
+above the floor in a BWJ repo, and nothing refuses a colour the way `gh` refuses a name. The lens
+carries that table and the instruction not to read a rung off a badge across the two families; the
+repair itself is #1691, because its cheap half edits live labels in two repos this one does not own.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+One paragraph reaches a consumer, and it is the half worth having: a BWJ session that reaches for
+`prio-4` and gets a refusal now reads that as the expected answer rather than as a broken setup, and
+is told in the same breath that nothing on their side needs doing. The rule itself deliberately did
+not become theirs to follow.
+
+**Score:** 2
+
+#### Pull Request
+
+The two priority label sets stay apart, and the rule stays repo-local
+
+Plugins: dkj-policy-bwj
+
+[PR #1692](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1692)
+
+---
+
+### DEPLOY: fix/1679-utf8-short-read-class · 20260909-062511
+
+`Invoke-NativeCapture` now says when a capture was read while a writer still held it, so a caller can
+tell "the child said nothing" from "we read before the flush". Both are an empty `Output` at exit `0`,
+and until now nothing separated them -- so six callers in the shipping scripts resolved the ambiguity
+toward a substantive answer: "no PR", "no issue declared", "the body does not carry the section",
+"the claim was refused". The sharpest refused the merge over a section that had not changed, in a
+gate with no `-Force`. The quietest reported the resolves verification as a clean pass having checked
+nothing. And the one that reaches furthest is the claim step, which told an operator to treat an
+issue as UNCLAIMED on a claim that had in fact landed -- the first move of every issue-driven
+assignment. The read itself is unchanged: `FileShare.ReadWrite` still returns whatever was flushed
+(#1252), it simply no longer does so in silence, and on a clean exit it now waits briefly for the
+handle to release rather than reporting a short read it could have avoided.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+These are the scripts a consumer runs through the workflow plugin, so the wrong verdicts were theirs
+to meet: a merge refused by a gate with no way past it, an already-done check that quietly stopped
+warning, and a claim step that refused a claim it had itself just written. Nothing to do on adoption
+-- the field is additive and every existing caller keeps working -- but the refusals a consumer does
+hit now name the read that failed instead of accusing their document, and the one skipped check that
+cannot be recovered says so in a warning rather than in a dim grey line.
+
+**Score:** 3
+
+#### Pull Request
+
+A short capture on exit 0 is reported as a short read instead of as a substantive answer
+
+Plugins: dkj-policy, dkj-team-shopify
+
+[PR #1690](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1690)
+
+---
+
+### DEPLOY: docs/1678-nested-worktree-refusal · 20260909-060959
+
+The lint gate's tree walks are filesystem walks, so a worktree registered inside the repo is a second
+complete copy of the tree it is standing in: every recursive count from the root doubles exactly
+(`*-agent.md` 26 to 52, `*.ps1` 233 to 466) and the gate fails with 26 duplicate-id errors, each one
+accusing the **real** file. #1673 repairs what an operator reads. What it deliberately left open, and
+what this branch answers, is whether the gate should instead be made to work *through* such a worktree
+-- roughly twenty `Get-ChildItem -Recurse` sites plus the suites that walk the root, behind a shared
+predicate and a meta-check of its own.
+
+It should not, and the exclusion is now recorded as DECLINED beside the gate's other measured-and-
+declined rules, so the option is priced rather than re-argued the next time somebody meets the 26
+errors. Four grounds, each measured on this tree: the lint half of `Invoke-WorkflowGates` returns
+before the test gate is ever reached, so on the documented route the doubling suites never run and
+excluding the path from them buys a caller nothing; the report's price was one suite too high --
+`template-selfcontained.tests.ps1` walks `plugins/`, not the root, and its count is unmoved by a probe
+worktree, leaving two rather than three; a predicate every future walk must remember to call is the
+enforced-by-memory shape #1665 was filed against, in a file already carrying 36 numbered checks; and
+`worktree-lane.ps1` has already decided where a worktree belongs, placing lanes outside the tree for
+exactly this reason. The residual is stated rather than left to be found: under `-SkipLint` those two
+suites still take a doubled set in silence, which is what that switch means everywhere here.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+N/A. One repo lens changes and nothing else -- no script, no manifest, no plugin payload. The gate it
+describes is `check-plugin-integrity.ps1`, which is not mirrored into any plugin, so a consumer
+receives nothing from this and their own gate's answer to the same fork stays theirs.
+
+**Score:** N/A
+
+#### Pull Request
+
+The lint gate refuses a nested worktree rather than walking through one
+
+[PR #1688](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1688)
+
+---
+
+### DEPLOY: feat/1685-prio-labels · 20260909-055712
+
+Every issue in this repo's tracker now carries exactly one priority, `prio-1` (lowest) to `prio-4`
+(highest). The four labels exist on GitHub, the ten issues open on the day were labelled in the same
+movement — a taxonomy applied only to new issues splits the tracker in two, and the older half is
+where the backlog is — and the rule that a finding is filed *with* its priority is written down in
+the always-on layer, so the next session does it without being reminded. It is a separate axis from
+the prefix→label mapping that classifies a pull request — `enhancement`, `bug` and `documentation` are
+the labels this repo already had, written from the branch prefix; a `prio-N` is the new one, written by
+whoever files. Derek's lens says so, and says which command re-ranks an issue without leaving two
+rungs on it.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A — nothing here reaches a consumer of the plugins. The labels are this tracker's own state and
+both documents are repo-local lenses, which travel to nobody.
+
+**Score:** N/A
+
+#### Pull Request
+
+Priority labels prio-1..prio-4 on every issue
+
+[PR #1687](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1687)
+
+---
+
+### DEPLOY: feat/1670-fanout-shrinkage-detection · 20260908-222347
+
+A dispatched fan-out can no longer discard this session's uncommitted work invisibly. `#1665` measured
+a review specialist running `git stash` and then `git checkout HEAD -- <file>` in the orchestrator's
+checkout, taking three files of uncommitted work with it: no error, no notice, no refusal, and a clean
+`git status` afterwards -- which the review's own report cited as proof it had changed nothing. It was
+found days later, by accident, when a `grep` showed old text where new text had been verified minutes
+earlier. That was repaired with an instruction; `#1670`'s point was that **nothing anywhere detected
+it**, so a repeat would be exactly as invisible as the first, and less conspicuous whenever what gets
+discarded is a config value rather than a paragraph somebody later reads.
+
+The new `check-fanout` skill takes a reading of the working copy before a dispatch and compares it
+after, and what it reports is **shrinkage only** -- a path that was changed and is not any more, a
+worktree edit reverted under a path that remains, or a stash entry gone by its own id. That asymmetry
+is the whole design: a subagent legitimately writing files makes the list **grow**, which is expected
+and never reported, so the detector has nothing to say on an ordinary fan-out. Five false positives are
+answered rather than tolerated -- the orchestrator's own commits (their paths are excluded), a rewritten
+history and a branch change (both refuse to difference at all, because a wrong list is worse than none),
+`git reset`, which moves a change from the index to the worktree and destroys nothing, and a `git mv`,
+which the comparison follows rather than exempts, so a loss on the far side of a rename is still caught.
+
+**Three answers, not two, and the third is the one worth knowing.** Exit 0 means the comparison was
+made and nothing shrank; exit 1 that something did; exit **3** that the comparison could not be made at
+all -- a branch change, a rewritten history, or a git read that failed. That last is the likeliest
+outcome in this tool's own scenario, where dispatched agents run `git` concurrently in one checkout and
+a `git status` can lose a race for `.git/index.lock`, and an incomplete answer now keeps the baseline
+instead of spending it, because a retry is exactly the right next move.
+
+**It goes further than the issue asked in one place, and admits a weakness in another.** `#1670`
+proposed counting stash entries and said a count is enough; it is not, and a subagent that pops one
+entry while the orchestrator pushes another leaves the count unchanged -- so entries are compared by
+their own commit ids and that case is pinned in the suite. The weakness is that the baseline has to be
+taken by somebody: this is an invoked step, not a hook, because a `Pre`/`PostToolUse` pair around the
+dispatch rests on the matcher name of the dispatch tool and that has not been measured. Nothing here
+rests on anything unmeasured, the hook variant stays open on `#1670`, and it is cheap to add because
+the judgement it would need is already the shared function rather than anything in the script.
+
+**And it reports rather than restores, which is a property of the damage and not a choice.** Content
+discarded by `git checkout HEAD -- <path>` was never committed and sits in no reflog, so there is
+nothing to restore it from -- which is precisely why the detection gap was the one worth closing. What
+a finding buys is knowing which file to write again, so it names the path, unlike `park-lib`'s
+counts-only figure that ends up in a public commit.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A. This repo is not a service anyone subscribes to; the reader here is a developer maintaining it or
+consuming the plugins, and what they get is scored above. It reaches a consuming repo through a release
+like any other shared script.
+
+**Score:** N/A
+
+#### Pull Request
+
+A dispatched fan-out's working-copy losses are detected instead of found by accident
+
+Plugins: dkj-policy, dkj-team-alpha
+
+[PR #1683](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1683)
+
+---
+
+### DEPLOY: fix/1676-remote-ahead-tip-short-read · 20260908-220203
+
+The remote-ahead warning now says when it could not read the diverged branch's tip, instead of dropping
+that half of the sentence in silence. `Get-RemoteAheadNote` reads an empty `git log` capture on exit code 0
+as a failure to read rather than as nothing to report, names which of three reasons it was, and states
+that the author and the subject are missing from the warning and not absent from the branch.
+
+The silent drop degraded the guard to exactly the sentence #1439 was filed for being insufficient: "1
+commit(s) behind" reads identically for another session's push and for a fast-forward of your own autopark,
+and the author and the subject are what separate them. It degraded on the loaded machine, which is when two
+sessions are most likely to be racing.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+`remote-ahead-lib.ps1` is a shipping script, so this reaches every consumer through the next release, at
+all three doors that ask the question -- `new-branch`'s resume warning, `open-pr`'s remote-ahead gate and
+`park-cycle`'s refused-push report. Nothing a consumer types changes; the sentence gains a clause it used
+to omit.
+
+**Score:** 3
+
+#### Pull Request
+
+The remote-ahead warning says when it could not read the tip, instead of dropping it in silence
+
+Plugins: dkj-policy
+
+[PR #1681](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1681)
+
+---
+
+### DEPLOY: feat/1605-sessioncheck-version-cache · 20260908-204605
+
+A session start on a machine with no source checkout stops paying for its version verdict twice.
+`connector-sessioncheck`'s consumer fallback ran `plugin-versions.ps1 -Brief` -- two nested
+powershell bring-ups plus git in the marketplace clone -- at every firing of the
+`startup|resume|clear|compact` matcher, so a session with four compactions measured five times for an
+answer that had not changed. The matcher stays exactly as it is; narrowing it is what makes the whole
+report go silent after the first `/compact`. Instead the engine's output is now held for the life of
+the session, keyed on the `session_id` the harness writes to the hook's stdin: a compaction keeps
+that id and replays, a startup and a `/clear` bring a new one and re-measure, so nothing has to read
+the payload's `source` field or decide which kinds of firing may trust a cache. Measured over five
+measure-then-replay pairs against a synthetic five-plugin consumer fixture: a median of 1,288 ms
+against 439 ms, about 850 ms back per compaction.
+
+What a replay guarantees is a **bound, not an invariant**, and that is the one place this branch
+disagrees with the issue that asked for it. #1605 argued the cached answer cannot go stale within a
+session, citing the hook's own "restart the session" line -- but that line is about a hook's *code*
+being pinned, while the verdict is about two ordinary mutable files, and a sibling terminal running
+`claude plugin update` moves them with no restart involved. So a replay is bounded by age at one hour
+rather than the four this started with, the reasoning is written into the lib's header instead of the
+citation that does not carry it, and the direction a reader acts on self-heals: acting on "you are
+behind" means an update, after which this hook says to restart -- which is a new id and a bypass.
+
+Everything about it fails towards measuring. No session id, an unwritable cache directory, a corrupt
+entry, a plugin payload predating the lib: each falls back to the spawn this branch exists to avoid,
+which is exactly what the hook did before. The suite counts engine spawns on disk rather than
+inferring them from wall-clock, so "the second firing spawns nothing" is a measurement.
+
+**The cache does not live under the shared temp root**, and that answers #1666, which landed while
+this branch was open: every temp path in this layer is now composed per run with a guid, so nothing
+can be pre-planted at a name that does not exist yet. A cache is the one thing that cannot take that
+shape -- a later process has to find what an earlier one wrote, and a guid is what a later process
+cannot re-derive. So instead of a third exemption from that gate it leaves the shared root
+altogether, for the per-user cache directory (`LOCALAPPDATA`, else `XDG_CACHE_HOME`, else
+`~/.cache`), where a stable name sits in a directory only this user can write. Not under `~/.claude`
+either: that tree is what these checks READ, and one of them snapshots it.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A. This repo is not a service anyone subscribes to; the reader here is a developer maintaining it,
+and what they get is already scored above. The saving lands in every consuming repo through a
+release, but a consumer of this product is a developer too.
+
+**Score:** N/A
+
+#### Pull Request
+
+connector-sessioncheck measures the version verdict once per session instead of on every compaction
+
+Plugins: dkj-policy
+
+[PR #1672](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1672)
+
+---
+
+### DEPLOY: docs/1667-review-dispatch-worktree · 20260908-204043
+
+A dispatched review runs in the primary checkout and never in `isolation: "worktree"`, and Chris's
+portable manual now says so at the one place a reader meets the question -- the *Delegating parallel
+work* section, which already named worktree isolation as an option. #1667 filed the call as the
+owner's because its own first bullet was inferred; both halves were probed instead, in this repo, on
+September 8, 2026.
+
+The flag is worse than the hazard it would remove. A dispatched worktree is a fresh checkout of the
+primary's **HEAD commit** on a branch of the harness's own making, with a clean `git status`: an
+untracked file and a tracked edit made seconds earlier were both invisible inside it. A review sits
+*before* the PR, so the tree it would read is the one without the change, and what comes back is a
+confident "no findings" carrying nothing that says which tree it read. And the worktree lands at
+`.claude/worktrees/agent-<id>` **inside** the checkout, ignored by nothing, so while it stands the
+primary's own `git status` carries `?? .claude/worktrees/` -- it dirties the tree it was dispatched
+to protect. That is why the repo's lane mechanism puts its worktrees in a sibling directory; the
+harness flag does not offer the choice.
+
+So the `working-copy-boundary` block -- #1665, merged the same evening this was measured -- stays the
+whole of the answer for reviewers, and it is not weakened by being unenforceable: `isolation` is set
+by the caller at dispatch and lives in no agent def, so no lint gate could ever have reached it. The
+section now sits under the bullets #1665 added rather than restating them, and worktree isolation
+stands for the case the `fork` bullet named it for -- several sub-agents writing the same files at
+once -- with both costs named there rather than waived.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+N/A -- nothing a subscriber of a service sees. This is guidance in an orchestrator's on-demand
+manual about how sub-agents are dispatched; no behaviour anybody invokes changes.
+
+**Score:** N/A
+
+#### Pull Request
+
+The review chain is not dispatched into a worktree, and the measurement says why
+
+Plugins: dkj-team-alpha
+
+[PR #1675](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1675)
+
+---
+
+### DEPLOY: docs/1668-fixture-teardown-measured · 20260908-203035
+
+#1668 reported 413 leftover fixture trees in the temp directory and named a cause:
+`fold-changelog.tests.ps1`'s per-case tree helper never tears down. Measured, the cause does not hold.
+The helper registers every tree it builds and the register is swept twice, both since the file's
+creation commit on July 24, 2026; run to completion the suite leaks **zero**, and so does
+`new-branch.tests.ps1`, the second-largest contributor. What the standing entries have in common is
+*where* they were registered -- all after a suite's last completed sweep -- which is the signature of an
+interrupted run, and no in-process teardown reaches those.
+
+The count was also read for more than it was. Of the directory measured, 546 entries were
+`sync-pr-body-*`, written deliberately by `sync-main.ps1` for an operator to paste into
+`gh pr create --body-file` and therefore required to outlive their run, and 162 belonged to an unrelated
+tool; the suites' own share was ~215, not 413. So the largest group counted as litter was the one thing
+in that directory that is retained on purpose.
+
+`scripts/README.md` now carries both findings beside the `$PID` fixture convention, because the
+distinction decides the repair: the obvious fix is to give a helper a teardown it already has, and the
+fix that would actually reach an interrupted run's residue is a sweep by name pattern in a shared temp
+directory -- the same delete primitive `New-ScratchPath` was introduced to remove. Written down rather
+than re-measured, so the next reader of that directory does not re-file it.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+N/A -- nothing a subscriber of a service sees. `scripts/README.md` documents this repo's own script
+layer, ships in no plugin, and no behaviour a consumer invokes changes.
+
+**Score:** N/A
+
+#### Pull Request
+
+The fixture convention records that suites DO tear down, and what a leftover actually means
+
+[PR #1674](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1674)
+
+---
+
+### DEPLOY: fix/1665-working-copy-boundary · 20260908-202038
+
+A dispatched specialist holding `Bash` is now told, in its own always-loaded boundary, that the checkout
+it stands in is not its own to move: no `git stash`, `checkout -- <path>`, `reset`, `clean`, `restore`,
+branch switch, or anything else that mutates the tree, the index or **any ref** -- whatever files it may
+legitimately edit. The block names the read-only way to read another ref instead, and says that a clean
+`git status` proves nothing, because it is exactly what discarded uncommitted work looks like.
+
+It closes a real loss rather than a hypothetical one: a review stashed, hit other sessions' stash
+entries, and resolved the conflict with `git checkout HEAD -- <file>` on three files, taking four of the
+orchestrator's uncommitted edits with it and reporting `No repo content was altered`. The old wording
+did not reach that, because a stash corrects nothing and lands nothing.
+
+**And the circle that carries it is now kept by a gate rather than by memory.** This is the first shared
+block placed by **capability** instead of by craft -- it goes wherever `tools:` names `Bash` -- and that
+is the one kind of circle a check can hold, so **lint check 36** reports any agent def that names the
+tool and carries no block. Without it a specialist gaining `Bash` later would have sat silently outside
+the boundary with every gate green, which is the same enforced-by-memory failure as the defect itself.
+
+**Score:** 4
+
+#### What makes this deploy extra special
+
+N/A -- the block ships to every consumer of the four team plugins, but its reader is a subagent rather
+than a subscriber of a service, and this repo publishes to none.
+
+**Score:** N/A
+
+#### Pull Request
+
+A review may not mutate the working copy: no git stash, checkout --, reset or clean
+
+Plugins: dkj-team-alpha, dkj-team-ecomm
+
+[PR #1671](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1671)
+
+---
+
+### DEPLOY: feat/1659-temp-path-unpredictable · 20260908-190619
+
+Seven sites across six scripts composed their temp path as `<label>-$PID`, which is a name a local
+actor can reach first: `New-Item -Force` and `WriteAllText` both follow a symlink or junction, so a
+pre-planted link redirects the write, and where the script then deletes recursively there, the same
+window is a delete primitive in somebody else's directory. All seven now call one composer,
+`New-ScratchPath`, which
+returns `<temp>/<label>-<pid>-<guid>` -- there is no name to plant at. A reparse-point check was the
+obvious alternative and was declined on the measurement: it is a check-then-write, and on macOS `/tmp`
+is itself a symlink, so the same check refuses a whole platform for the ordinary case. A scan in
+`native-capture.tests.ps1` now fails on the eighth site, which is what the class needed more than the
+seven edits did.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+N/A -- nothing a subscriber of a service sees. These are the workflow's own scripts, and the hardening
+is against a local actor on the machine running them; no behaviour a consumer invokes changes.
+
+**Score:** N/A
+
+#### Pull Request
+
+No shipping script composes a predictable temp path any more
+
+Plugins: dkj-policy, dkj-team-shopify
+
+[PR #1666](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1666)
+
+---
+
+### DEPLOY: fix/1655-unjudged-fixture-git-check · 20260908-185415
+
+A test suite can no longer reintroduce the fixture-git idiom that #1635 swept out. Check 35
+(`[fixture-git]`) walks `scripts/tests/` for a git command whose output is discarded and whose exit
+code is judged on neither the same statement nor the next -- the idiom that made a git which FAILED
+indistinguishable from one that worked, so every assert below it read a repo that was never built and
+blamed the script under test.
+
+The sweep it enforces turned out to be unfinished, which is the finding rather than a side note. The
+matcher read **27 unjudged calls still standing in four files** -- `find-specialist-mentions`,
+`shared-scripts`, `source-repo-guard` and `fresh-consumer.measure`, whose spellings (`git ... 2>&1 |
+Out-Null` with no `&`, and `& $git @(...)` over a scriptblock) the earlier search never reached. All
+27 are converted here, so the check is born green with **zero exemptions**. Over the pre-sweep tree it
+reads 182 findings in 18 files: the house style, measured.
+
+What makes the check possible at all is that a git QUESTION reads its exit code **immediately** --
+`rev-parse --verify --quiet` on a ref expected to be absent answers with exit 1 and is judged on the
+next line. So a call is cleared when `$LASTEXITCODE` appears in the same statement or the next one, no
+verb is special-cased, and no file is exempt: **zero probe false positives over both trees**. The
+subject is deliberately a *discarded* result rather than every unjudged call -- widening to a bare
+statement pipeline yields 20 findings here and all 20 are value-returning questions. All three ways to
+discard are covered (`| Out-Null`, `$null =`, a `[void]` cast), each after one shared unwrap of any
+`(...)` so a pair of brackets is not an escape hatch, and the clearing condition reads the AST rather
+than the line text. None of those three came from the measurement -- this tree holds only the plainest
+spelling of each -- but from probing the check's own stated boundary and from the review that followed.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+Nothing here reaches a consumer's own repo: the check reads `scripts/tests/`, which is workshop-only
+and mirrored into no plugin. One portable page does change -- the system-administration manual gains
+a tenth PowerShell trap (`@($i, $i + 1)` is `@($i, $i) + 1`, the comma binding tighter than the
+addition), which travels to every consumer at the next release and is worth having: it produced nine
+false findings inside the very pass that was deciding whether this check's false-positive rate was
+acceptable.
+
+**Score:** 1
+
+#### Pull Request
+
+A lint check for the unjudged fixture-git idiom, and the four suites the #1635 sweep missed
+
+Plugins: dkj-team-alpha
+
+[PR #1663](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1663)
+
+---
+
+### DEPLOY: fix/1650-shape-gate-local · 20260908-182018
+
+The branch document's **shape** rules -- four `###` headings and never a fifth, and nothing
+branch-specific above the first phase -- are one shared function now
+(`Get-DevelopmentShapeFindings`), and `open-pr` refuses on them before the push. They lived only in
+`check-branch-entry.ps1`, which runs in CI and only advisorily, so nothing stopped a malformed document:
+PR #1644 shipped through push, the required check, the merge and the fold with its `### PLAN` heading and
+most of its guidance block gone, every other gate correctly green -- and the fold then deleted the very
+file the one red check named, so the evidence was destroyed by the thing whose success it was warning
+about. CI still reports rather than refuses, from the same code, and `branch-entry` is still not a
+required check.
+
+**Score:** 4
+
+#### What makes this deploy extra special
+
+A consumer gets the same refusal, before the push, on the half of the rule that applies to them: branch
+content in the generic guidance block. The heading-count half stays the source repo's own, so a document
+where they keep a heading of their own is still not refused. Documented as its own gate on the `open-pr`
+skill page and in the portable contributing page, both of which travel with the plugin.
+
+**Score:** 3
+
+#### Pull Request
+
+The branch-document shape rule becomes a shared function and refuses before the push
+
+Plugins: dkj-policy
+
+[PR #1661](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1661)
+
+---
+
+### DEPLOY: docs/1656-gate-count-readme · 20260908-180529
+
+The `dkj-policy` README's one-paragraph summary no longer counts the gates. It read *"Four gates hold the
+whole thing together, and none of them is advisory"* and now reads *"Gates on the branch's own paperwork
+hold the whole thing together"* -- the same claim, with the half that goes stale removed and the half that
+does the work kept verbatim.
+
+The count was correct when it was written and is correct today. What it was not is durable: the paragraph
+sits one sentence above the pointer to
+[`CONTRIBUTING-portable.md`](../plugins/dkj-policy/CONTRIBUTING-portable.md), whose matching sentence
+becomes "Five further gates" the moment
+[#1650](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1650) lands -- so the summary would
+have started contradicting its own next paragraph without anybody editing it. That is the second time this
+count has gone stale by standing still, which is the argument for naming the gates instead: *"Gates on the
+branch's own paperwork"* is what `CONTRIBUTING-portable.md` already calls them, and it stays true at four,
+five or six.
+
+Deliberately scoped to this one sentence. The other counts in the tree are either a different subject or
+sit in files #1650's own branch is already editing; the one it leaves behind,
+`CONTRIBUTING.md:380`, is filed on
+[that thread](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1650#issuecomment-5589481061)
+rather than swept from here.
+
+**Score:** 1
+
+A wrong number in a summary paragraph misleads nobody today -- it prevents a contradiction that has not
+happened yet, and names the failure it prevents. Cosmetic in isolation; worth doing because the alternative
+is finding it a third time.
+
+#### What makes this deploy extra special
+
+This page ships with the plugin, and it is the one the README itself calls *"the page to read"* before
+handing a consumer to `CONTRIBUTING-portable.md`. A consumer adopting the workflow reads the summary and
+the page it points at in that order, so the pending contradiction would have landed on them first and with
+nothing in their own tree to explain it.
+
+**Score:** 1
+
+They read a paragraph that stays true instead of one that quietly stops being true. Cosmetic on arrival,
+and invisible if it works.
+
+#### Pull Request
+
+Drop the gate count from the dkj-policy README's opening paragraph
+
+Plugins: dkj-policy
+
+[PR #1658](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1658)
+
+---
+
+### DEPLOY: docs/1642-pre-split-entry-shape · 20260908-175640
+
+Four comments in `../scripts/lib/entry-scaffold-lib.ps1` and its guardrail suite described the
+pre-split root changelog entry incompatibly -- an H2 title naming no branch in one place, an H1 title
+with a `**Branch:**` line below it in the other -- and each was the stated reason a piece of live
+behaviour survives. The history settles it: of the **344** pre-split root entries this repo has ever
+had, **0** carry a `**Branch:**` line and **0** open with an H1 (334 open at H3, 10 at H2 in the flat
+window of August 5-6, 2026). The `**Branch:**` shape was never a root entry at all -- it sat below the
+H1 title of the pre-split **per-branch** files, `branch/branch-changelog.md` (`# Branch changelog`) and
+`branch/branch-progress.md` -- and the release cut's root scan is non-recursive, so `branch/` was never
+in its reach either. All four sites now name that file, cite the measurement, and keep the one
+justification that survives it: the fallback's regex is anchored end to end, which is what makes it
+safe to leave un-narrowed. `Test-BranchChangelogIsFilled`'s docstring reads `AT AN ENTRY LEVEL` rather
+than `as an H2`, since it accepts both and both were written. Behaviour is unchanged -- the report had
+already established the code handles each shape correctly, and this measurement agrees -- but the
+guardrail suite gains the H3 assert it never had, which is the shape 334 of those 344 files actually
+have.
+
+The failure this prevents had not happened yet: a maintainer following the un-corrected comments would
+conclude that a root entry declares its branch, therefore that the name test already answers for it,
+therefore that the level test beside it is dead -- and removing it is exactly what would let the
+release cut, whose guard is "no unfolded entry anywhere", cut straight over all 344.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+N/A. The corrected text travels to consumers in the `dkj-policy` mirror, but nothing a consumer runs
+changes: this is comment prose and one added assert in the source repo's own suite.
+
+**Score:** N/A
+
+#### Pull Request
+
+Name the legacy shape the '**Branch:**' fallback actually answers for
+
+Plugins: dkj-policy
+
+[PR #1657](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1657)
+
+---
 
 ### DEPLOY: fix/1635-fixture-git-judged-siblings · 20260908-173553
 

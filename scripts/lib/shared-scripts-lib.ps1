@@ -447,6 +447,26 @@ function Get-SharedScriptPairs {
             LibOnly = $true
         },
         @{
+            # THE OTHER HALF OF THE SAME COST (issue #1605, September 8, 2026). hook-check-lib above
+            # removed the second interpreter a hook starts; this one removes the REPEAT -- the
+            # 'startup|resume|clear|compact' matcher means a session with four compactions runs every
+            # check five times, and connector-sessioncheck's #1591 fallback cannot be run in-process
+            # at all (it is bounded by a 30 s timeout, which an in-process call cannot be abandoned
+            # under). So its verdict is held for the life of the session instead, keyed on the
+            # session_id the harness writes to the hook's stdin.
+            #
+            # MIRRORED INTO dkj-policy ONLY, and only that, because connector-sessioncheck.ps1 is its
+            # one caller and ships there. A consumer's hook dot-sources it as a $PSScriptRoot sibling,
+            # so a payload without it would find nothing -- which the hook handles by measuring, the
+            # same way it did before this lib existed, but the pair is registered so that never
+            # becomes the normal case. No contract row follows: nothing in it is repo-owned. It reads
+            # a payload the harness sends and writes under temp.
+            Name    = 'session-cache-lib'
+            Source  = 'scripts\lib\session-cache-lib.ps1'
+            Plugin  = 'dkj-policy'
+            LibOnly = $true
+        },
+        @{
             # THE MERGED-PR PROOF (issue #1194, September 1, 2026) -- was THIS ref merged, or only a
             # branch that once wore its name? A THIRD lib with a reader in more than one plugin, and it
             # arrived the way the argument for sharing is usually only made in hindsight: the same
@@ -577,6 +597,43 @@ function Get-SharedScriptPairs {
             Name    = 'park-lib'
             Source  = 'scripts\lib\park-lib.ps1'
             Plugin = 'dkj-policy'
+            LibOnly = $true
+        },
+        @{
+            # Issue #1682, September 9, 2026. The one reading of `git status --porcelain`: the command
+            # with its two flags, and the line parse. Mirrored because BOTH its callers are, and each
+            # dot-sources it by name -- park-lib.ps1 (the uncommitted count behind the backing gate) and
+            # fanout-lib.ps1 (the per-path snapshot behind check-fanout). A consumer whose park-cycle
+            # Stop hook dot-sources a file the mirror does not carry would fail on every turn.
+            #
+            # THE DOT-SOURCE IS GUARDED IN BOTH CALLERS, so a mirror that predates this entry loads
+            # without crashing -- but the function is then missing, which is why it is registered rather
+            # than left to the guard. The guard buys an ordered release, not an optional file.
+            #
+            # ITS OWN FILE, for the reason park-lib's entry gives one line up: native-capture-lib asks
+            # not to be widened again, and a porcelain parse is neither a capture helper nor a park.
+            # Nothing in it is repo-owned -- it takes lines and a repo root and returns paths and status
+            # characters -- so no contract row follows.
+            Name    = 'git-porcelain-lib'
+            Source  = 'scripts\lib\git-porcelain-lib.ps1'
+            Plugin = 'dkj-policy'
+            LibOnly = $true
+        },
+        @{
+            # THE SECOND MIRROR OF THE SAME SOURCE (issue #1689, September 9, 2026), on
+            # native-capture-lib-shopify's and merged-pr-lib-shopify's precedent -- read either of those for
+            # the argument in full. Convert-GitQuotedPath moved in here from sync-rules.ps1, and sync-main.ps1
+            # dot-sources this file directly and unguarded for it, so dkj-team-shopify needs its own copy:
+            # the two plugins are separately versioned and separately installed, and a cross-plugin path is a
+            # dependency a version mismatch breaks silently.
+            #
+            # NOT REACHED THROUGH sync-rules.ps1, which is the file the decoder came OUT of and the one place
+            # it must not go back into: that entry's own note says it is dependency-free on purpose, because
+            # the live-theme guard dot-sources it on every command inside a catch that returns no live theme
+            # id. It never called the function it defined, so losing it cost that file nothing.
+            Name    = 'git-porcelain-lib-shopify'
+            Source  = 'scripts\lib\git-porcelain-lib.ps1'
+            Plugin = 'dkj-team-shopify'
             LibOnly = $true
         },
         @{
@@ -1004,6 +1061,50 @@ function Get-SharedScriptPairs {
             # are where all four refusals live. Pinned by scripts/tests/claim-issue.tests.ps1.
             Name    = 'claim-issue-lib'
             Source  = 'scripts\lib\claim-issue-lib.ps1'
+            Plugin = 'dkj-policy'
+            LibOnly = $true
+        },
+        @{
+            # THE DETECTION HALF of the working-copy boundary (issue #1670). #1665 measured a dispatched
+            # review specialist discarding three files of the orchestrator's uncommitted work with a
+            # `git checkout HEAD --` it was never asked to run -- no error, no notice, and a clean
+            # `git status` afterwards, which the reviewer cited as proof it had changed nothing. That was
+            # repaired with an INSTRUCTION (the shared block working-copy-boundary, carried by every
+            # agent def holding Bash), and #1670's finding was that nothing anywhere DETECTED it, so a
+            # repeat would be exactly as invisible as the first.
+            #
+            # IT TRAVELS IN dkj-policy for the reason claim-issue does, and it is the same split: the
+            # RULE lives in the orchestrator's manual in dkj-team-alpha (Chris owes a reconciliation
+            # step after a fan-out), the MECHANISM sits here with the other git mechanics -- new-branch,
+            # park-cycle, prune-merged. Nothing in it knows what a specialist is.
+            #
+            # INVOKED RATHER THAN AUTOMATIC, and the choice is recorded because this repo's laziness rule
+            # points the other way: a step that must happen every time belongs in a hook. #1670 left the
+            # home open between a hook, tooling and a documented step, and the invoked script shipped
+            # first because a Pre/PostToolUse pair around the dispatch rests on the matcher name of the
+            # dispatch tool, which had not been measured. The hook variant stays open on #1670 and is
+            # cheap to add, because the judgement it needs is already the shared lib below.
+            Name   = 'check-fanout'
+            Source = 'scripts\task\check-fanout.ps1'
+            Plugin = 'dkj-policy'
+            Skill  = 'check-fanout'
+            # A fixture root, so the suite can put this script in front of throwaway repos -- including
+            # the one where it reproduces the #1665 command for real. A caller never types it.
+            SkillParamsExempt = @('RootOverride')
+            # NO MeasureArgs, and that is a declaration rather than an omission: -Capture WRITES a
+            # baseline file to the temp directory, and -Compare DELETES the one it was given. A timing
+            # harness must not leave scratch files behind or consume somebody's baseline as a side
+            # effect of measuring, and there is no third, read-only form.
+        },
+        @{
+            # The snapshot and the whole shrinkage judgement behind check-fanout.ps1. A lib for the
+            # reason park-lib's own comparison is one: what can be got WRONG here is a decision -- growth
+            # must stay silent, a committed path is not a loss, `git reset` is not a loss, a branch change
+            # refuses instead of differencing -- and each of those is three lines in a suite against
+            # hand-built snapshots, where the same case through the script would need a fixture repo.
+            # Pinned by scripts/tests/fanout-lib.tests.ps1, which also drives the script end to end.
+            Name    = 'fanout-lib'
+            Source  = 'scripts\lib\fanout-lib.ps1'
             Plugin = 'dkj-policy'
             LibOnly = $true
         },

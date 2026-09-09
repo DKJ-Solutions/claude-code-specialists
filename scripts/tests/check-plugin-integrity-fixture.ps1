@@ -48,6 +48,9 @@ $BranchInfoSrc = Join-Path $RepoRoot 'scripts\lib\branch-info.ps1'
 # changelog's tier sections. Copied for the same reason as the five above -- this fixture runs the REAL
 # script, so a missing sibling is a broken suite rather than one skipped check.
 $EntryScaffoldSrc = Join-Path $RepoRoot 'scripts\lib\entry-scaffold-lib.ps1'
+# Seventh, since #1650: entry-scaffold-lib.ps1 dot-sources this one for Get-DisplayRef -- see the copy
+# below for what a fixture that forgets it looks like.
+$RefPrintLibSrc = Join-Path $RepoRoot 'scripts\lib\ref-print-lib.ps1'
 # Seventh, since the plugin set became derived (August 9, 2026): plugin-tree-lib.ps1, dot-sourced by
 # release-lib AND by shared-scripts-lib, and read by the lint itself for the published plugin roots.
 # Copied for the same reason as the six above.
@@ -221,6 +224,13 @@ function New-IntegrityFixture {
     Copy-Item -Path $ReleaseLibSrc -Destination (Join-Path $Fixture 'scripts\lib\release-lib.ps1') -Force
     Copy-Item -Path $BranchInfoSrc -Destination (Join-Path $Fixture 'scripts\lib\branch-info.ps1') -Force
     Copy-Item -Path $EntryScaffoldSrc -Destination (Join-Path $Fixture 'scripts\lib\entry-scaffold-lib.ps1') -Force
+    # AND ITS OWN SIBLING WITH IT (#1650). entry-scaffold-lib.ps1 dot-sources ref-print-lib.ps1 from
+    # $PSScriptRoot, so a fixture that copies the one and not the other hands the lint gate a lib that
+    # THROWS ON LOAD -- and the failure is loud rather than subtle: 85 of this suite's asserts went red at
+    # once, because the script died before it could report a single finding. That loudness is the reason
+    # the dot-source is unconditional rather than guarded: a fixture forgetting it fails immediately
+    # instead of silently dropping the control-character strip the lib loads it for.
+    Copy-Item -Path $RefPrintLibSrc -Destination (Join-Path $Fixture 'scripts\lib\ref-print-lib.ps1') -Force
     Copy-Item -Path $PluginTreeSrc -Destination (Join-Path $Fixture 'scripts\lib\plugin-tree-lib.ps1') -Force
     Copy-Item -Path $PrBodyLibSrc -Destination (Join-Path $Fixture 'scripts\lib\pr-body-lib.ps1') -Force
     Copy-Item -Path $MeasureContextSrc -Destination (Join-Path $Fixture 'scripts\lib\measure-context-lib.ps1') -Force

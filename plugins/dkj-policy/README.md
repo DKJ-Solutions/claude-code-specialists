@@ -27,8 +27,8 @@ A branch is never entry-less: creating one writes the two files it works in — 
 list — and the branch cannot reach a PR until both are answered. The entry declares **how far the change
 reaches** (a tier) and **what it weighs** for each audience (a score), and that pair decides where it lands
 in `CHANGELOG.md` and which release documents it appears in. The merge folds the entry into the changelog;
-a release empties the changelog into dated notes and moves a tag. Four gates hold the whole thing together,
-and none of them is advisory.
+a release empties the changelog into dated notes and moves a tag. Gates on the branch's own paperwork hold
+the whole thing together, and none of them is advisory.
 
 **The cycle itself is written out in [`CONTRIBUTING-portable.md`](CONTRIBUTING-portable.md), beside this
 file.** That is the page to read — and the page to point your own contributors at — because it names the
@@ -138,6 +138,7 @@ below changes for you, and nothing here asks you to run anything.
 | [`check-policy-drift`](skills/check-policy-drift/SKILL.md) | your own `CLAUDE.md` and this plugin's pages may be saying different things — lays every legislating document out in rank order so you can read them against each other. Report-only; it edits nothing |
 | [`prune-merged`](skills/prune-merged/SKILL.md) | merged branches have piled up in the clone — reaps the local ones it can prove are merged, and leaves every other one alone |
 | [`plugin-versions`](skills/plugin-versions/SKILL.md) | unsure whether this checkout is on the current plugin release — shows, per enabled plugin, the version installed for this checkout against the marketplace clone's version and HEAD, with a verdict on whether a plugin update is due |
+| [`check-fanout`](skills/check-fanout/SKILL.md) | work is about to be handed to subagents while the checkout holds uncommitted edits — reads the working copy before the dispatch and again after, and reports only what SHRANK: a change that is gone, or a stash entry that is. Report-only, and it cannot restore |
 | [`cut-release`](skills/cut-release/SKILL.md) | the release: the bump, the notes, the tag, and the closing steps the script does not automate |
 | [`release-notes-page`](skills/release-notes-page/SKILL.md) | after a release — builds the hand-written notes into one browsable page for the reader they are written for, and optionally the Cloudflare Worker that hosts it |
 | [`fix-mojibake`](skills/fix-mojibake/SKILL.md) | repairing encoding damage in markdown |

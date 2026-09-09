@@ -67,6 +67,14 @@
     Pure ASCII (repo convention for .ps1).
 #>
 
+# The porcelain read and its line parse (#1682), which fanout-lib.ps1 dot-sources too -- that shared
+# ownership is the whole point of the file. Guarded on fanout-lib's grounds: dot-sourcing twice is
+# harmless, and a tree whose mirror predates this lib must not crash on load. Invoke-NativeCapture is
+# deliberately NOT dot-sourced here and never has been -- every caller of this lib already supplies it,
+# and the porcelain lib guards its own copy the same way.
+$parkPorcelainLib = Join-Path $PSScriptRoot 'git-porcelain-lib.ps1'
+if (Test-Path -LiteralPath $parkPorcelainLib -PathType Leaf) { . $parkPorcelainLib }
+
 # THE TWO SCOPES, AND WHAT EACH IS CALLED IN THE COMMIT. One map, so the words and the pathspec are the
 # same decision -- see the note above. 'Everything' carries no pathspec: git add -A and a bare commit.
 $script:GitParkScopes = @{
@@ -168,7 +176,9 @@ function Get-GitParkBacking {
         a child's stdout with whatever console code page the run inherited. Quoting holds the wire to
         ASCII, where every candidate code page agrees, so a filename with an accent cannot decode into
         something that accidentally matches -- or fails to match -- the path being excluded. A repo may
-        set core.quotepath in its own config, hence -c rather than trusting the default.
+        set core.quotepath in its own config, hence -c rather than trusting the default. It is stated
+        here because THIS function still spawns the `git diff` half itself; since #1682 the porcelain
+        half inherits the same flag from git-porcelain-lib.ps1, which documents it for both callers.
     #>
     param(
         [Parameter(Mandatory)][string]$RepoRoot,
@@ -212,25 +222,26 @@ function Get-GitParkBacking {
 
     $uncommitted = 0
     $uncommittedKnown = $false
-    # --untracked-files=all, AND THE DEFAULT WAS MEASURABLY WRONG HERE. git's default collapses an
-    # untracked DIRECTORY to a single entry naming the directory -- '?? dkj-policy/' -- so on
-    # the very first park of a branch, where the cycle document's folder is itself new, the one path this
-    # function is asked to EXCLUDE never appears and its parent is counted as unpublished work instead.
-    # Caught by the suite on the ordinary happy path: 2 uncommitted files reported where there was 1.
-    # A per-file listing also reads better ('12 file(s)' means twelve files), and it respects .gitignore,
-    # so the untracked-build-directory case the collapse protects against is normally ignored anyway.
-    $stRes = Invoke-NativeCapture -FilePath 'git' -Arguments @('-c', 'core.quotePath=true', '-C', $RepoRoot, 'status', '--porcelain', '--untracked-files=all')
-    if ($stRes.ExitCode -eq 0) {
+    # THE READ AND THE PARSE COME FROM git-porcelain-lib.ps1 (#1682), fanout-lib.ps1's other caller.
+    # Both flags and all three lessons live in that file's header, this function's measurement among
+    # them; what stays here is what the exclusion does with them.
+    #
+    # WHY --untracked-files=all MATTERS TO THE EXCLUSION SPECIFICALLY, which is the half the lib cannot
+    # state: git's default collapses an untracked DIRECTORY to one entry naming the directory --
+    # '?? dkj-policy/' -- so on the very first park of a branch, where the cycle document's folder is
+    # itself new, the one path this function is asked to EXCLUDE never appears at all and its parent is
+    # counted as unpublished work instead. Caught by the suite on the ordinary happy path: 2 uncommitted
+    # files reported where there was 1.
+    #
+    # ONLY THE COUNT AND THE EXCLUSION ARE THIS FUNCTION'S, and the lib's From field is deliberately
+    # ignored: a count follows no file, so a rename is one outstanding path either way. The keys were
+    # already forward-slashed on both sides before this change and the lib normalises Path, so the
+    # comparison is unchanged.
+    $st = Get-GitPorcelainStatus -RepoRoot $RepoRoot
+    if ($st.Known) {
         $uncommittedKnown = $true
-        foreach ($line in (($stRes.Output | Out-String) -split '\r?\n')) {
-            if ($line.Length -lt 4) { continue }
-            $path = $line.Substring(3).Trim()
-            # A rename reads 'old -> new'; the new path is the one that exists on disk.
-            $arrow = $path.IndexOf(' -> ')
-            if ($arrow -ge 0) { $path = $path.Substring($arrow + 4) }
-            $path = $path.Trim().Trim('"')
-            if (-not $path) { continue }
-            if ($skip.ContainsKey(($path -replace '\\', '/'))) { continue }
+        foreach ($e in $st.Entries) {
+            if ($skip.ContainsKey($e.Path)) { continue }
             $uncommitted++
         }
     }
@@ -629,7 +640,7 @@ function Invoke-GitParkCommit {
     $msg = "park: $Branch ($($script:GitParkScopes[$Scope]))"
     if ($Intent.Trim()) { $msg = "$msg`n`n$($Intent.Trim())" }
     if ($BodyNote.Trim()) { $msg = "$msg`n`n$($BodyNote.Trim())" }
-    $msgFile = Join-Path ([System.IO.Path]::GetTempPath()) "git-park-msg-$PID.txt"
+    $msgFile = New-ScratchPath -Label 'git-park-msg' -Extension '.txt'
     [System.IO.File]::WriteAllText($msgFile, $msg, (New-Object System.Text.UTF8Encoding $false))
     try {
         $commitArgs = @('-C', $RepoRoot, 'commit', '-F', $msgFile)

@@ -1,8 +1,9 @@
 <#
 .SYNOPSIS
     Regression tests for scripts/lib/native-capture-lib.ps1 -- the -Utf8 capture path (issue #907),
-    the non-interactive environment + bounded wait (inbound #1179), and the shared read of the capture
-    files while a killed grandchild still holds a handle (#1252).
+    the non-interactive environment + bounded wait (inbound #1179), the shared read of the capture
+    files while a killed grandchild still holds a handle (#1252), and that this read REPORTS that
+    hold instead of leaving a caller to guess what an empty capture on exit 0 meant (#1679).
 
 .DESCRIPTION
     Dependency-free: no Pester needed, only PowerShell. Exit code 0 if everything passes, 1 on a
@@ -331,7 +332,7 @@ try {
     Assert-True (-not (Test-Path -LiteralPath $survived)) 'the grandchild was killed with its parent -- taskkill /T, not Stop-Process'
 
     # ---------------------------------------------------------------------------------------------
-    Write-Host 'Read-NativeCaptureFileText -- a lingering write handle is not an IO error (#1252)' -ForegroundColor Cyan
+    Write-Host 'Read-NativeCaptureFile -- a lingering write handle is not an IO error (#1252), and it is now REPORTED (#1679)' -ForegroundColor Cyan
 
     # THE OTHER HALF OF THE KILL ABOVE. The grandchild dies, but not synchronously: the bounded wait
     # after Stop-NativeProcessTree is on the DIRECT child only, so a grandchild that inherited the
@@ -341,8 +342,13 @@ try {
     # FileShare.Read, which cannot coexist with the writer handle still open, so it throws
     # "being used by another process". The fixture holds that handle for real rather than simulating
     # the window with a sleep.
+    #
+    # AND THE HANDLE IS WHAT MAKES THE FIXTURE DETERMINISTIC, which is why #1679's asserts live here
+    # rather than against a real child. A grandchild race cannot be scheduled; a FileStream can, so
+    # WriterHeld is pinned on a writer this suite owns.
+    $utf8NoBom = New-Object System.Text.UTF8Encoding $false
     $held = Join-Path $sandbox 'held-open.txt'
-    [System.IO.File]::WriteAllText($held, "flushed output`n", (New-Object System.Text.UTF8Encoding $false))
+    [System.IO.File]::WriteAllText($held, "flushed output`n", $utf8NoBom)
     $writer = New-Object System.IO.FileStream(
         $held, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Write, [System.IO.FileShare]::Read)
     try {
@@ -350,11 +356,73 @@ try {
         try { [void][System.IO.File]::ReadAllText($held) } catch { $threw = $true }
         Assert-True $threw 'the plain ReadAllText throws while the handle is held -- this is the bug the CI red was'
 
-        $got = Read-NativeCaptureFileText -Path $held -Encoding (New-Object System.Text.UTF8Encoding $false)
-        Assert-Equal "flushed output`n" $got 'the shared read returns what was flushed instead of throwing'
+        $gotHeld = Read-NativeCaptureFile -Path $held -Encoding $utf8NoBom
+        Assert-Equal "flushed output`n" $gotHeld.Text 'the shared read returns what was flushed instead of throwing'
+        Assert-True $gotHeld.WriterHeld 'and it SAYS the writer still held the file -- the fact five callers used to have to guess (#1679)'
+
+        # THE PROBE IS NOT SATISFIED BY A WAIT IT CANNOT WIN. The writer above is held for the whole
+        # block, so the budget is spent in full and the verdict still comes back true -- which is the
+        # correct answer for a holder that is alive rather than being reaped, and the reason the budget
+        # is short. Asserted on elapsed as well as on the flag: a WriterHeld that arrived without
+        # waiting would mean the settle parameter is being ignored.
+        $waitClock = [System.Diagnostics.Stopwatch]::StartNew()
+        $gotWaited = Read-NativeCaptureFile -Path $held -Encoding $utf8NoBom -SettleMilliseconds 300
+        $waitClock.Stop()
+        Assert-True $gotWaited.WriterHeld 'a holder that never releases is still reported as a short read after the budget'
+        Assert-True ($waitClock.ElapsedMilliseconds -ge 300) "the settle budget was actually spent (waited $($waitClock.ElapsedMilliseconds)ms of 300)"
+        Assert-Equal "flushed output`n" $gotWaited.Text 'and what was flushed still comes back -- #1252 is not weakened by #1679'
     } finally {
         $writer.Dispose()
     }
+
+    # A SETTLED FILE IS THE OTHER HALF OF THE VERDICT, and without it WriterHeld could be hard-coded
+    # true and every assert above would still pass.
+    $settledFile = Join-Path $sandbox 'settled.txt'
+    [System.IO.File]::WriteAllText($settledFile, "complete output`n", $utf8NoBom)
+    $gotSettled = Read-NativeCaptureFile -Path $settledFile -Encoding $utf8NoBom
+    Assert-Equal "complete output`n" $gotSettled.Text 'a file nobody holds reads whole'
+    Assert-True (-not $gotSettled.WriterHeld) 'and reports no writer -- so WriterHeld discriminates rather than always answering yes'
+
+    # AN EMPTY FILE NOBODY HOLDS IS THE CASE THE WHOLE ISSUE TURNS ON: empty AND settled means the
+    # child genuinely wrote nothing, which is a legitimate answer at two of this repo's own call sites
+    # (`git show --name-status --format=` on a commit that changed no files, and `gh --json body -q
+    # .body` on a PR with an empty body). A caller may only treat empty as a failure when WriterHeld
+    # says so, and this is the assert that keeps the two distinguishable.
+    $emptyFile = Join-Path $sandbox 'empty-settled.txt'
+    [System.IO.File]::WriteAllText($emptyFile, '', $utf8NoBom)
+    $gotEmpty = Read-NativeCaptureFile -Path $emptyFile -Encoding $utf8NoBom
+    Assert-Equal '' $gotEmpty.Text 'an empty capture reads as empty'
+    Assert-True (-not $gotEmpty.WriterHeld) 'and as SETTLED -- "the child said nothing" is a different answer from "we read too early"'
+
+    # A MISSING FILE IS NOT A SHARING VIOLATION AND IS NOT WAITED ON. FileNotFoundException derives
+    # from IOException, so a retry loop that catches the base type would spend the entire budget before
+    # failing with the error it started with. Pinned on elapsed, because the throw alone cannot tell a
+    # prompt rethrow from a patient one.
+    $missingClock = [System.Diagnostics.Stopwatch]::StartNew()
+    $missingThrew = $false
+    try {
+        $null = Read-NativeCaptureFile -Path (Join-Path $sandbox 'not-there.txt') -Encoding $utf8NoBom -SettleMilliseconds 3000
+    } catch {
+        $missingThrew = $true
+    }
+    $missingClock.Stop()
+    Assert-True $missingThrew 'a missing capture file still throws rather than returning an empty document'
+    Assert-True ($missingClock.ElapsedMilliseconds -lt 1500) "and it throws at once rather than spending the settle budget (took $($missingClock.ElapsedMilliseconds)ms of a 3000ms budget)"
+
+    # ---------------------------------------------------------------------------------------------
+    Write-Host 'Invoke-NativeCapture -- ShortRead is present on BOTH arms (#1679)' -ForegroundColor Cyan
+
+    # THE PROMISE IS THE ONE TimedOut ALREADY MAKES: a caller reads one field without knowing which
+    # arm answered it. The & arm has no capture file at all, so its $false is a fact rather than a
+    # default -- and a caller that has to test for the field's existence is back to guessing.
+    $ampRun = Invoke-NativeCapture -FilePath 'git' -Arguments @('--version')
+    Assert-True ($null -ne $ampRun.PSObject.Properties['ShortRead']) 'the & arm returns a ShortRead field'
+    Assert-True (-not $ampRun.ShortRead) 'and it is false -- the & operator reads the pipeline directly, so there is no capture file to truncate'
+
+    $utf8Run = Invoke-NativeCapture -FilePath 'git' -Arguments @('--version') -Utf8
+    Assert-True ($null -ne $utf8Run.PSObject.Properties['ShortRead']) 'the -Utf8 arm returns a ShortRead field'
+    Assert-True (-not $utf8Run.ShortRead) 'and an ordinary clean child is not a short read -- the probe must not cry wolf on the normal case'
+    Assert-Equal 0 $utf8Run.ExitCode 'the fixture command really did succeed, so the assert above is about the read and not about a failure'
 
     # ---------------------------------------------------------------------------------------------
     Write-Host 'Invoke-NativeCapture -Utf8 -- the code page cannot reach the answer (issue #907)' -ForegroundColor Cyan
@@ -541,6 +609,98 @@ Assert-True ($readers.Count -gt 3) "more than three files read the bound, which 
 Assert-True (@($readers | Where-Object { $_.Name -eq 'claim-issue.ps1' }).Count -eq 1) 'and claim-issue.ps1 is now among them (#1639)'
 
 Write-Host ''
+Write-Host ''
+Write-Host 'New-ScratchPath -- a temp path nobody can name in advance (#1659)' -ForegroundColor Cyan
+
+$tempRoot = ([System.IO.Path]::GetTempPath()).TrimEnd('\', '/')
+
+$p1 = New-ScratchPath -Label 'ccs-scratch-test'
+$p2 = New-ScratchPath -Label 'ccs-scratch-test'
+Assert-True ($p1 -ne $p2) 'two calls with the SAME label return different paths -- there is no name to pre-plant a junction at'
+Assert-True ((Split-Path -Parent $p1) -eq $tempRoot) 'the result is a direct child of the temp directory'
+Assert-True ((Split-Path -Leaf $p1) -match "^ccs-scratch-test-$PID-[0-9a-f]{32}$") 'the leaf is <label>-<pid>-<32 hex>, so a leftover is still attributable to a run that is still alive'
+Assert-True (-not (Test-Path -LiteralPath $p1)) 'nothing is created without -Directory -- ship-pr hands its path to `git worktree add`, which makes it'
+
+Assert-True ((New-ScratchPath -Label 'ccs-scratch-test' -Extension '.md') -match '\.md$') '-Extension lands at the end, after the guid'
+
+$pd = New-ScratchPath -Label 'ccs-scratch-test' -Directory
+try {
+    Assert-True (Test-Path -LiteralPath $pd -PathType Container) '-Directory creates the directory itself'
+} finally { Remove-Item -Recurse -Force -LiteralPath $pd -ErrorAction SilentlyContinue }
+
+# THE LABEL IS THE ONE HALF A CALLER COMPOSES -- ship-pr puts a PR number in it, verify-resolved-issues
+# an issue number, sync-main a branch name. These pin that no value of it can walk out of the temp
+# directory, which is the property the "direct child" assert above states and this one enforces.
+function Test-ScratchThrows { param([scriptblock]$Body) try { & $Body | Out-Null; return $false } catch { return $true } }
+Assert-True (Test-ScratchThrows { New-ScratchPath -Label '..' }) 'a label of ".." is refused'
+Assert-True (Test-ScratchThrows { New-ScratchPath -Label 'a/../../b' }) 'and so is one carrying a separator, so no label can leave the temp directory'
+Assert-True (Test-ScratchThrows { New-ScratchPath -Label 'ok' -Extension 'md' }) 'an extension missing its dot is refused rather than silently glued to the guid'
+
+Write-Host ''
+Write-Host 'Every temp path the SHIPPING scripts compose carries a guid (#1659)' -ForegroundColor Cyan
+
+# THE SCAN, RATHER THAN A NOTE IN A DOC. #1659 was filed because seven sites had each hand-composed
+# "<label>-$PID" and nothing stopped an eighth; a rule enforced by memory is one that gets skipped.
+#
+# THE RULE IS ON THE TEMP ROOT ITSELF, rather than on the
+# join standing beside it. Requiring the two together on one line was the first shape, and it had a hole
+# a reformat walks straight through: assign the root to a variable on one line, join to it on the next,
+# and the composition is invisible to a line scan while being exactly what the rule forbids. So any
+# non-comment line naming a temp root -- the .NET call, or the TEMP/TMP environment variables, which is
+# the second spelling of the same hole -- must carry a guid or an explicit exemption marker. That also
+# drops the "a mere READER of the temp root is not the subject" carve-out: a reader is now declared
+# rather than inferred.
+#
+# THIS PARAGRAPH IS WORDED TO KEEP THE TWO TOKENS OFF ONE LINE, and that is not fussiness. The scanner in
+# test-suite-gate.tests.ps1 reads every line of every file in this directory, comments and string
+# literals included, and it flagged an earlier draft of this very comment as a predictable fixture path.
+# A guard's own prose is inside the tree its sibling guard measures.
+#
+# THE EXEMPTION IS A MARKER AT THE SITE, not a match on the line's source text. Two lines cannot carry a
+# guid honestly: New-ScratchPath's own composition (it USES the guid built one line above) and
+# check-claude-home's enumeration of the temp roots (it composes nothing). Pinning the first by its
+# exact text was the first shape, and a rename of $leaf or a reflow of that one line would have turned
+# the scan against its own composer. '# temp-path-exempt:' says so where a reader and a diff both see
+# it, and the count below is what stops a third appearing quietly.
+#
+# scripts/tests/ is out of scope: fixtures have their own rule (test-suite-gate.tests.ps1 requires $PID
+# or a guid) and it answers a DIFFERENT question -- two concurrent runs tearing down each other's tree,
+# not a hostile neighbour -- so it leaves the exposure standing there. Measured September 8, 2026: 108
+# predictable fixture paths across 66 files, 53 of them opening with a recursive delete at that path.
+# Pre-existing, larger than the half this scan closes, and filed as #1664 rather than swept in with it.
+# Built from fragments so this pattern does not itself read as one of the tokens it hunts -- see the
+# paragraph above about a guard's prose living inside the tree its sibling guard measures.
+$tempRootPattern = 'Get' + 'TempPath' + '|\$env:TEMP\b|\$env:TMP\b'
+$tempOffenders = @()
+$tempExempt    = @()
+foreach ($f in @(Get-ChildItem -LiteralPath $scriptsRoot -Recurse -Filter '*.ps1' -File |
+                 Where-Object { $_.Directory.Name -ne 'tests' })) {
+    $n = 0
+    foreach ($line in [System.IO.File]::ReadAllLines($f.FullName)) {
+        $n++
+        $t = $line.Trim()
+        if ($t.StartsWith('#'))               { continue }
+        if ($t -notmatch $tempRootPattern)    { continue }
+        if ($t -match 'temp-path-exempt')     { $tempExempt += ('{0}:{1}' -f $f.Name, $n); continue }
+        if ($t -match 'NewGuid')              { continue }
+        $tempOffenders += ('{0}:{1}' -f $f.Name, $n)
+    }
+}
+Assert-True ($tempOffenders.Count -eq 0) ('no shipping script composes a temp path without a guid' + $(if ($tempOffenders.Count) { ' -- ' + ($tempOffenders -join ', ') } else { '' }))
+Assert-True ($tempExempt.Count -eq 2) ("exactly two lines are declared exempt -- the composer and check-claude-home's reader (found $($tempExempt.Count): " + ($tempExempt -join ', ') + ')')
+
+# AND THE CONVERSION IS PINNED AT ITS CALL SITES, so a revert to a hand-composed path fails here rather
+# than only in the scan above -- which a reverter could satisfy by adding a guid and leaving the class
+# scattered again. FIVE CALLER FILES, not five sites: open-pr.ps1 holds two of the seven sites, which is
+# why the two counts in this branch differ and why this comment says which unit it is using.
+$scratchCallers = @(Get-ChildItem -LiteralPath $scriptsRoot -Recurse -Filter '*.ps1' -File |
+                    Where-Object { $_.Directory.Name -ne 'tests' -and $_.Name -ne 'native-capture-lib.ps1' } |
+                    Where-Object { (Get-Content -LiteralPath $_.FullName -Raw) -match 'New-ScratchPath' })
+Assert-True ($scratchCallers.Count -ge 5) "the composer is used across the script layer rather than in one place (found $($scratchCallers.Count) files)"
+foreach ($expected in @('park-lib.ps1', 'open-pr.ps1', 'ship-pr.ps1', 'verify-resolved-issues.ps1', 'sync-main.ps1')) {
+    Assert-True (@($scratchCallers | Where-Object { $_.Name -eq $expected }).Count -eq 1) "$expected composes its temp path through New-ScratchPath"
+}
+
 if ($script:fail -eq 0) {
     Write-Host "Result: $($script:pass) pass, 0 fail." -ForegroundColor Green
     exit 0

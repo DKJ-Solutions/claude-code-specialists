@@ -2127,6 +2127,233 @@ all. The machine's own resolution — `$env:TEMP` and a literal `\temp\` path se
 What is pinned instead is the boundary logic those roots feed, including that a sibling directory whose
 name merely *begins* with a scratch root's name is not inside it.
 
+#### Check 35, and the sweep that reported itself finished (September 8, 2026, [#1655](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1655))
+
+**The check exists because a sweep is not an enforcement**, and this one is the cleanest instance of that
+this repo has. [#1635](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1635) moved the
+judging of a test fixture's own git commands into
+[`scripts/lib/fixture-git-lib.ps1`](../../../scripts/lib/fixture-git-lib.ps1) and converted seventeen
+suites onto it — and left nothing that refuses the next copy of the idiom it removed. The idiom was never
+a mistake somebody made once; it was the **house style**, copied from suite to suite for as long as
+`scripts/tests/` has existed, and the next fixture builder is written by copying the nearest neighbour.
+
+**What the measurement actually found, and it is not what the report predicted.** #1655 asked for the
+matcher to be run over the swept tree, expecting zero, and over the pre-sweep tree, expecting the fifteen
+suites it had counted. The first number came back **27, in four files** — `find-specialist-mentions`,
+`shared-scripts`, `source-repo-guard` and `fresh-consumer.measure`, whose spellings the sweep's own search
+never reached: `git ... 2>&1 | Out-Null` with no `&`, and `& $git @(...)` over a scriptblock. So the
+branch that added the check also finished the sweep, and the check is born green with **0 exemptions**.
+The pre-sweep tree read **182 findings across 18 files** — the house style, measured.
+
+**The reason #1635 did not just add the check was a good one, and answering it was the work.** This repo
+has scar tissue from checks born needing an exemption list (the stale-path check declined at 124 findings
+all false, above), and there is a real false-positive class here: a git call that is a **question** rather
+than a mutation. A `rev-parse --verify --quiet` on a ref *expected* to be absent answers with exit 1 and
+is judged on the very next line; counting it would report every negative case as a defect, and #1635's own
+conversion hit that class twice.
+
+**What separates the two classes is cheap, and it is not a list of git verbs**: a question's exit code is
+**read, and read immediately**. So a call is cleared when `$LASTEXITCODE` or `Assert-FixtureGitOk` appears
+in the same statement or the next one. Over both trees that rule produced **zero probe false positives** —
+not one `rev-parse`, `ls-remote` or `show-ref` call appears in either finding set — and it also clears
+`publish-to-business.tests.ps1`'s deliberately failing probe, which reads `$probeCode = $LASTEXITCODE`.
+
+**The subject is a DISCARDED result, not every unjudged call, and that bound was measured too.** Widening
+it to a bare statement pipeline (`git log --oneline` with no `Out-Null`) yields **20 findings on this tree
+and 20/20 are false** — every one a value-returning question, a helper's implicit return or
+`return @(& git ...)`. Discarding the output *and* ignoring the exit code is the combination meaning
+nothing git said was read; either alone is ordinary.
+
+**And the check's own stated boundary was probed rather than trusted, which is what found the gaps the
+measurement could not.** Running contrived shapes past it turned up a third way to throw a result away —
+a `[void]` cast — that this tree simply does not contain, so no amount of measuring it would have
+surfaced. Leaving it out would not have stopped the idiom; it would have renamed it, and the finding's
+own message would have become advice on how to get past the check. The rule generalises: a measurement
+tells you what a check catches *here*, and only a probe tells you what it would wave through.
+
+**The code review then found the same class one level deeper, and that one is the more instructive
+half.** Adding the `[void]` arm meant walking out of the `(...)` a cast requires — and only that arm did
+it, so `$null = (& git ...)` and `(& git ...) | Out-Null` were both silently skipped: the exact call the
+check exists to catch, wearing one pair of brackets. Neither spelling exists in this tree, so the probe
+above did not reach them either; what found it was noticing that three arms of one check disagreed about
+wrapping. **The repair is that the unwrap is now shared rather than written per-arm** — climbed once, so
+every discard spelling is judged on the same node. A guard whose arms disagree about a detail teaches
+whichever shape the weakest arm accepts.
+
+**The clearing condition moved onto the AST in the same pass**, for the reason check 31 already states —
+*through the parser, not by line matching* — and it applies with extra force to a condition that
+**clears** a finding: a text match on `$LASTEXITCODE` is satisfied by the name sitting in a single-quoted
+string or a trailing comment, and a wrongly cleared miss leaves nothing behind to notice. A
+`VariableExpressionAst` is a read; a comment is not in the AST at all.
+
+**Two invocation spellings are in scope, because a check written BECAUSE spellings vary must not repeat
+the sweep's mistake**: a command named `git`, and `& $git` where the variable is named exactly `git`. A
+wrapper under any other name is out of reach, and the check's own comment says so rather than implying
+coverage it does not have.
+
+**The check is free on a gate run; its TESTS were not, and that is where the cost review earned its
+place.** Check 35 rides the `Get-PsScriptCommandAsts` cache checks 31 and 33 already populate, so the
+gate measures 11.21s with it against 11.26s without — noise. But each scenario asserting on gate output
+spawns a fresh PowerShell over the ~4,000-line script, ~1.1s of interpreter start and parse whatever it
+asserts, and written the obvious way — one rewrite-and-reinvoke per shape — the scenarios cost **12
+invocations, taking the docs suite from 54.5s to 63.7s (+17%)** on a file that runs on every push and
+again in CI. The shapes are independent, so they batch by **expected verdict**: everything that must fire
+in one run, everything that must stay silent in the next. Same asserts, **3 invocations, +2.8s instead of
++9.2s**. What pays for it is that each probe carries its shape in its file name, so one run's output still
+says which shape failed — batching scenarios that could not be told apart afterwards would trade a real
+diagnostic for the seconds, which is a different and worse deal.
+
+**And the probe that took this measurement carried the defect it was measuring for.** Its first run
+reported 36 findings including nine `rev-parse` probes that the next-statement rule should have cleared —
+because `@($i, $i + 1)` is `@($i, $i) + 1` in PowerShell, the comma binding tighter than the addition, so
+it silently checked statements `$i`, `$i` and `1`. Nine false positives from a two-character omission, in
+the pass whose whole job was deciding whether the false-positive rate was acceptable. The parenthesised
+form is now in the check with a comment saying why, and it belongs beside the other traps that produce
+well-formed wrong output.
+
+#### The nested-worktree exclusion, measured and DECLINED (September 9, 2026, [#1678](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1678))
+
+**The tree walks in this gate are FILESYSTEM walks, not git walks**, so a worktree registered inside the
+repo is a second complete copy of the tree the gate is standing in. Measured here with one probe at
+`.claude/worktrees/probe-1678`: every recursive count from the root doubles exactly — `*-agent.md` 26 to
+52, `plugin.json` 6 to 12, `*.ps1` 233 to 466 — and the gate then fails with **26 errors, one per
+specialist id, each naming the REAL file as the offender** and the worktree's copy as the legitimate
+claimant, because that path sorts first. The coverage lines report the doubled sets as normal
+(`checked 52`), so nothing in the run says the *set* is wrong rather than the files. That symptom is
+[#1673](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1673)'s, and its named finding is
+the accurate sentence an operator now reads instead of the 26.
+
+**What #1678 left open was the fork after that, and this is the answer: the gate REFUSES, and is not made
+to work through a nested worktree.** The alternative was real — roughly twenty `Get-ChildItem -Recurse`
+sites here plus the suites that walk the root, behind one shared predicate — and it is declined on four
+grounds, each measured rather than argued:
+
+1. **The gate is the only chokepoint anyone passes, so the walks below it never run.**
+   `Invoke-WorkflowGates` ([`gate-lib.ps1`](../../../scripts/lib/gate-lib.ps1)) runs the lint half
+   **first** and `return $false`s on its failure, several dozen lines above the test gate. So on the
+   documented route a nested worktree is named once and the two suites that would double never execute.
+   Excluding the path from them buys nothing a caller can reach — and what is past the refusal is
+   `-SkipLint`, the switch that already means *this run did not measure*.
+2. **The price was quoted one suite too high.** #1678 names three root-walking suites; measured, there are
+   two. `agent-shared.tests.ps1` (the `*-agent.md` and `*-persona.md` walks) and `shared-scripts.tests.ps1`
+   (the `*.ps1` scan) do walk `$RepoRoot` and do double. `template-selfcontained.tests.ps1` walks
+   `Join-Path $RepoRoot 'plugins'`, and a worktree under `.claude/` is not inside that subtree: its
+   templates count stayed at 1 with the probe standing. This does not change the verdict, but a declined
+   option should be declined at its real price.
+3. **The exclusion is the enforced-by-memory shape [#1665](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1665) was filed against.**
+   A predicate every walk must remember to call, in a four-thousand-line file that has grown to 36
+   numbered checks, is reintroduced silently by the next walk somebody adds — so it needs a meta-check
+   policing the whole file, forever, to hold. That is a permanent cost bought for an arrangement this repo
+   steers away from anyway, which is ground 4.
+4. **The repo has already decided where a worktree belongs.**
+   [`worktree-lane.ps1`](../../../scripts/task/worktree-lane.ps1) places lanes **outside** the tree and
+   says why in as many words — *"a worktree inside the tree would be walked by the lint gate's link scan
+   and by the test suites."* Both halves of that sentence are correct, and the lane is the supported route
+   for a session that wants isolation. Making the gate work through a nested worktree would endorse the
+   one arrangement the lane exists to avoid. The harness's own `isolation: "worktree"` does not get that
+   choice — the path is `.claude/worktrees/agent-<id>` and nothing here selects it — but
+   [#1667](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1667) has already decided the
+   review chain is not dispatched that way, so what remains is a caller who opted in and is one
+   `git worktree remove` from the gate, or one lane from never meeting it.
+
+**The residual is stated rather than left to be discovered.** With `-SkipLint` a standing nested worktree
+still hands those two suites a doubled set in silence. That is not a hole this decision opens — it is what
+`-SkipLint` means everywhere in this repo — and it is one more reason the refusal lives in the gate rather
+than being spread across the walks: one place to state it, one place that can go stale. Worth keeping
+beside it: `git worktree remove` leaves the empty `.claude/worktrees/` parent behind, so the directory
+outlives the worktree it held and the next `git worktree list` is the honest check, not the directory's
+existence.
+
+#### Check 37, and the second hand-maintained list this file was keeping (September 9, 2026, [#1680](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1680))
+
+**Check 34 reached half of the problem it was filed for.** It reads the column-0 `# --- <n>.` headers back
+and holds them to each other, which is what stopped two checks sharing a number. What it has no opinion
+about is the **prose list in the gate's own `.DESCRIPTION`** — the summary a reader who has not opened a
+four-thousand-line file consults, and the one a lens, a hook, a test-scenario name or a released note
+quotes a number from. That list was read by nothing, in the one file whose purpose is refusing a
+hand-maintained list a machine could check.
+
+**It had drifted in three directions at once, and only two were reported.** #1680 named the first two: the
+list stopped at **30** while the code ran to **36**, and its own item `30.` described the barred-skill
+check that #1494 had renumbered to **33** a month after the list was written — so a reader who grepped the
+list for "check 30" was told about a check answering to a different number, which is precisely the
+confusion #1494 was filed to end, one layer up. The third was older and quieter: items **9** and **17**
+still described checks **retired on August 8, 2026**, reading as live ones. They are tombstones now,
+keeping their numbers for the reason the code keeps the gaps — reusing one silently repoints every older
+citation.
+
+**And the check found a seventh missing entry on its first run, which is the whole argument for building
+it rather than repairing the list by hand.** `13b` — no branch document left behind between branches — has
+a real header and had no line in the list; no report had noticed, including the one that counted the
+others. A hand pass resets the clock, exactly as [check 32](#check-32-and-the-extraction-that-came-with-it-september-6-2026-1491)'s
+own header says about the three hand repairs of the mirror table before it.
+
+**ONE DIRECTION, AND THAT IS WHAT LET IT BE BORN GREEN.** Every header must have an entry; an entry need
+not have a header. The reverse direction is where the exemptions live, and there are three legitimate
+entries with no header of their own — the two tombstones, and the consumer-doc guard the suites already
+call check 19, which carries no column-0 header at all (check 20's comment says why in as many words). A
+rule asserting both directions would have arrived needing exactly those three exemptions on the day it was
+written, which is the shape this repo declined at 124 findings all false and has refused since. Measured
+after the seven entries were written back: **1 span, 37 headers, 37 claimed, 0 findings, 0 exemptions.**
+
+**OPT-IN, through the same `Invoke-MarkedSpanWalk` checks 10, 29 and 32 use.** A blanket rule keyed on "a
+script carrying numbered headers" would be born with a finding for each of the **19 files** check 34
+measured, none of which claims to enumerate anything: the marker is what turns a list into a claim, and it
+is the only thing that does. Reusing the walk also inherits its three refusals for free — an unpaired
+opener, a stray closer, and a second opener inside an open span — each of which would otherwise read as
+"no list here", the one failure mode that turns a gate green by silencing it.
+
+**The header pattern is check 34's own literal, deliberately.** Two readers disagreeing about what a
+section header is would let a header satisfy one and not the other, which is the divergence this tree has
+extracted libs to prevent elsewhere.
+
+**And the suite had to be kept OUT of its own subject, which is scenario 57's trap arriving through the
+other door.** `check-plugin-integrity-commands.tests.ps1` is a `.ps1` in the set check 37 walks, so a
+literal marker in a fixture line would open a span in the *suite* — a file with no numbered headers — and
+the real gate run would report the test file. The scenarios compose the marker from a variable instead.
+Where check 34 needed the suite to *be* its fixture for the indented-header bound, this one needs it to
+stay outside the walk entirely.
+
+**One measured trap worth keeping, because it produced a well-formed wrong answer.** The count assert in
+scenario 58 read 2 where 1 was right: this check's own coverage line contains the words *"claims to
+enumerate them"*, so a pattern matching finding *phrases* counted the coverage line as a finding — the
+same trap three patterns in that suite already document, met again by the check that was added to it. The
+assert now matches the finding's leading path, which the coverage line does not have.
+
+**The review round moved four things, and three of them are the same defect wearing different clothes: a
+rule read off the happy path.** The claim reader matched *any* indented line opening with `N. `, so a
+nested enumeration inside an entry's prose would have registered claims — and drop those entries later
+and the nested pair keeps satisfying their headers with the gate green, which is the drift this check
+exists to refuse. The repair is that an entry must **start inside the list's gutter**, whose width is the
+narrowest number prefix in the span. The first attempt required the exact prefix width, which is what a
+*perfectly* right-aligned list would have; this one is not — `3b` and `3c` sit one column out — and it
+reported two real entries as missing. The weaker rule is the true one: however ragged the alignment,
+every entry begins inside the gutter and a line indented past it is prose. Second, the header comparison
+ran **inside** the span callback, so a file with two spans counted its headers twice and named one gap
+twice; it now runs once per file over the union of its spans, which also makes a split list legal. Third,
+the coverage note keyed on the span count, so a **broken** marker printed *"the marker is opt-in, so zero
+is a pass and not a gap"* in the same run that raised an error about that very file — the two zero states
+are now said separately.
+
+**And the shape of the fourth is worth more than the fix.** The nested-enumeration hole was found by
+**probing** the check, not by measuring the tree: the list contains no such line today, so no amount of
+measuring would have surfaced it. That is
+[check 35](#check-35-and-the-sweep-that-reported-itself-finished-september-8-2026-1655)'s own lesson —
+*a measurement tells you what a check catches here, and only a probe tells you what it would wave
+through* — arriving at its neighbour one day later. The same round also found the branch document citing
+`.SYNOPSIS` where the list lives in `.DESCRIPTION`, in an entry whose whole subject is a citation being
+wrong, and which travels verbatim into `CHANGELOG.md` and then a release note.
+
+**Two bounds are named rather than closed, and the reason is the same in both.** A **stale** entry still
+satisfies its number: renumber a check, add the new entry, and the abandoned line — still describing what
+moved — keeps the old header satisfied. That is #1680's second drift recurring, and reaching it means
+reading an entry's text against a header's, which is a fuzzy rule, and a fuzzy rule on a gate arrives
+with an exemption list. Check 34's ascending rule limits the blast radius to a lingering line rather than
+a wrong live one. And the two zero-state coverage notes **cannot be asserted from the suite**: every
+fixture run invokes a copy of this script inside the fixture, and that copy carries the list, so one
+valid span always exists there. Both are written into the check's own header, because an unstated gap
+reads as coverage.
+
 In short: the **how** (managing the harness, scripts, config, safety guards) is portable; the **what**
 (the plugin lint + drift lint, `branch-info.ps1`, `.claude/settings.json` with the github source, and
 the marketplace/plugin manifests) belongs to this repo.

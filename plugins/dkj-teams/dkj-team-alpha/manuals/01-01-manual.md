@@ -64,9 +64,71 @@ approach is non-negotiable (a lesson from practice, when a parallel manual split
 - **Explicitly forbid committing** in the assignment; a sub-agent delivers only changes on the
   working copy.
 - **Verify and reconcile yourself** afterwards (lint + diff review) instead of trusting the
-  agents' self-reports.
-- Fanning out read-only exploration in parallel is perfectly fine — for example via a fresh
-  research/exploration agent.
+  agents' self-reports. **A self-report about the working copy is the least trustworthy of them**, and
+  not because a subagent lies: it reports what `git status` told it, and a clean `git status` reads the
+  same whether nothing was touched or your uncommitted edits were discarded.
+- **And that reconciliation has a measurement now, not only an instruction** (September 8, 2026,
+  [#1670](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1670)). Take a reading of the
+  working copy **before** you dispatch and compare it **after** the agents return: what the comparison
+  reports is *shrinkage* only — a path that was changed and no longer is, a worktree edit that has been
+  reverted under a path that remains, or a stash entry that has gone by its own id. Growth is expected
+  and stays silent, so a subagent legitimately writing files never trips it. Where the workflow plugin
+  is installed the step is the `check-fanout` skill (`-Capture` before, `-Compare <path>` after); where
+  it is not, the same reading by hand is `git status --porcelain --untracked-files=all` plus
+  `git stash list --format=%H`, kept and diffed — **and two things a hand diff gets wrong**: a path that
+  left the list because *you* committed it, and one that left because it was renamed, where the edit is
+  intact under the new name.
+  It **reports and cannot restore**: uncommitted content that was discarded is in no reflog, so what
+  the finding buys you is knowing which file to write again.
+- Fanning out **read-only** work in parallel is fine as far as the *deliverable* goes — nobody is
+  writing files — but **"read-only" describes the assignment, not the tools.** A specialist holding
+  `Bash` can move the tree with `git` while changing no file of its own, and that is what the
+  `working-copy-boundary` block forbids. Measured, September 8, 2026
+  ([#1665](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1665)): a review fanned out
+  on exactly this reasoning ran `git stash` and then `git checkout HEAD -- <file>` to settle the
+  conflict it caused, and four uncommitted edits of the orchestrator's own — made after the branch's
+  last commit, while the review ran — were gone with no error and no notice.
+- **So commit before you fan out, if you have anything uncommitted.** It is the orchestrator's own
+  move, and it is what makes the parallel chain safe rather than merely permitted: a boundary in the
+  agent defs reduces the risk and cannot remove it, and nothing in the harness will tell you **on its
+  own** that something was lost — the bullet above is a step somebody has to run, not a notice that
+  arrives. **It is not free, though, and pretending otherwise is how the advice gets
+  ignored**: in a repo that does not squash on merge, a mid-work commit made only so a review could run
+  is permanent history — and tidying several of them afterwards is a rebase or an amend, which is
+  precisely what a repo's own safety rules may gate behind the owner's word. Weigh that against what it
+  buys, prefer one commit over several, and where the repo forbids the tidy-up, say so rather than
+  reaching for the command.
+
+### A review is dispatched into the primary checkout, never into a worktree
+
+**Decided September 8, 2026, and the measurement is the whole of the reasoning.** `isolation:
+"worktree"` is the obvious mechanical answer to the hazard the bullets above describe: a reviewer
+that cannot reach the primary checkout cannot move it, whatever its boundary says. It is not that
+answer, for two reasons that were **probed rather than reasoned about**, in this system's own source
+repo.
+
+- **The worktree carries no uncommitted work.** An untracked file and a tracked edit made in the
+  primary seconds before the dispatch were both invisible inside it: the harness cuts a fresh
+  checkout of the primary's **HEAD commit**, on a branch of its own (`worktree-agent-<id>`), with a
+  clean `git status`. A review sits *before* the PR, so the tree it would read is the one that does
+  not contain the change — and what comes back is a confident "no findings" with nothing in it to
+  say which tree it read.
+- **It dirties the tree it was meant to protect.** The harness puts the worktree at
+  `.claude/worktrees/agent-<id>`, **inside the checkout**, and nothing ignores that path — while the
+  agent runs, the primary's own `git status` carries `?? .claude/worktrees/`. Every step of a
+  workflow that refuses on a dirty tree sees that, and the flag offers no way to put the worktree
+  anywhere else.
+
+So a reviewer is a fresh agent in the primary checkout, and the `working-copy-boundary` block stays
+the whole of what keeps it off the working copy. **That is not weakened by being unenforceable** —
+no lint gate could reach this anyway, since `isolation` is set by the caller at dispatch and lives in
+no agent def. Committing before you fan out is the orchestrator's own second layer, and it stays the
+one that does not depend on a specialist reading its boundary.
+
+**Worktree isolation stays true for the case the `fork` bullet named it for**, several sub-agents
+*writing* to the same files at once. Both costs apply there too rather than being waived: such a
+worktree starts from HEAD rather than from the working copy, so whatever it produces has to be
+reconciled back by hand, and it dirties the primary for as long as it stands.
 
 ## Picking up an inbound report — the six checks, in full
 

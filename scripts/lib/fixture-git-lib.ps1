@@ -40,6 +40,16 @@
     dot-sourced this one. Each suite is its own process under the gate, so there is nothing to share and
     nothing to reset between suites.
 
+    AND SINCE #1655 SOMETHING ENFORCES IT. Adopting this lib was a sweep, and a sweep does not refuse the
+    next copy of the idiom it removed -- which matters here because the idiom was the HOUSE STYLE rather
+    than one author's slip, and the next fixture builder is written by copying the nearest neighbour.
+    Check 35 ('[fixture-git]') in scripts/lint/check-plugin-integrity.ps1 walks scripts/tests/ for a git
+    command whose result is discarded and whose exit code is judged on neither the same statement nor the
+    next. That last clause is what lets a fixture MUTATION be told from a git QUESTION -- a
+    'rev-parse --verify --quiet' on a ref expected to be absent answers with exit 1 and is read on the very
+    next line -- so no verb is special-cased and no file is exempt. The sweep itself turned out to have
+    missed four files, which the check found: see the system-administration lens for the numbers.
+
     Workshop-only -- scripts/tests/ is not mirrored into any plugin, so this lib is not registered in
     shared-scripts-lib.ps1 and has no mirror to drift from.
 

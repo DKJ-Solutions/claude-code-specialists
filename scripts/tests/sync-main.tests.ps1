@@ -872,6 +872,25 @@ try {
     Assert-True ($shopLib.Count -eq 1 -and (Test-Path -LiteralPath $shopLib[0].MirrorPath -PathType Leaf)) `
         'net: and that mirror is present beside the mirrored sync-main.ps1'
 
+    # AND THE SAME FOR THE QUOTED-PATH DECODER (issue #1689, September 9, 2026). Convert-GitQuotedPath moved
+    # out of sync-rules.ps1 into git-porcelain-lib.ps1, which this script now dot-sources directly and
+    # unguarded -- so it needs its own dkj-team-shopify mirror for exactly the reason the block above gives,
+    # and the same reason that block gives for why nothing else can catch a missing entry. The dot-source is
+    # asserted too: unguarded is the point, because a payload without the file must fail at LOAD rather than
+    # fall through to a path that is silently mis-decoded, which is inbound #821's failure exactly.
+    $porcLib = @(Get-SharedScriptPairs -RepoRoot $RepoRoot |
+        Where-Object { $_.Plugin -eq 'dkj-team-shopify' -and $_.SourceRel -eq 'scripts\lib\git-porcelain-lib.ps1' })
+    Assert-True ($porcLib.Count -eq 1) 'decoder: the registry mirrors git-porcelain-lib into dkj-team-shopify'
+    Assert-True ($porcLib.Count -eq 1 -and (Test-Path -LiteralPath $porcLib[0].MirrorPath -PathType Leaf)) `
+        'decoder: and that mirror is present beside the mirrored sync-main.ps1'
+    Assert-True ($src -match [regex]::Escape("lib\git-porcelain-lib.ps1")) 'decoder: sync-main dot-sources the lib it takes Convert-GitQuotedPath from'
+    Assert-True ($src -notmatch 'Test-Path[^\r\n]*git-porcelain-lib') 'decoder: and does so UNGUARDED -- a missing payload must fail at load, not mis-decode quietly'
+    # THE FUNCTION IS NO LONGER IN sync-rules.ps1, which is the half that keeps that file dependency-free.
+    # A future tidy-up that moved it back would disarm the live-theme guard's catch, so it is pinned here.
+    $rulesSrc = Get-Content -LiteralPath (Join-Path $RepoRoot 'scripts\lib\sync-rules.ps1') -Raw
+    Assert-True ($rulesSrc -notmatch 'function Convert-GitQuotedPath') 'decoder: sync-rules.ps1 no longer defines it'
+    Assert-True ($rulesSrc -notmatch '^\s*\.\s+.*git-porcelain-lib') 'decoder: and sync-rules.ps1 does not dot-source it either -- it must stay dependency-free'
+
     # THE ls-remote FAILURE: A REAL RUN REFUSES, A DRY RUN REPORTS AND CONTINUES (inbound #1181,
     # DryRun carve-out #1373). Before #1181 the call ran through Invoke-SyncGitQuiet, so an unreachable
     # origin produced no lines -- indistinguishable from "no sync branch on origin" -- and the guard

@@ -80,6 +80,47 @@ twice at once. `$PID` (or a fresh GUID, where one file per child invocation is c
 per-case `$Label` is not, because it repeats across runs. `test-suite-gate.tests.ps1` enforces this and
 names the offending `file:line`.
 
+**Writing a shipping script: do not compose a temp path at all — call `New-ScratchPath`**
+([`lib/native-capture-lib.ps1`](lib/native-capture-lib.ps1)). It returns
+`<temp>/<label>-<pid>-<guid>`, creates the directory with `-Directory`, and refuses a label that is not
+a single safe path segment. The reason is not collision but the *other* property a fixed leaf has: it is
+a name somebody else can reach first. `New-Item -ItemType Directory -Force` and
+`[System.IO.File]::WriteAllText` both follow a symlink or junction, so a pre-planted link at the exact
+path redirects the write — and where the script later deletes recursively there, the same window is a
+delete primitive somewhere else. Measured on September 8, 2026
+([#1659](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1659), which had counted the
+class as one): **seven** sites composed `<label>-$PID` by hand, the test gate's capture directory among
+them. A guid removes the target instead of checking for one — a reparse-point check is a check-then-write
+with a window, and it cannot be applied to the temp root at all, because on macOS `/tmp` *is* a symlink.
+`native-capture.tests.ps1` enforces this over `scripts/**` outside `tests/` and names the offending
+`file:line`. The `$PID` convention above is the sibling rule for **fixtures**, and it answers a different
+question — two concurrent runs, not a hostile neighbour — which is why it leaves that exposure standing
+in `tests/`: 108 predictable fixture paths across 66 files, 53 of them opening with a recursive delete,
+[#1664](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1664).
+
+**And a leftover under the temp directory is an aborted run, not a missing teardown.** Measured on
+September 8, 2026 ([#1668](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1668)) over a
+machine carrying twelve days of gate runs: 107 `fold-test-*` and 96 `new-branch-test-*` entries were
+standing, and **both suites leaked zero** when run to completion. Every suite here that composes a
+fixture path also removes it — `fold-changelog.tests.ps1` registers each tree the moment it builds one
+and sweeps that register twice, and has done since the file was created. What the leftovers have in
+common is *where* they were registered: all of them after a suite's last completed sweep, which is the
+signature of a run that was interrupted or threw, not of a helper without a teardown. The distinction
+decides the repair, which is why it is written down rather than left to be re-measured — the obvious fix
+is to give a helper the teardown it already has, and the fix that would actually reach these is a sweep
+by name pattern in a shared temp directory, i.e. the same delete primitive `New-ScratchPath` exists to
+remove. So the entries are left standing on purpose: `$PID` in the leaf is what makes one attributable
+to a run that is no longer alive, and a person can clear it by hand.
+
+**Attribute before you count, because most of what is down there is not litter.** That same measurement
+first read 413 entries as leaked fixtures. Of the directory it was taken over, 546 were `sync-pr-body-*`
+— written deliberately by [`task/sync-main.ps1`](task/sync-main.ps1) for the operator to paste into
+`gh pr create --body-file`, so they *must* outlive the run that wrote them, the same
+retained-on-purpose category as the gate's capture directories
+([#1636](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1636)) — and 162 were an
+unrelated tool's logs. The suites' own share was roughly half the figure reported, and none of it was
+what that figure was read as.
+
 `repo-config.ps1` sits at the top level rather than in a directory, deliberately: it is **not machinery
 but data** — this repo's own answers to the seam the shared scripts read (the trunk name, the lint script,
 the release grouping, the merge method). A consuming repo has its own, and that is the whole point of the
@@ -102,10 +143,11 @@ scripts named below the table, which nothing in this table reaches at all.
 | [`task/adopt-config.ps1`](task/adopt-config.ps1) | reads the config blueprint and places or proposes each seam answer | `adopt-dkj-policy` (Part 2) |
 | [`task/adopt-workflow-folder.ps1`](task/adopt-workflow-folder.ps1) | scaffolds `dkj-policy/` in a consumer — the folder docs, the releases root and the branch dossier | `adopt-dkj-policy` (Part 1) |
 | [`task/adopt-shopify-floor.ps1`](task/adopt-shopify-floor.ps1) | places dkj-team-shopify's floor in a consumer: the live-theme guard's seams, a starter theme-check config and the CI workflow that runs it | `adopt-shopify-floor` |
+| [`task/check-fanout.ps1`](task/check-fanout.ps1) | `-Capture` before work is handed to subagents and `-Compare <path>` after: reports only what **shrank** in the working copy — a changed path that is now unchanged, a reverted worktree edit, a stash entry gone by its own id. Growth is expected and stays silent; it reports and cannot restore | `check-fanout` |
 | [`task/check-policy-drift.ps1`](task/check-policy-drift.ps1) | lays out every document that legislates here — the plugins' portable pages against this repo's own prose — so the two can be read against each other; it decides nothing | `check-policy-drift` |
 | [`task/push-preview.ps1`](task/push-preview.ps1) | pushes the branch to its own **unpublished** preview theme, creating that theme on the first push rather than at branch creation | `push-preview` |
 | [`task/sync-main.ps1`](task/sync-main.ps1) | mirrors the live Shopify theme into the trunk without letting live overwrite the trunk's own work | `sync-main` |
-| [`release/open-pr.ps1`](release/open-pr.ps1) | the four gates, the push and the PR; the body and title come from the entry | `open-pr` |
+| [`release/open-pr.ps1`](release/open-pr.ps1) | the gates on the branch dossier, the push and the PR; the body and title come from the entry | `open-pr` |
 | [`release/ship-pr.ps1`](release/ship-pr.ps1) | open → wait for CI → merge → fold, in one motion | `ship-pr` |
 | [`release/verify-resolved-issues.ps1`](release/verify-resolved-issues.ps1) | checks that a merged PR closed the issues it declared, and closes any it did not — `ship-pr.ps1` runs it as its own process after the merge | `ship-pr` |
 | [`release/verify-pushed-merges.ps1`](release/verify-pushed-merges.ps1) | resolves the pull requests a push to the trunk carried and runs the check above against each — the same step, off the merge instead of off the shipping session, since a queue merge is one no session sees | — (CI: `verify-resolved.yml`) |
