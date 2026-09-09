@@ -11,6 +11,11 @@
 
     Pure ASCII (repo convention for .ps1).
 #>
+
+# Test-FunctionDefined (issue #1729): the retirement asserts below ask the function table directly
+# rather than through Get-Command, whose miss path -- the case every one of those asserts is in --
+# scans the whole PATH for an executable of that name.
+. (Join-Path $PSScriptRoot '..\lib\command-probe-lib.ps1')
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot '..\repo-config.ps1')
 
@@ -106,7 +111,7 @@ foreach ($id in $ignored) { Assert-Match $id '^\d{2}-\d{2}$' "Get-RosterIgnoredI
 # mechanism that no longer reads them -- the write-once-config failure this file already guards for the two
 # retired remove-before-publishing knobs below.
 foreach ($retired in @('Get-ChangelogTierHeadings', 'Get-ChangelogHeading')) {
-    Assert-Equal $null (Get-Command $retired -ErrorAction SilentlyContinue) "$retired is retired -- the flat changelog has no sections to name"
+    Assert-Equal $false (Test-FunctionDefined $retired) "$retired is retired -- the flat changelog has no sections to name"
 }
 
 # AND THE DOCUMENT ITSELF HAS NONE. The mirror-image assert: a heading left in CHANGELOG.md would be read
@@ -141,7 +146,7 @@ Assert-Equal 10 (Get-ReleaseMajorMinMinors) 'Get-ReleaseMajorMinMinors is 10 in 
 # marker that the tier model replaced, and a repo-config still answering them would be handing values to
 # a mechanism that no longer reads them.
 foreach ($gone in 'Get-ReleaseHighlightsStakeholderTypes', 'Get-ReleaseHighlightsWording') {
-    Assert-Equal $null (Get-Command $gone -ErrorAction SilentlyContinue) "$gone is retired, not left returning a value nothing reads"
+    Assert-Equal $false (Test-FunctionDefined $gone) "$gone is retired, not left returning a value nothing reads"
 }
 
 # The optional "go live" stage description for the cut-release skill's Block 2 (issue #177, Optional
@@ -239,7 +244,7 @@ Assert-Equal 0 $badBumps.Count "Get-ReleaseConsumerBumps names only major/minor/
 # the fallback would never be exercised by anything, and the day it broke nothing in this repo would
 # notice. That the fallback still reads the old name is asserted where it lives, in
 # cut-release-guardrail.tests.ps1; this side asserts the other half of the pair.
-Assert-True ($null -eq (Get-Command 'Get-ReleaseHighlightsBumps' -ErrorAction SilentlyContinue)) `
+Assert-True (-not (Test-FunctionDefined 'Get-ReleaseHighlightsBumps')) `
     'the retired name Get-ReleaseHighlightsBumps is NOT defined here -- only the fallback in cut-release still knows it'
 
 Write-Host ""

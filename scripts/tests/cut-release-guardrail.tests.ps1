@@ -22,6 +22,11 @@
 
     Pure ASCII (repo convention for .ps1).
 #>
+
+# Test-FunctionDefined (issue #1729): the retirement asserts below ask the function table directly
+# rather than through Get-Command, whose miss path -- the case every one of those asserts is in --
+# scans the whole PATH for an executable of that name.
+. (Join-Path $PSScriptRoot '..\lib\command-probe-lib.ps1')
 $ErrorActionPreference = 'Stop'
 
 $RepoRoot       = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
@@ -90,7 +95,7 @@ $repoConfig = Join-Path $RepoRoot 'scripts\repo-config.ps1'
 $allowlist = $fallback
 if (Test-Path -LiteralPath $repoConfig) {
     . $repoConfig
-    if (Get-Command -Name 'Get-ReservedRootMd' -ErrorAction SilentlyContinue) {
+    if (Test-FunctionDefined 'Get-ReservedRootMd') {
         $allowlist = @(Get-ReservedRootMd)
     }
 }

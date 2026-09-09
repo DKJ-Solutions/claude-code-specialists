@@ -102,13 +102,19 @@ $ErrorActionPreference = 'Stop'
 $guardLib = Join-Path $PSScriptRoot '..\lib\source-repo-guard-lib.ps1'
 if (Test-Path -LiteralPath $guardLib -PathType Leaf) { . $guardLib; Assert-OwnCopy -ScriptPath $PSCommandPath }
 
+# Test-FunctionDefined (issue #1729): the seam probes below read the function table directly rather
+# than through Get-Command, which parses the name as a wildcard pattern and pays a full PATH scan on
+# every miss -- and a miss is the normal case for an optional seam. $PSScriptRoot-relative, so it
+# resolves in the plugin mirror as well as here.
+. (Join-Path $PSScriptRoot '..\lib\command-probe-lib.ps1')
+
 # THE ROOT COMES FROM ONE DEFINITION (#1422). Dot-sourced guarded, so a mirror built before this lib
 # existed degrades to the old inline form rather than throwing. AFTER the source-repo guard above, which
 # is dot-sourced on the first line that runs and may rely on nothing being loaded yet.
 $checkLib = Join-Path $PSScriptRoot '..\lib\consumer-check-lib.ps1'
 if (Test-Path -LiteralPath $checkLib -PathType Leaf) { . $checkLib }
 
-$repoRoot = if (Get-Command Resolve-CheckRepoRoot -ErrorAction SilentlyContinue) {
+$repoRoot = if (Test-FunctionDefined 'Resolve-CheckRepoRoot') {
     Resolve-CheckRepoRoot -RootOverride $RootOverride
 } elseif ($RootOverride) { $RootOverride } elseif ($env:CLAUDE_PROJECT_DIR) { $env:CLAUDE_PROJECT_DIR } else { (git rev-parse --show-toplevel).Trim() }
 
@@ -167,7 +173,7 @@ if (-not $Branch -or $Branch -eq 'HEAD') {
     exit 1
 }
 
-$trunk = if (Get-Command Get-TrunkBranchName -ErrorAction SilentlyContinue) {
+$trunk = if (Test-FunctionDefined 'Get-TrunkBranchName') {
     $t = ([string](Get-TrunkBranchName)).Trim(); if ($t) { $t } else { 'main' }
 } else { 'main' }
 
@@ -181,7 +187,7 @@ if ($Branch -eq $trunk) {
 }
 
 # --- Exempt prefixes -------------------------------------------------------------------------------
-$exempt = if (Get-Command Get-EntryGateExemptPrefixes -ErrorAction SilentlyContinue) {
+$exempt = if (Test-FunctionDefined 'Get-EntryGateExemptPrefixes') {
     @(Get-EntryGateExemptPrefixes)
 } else { @('sync') }
 
@@ -196,7 +202,7 @@ if ($exempt -contains $prefix) {
 # before a move carries the older path. Preferring the current one and falling back is what lets a
 # branch cut over mid-flight without this gate suddenly finding nothing -- which would not merely warn,
 # it would PASS, since a gate with nothing to read reports nothing.
-$safeName = if (Get-Command Get-BranchInfo -ErrorAction SilentlyContinue) {
+$safeName = if (Test-FunctionDefined 'Get-BranchInfo') {
     (Get-BranchInfo -Branch $Branch).SafeName
 } else { $Branch -replace '/', '-' }
 

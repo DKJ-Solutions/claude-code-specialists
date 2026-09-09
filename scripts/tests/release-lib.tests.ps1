@@ -38,6 +38,12 @@
     content is arbitrary stand-in text for contributor-authored PR entries; it is English for repo-wide
     consistency, not because its language is what is under test here.
 #>
+
+# Test-FunctionDefined (issue #1729): the seam probes below read the function table directly rather
+# than through Get-Command, which parses the name as a wildcard pattern and pays a full PATH scan on
+# every miss -- and a miss is the normal case for an optional seam. $PSScriptRoot-relative, so it
+# resolves in the plugin mirror as well as here.
+. (Join-Path $PSScriptRoot '..\lib\command-probe-lib.ps1')
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot '..\lib\release-lib.ps1')
 
@@ -239,9 +245,13 @@ Write-Host "Get-FencedLineFlags -- one owner, reached from here through the lib 
 # lib's recognised '~~~', so an entry with tilde fences had its quoted content read as STRUCTURE by every
 # reader in entry-scaffold-lib while the readers here handled it correctly. The tilde behaviour and the
 # absence of a second definition are asserted in that lib's own suite, where the owner now lives.
+# NOT Test-FunctionDefined, and this is the exception the helper's own docstring points at (#1729): this
+# assert does not ask WHETHER the function is defined but WHICH FILE defines it, and it reads
+# .ScriptBlock.File off the CommandInfo to answer that. A boolean cannot carry it, so the expensive call
+# is the only one that works here -- and it is a hit rather than a miss, which is the cheap direction.
 Assert-Equal $null (Get-Command Get-FencedLineFlags -CommandType Function -ErrorAction SilentlyContinue |
     Where-Object { $_.ScriptBlock.File -and $_.ScriptBlock.File.EndsWith('release-lib.ps1') }) 'the fence reader is no longer defined by release-lib itself'
-Assert-Equal $true ($null -ne (Get-Command Get-FencedLineFlags -ErrorAction SilentlyContinue)) 'but dot-sourcing release-lib still brings it into scope, so no call site changed'
+Assert-Equal $true (Test-FunctionDefined 'Get-FencedLineFlags') 'but dot-sourcing release-lib still brings it into scope, so no call site changed'
 $fenceLines = @('## real', 'text', '```', '## QUOTED', '---', '```', '---', '## real2')
 $fenceFlags = Get-FencedLineFlags -Lines $fenceLines
 Assert-Equal $false $fenceFlags[0] 'flags: a heading outside a fence is not fenced'
@@ -298,7 +308,7 @@ Assert-Match $pendReset ('(?m)^' + [regex]::Escape((Get-ChangelogUnreleasedHeadi
 Assert-NoMatch $pendReset ('(?m)^' + $EntryH + ' #22 ') 'and the entries it released are gone from it'
 # THE SEAM IS GONE, not merely unused: there is no map left to ask which headings count.
 Assert-NoParameter -Command 'Split-Changelog' -Names @('TierSections', 'FallbackHeading', 'TierHeadings')
-Assert-Equal $null (Get-Command 'Resolve-ChangelogTierSections' -ErrorAction SilentlyContinue) 'Resolve-ChangelogTierSections is retired with the sections it resolved'
+Assert-Equal $false (Test-FunctionDefined 'Resolve-ChangelogTierSections') 'Resolve-ChangelogTierSections is retired with the sections it resolved'
 
 # AN ENTRY'S OWN SECTIONS STAY INSIDE IT. This is the assert that catches "one entry rendering as
 # four", which is well-formed markdown and therefore invisible to an eye.
@@ -552,7 +562,7 @@ Write-Host "Format-RankedEntries -- one flat list, no categories" -ForegroundCol
 # third under 'Maintenance'. Asserted on absence for the same reason as the retired HTML renderer --
 # re-adding it should turn a test red rather than pass unnoticed.
 foreach ($gone in @('Format-CategorizedEntries', 'Get-ReleaseCategories')) {
-    Assert-Equal $null (Get-Command $gone -ErrorAction SilentlyContinue) "release-lib no longer defines $gone"
+    Assert-Equal $false (Test-FunctionDefined $gone) "release-lib no longer defines $gone"
 }
 $flat = Format-RankedEntries -Entries @($e22, $e21) -EntryLevel 2
 Assert-Match $flat '(?m)^## #22 ' 'the first entry sits at the requested level'
@@ -1233,7 +1243,7 @@ Write-Host "the consumer tier produces markdown ONLY (no HTML renderer)" -Foregr
 # than simply deleting the old asserts: a partial HTML renderer is exactly the kind of thing that gets
 # helpfully reintroduced, and re-adding it should turn a test red rather than pass unnoticed.
 foreach ($gone in @('ConvertTo-ReleaseHtml', 'Format-InlineMarkdown')) {
-    Assert-Equal $null (Get-Command $gone -ErrorAction SilentlyContinue) "release-lib no longer defines $gone"
+    Assert-Equal $false (Test-FunctionDefined $gone) "release-lib no longer defines $gone"
 }
 # THE SUBJECT IS A TAG, NOT A COMMENT (issue #1370). This scanned the retired consumer document, which
 # carried neither. The draft that replaced it as the one outward-travelling document carries its guidance
@@ -1536,7 +1546,7 @@ Assert-Equal "3" ((Get-OverviewSectionHeading -ReadmeContent $tiers) -replace '^
 $liveReadme = Join-Path $PSScriptRoot ('..\..\' + ((& {
     Set-StrictMode -Off
     . (Join-Path $PSScriptRoot '..\repo-config.ps1')
-    if (Get-Command Get-ReleaseHistoryPath -ErrorAction SilentlyContinue) { Get-ReleaseHistoryPath } else { 'releases/README.md' }
+    if (Test-FunctionDefined 'Get-ReleaseHistoryPath') { Get-ReleaseHistoryPath } else { 'releases/README.md' }
 }) -replace '/', '\'))
 if (Test-Path -LiteralPath $liveReadme) {
     Assert-Equal '4' (Get-OverviewTargetMajor -ReadmeContent (Get-Content -LiteralPath $liveReadme -Raw -Encoding UTF8)) "this repo's own overview now targets 4.x -- a 4.0.0 cut lands under its own major, and a 3.x cut would be refused"

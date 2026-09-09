@@ -150,6 +150,12 @@ param(
     [switch]$SkipReachability
 )
 
+# Test-FunctionDefined (issue #1729): the seam probes below read the function table directly rather
+# than through Get-Command, which parses the name as a wildcard pattern and pays a full PATH scan on
+# every miss -- and a miss is the normal case for an optional seam. $PSScriptRoot-relative, so it
+# resolves in the plugin mirror as well as here.
+. (Join-Path $PSScriptRoot '..\lib\command-probe-lib.ps1')
+
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
@@ -364,7 +370,7 @@ foreach ($libRel in $contractLibs) {
             return $result
         }
         foreach ($fn in $args[1]) {
-            $result.Present[$fn] = [bool](Get-Command -Name $fn -ErrorAction SilentlyContinue)
+            $result.Present[$fn] = [bool](Test-FunctionDefined $fn)
         }
         return $result
     } $libPath (@($records.Function))

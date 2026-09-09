@@ -97,6 +97,12 @@ $ErrorActionPreference = 'Stop'
 # NO SOURCE-REPO GUARD, deliberately, and for exactly the reason source-repo-guard-lib.ps1's own header
 # gives for check-roster-sync.ps1 and check-script-contract.ps1: a SessionStart hook invokes this from
 # '${CLAUDE_PLUGIN_ROOT}/scripts/lint/' against the current repo, so Assert-OwnCopy would refuse it --
+
+# Test-FunctionDefined (issue #1729): the seam probes below read the function table directly rather
+# than through Get-Command, which parses the name as a wildcard pattern and pays a full PATH scan on
+# every miss -- and a miss is the normal case for an optional seam. $PSScriptRoot-relative, so it
+# resolves in the plugin mirror as well as here.
+. (Join-Path $PSScriptRoot '..\lib\command-probe-lib.ps1')
 # and thereby the hook -- at every session start in the source repo. The CI half runs the in-repo copy
 # (via actions/checkout), which the guard would not have fired on anyway.
 
@@ -105,7 +111,7 @@ $ErrorActionPreference = 'Stop'
 $checkLib = Join-Path $PSScriptRoot '..\lib\consumer-check-lib.ps1'
 if (Test-Path -LiteralPath $checkLib -PathType Leaf) { . $checkLib }
 
-$repoRoot = if (Get-Command Resolve-CheckRepoRoot -ErrorAction SilentlyContinue) {
+$repoRoot = if (Test-FunctionDefined 'Resolve-CheckRepoRoot') {
     Resolve-CheckRepoRoot -RootOverride $RootOverride
 } elseif ($RootOverride) { $RootOverride } elseif ($env:CLAUDE_PROJECT_DIR) { $env:CLAUDE_PROJECT_DIR } else { (git rev-parse --show-toplevel).Trim() }
 
@@ -165,7 +171,7 @@ if ($leftovers.Count -eq 0) {
 # why $behind stays 0 unless the measurement actually succeeded.
 $behind   = 0
 $trunkRef = ''
-if ((Get-Command Get-TrunkGap -ErrorAction SilentlyContinue) -and (Get-Command Invoke-NativeCapture -ErrorAction SilentlyContinue)) {
+if ((Test-FunctionDefined 'Get-TrunkGap') -and (Test-FunctionDefined 'Invoke-NativeCapture')) {
     try {
         $gap = Get-TrunkGap -RepoRoot $repoRoot -NoFetch
         # Measured means the remote-tracking ref EXISTS and the count parsed -- which is the only thing
@@ -179,7 +185,7 @@ if ((Get-Command Get-TrunkGap -ErrorAction SilentlyContinue) -and (Get-Command I
 # nothing -- Test-BranchFoldedOnRef then falls back to '<workflow folder>/CHANGELOG.md', which is
 # Get-DefaultChangelogPath's answer.
 $changelogRel = ''
-if (Get-Command Get-SeamValue -ErrorAction SilentlyContinue) {
+if (Test-FunctionDefined 'Get-SeamValue') {
     try { $changelogRel = [string](Get-SeamValue -Name 'Get-ChangelogPath' -Default '') } catch { }
 }
 
@@ -193,7 +199,7 @@ $folded   = New-Object System.Collections.Generic.List[object]
 $stranded = New-Object System.Collections.Generic.List[object]
 foreach ($l in $leftovers) {
     $landed = $false
-    if ($trunkRef -and (Get-Command Test-BranchFoldedOnRef -ErrorAction SilentlyContinue)) {
+    if ($trunkRef -and (Test-FunctionDefined 'Test-BranchFoldedOnRef')) {
         try {
             $onRef = Test-BranchFoldedOnRef -RepoRoot $repoRoot -Ref $trunkRef -Branch $l.DeclaredBranch -ChangelogRel $changelogRel
             if ($onRef -eq $true) { $landed = $true }

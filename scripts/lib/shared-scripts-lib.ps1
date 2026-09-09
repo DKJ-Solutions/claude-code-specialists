@@ -570,6 +570,36 @@ function Get-SharedScriptPairs {
             LibOnly = $true
         },
         @{
+            # THE FUNCTION-TABLE PROBE (issue #1729). A leaf with no dependencies of its own, like
+            # ref-print-lib above, which is what makes it safe for the three libs below it to load
+            # first. It is mirrored because those three are: entry-scaffold-lib, native-capture-lib and
+            # seam-lib all dot-source it, and a consumer runs the mirror -- so an unmirrored source
+            # would leave Test-FunctionDefined undefined in exactly the repos that never see this one.
+            Name    = 'command-probe-lib'
+            Source  = 'scripts\lib\command-probe-lib.ps1'
+            Plugin  = 'dkj-policy'
+            LibOnly = $true
+        },
+        @{
+            # THE SECOND MIRROR OF THE SAME SOURCE, on ref-print-lib-shopify's precedent above -- read
+            # native-capture-lib-shopify's banner for why a second entry rather than a list of mirrors.
+            # The caller here is that plugin's own native-capture-lib copy, which dot-sources this one.
+            Name    = 'command-probe-lib-shopify'
+            Source  = 'scripts\lib\command-probe-lib.ps1'
+            Plugin  = 'dkj-team-shopify'
+            LibOnly = $true
+        },
+        @{
+            # THE THIRD MIRROR OF THE SAME SOURCE. check-roster-sync.ps1 lives in the core team plugin
+            # rather than in the workflow one, and it probes two seams (Get-RosterPath,
+            # Get-RosterIgnoredIds) -- so the lib has to travel there too, exactly as check-report-lib
+            # already does for the same caller.
+            Name    = 'command-probe-lib-alpha'
+            Source  = 'scripts\lib\command-probe-lib.ps1'
+            Plugin  = 'dkj-team-alpha'
+            LibOnly = $true
+        },
+        @{
             Name    = 'pr-issues-lib'
             Source  = 'scripts\lib\pr-issues-lib.ps1'
             Plugin = 'dkj-policy'

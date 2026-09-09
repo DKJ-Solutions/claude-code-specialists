@@ -26,6 +26,12 @@
     Pure ASCII (repo convention for .ps1).
 #>
 
+# Test-FunctionDefined (issue #1729): the seam probes below read the function table directly rather
+# than through Get-Command, which parses the name as a wildcard pattern and pays a full PATH scan on
+# every miss -- and a miss is the normal case for an optional seam. $PSScriptRoot-relative, so it
+# resolves in the plugin mirror as well as here.
+. (Join-Path $PSScriptRoot 'command-probe-lib.ps1')
+
 function Get-EntryDescription {
     <#
     .SYNOPSIS
@@ -148,11 +154,11 @@ function Get-PrDescription {
     $whatNames = @('What does the change on this branch deploy to main?',
                    'What does the change on this branch bring to main?', 'What does this change do?')
     $endNames  = @('Pull Request')
-    if (Get-Command -Name Get-EntrySectionHeadings -ErrorAction SilentlyContinue) {
+    if (Test-FunctionDefined 'Get-EntrySectionHeadings') {
         $headings = Get-EntrySectionHeadings
         $whatNames = @($headings['What'])
         $endNames  = @($headings['PullRequest'])
-        if (Get-Command -Name Get-EntrySectionRetiredNames -ErrorAction SilentlyContinue) {
+        if (Test-FunctionDefined 'Get-EntrySectionRetiredNames') {
             $whatNames += @(Get-EntrySectionRetiredNames -Key 'What')
             $endNames  += @(Get-EntrySectionRetiredNames -Key 'PullRequest')
         }
@@ -175,7 +181,7 @@ function Get-PrDescription {
     # suite fail on a function it deliberately does not load. The default is not a second definition of the
     # rule -- it is the same two shapes with the same English words that lib ships, and a repo that renamed
     # the title reaches this code with the lib loaded, which is where its own answer comes from.
-    $deployRx = if (Get-Command -Name Get-DevelopmentEntryPattern -ErrorAction SilentlyContinue) {
+    $deployRx = if (Test-FunctionDefined 'Get-DevelopmentEntryPattern') {
         Get-DevelopmentEntryPattern
     } else {
         # Today's shape leads with the title and a colon; every entry written before August 23, 2026 puts
@@ -663,7 +669,7 @@ function Test-DeployLock {
     # cycle file shifted one level down and the DEPLOY heading became an H3 -- and both levels have to pass,
     # because a PR opened from a document scaffolded before the shift publishes the old one. Read off the
     # entry heading level so a future re-level cannot leave this test locking a shape nothing writes.
-    $lockLevel = if (Get-Command -Name Get-EntryHeadingLevel -ErrorAction SilentlyContinue) { Get-EntryHeadingLevel } else { 3 }
+    $lockLevel = if (Test-FunctionDefined 'Get-EntryHeadingLevel') { Get-EntryHeadingLevel } else { 3 }
     $lockRx = '^#{' + ($lockLevel - 1) + ',' + $lockLevel + '}\s+\S'
     $expectedLines = @($expected -split "\r?\n" | ForEach-Object { $_.TrimEnd() })
     if ($expectedLines.Count -eq 0 -or $expectedLines[0] -notmatch $lockRx) { return $na }

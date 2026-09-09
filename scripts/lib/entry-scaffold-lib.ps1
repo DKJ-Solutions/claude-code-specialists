@@ -51,6 +51,12 @@
 # it safe to load first.
 . (Join-Path $PSScriptRoot 'ref-print-lib.ps1')
 
+# THE FUNCTION-TABLE PROBE (issue #1729). Same unconditional, $PSScriptRoot-relative shape as
+# ref-print-lib above and for the same reason -- it has to resolve in the plugin mirror as well as
+# here -- and it is likewise a leaf with no dependencies of its own. This lib carries ten seam probes,
+# more than any other file in the tree, and Get-ReleaseAudienceTier's is the frame #1723 faulted in.
+. (Join-Path $PSScriptRoot 'command-probe-lib.ps1')
+
 # The English fallbacks, and the ONLY copy of them. new-branch.ps1 held these literals until
 # the gate needed the same list; it now reads them from here.
 #
@@ -105,7 +111,7 @@ function Get-EntryScaffoldWording {
     foreach ($key in @('Title', 'BodyHeading', 'BodyPlaceholder')) {
         $value = $script:EntryScaffoldDefaults[$key]
         $getter = $map[$key]
-        if (Get-Command $getter -ErrorAction SilentlyContinue) {
+        if (Test-FunctionDefined $getter) {
             $v = & $getter
             if ($v) { $value = $v }
         }
@@ -425,7 +431,7 @@ function Get-EntryAudienceTier {
         a seam returning 7 would otherwise have the scaffolder write a section no validator accepts, and a
         gate that refuses every entry in the repo is worse than a gate nobody configured.
     #>
-    if (-not (Get-Command Get-ReleaseAudienceTier -ErrorAction SilentlyContinue)) { return $null }
+    if (-not (Test-FunctionDefined 'Get-ReleaseAudienceTier')) { return $null }
     $v = & Get-ReleaseAudienceTier
     if ($null -eq $v) { return $null }
     if ("$v" -notmatch '^\d+$') { return $null }
@@ -1561,7 +1567,7 @@ function Merge-WordingOverrides {
     $out = [ordered]@{}
     foreach ($key in $Defaults.Keys) { $out[$key] = $Defaults[$key] }
 
-    if (-not (Get-Command $OverrideCommand -ErrorAction SilentlyContinue)) { return [pscustomobject]$out }
+    if (-not (Test-FunctionDefined $OverrideCommand)) { return [pscustomobject]$out }
     $overrides = & $OverrideCommand
     if (-not $overrides) { return [pscustomobject]$out }
 
@@ -1583,7 +1589,7 @@ function Get-EntryGuidance {
     #>
     $out = [ordered]@{}
     foreach ($key in $script:EntryGuidanceDefaults.Keys) { $out[$key] = $script:EntryGuidanceDefaults[$key] }
-    if (Get-Command Get-EntryGuidanceOverrides -ErrorAction SilentlyContinue) {
+    if (Test-FunctionDefined 'Get-EntryGuidanceOverrides') {
         $override = Get-EntryGuidanceOverrides
         foreach ($key in @($out.Keys)) {
             # THE READ IS SHARED, THE ANSWER RULE IS NOT (#941). Get-OverrideMapValue is the same container
@@ -1950,7 +1956,7 @@ function Get-EntrySignificanceRubric {
         # String keys throughout: an OrderedDictionary keyed by [int] is the trap documented above.
         $levels[[string]$pair.Score] = $pair.Test
     }
-    if (Get-Command Get-EntrySignificanceRubricLevels -ErrorAction SilentlyContinue) {
+    if (Test-FunctionDefined 'Get-EntrySignificanceRubricLevels') {
         $override = Get-EntrySignificanceRubricLevels
         if ($override) {
             foreach ($entry in $override.GetEnumerator()) {
@@ -2009,7 +2015,7 @@ function Test-EntrySignificanceActive {
         needs the same repair; it is left to the change that reworks the release side, because the answer
         there is about which release documents exist rather than about scoring.
     #>
-    if (Get-Command Get-EntrySignificanceEnabled -ErrorAction SilentlyContinue) {
+    if (Test-FunctionDefined 'Get-EntrySignificanceEnabled') {
         return [bool](Get-EntrySignificanceEnabled)
     }
     return $true
@@ -4278,7 +4284,7 @@ function Get-EntrySectionHeadings {
     #>
     $out = [ordered]@{}
     foreach ($key in $script:EntrySectionDefaults.Keys) { $out[$key] = $script:EntrySectionDefaults[$key] }
-    if (Get-Command Get-EntrySectionHeadingOverrides -ErrorAction SilentlyContinue) {
+    if (Test-FunctionDefined 'Get-EntrySectionHeadingOverrides') {
         $override = Get-EntrySectionHeadingOverrides
         if ($override) {
             foreach ($entry in $override.GetEnumerator()) {
@@ -4489,7 +4495,7 @@ function Get-ReleaseChangeTypes {
         Probed with Get-Command rather than taken as a parameter, the same pattern teardown.ps1 uses for
         Get-RosterIdTokenPattern.
     #>
-    if (Get-Command Get-BranchTypes -ErrorAction SilentlyContinue) { return @(Get-BranchTypes) }
+    if (Test-FunctionDefined 'Get-BranchTypes') { return @(Get-BranchTypes) }
     return @('Feat', 'Fix', 'Docs', 'Chore')
 }
 
@@ -4538,7 +4544,7 @@ function Resolve-EntryType {
     # Two lists, two jobs -- see the header. $repoTypes is empty where the repo has no table of its own, and
     # only that list may accuse an author of a wrong type; $known always has something to recognise with.
     $repoTypes = @()
-    if (Get-Command Get-BranchTypes -ErrorAction SilentlyContinue) { $repoTypes = @(Get-BranchTypes) }
+    if (Test-FunctionDefined 'Get-BranchTypes') { $repoTypes = @(Get-BranchTypes) }
     $known = @(Get-ReleaseChangeTypes)
 
     # THE ANSWER, NOT THE BODY, and the difference is the guidance comment sitting above it. Reading the raw
@@ -4648,7 +4654,7 @@ function Resolve-EntryType {
             # without a repo-config.ps1 no type at all, which is every bare consumer and every fixture:
             # strictly less than the writer used to manage, and silent about it.
             $fallback = $script:EntryFallbackTypeDefault
-            if (Get-Command Get-EntryFallbackType -ErrorAction SilentlyContinue) {
+            if (Test-FunctionDefined 'Get-EntryFallbackType') {
                 $v = Get-EntryFallbackType
                 if ($v) { $fallback = [string]$v }
             }
@@ -5606,7 +5612,7 @@ function Get-BranchTrunkName {
         in each is the shape where a consumer on 'master' gets a correct refusal and a document that
         tells them the wrong branch name.
     #>
-    if (Get-Command Get-TrunkBranchName -ErrorAction SilentlyContinue) {
+    if (Test-FunctionDefined 'Get-TrunkBranchName') {
         $v = Get-TrunkBranchName
         if ($v) { return [string]$v }
     }
@@ -7764,7 +7770,7 @@ function Test-BranchFoldedOnRef {
     )
 
     if (-not $Ref -or [string]::IsNullOrWhiteSpace($Branch)) { return $null }
-    if (-not (Get-Command Invoke-NativeCapture -ErrorAction SilentlyContinue)) { return $null }
+    if (-not (Test-FunctionDefined 'Invoke-NativeCapture')) { return $null }
 
     if (-not $ChangelogRel) {
         $paths = Get-BranchFilePaths

@@ -366,18 +366,18 @@ $seam = & {
     $configPath = Join-Path $args[0] 'scripts\repo-config.ps1'
     if (-not (Test-Path -LiteralPath $configPath -PathType Leaf)) { return $answers }
     try { . $configPath } catch { return $answers }
-    if (Get-Command Get-ShopifyLiveThemeId          -ErrorAction SilentlyContinue) { $answers.LiveThemeId  = [string](Get-ShopifyLiveThemeId) }
-    if (Get-Command Get-ShopifyStoreDomain          -ErrorAction SilentlyContinue) { $answers.StoreDomain  = [string](Get-ShopifyStoreDomain) }
-    if (Get-Command Get-ShopifySyncReferencePattern -ErrorAction SilentlyContinue) { $answers.Pattern      = [string](Get-ShopifySyncReferencePattern) }
-    if (Get-Command Get-ShopifySyncBranchPrefix     -ErrorAction SilentlyContinue) { $answers.BranchPrefix = [string](Get-ShopifySyncBranchPrefix) }
-    if (Get-Command Get-ShopifySyncMerges           -ErrorAction SilentlyContinue) { $answers.Merges       = [bool](Get-ShopifySyncMerges) }
-    if (Get-Command Get-TrunkBranchName             -ErrorAction SilentlyContinue) { $answers.Trunk        = [string](Get-TrunkBranchName) }
-    if (Get-Command Get-PrMergeMethod               -ErrorAction SilentlyContinue) { $answers.MergeMethod  = [string](Get-PrMergeMethod) }
+    if (Test-FunctionDefined 'Get-ShopifyLiveThemeId') { $answers.LiveThemeId  = [string](Get-ShopifyLiveThemeId) }
+    if (Test-FunctionDefined 'Get-ShopifyStoreDomain') { $answers.StoreDomain  = [string](Get-ShopifyStoreDomain) }
+    if (Test-FunctionDefined 'Get-ShopifySyncReferencePattern') { $answers.Pattern      = [string](Get-ShopifySyncReferencePattern) }
+    if (Test-FunctionDefined 'Get-ShopifySyncBranchPrefix') { $answers.BranchPrefix = [string](Get-ShopifySyncBranchPrefix) }
+    if (Test-FunctionDefined 'Get-ShopifySyncMerges') { $answers.Merges       = [bool](Get-ShopifySyncMerges) }
+    if (Test-FunctionDefined 'Get-TrunkBranchName') { $answers.Trunk        = [string](Get-TrunkBranchName) }
+    if (Test-FunctionDefined 'Get-PrMergeMethod') { $answers.MergeMethod  = [string](Get-PrMergeMethod) }
     # UNANSWERED MEANS NO LOG, and that is why this seam is not required (inbound #1382). Keeping a sync
     # log is a repo's POLICY -- dkj-policy-bwj's, for the two BWJ store repos -- while the machinery here is
     # generic and reaches every Shopify consumer through a plugin update. A repo that never asked for the
     # record must not find a new file in its tree because it updated a plugin, so the default is silence.
-    if (Get-Command Get-ShopifySyncLogPath          -ErrorAction SilentlyContinue) { $answers.SyncLogPath  = [string](Get-ShopifySyncLogPath) }
+    if (Test-FunctionDefined 'Get-ShopifySyncLogPath') { $answers.SyncLogPath  = [string](Get-ShopifySyncLogPath) }
     # THE ONE ANSWER IN THIS BLOCK WHOSE FAULT IS REPORTED, and it is the body seam's reason below applied
     # to the PR route (inbound #1023). Every other default here is a CORRECT answer, so falling back to one
     # is silent by design. No label is different: in a repo whose guardrail requires one, the fallback
@@ -389,7 +389,7 @@ $seam = & {
     # demanding @('sync') would make the seam wrong in the way that is hardest to see in a config file.
     # @() around the pipeline keeps one label an array rather than a string PowerShell then iterates by
     # character. Blank entries are dropped, so a 'VUL-IN' cleared to '' reads as unanswered.
-    if (Get-Command Get-ShopifySyncPrLabels -ErrorAction SilentlyContinue) {
+    if (Test-FunctionDefined 'Get-ShopifySyncPrLabels') {
         try {
             $answers.Labels = @(Get-ShopifySyncPrLabels | ForEach-Object { ([string]$_).Trim() } | Where-Object { $_ })
         } catch {
@@ -442,7 +442,7 @@ function Get-SyncPrBodySeamAnswer {
         $configPath = Join-Path $root 'scripts\repo-config.ps1'
         if (-not (Test-Path -LiteralPath $configPath -PathType Leaf)) { return '' }
         try { . $configPath } catch { return '' }
-        if (-not (Get-Command Get-ShopifySyncPrBody -ErrorAction SilentlyContinue)) { return '' }
+        if (-not (Test-FunctionDefined 'Get-ShopifySyncPrBody')) { return '' }
         try {
             $answer = [string](Get-ShopifySyncPrBody -Take $take -Keep $keep -Default $default)
         } catch {
