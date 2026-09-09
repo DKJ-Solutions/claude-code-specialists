@@ -43,7 +43,76 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**30 / 69 minor entries** <!-- pending-tally -->
+**31 / 71 minor entries** <!-- pending-tally -->
+
+### DEPLOY: docs/1705-findings-block-granularity · 20260909-123952
+
+Ravi's lens now records that a **universal shared block does not cost uniformly**. Of
+`findings-become-issues`'s thirty carriers exactly one sits on the always-on path — Chris's persona
+body, imported on every turn — while the other twenty-nine are paid per invocation, since the agent
+defs carry these blocks in the body rather than in the frontmatter description. A bullet appended to a
+universal block is therefore paid once per session in every consuming repo, and the word *universal*
+hides that.
+
+So the lens carries the test that follows from it: **would you put this bullet in Chris's body on its
+own?** If not, it belongs in a narrower circle, which the generator already supports. And there is no
+cheap middle — the source file is copied whole, so nothing written into it stays behind.
+
+**The question #1705 actually asked was answered by measuring and declining.** Seven of the eight
+bullets are universal on their face; the eighth reads narrow and generalises. The block stays as it is.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+N/A — a repo-local lens, read on demand, and nothing in any plugin changed. A consumer receives no
+byte of this.
+
+**Score:** N/A
+
+#### Pull Request
+
+What earns a place in the findings block, measured per bullet
+
+[PR #1711](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1711)
+
+---
+
+### DEPLOY: docs/1699-policy-is-adopted-craft-adapts · 20260909-122141
+
+*"The plugin serves the consumer's repo"* is now only half the story, and the README says which half.
+A specialist **team** adapts to the repo it lands in — that is a craft, and a craft that overrode its
+host would be worth less. **`dkj-policy` runs the other way**: nothing arrives unasked, and enabling it
+is choosing to be governed by it, with the consuming repo's own page yielding on conflict. The evidence
+that this reaches outward rather than being a local arrangement is a mechanism the plugin ships — a
+SessionStart check that reports a consumer's own prose when it claims precedence.
+
+The August 8, 2026 sentence was written when one claim could still cover everything that shipped, and
+its last clause now reads *"nothing travels outward **unasked** that assumes otherwise"*. The
+craft-versus-way-of-working test question below it is untouched and is what both halves point at; what
+#1699 adds is that **opt-in describes the install, not the obedience**.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+A consumer reading `dkj-policy`'s own front page now learns what installing it commits them to, in the
+place they meet the plugin — that page said *"not a baseline every consumer inherits"* and stopped
+there, which is true of the install and easy to read as a promise about the rest. Nothing they run
+changes, and no value they set changes: the portable page still names a seam wherever the repo owns the
+answer.
+
+**Score:** 3
+
+#### Pull Request
+
+The plugin serves the consumer -- except the policy, which the consumer adopts
+
+Plugins: dkj-policy
+
+[PR #1709](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1709)
+
+---
 
 ### DEPLOY: feat/1693-fixture-lib-dep-check · 20260909-120859
 
