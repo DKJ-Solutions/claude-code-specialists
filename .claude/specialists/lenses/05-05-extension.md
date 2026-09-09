@@ -454,8 +454,54 @@ the other three as it sets one — and it is worth knowing that set exists: `ver
 high`, on three of the same colour codes, in the BWJ store repos. **Different vocabulary, different
 motor** — that one is derived from an Asana `Prio-Score`, this one is a judgement typed by whoever
 files — so a session moving between the two repo families reaches for a label the other does not have,
-and `gh` fails outright on a label that does not exist. Whether the two should be unified is
-[#1686](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1686), and it is Dave's call.
+and `gh` fails outright on a label that does not exist.
+
+**The two stay apart, and the different names are load-bearing** (decided September 9, 2026,
+[#1686](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1686), by Dave's standing
+instruction to follow the specialist's advice on a question raised while he was away). Three things
+decided it, and the first two are measurements rather than preferences:
+
+1. **The BWJ names are not a convention, they are code.**
+   `plugins/dkj-policy/dkj-policy-bwj/templates/asana-mirror.ps1` holds them as a literal
+   (`$script:PrioLabels = @('very low', 'low', 'high', 'very high')`), `Get-PrioLabelForScore` returns
+   those exact strings from a score band, and `scripts/tests/dkj-policy-bwj.tests.ps1` asserts every
+   boundary from both sides. So unifying is not a rename: it is an edit to a shipped CI mechanism that
+   runs daily against two live stores, a re-pinning of its suite, and a label rename on two live
+   trackers — none of which this repo owns.
+2. **The collision cannot mis-file anything, because the two sets are disjoint in both directions.**
+   Measured on all three trackers in the family on the day of the decision, with `gh label list`: this
+   one carries `prio-1`…`prio-4` and **none** of the four words, while both
+   `BWJ-Development/smartwatchbanden` and `BWJ-ecommerce/xoxowildhearts` carry the four words and **no**
+   `prio-N` at all. A session that reaches for the wrong one is refused by `gh` rather than filing an
+   issue at the wrong rung — the same shape as the label gate in
+   [`open-pr.ps1`](#derek-is-lazy--so-he-scripted-everything), which exists because `gh` judges an
+   unknown label at the create. The whole symptom is one failed command that names the label it would
+   not accept, and one re-run.
+3. **And the names are the only thing that says which motor owns the rung.** A single vocabulary would
+   read as a single mechanism, which is the more expensive mistake: a rung typed by hand in a BWJ repo
+   is answering to a score nobody typed, and one derived from a score is meaningless here, where there
+   is no Asana to derive it from. Two names for two motors is information; one name for two motors is a
+   session assuming the sweep applies where it does not.
+
+**What was NOT weighed: how recently either set was created.** `prio-1`…`prio-4` are one day older than
+this decision and the BWJ set a week, and neither fact is an argument — the case above is the mechanism
+or it is nothing.
+
+**And the rule stays repo-local rather than moving into `dkj-policy`** (same decision, the issue's
+second half). **Nothing in the workflow reads a priority**: searched across `scripts/`, `plugins/` and
+`.github/` on the day of the decision, `prio-` appears in no gate, no script and no runner here — only
+on the BWJ side, where a shipped script owns it. A portable version would therefore prescribe to every
+consumer a convention no gate enforces and nothing reads, which is the enforced-by-memory shape
+[#1665](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1665) was filed against, and it
+would owe `adopt-dkj-policy` a label-creation step for four labels the consumer never asked for. That
+is worse than the prescription-a-consumer-cannot-follow trap of
+[#1540](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1540): here they *could* follow
+it and would gain nothing for it.
+
+**The seam is the shape if that ever changes.** The day something needs to read the axis, the portable
+half is one `scripts/repo-config.ps1` function stating this repo's own scheme — or that it has none —
+exactly like `Get-ReleaseAudienceTier` and `Get-ShopifyRepoHasNoStore`. Nothing reads it today, so
+nothing is built today.
 
 **It is a separate axis from the prefix→label mapping in
 [step 2](#classifying-naming-and-creating-a-branch), which is about a PULL REQUEST.** `enhancement`,
