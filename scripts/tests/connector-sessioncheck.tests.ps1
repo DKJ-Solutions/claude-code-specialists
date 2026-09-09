@@ -233,7 +233,19 @@ function Invoke-Hook {
     $env:USERPROFILE = $HomeDir
     Push-Location $RepoRoot
     try {
-        $args = @('-WorkshopPathOverride', (Join-Path $Fixture 'nowhere')) + $HookArgs
+        # THE VERSION BOUND IS RAISED HERE, ONCE, FOR EVERY CALLER OF THIS HELPER (#1701). This is the
+        # helper that runs the hook against the REAL engine, so every one of its callers races the same
+        # cold PowerShell 5.1 startup -- and this suite runs inside the test gate's own parallel lanes,
+        # which is the one condition under which the production 30s is reachable. When it was hit, the
+        # hook took its graceful-degradation branch (correctly, still exit 0) and six assertions written
+        # against the branch that did not run all failed, on a branch that reads nothing this hook
+        # touches. Raised rather than tolerated: the un-degraded five-line output is exactly what these
+        # blocks exist to pin, and asserting "either shape" would retire the assertion to keep the
+        # suite green. The degraded shape has its own scenario below, forced deterministically.
+        #
+        # A caller that names the parameter itself wins, which is what lets that scenario exist.
+        $bound = if ($HookArgs -contains '-VersionTimeoutSeconds') { @() } else { @('-VersionTimeoutSeconds', '300') }
+        $args = @('-WorkshopPathOverride', (Join-Path $Fixture 'nowhere')) + $bound + $HookArgs
         $out = & powershell -NoProfile -ExecutionPolicy Bypass -File $Hook @args
         return [pscustomobject]@{ Code = $LASTEXITCODE; Lines = @($out); Text = ($out -join "`n") }
     } finally {
@@ -258,19 +270,37 @@ function Invoke-HookWithFakeEngine {
         branch 3 asserted against a genuine "no plugins are enabled" line. The suite caught it, which
         is the argument for pinning whole lines here rather than fragments.
     #>
-    param([string]$EngineDir, [string]$FakeBody, [string]$RepoDir, [string]$HomeDir)
+    param(
+        [string]$EngineDir,
+        [string]$FakeBody,
+        [string]$RepoDir,
+        [string]$HomeDir,
+        [string[]]$HookArgs = @(),
+        # Copy native-capture-lib.ps1 to the hook copy's own ..\scripts\lib\ sibling, which is where the
+        # hook resolves it from. Without it the copy takes its pre-#1591 fallback -- a bare '& powershell'
+        # with no bound at all -- so a scenario about the BOUND has to ask for the lib that enforces it.
+        # Same seam Invoke-CountedHook uses for session-cache-lib, and off by default for the same reason:
+        # the blocks that predate it assert the fallback and must keep getting it.
+        [switch]$WithCaptureLib
+    )
     $hookCopy = Join-Path $EngineDir 'hooks\connector-sessioncheck.ps1'
     New-Item -ItemType Directory -Path (Split-Path -Parent $hookCopy) -Force | Out-Null
     Copy-Item -LiteralPath $Hook -Destination $hookCopy -Force
     New-Item -ItemType Directory -Path (Join-Path $EngineDir 'scripts\task') -Force | Out-Null
     [System.IO.File]::WriteAllText((Join-Path $EngineDir 'scripts\task\plugin-versions.ps1'), $FakeBody, $Utf8)
+    if ($WithCaptureLib) {
+        New-Item -ItemType Directory -Path (Join-Path $EngineDir 'scripts\lib') -Force | Out-Null
+        Copy-Item -LiteralPath (Join-Path $RepoRoot 'scripts\lib\native-capture-lib.ps1') `
+                  -Destination (Join-Path $EngineDir 'scripts\lib\native-capture-lib.ps1') -Force
+    }
     $prevP = $env:CLAUDE_PROJECT_DIR
     $prevU = $env:USERPROFILE
     $env:CLAUDE_PROJECT_DIR = $RepoDir
     $env:USERPROFILE = $HomeDir
     Push-Location $EngineDir
     try {
-        $out = & powershell -NoProfile -ExecutionPolicy Bypass -File $hookCopy -WorkshopPathOverride (Join-Path $Fixture 'nowhere')
+        $out = & powershell -NoProfile -ExecutionPolicy Bypass -File $hookCopy `
+            -WorkshopPathOverride (Join-Path $Fixture 'nowhere') @HookArgs
         return [pscustomobject]@{ Code = $LASTEXITCODE; Lines = @($out); Text = ($out -join "`n") }
     } finally {
         Pop-Location
@@ -521,6 +551,26 @@ try {
     Assert-Equal 0 $r5.Code '5d: exit 0 with the lib gone'
     Assert-Equal 2 $r5.Spawns '5d: it measures rather than replaying, because there is nothing to ask'
     Assert-Equal $r4.Text $r5.Text '5d: and the verdict is the one it always printed'
+
+    # --- 6. -VersionTimeoutSeconds is honoured, and a hit degrades to the exit-124 line (#1701) -----
+    #     The bound the four blocks above now RAISE, asserted from the other side. It is forced rather
+    #     than raced: the fake engine sleeps five seconds and the bound is one, so the timeout fires on
+    #     any machine at any load -- which is the property block 1 lacked, where a 30s bound and a cold
+    #     PowerShell 5.1 startup under sixteen lanes decided the verdict.
+    #
+    #     Both halves matter. That the PARAMETER is read at all is what makes raising it above real: a
+    #     default the hook ignored would leave those blocks racing exactly as before, silently. And that
+    #     a hit still exits 0 with one honest line is the behaviour #1701 was careful to call correct --
+    #     the hook is not the defect there, so this pins the degradation rather than removing it.
+    Write-Host "6. -VersionTimeoutSeconds is read, and a hit degrades to one honest line at exit 0" -ForegroundColor Cyan
+    $c = New-Case 'bound6'
+    $slowBody = "Start-Sleep -Seconds 5`r`nWrite-Host '[SUMMARY] 1 plugin(s) enabled here: 0 behind, 1 up to date.'`r`nexit 0`r`n"
+    $r = Invoke-HookWithFakeEngine -EngineDir (Join-Path $Fixture 'bound6\slowengine') -FakeBody $slowBody `
+        -RepoDir $c.Repo -HomeDir $c.Home -WithCaptureLib -HookArgs @('-VersionTimeoutSeconds', '1')
+    Assert-Equal 0 $r.Code '6: a bound that is hit still exits 0 -- the hook degrades, it does not fail the session start'
+    Assert-Equal 1 $r.Lines.Count '6: exactly one line'
+    Assert-Equal "connector-sessioncheck: no source checkout on this machine, so $REGISTER_PHRASE, and the version check produced no readable output (exit 124) -- run the plugin-versions skill to see why." $r.Lines[0] '6: the whole line, naming exit 124 -- which is the substitution that failed block 1 under the gate load'
+    Assert-Lacks $r.Text '0 behind, 1 up to date' '6: the engine never answered, so the verdict it would have printed is absent -- without this the assert above could pass on a run that did not time out'
 }
 finally {
     if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture -ErrorAction SilentlyContinue }
