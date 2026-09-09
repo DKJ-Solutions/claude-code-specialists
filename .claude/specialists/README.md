@@ -10,12 +10,14 @@ themselves**. It is **not a replacement** for the safety rules or the routing.
 > **This repo is an outlier.** claude-code-specialists is the marketplace repo of one product; the
 > specialists system lives here as the plugins under `plugins/` — a stack of teams plus an opt-in
 > workflow (see [`../../README.md`](../../README.md)) — and the repo also consumes that system here
-> **itself** — and it enables **every** plugin in the marketplace, so that the repo which ships a
+> **itself**. It enables **all six** of the marketplace's plugins, so that the repo that ships a
 > plugin is also a repo that loads it (Dave, September 8, 2026; the reasoning and what it costs are in
 > [the repo slot of `CLAUDE.md`](../../CLAUDE.md#specific-to-this-repo-claude-code-specialists)). Only
 > `dkj-team-alpha` (the core team) and `dkj-policy` carry real work here, so the team is small and
 > focused on maintaining this product (agent defs, manuals, docs, tooling), not the broad team of a
-> content repo. The other four are enabled for validation, not for routing.
+> content repo. The other four are enabled for validation — and they are validation of two different
+> kinds: the three add-on teams ship specialists nothing here routes to, while `dkj-policy-bwj` ships
+> no agents at all.
 
 - The constitution remains [`../../CLAUDE.md#safety-rules`](../../CLAUDE.md#safety-rules).
 - **Chris still takes in and routes every assignment** — see his fixed ritual in
@@ -225,8 +227,8 @@ seam's inclusion file, which `../../CLAUDE.md` imports; the list below is purely
 repo lenses themselves.
 
 **Every specialist an enabled plugin ships has a lens file, without exception** — so `lenses/` holds
-more files than this table has rows. **The table is the CORE TEAM's**, which is the roster this repo
-routes to; the eleven that arrive with the three add-on teams are listed per plugin in
+more files than this table has rows. **The table is the core team's roster**; the eleven that arrive
+with the three add-on teams are listed per plugin in
 [`SPECIALISTS.md`](SPECIALISTS.md#the-team-roster--routing) rather than repeated here. A lens marked
 *scaffold* is an empty `VUL-IN` template waiting for that specialist's first work here — **the intended
 state, not a backlog item**, exactly as
@@ -258,14 +260,14 @@ The six scaffolds mark specialists who rarely have work in this maintenance repo
 interviews, Paula's timelines, Vera's dashboards, Gwen's visuals, Cody's application code, Auden's
 long-form writing. On the day one of them first has work here,
 [Tessa #16](lenses/06-16-extension.md) fills the lens in before that specialist is deployed.
-**The three add-on teams — `dkj-team-ecomm`, `dkj-team-lifehub` and `dkj-team-shopify` — are ON here,
-and their eleven lenses are empty for a different reason: they will stay empty.** The six scaffolds
-above are waiting; those eleven are not. Those plugins are enabled so that the repo which ships a
-plugin is also a repo that loads it — validation, not a roster — and this repo is not a webshop, a
-personal-life repo or a Shopify store, so [Chris does not route to
+**The three add-on teams — `dkj-team-ecomm`, `dkj-team-lifehub` and `dkj-team-shopify` — are on here,
+and their eleven lenses are empty for a different reason: they will stay empty.** The six
+scaffolds above are waiting; those eleven are not. Those plugins are enabled so that the repo that
+ships a plugin is also a repo that loads it — validation, not a roster — and this repo is not a
+webshop, a Shopify store or a personal-life repo, so [Chris does not route to
 them](lenses/01-01-extension.md#the-roster--routing-table--which-assignment-goes-to-whom) at all. **Do
 not treat those eleven as a backlog**: a filled-in lens for one of them would describe work this repo
-does not have. Same wording, same reasoning, in
+does not have. Same reasoning, in
 [`SPECIALISTS.md`](SPECIALISTS.md#the-team-roster--routing) and [the repo slot of
 `CLAUDE.md`](../../CLAUDE.md#specific-to-this-repo-claude-code-specialists).
 

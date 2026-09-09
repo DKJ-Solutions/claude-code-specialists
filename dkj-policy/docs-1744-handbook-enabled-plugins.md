@@ -82,6 +82,16 @@ answer instead of restating it, so the next plugin cannot make them wrong.
 - [x] Replace the two stale counts with a pointer to the file that holds the answer
 - [x] Correct the four `DaveKJohn/` repo citations, under `CLAUDE.md`'s corrected-when-edited rule
 - [x] Copy edit on the diff (Edith #17), held against `SPECIALISTS.md` and the repo slot of `CLAUDE.md`
+- [x] Act on all eight of her findings -- two were substantive: the first draft wrote *"the roster this
+      repo routes to"*, which conflates the two things [Chris's lens](../.claude/specialists/lenses/01-01-extension.md)
+      keeps apart (*"the table above is the routing, not the roster"*) and contradicted this page's own
+      next paragraph; and it folded `dkj-policy-bwj` into *"not for routing"* when that plugin ships no
+      agents to route to at all, which is a different kind of validation from the add-on teams'. The
+      other six: a dangling *"the other four"* with the total never stated, `which` for `that` in a
+      restrictive clause echoing `CLAUDE.md`'s canonical phrasing, two spots of all-caps emphasis the
+      page uses nowhere else, a stacked conjunction, and *"same wording"* where only the reasoning
+      matches. A nested `**` inside a bold span, introduced by that same repair, was caught and fixed
+      before the commit -- no gate here reads markdown emphasis, so that one was on the reader.
 
 ### TEST
 
