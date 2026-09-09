@@ -76,6 +76,9 @@ certified. So the repair is a **second evidence source**, not a change to the fi
 - [x] `Get-CiTestCheckName` in `scripts/repo-config.ps1` -- the seam naming the check whose green
       proves this repo's suites (`lint-en-tests`), registered in the contract as **optional** with
       "no certificate, the gate runs" as its default, so the change arrives inert in a consumer.
+      **The contract record count moves 36 -> 37**, and this is the record: the count assert is
+      deliberately exact and asks for the addition to be named here, which is the conversation it
+      exists to force. Nothing was retired.
 - [x] `Get-CiTestCertificate` in `scripts/lib/gate-lib.ps1` -- pure, judging two SHAs plus the
       `gh pr checks --required` payload the caller fetched against that named check, so every refusal
       is reachable in a suite without a network or a PR.
