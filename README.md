@@ -19,7 +19,7 @@ keeping its own copies, and enables or disables **per plugin** which teams and w
 | **connect my own repo — and know why** | **[INSTALL.md, the adoption half](INSTALL.md#adoption--how-to-connect-your-repo)** — the full, measurement-backed adoption manual for someone who did not build this, ~47 min (August 6, 2026). Read its *Before you start* section first if the machine is new or has adopted this family before. |
 | **disconnect it again** | [UNINSTALL.md](UNINSTALL.md) — the install page's mirror: the repo teardown and the machine-side removal, in the order they have to happen. |
 | **I already adopted this, under the old plugin names** | [INSTALL.md, migrating from the old plugin names](INSTALL.md#migrating-from-the-old-plugin-names) — a third procedure, neither the quickstart nor first-time adoption: the old ids (`specialists@claude-code-specialists` and its siblings) mapped onto the new teams and workflow. |
-| know **what this promises my repo** | [The plugin serves the consumer's repo](#the-plugin-serves-the-consumers-repo) — the specialists adapt to your way of working; ours is not a standard you inherit. |
+| know **what this promises my repo** | [The plugin serves the consumer's repo](#the-plugin-serves-the-consumers-repo) — the specialist teams adapt to your way of working, and nothing arrives unasked; `dkj-policy` is the exception, and installing it is choosing to be governed by it. |
 | know **which plugin does what** | [Teams and workflows](#teams-and-workflows--whats-the-difference) |
 | know **how a specialist is built** | [Manuals — the split model](#manuals--the-split-model) |
 | know **how a repo consumes this** | [Consumption](#consumption) · [Versioning](#versioning) |
@@ -78,7 +78,33 @@ Decision by Dave, August 3, 2026.
 **A consuming repo is unique and has its own way of working, and the specialists adapt to it. That is
 their strength.** This repository's way of working — the branch-and-entry model, the tier ladder, the
 fold, the cut, the gates — is *this* repo's answer to a problem, not a standard a consumer is expected
-to adopt. Nothing that travels outward may assume otherwise.
+to adopt. Nothing travels outward **unasked** that assumes otherwise.
+
+**That last word is a correction, and this section's title is now only half true** ([#1699](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1699),
+September 9, 2026). The sentence above was written on August 8, 2026, when the split it describes had
+just been made and one claim could still cover everything that shipped. It cannot any more, because the
+two kinds of plugin stand in opposite relations to a consumer's own rules:
+
+- **A team adapts to the repo it lands in.** `dkj-team-alpha` and the add-on teams describe a *craft*,
+  and a craft that overrode its host would be worth less, not more — which is what the test question
+  below is for.
+- **`dkj-policy` is adopted BY the consumer, and it wins.** The workflow's own page says so in its
+  opening line — *"it sits on top of the repo's `CLAUDE.md` and wins over it on conflict"* (Dave,
+  [`dkj-policy/CONTRIBUTING.md`](dkj-policy/CONTRIBUTING.md)) — [`CLAUDE.md`](CLAUDE.md) restates it
+  from the other side (*"where the two disagree, the plugin's page wins"*), and the evidence that this
+  reaches outward rather than being a local arrangement is a mechanism:
+  [`check-consumer-prose.ps1`](scripts/lint/check-consumer-prose.ps1) ships in the plugin and runs as a
+  **SessionStart check in a consumer**, reporting that repo's own always-on prose when it declares that
+  *its* `CLAUDE.md` wins. A way of working with a detector for repos claiming precedence over it is not
+  one that adapts to them. What stays adaptive is the *values*: the portable page names a **seam**
+  wherever a repo owns the answer.
+
+**Opt-in is what reconciles the two, and it describes the INSTALL rather than the obedience.** Nobody
+is handed this way of working: `dkj-policy` is enabled by choice and absent by default, and the
+enforcement moved out with it, so a repo that works differently is told nothing at session start. What
+installing it means is that the consumer has chosen to be governed by it — and from that moment the
+adaptation runs the other way, with the consumer's own page yielding. Both statements were always
+intended; only the first could be written while there was effectively one plugin family.
 
 **The exception is the author, and it is a real one.** Dave runs these plugins across several of his
 own repos and deliberately uses one way of working across them, deviating only where the domain forces
