@@ -600,6 +600,43 @@ function Get-SharedScriptPairs {
             LibOnly = $true
         },
         @{
+            # Issue #1682, September 9, 2026. The one reading of `git status --porcelain`: the command
+            # with its two flags, and the line parse. Mirrored because BOTH its callers are, and each
+            # dot-sources it by name -- park-lib.ps1 (the uncommitted count behind the backing gate) and
+            # fanout-lib.ps1 (the per-path snapshot behind check-fanout). A consumer whose park-cycle
+            # Stop hook dot-sources a file the mirror does not carry would fail on every turn.
+            #
+            # THE DOT-SOURCE IS GUARDED IN BOTH CALLERS, so a mirror that predates this entry loads
+            # without crashing -- but the function is then missing, which is why it is registered rather
+            # than left to the guard. The guard buys an ordered release, not an optional file.
+            #
+            # ITS OWN FILE, for the reason park-lib's entry gives one line up: native-capture-lib asks
+            # not to be widened again, and a porcelain parse is neither a capture helper nor a park.
+            # Nothing in it is repo-owned -- it takes lines and a repo root and returns paths and status
+            # characters -- so no contract row follows.
+            Name    = 'git-porcelain-lib'
+            Source  = 'scripts\lib\git-porcelain-lib.ps1'
+            Plugin = 'dkj-policy'
+            LibOnly = $true
+        },
+        @{
+            # THE SECOND MIRROR OF THE SAME SOURCE (issue #1689, September 9, 2026), on
+            # native-capture-lib-shopify's and merged-pr-lib-shopify's precedent -- read either of those for
+            # the argument in full. Convert-GitQuotedPath moved in here from sync-rules.ps1, and sync-main.ps1
+            # dot-sources this file directly and unguarded for it, so dkj-team-shopify needs its own copy:
+            # the two plugins are separately versioned and separately installed, and a cross-plugin path is a
+            # dependency a version mismatch breaks silently.
+            #
+            # NOT REACHED THROUGH sync-rules.ps1, which is the file the decoder came OUT of and the one place
+            # it must not go back into: that entry's own note says it is dependency-free on purpose, because
+            # the live-theme guard dot-sources it on every command inside a catch that returns no live theme
+            # id. It never called the function it defined, so losing it cost that file nothing.
+            Name    = 'git-porcelain-lib-shopify'
+            Source  = 'scripts\lib\git-porcelain-lib.ps1'
+            Plugin = 'dkj-team-shopify'
+            LibOnly = $true
+        },
+        @{
             # Issue #1069, August 29, 2026. Mirrored because BOTH its callers are: ship-pr.ps1 asks it
             # whether another worktree holds the trunk (before the merge, and again when handing the trunk
             # back afterwards), and prune-merged.ps1 asks it which worktree to name when its fast-forward

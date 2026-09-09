@@ -45,6 +45,9 @@ $SeamLibSrc      = Join-Path $RepoRoot 'scripts\lib\seam-lib.ps1'
 # seam-lib above: in a real consumer these arrive with the plugin, so the stand-in tree has to hold them.
 $NativeCaptureSrc = Join-Path $RepoRoot 'scripts\lib\native-capture-lib.ps1'
 $ParkLibSrc       = Join-Path $RepoRoot 'scripts\lib\park-lib.ps1'
+# park-lib dot-sources this one (#1682), guarded -- so a fixture that omits it loses Get-GitParkBacking
+# silently rather than crashing. park-cycle.tests.ps1 is where that cost ten asserts.
+$PorcelainSrc     = Join-Path $RepoRoot 'scripts\lib\git-porcelain-lib.ps1'
 $OpenPrSrc       = Join-Path $RepoRoot 'scripts\release\open-pr.ps1'
 # THE ALREADY-DONE CHECK'S PURE HALF (#1409). new-branch.ps1 dot-sources this unconditionally now, same
 # as the two above -- a fixture missing it dies before the document is written, exactly as it did for
@@ -190,7 +193,7 @@ Write-Host "the round trip (new-branch writes what the gate refuses)" -Foregroun
 # THE ASSERT THIS SUITE EXISTS FOR. Both scripts read the wording from the lib, so they cannot disagree
 # -- but "cannot" is a claim about code, and this measures it by running the real writer and handing its
 # output to the real matcher. If someone reintroduces a literal in either place, this goes red.
-$fixture = Join-Path ([System.IO.Path]::GetTempPath()) "entry-scaffold-test-$PID"
+$fixture = Join-Path ([System.IO.Path]::GetTempPath()) "entry-scaffold-test-$PID-$([guid]::NewGuid().ToString('n'))"
 if (Test-Path -LiteralPath $fixture) { Remove-Item -Recurse -Force -LiteralPath $fixture }
 New-Item -ItemType Directory -Path (Join-Path $fixture 'scripts\task') -Force | Out-Null
 New-Item -ItemType Directory -Path (Join-Path $fixture 'scripts\lib') -Force | Out-Null
@@ -200,6 +203,7 @@ Copy-Item -LiteralPath $LibSrc -Destination (Join-Path $fixture 'scripts\lib\ent
 Copy-Item -LiteralPath $SeamLibSrc -Destination (Join-Path $fixture 'scripts\lib\seam-lib.ps1') -Force
 Copy-Item -LiteralPath $NativeCaptureSrc -Destination (Join-Path $fixture 'scripts\lib\native-capture-lib.ps1') -Force
 Copy-Item -LiteralPath $ParkLibSrc -Destination (Join-Path $fixture 'scripts\lib\park-lib.ps1') -Force
+Copy-Item -LiteralPath $PorcelainSrc -Destination (Join-Path $fixture 'scripts\lib\git-porcelain-lib.ps1') -Force
 Copy-Item -LiteralPath $PrIssuesLibSrc -Destination (Join-Path $fixture 'scripts\lib\pr-issues-lib.ps1') -Force
 Copy-Item -LiteralPath $RemoteAheadLibSrc -Destination (Join-Path $fixture 'scripts\lib\remote-ahead-lib.ps1') -Force
 Copy-Item -LiteralPath $RefPrintLibSrc    -Destination (Join-Path $fixture 'scripts\lib\ref-print-lib.ps1')    -Force
@@ -1686,7 +1690,7 @@ Assert-True ($bfp.ContribFolderFile.EndsWith('contributing-davekjohn/development
 # beside the pair holding its real work. A resolver keyed on Test-Path would hand that branch the empty
 # document and call its entry missing. So the scenario below is the one that would have gone wrong:
 # both present, and the OLD one is the one that names this branch.
-$resolveFx = Join-Path ([System.IO.Path]::GetTempPath()) "branch-file-resolve-$PID"
+$resolveFx = Join-Path ([System.IO.Path]::GetTempPath()) "branch-file-resolve-$PID-$([guid]::NewGuid().ToString('n'))"
 if (Test-Path -LiteralPath $resolveFx) { Remove-Item -Recurse -Force -LiteralPath $resolveFx }
 New-Item -ItemType Directory -Path (Join-Path $resolveFx ($bfp.Directory -replace '/', '\')) -Force | Out-Null
 New-Item -ItemType Directory -Path (Join-Path $resolveFx 'dkj-policy\branch') -Force | Out-Null
@@ -2387,7 +2391,7 @@ Write-Host "Get-EntryLinkFindings -DestDirRel -- the base follows the CHANGELOG,
 # BOTH bases. The first draft used CONTRIBUTING.md, which sits at the root AND in the workflow folder here,
 # so the root case reported nothing and read as a broken repair rather than a badly chosen fixture. This
 # tree states exactly which file is where, and it does not move when the repo's layout does.
-$linkFixture = Join-Path ([System.IO.Path]::GetTempPath()) "entry-link-dest-$PID"
+$linkFixture = Join-Path ([System.IO.Path]::GetTempPath()) "entry-link-dest-$PID-$([guid]::NewGuid().ToString('n'))"
 if (Test-Path -LiteralPath $linkFixture) { Remove-Item -Recurse -Force -LiteralPath $linkFixture }
 $folderRel = (Get-BranchFilePaths).Directory
 New-Item -ItemType Directory -Path (Join-Path $linkFixture $folderRel) -Force | Out-Null
@@ -2483,6 +2487,33 @@ Assert-Equal 0 $notQuoted.Count "every guidance element opens with '>' -- an ele
 # split element still renders, with the marker orphaned onto its own line where it reads as a heading.
 $phaseHashes = '#' * (Get-BranchCycleSectionLevel)
 Assert-True (((Format-Development -Branch 'feat/x-v1' -Id '20260826-000000') -join "`n") -match ('FOUR `' + $phaseHashes + '` HEADINGS')) 'and the level composed from the knob reaches the document on one line, not orphaned onto its own'
+
+# THE GUIDANCE DOES NOT QUOTE A PHASE HEADING IT IS A RULE ABOUT (#1654, September 8, 2026). It quoted the
+# first one -- '`### PLAN`' -- so that string stood in the document TWICE, the mention ABOVE the use. Any
+# edit anchoring on the heading as a plain string found the mention, and two documents shipped through that
+# door: #1632 and #1644. Two gates catch the RESULT; this asserts the door itself.
+#
+# EVERY PHASE, NOT JUST THE FIRST, and derived from the seam rather than typed. The measured collisions were
+# both on PLAN because PLAN is what an edit anchors on, but the defect is the shape -- a heading quoted in
+# the region above itself -- and a later edit naming CREATE or DEPLOY the same way would reopen it under a
+# different letter. Deriving from StepPhases also means a consumer who renamed a phase is held to the same
+# rule rather than to this repo's four words.
+#
+# ON THE RENDERED DOCUMENT'S GUIDANCE REGION, not on the wording array, because that is where the collision
+# lives: the array is what a seam override may replace wholesale, while the region above the first phase
+# heading is what every anchor actually reads. A repo that overrides StepsGuidance is measured on the text
+# it really ships.
+$docLines1654   = @([regex]::Split(((Format-Development -Branch 'feat/x-v1' -Id '20260908-000000') -join "`n"), '\r?\n'))
+$phases1654     = @((Get-BranchFileWording).StepPhases | Where-Object { $_ })
+$headings1654   = @($phases1654 | ForEach-Object { $phaseHashes + ' ' + $_ })
+$firstIdx1654   = [array]::IndexOf($docLines1654, $headings1654[0])
+Assert-True ($firstIdx1654 -gt 0) "guidance/#1654: (the scaffolded document really carries its first phase heading '$($headings1654[0])')"
+$preamble1654   = if ($firstIdx1654 -gt 0) { @($docLines1654[0..($firstIdx1654 - 1)]) } else { @() }
+foreach ($h1654 in $headings1654) {
+    $hits1654 = @($preamble1654 | Where-Object { $_ -match [regex]::Escape($h1654) })
+    foreach ($hit1654 in $hits1654) { Write-Host "         quoted heading in the guidance: '$hit1654'" -ForegroundColor Red }
+    Assert-Equal 0 $hits1654.Count "guidance/#1654: the region above the first phase heading does not quote '$h1654' -- an edit anchoring on that heading must not find the guidance first"
+}
 
 Write-Host ""
 Write-Host "Remove-EntryAudienceGuidance -- a no-tier repo drops the audience PARAGRAPH, not one line of it (#928)" -ForegroundColor Cyan
@@ -2825,17 +2856,39 @@ Write-Host 'Test-DevelopmentEntryMissing (#1632)'
 $missingWhole = (Format-Development -Branch 'feat/no-entry') -join "`n"
 Assert-True (-not (Test-DevelopmentEntryMissing -Text $missingWhole)) 'entry-missing: the document the scaffolder writes has its entry -- the case that must never refuse'
 
-# THE MEASURED CUT, reproduced rather than hand-written: the truncation point was the first phase heading,
-# a string that also occurs INSIDE the guidance blockquote. That is what makes this reachable by an edit
-# meant to keep the guidance and replace the body, which is how the measured instance was produced.
+# THE MEASURED CUT, reproduced rather than hand-written: the truncation point was the first phase heading.
+# The cut is taken at the FIRST line matching it, which is what an anchor-on-the-heading edit does.
+#
+# WHAT THIS ASSERT PROVES CHANGED UNDER #1654, AND IT WAS SILENT ABOUT IT -- worth reading before trusting
+# the pair below. Its precondition used to read "the heading really occurs inside the guidance block",
+# because it did: the guidance quoted it, so the first match was the MENTION and the cut landed there.
+# #1654 stopped the guidance quoting it, so the first match is now the real heading and the cut lands one
+# region lower. The assert went on passing either way -- `$missingCut -gt 0` is true of both lines -- so a
+# green suite said nothing about which shape it was exercising. It is split in two now: the derived cut
+# below is the post-#1654 document, and the pinned one after it is the pre-#1654 one that no scaffolder
+# writes any more but that every branch open across the change still carries.
 $missingLines = @($missingWhole -split '\r?\n')
 $missingPhase = ('#' * (Get-BranchCycleSectionLevel)) + ' ' + @((Get-BranchFileWording).StepPhases)[0]
 $missingCut = 0
 for ($mi = 0; $mi -lt $missingLines.Count; $mi++) {
     if ($missingLines[$mi] -match [regex]::Escape($missingPhase)) { $missingCut = $mi; break }
 }
-Assert-True ($missingCut -gt 0) 'entry-missing: (the phase heading really occurs inside the guidance block, which is what makes the cut reachable)'
+Assert-True ($missingCut -gt 0) 'entry-missing: (the scaffolded document really carries that heading, so the cut has somewhere to land)'
 Assert-True (Test-DevelopmentEntryMissing -Text (($missingLines[0..($missingCut - 1)]) -join "`n")) 'entry-missing: a document reduced to its guidance block has no entry -- the state every gate passed'
+
+# AND THE PRE-#1654 SHAPE, PINNED RATHER THAN DERIVED, because the wording that produced it is gone from
+# the scaffolder and cannot be derived from it any more. This is the measured #1644 document: the guidance
+# truncated mid-sentence at its own mention of the heading. Deleting this case would retire the regression
+# test for the two incidents that built the gate, on a branch whose whole point is that new documents no
+# longer reach it -- while every branch already open still does.
+$missingLegacy = @(
+    '## feat/legacy-wording',
+    '',
+    '> **How this file is read.** A step is `- [ ]` until it is resolved.',
+    '>',
+    ('> **AND NOTHING BRANCH-SPECIFIC ABOVE `' + $missingPhase + '`** -- everything between the title and that heading')
+) -join "`n"
+Assert-True (Test-DevelopmentEntryMissing -Text $missingLegacy) 'entry-missing: and a document cut at the OLD guidance mention of the heading is still refused -- the #1644 shape, which pre-#1654 branches still carry'
 Assert-True (Test-DevelopmentEntryMissing -Text "## feat/x`n`n### PLAN`n`n### CREATE`n`n- [x] done`n`n### TEST`n") 'entry-missing: and so has one whose phases survived but whose DEPLOY section did not'
 
 # THE FALSE-REFUSAL SURFACE. Each of these has no DEPLOY heading of its own to find, so each reaches the

@@ -2264,6 +2264,96 @@ beside it: `git worktree remove` leaves the empty `.claude/worktrees/` parent be
 outlives the worktree it held and the next `git worktree list` is the honest check, not the directory's
 existence.
 
+#### Check 37, and the second hand-maintained list this file was keeping (September 9, 2026, [#1680](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1680))
+
+**Check 34 reached half of the problem it was filed for.** It reads the column-0 `# --- <n>.` headers back
+and holds them to each other, which is what stopped two checks sharing a number. What it has no opinion
+about is the **prose list in the gate's own `.DESCRIPTION`** — the summary a reader who has not opened a
+four-thousand-line file consults, and the one a lens, a hook, a test-scenario name or a released note
+quotes a number from. That list was read by nothing, in the one file whose purpose is refusing a
+hand-maintained list a machine could check.
+
+**It had drifted in three directions at once, and only two were reported.** #1680 named the first two: the
+list stopped at **30** while the code ran to **36**, and its own item `30.` described the barred-skill
+check that #1494 had renumbered to **33** a month after the list was written — so a reader who grepped the
+list for "check 30" was told about a check answering to a different number, which is precisely the
+confusion #1494 was filed to end, one layer up. The third was older and quieter: items **9** and **17**
+still described checks **retired on August 8, 2026**, reading as live ones. They are tombstones now,
+keeping their numbers for the reason the code keeps the gaps — reusing one silently repoints every older
+citation.
+
+**And the check found a seventh missing entry on its first run, which is the whole argument for building
+it rather than repairing the list by hand.** `13b` — no branch document left behind between branches — has
+a real header and had no line in the list; no report had noticed, including the one that counted the
+others. A hand pass resets the clock, exactly as [check 32](#check-32-and-the-extraction-that-came-with-it-september-6-2026-1491)'s
+own header says about the three hand repairs of the mirror table before it.
+
+**ONE DIRECTION, AND THAT IS WHAT LET IT BE BORN GREEN.** Every header must have an entry; an entry need
+not have a header. The reverse direction is where the exemptions live, and there are three legitimate
+entries with no header of their own — the two tombstones, and the consumer-doc guard the suites already
+call check 19, which carries no column-0 header at all (check 20's comment says why in as many words). A
+rule asserting both directions would have arrived needing exactly those three exemptions on the day it was
+written, which is the shape this repo declined at 124 findings all false and has refused since. Measured
+after the seven entries were written back: **1 span, 37 headers, 37 claimed, 0 findings, 0 exemptions.**
+
+**OPT-IN, through the same `Invoke-MarkedSpanWalk` checks 10, 29 and 32 use.** A blanket rule keyed on "a
+script carrying numbered headers" would be born with a finding for each of the **19 files** check 34
+measured, none of which claims to enumerate anything: the marker is what turns a list into a claim, and it
+is the only thing that does. Reusing the walk also inherits its three refusals for free — an unpaired
+opener, a stray closer, and a second opener inside an open span — each of which would otherwise read as
+"no list here", the one failure mode that turns a gate green by silencing it.
+
+**The header pattern is check 34's own literal, deliberately.** Two readers disagreeing about what a
+section header is would let a header satisfy one and not the other, which is the divergence this tree has
+extracted libs to prevent elsewhere.
+
+**And the suite had to be kept OUT of its own subject, which is scenario 57's trap arriving through the
+other door.** `check-plugin-integrity-commands.tests.ps1` is a `.ps1` in the set check 37 walks, so a
+literal marker in a fixture line would open a span in the *suite* — a file with no numbered headers — and
+the real gate run would report the test file. The scenarios compose the marker from a variable instead.
+Where check 34 needed the suite to *be* its fixture for the indented-header bound, this one needs it to
+stay outside the walk entirely.
+
+**One measured trap worth keeping, because it produced a well-formed wrong answer.** The count assert in
+scenario 58 read 2 where 1 was right: this check's own coverage line contains the words *"claims to
+enumerate them"*, so a pattern matching finding *phrases* counted the coverage line as a finding — the
+same trap three patterns in that suite already document, met again by the check that was added to it. The
+assert now matches the finding's leading path, which the coverage line does not have.
+
+**The review round moved four things, and three of them are the same defect wearing different clothes: a
+rule read off the happy path.** The claim reader matched *any* indented line opening with `N. `, so a
+nested enumeration inside an entry's prose would have registered claims — and drop those entries later
+and the nested pair keeps satisfying their headers with the gate green, which is the drift this check
+exists to refuse. The repair is that an entry must **start inside the list's gutter**, whose width is the
+narrowest number prefix in the span. The first attempt required the exact prefix width, which is what a
+*perfectly* right-aligned list would have; this one is not — `3b` and `3c` sit one column out — and it
+reported two real entries as missing. The weaker rule is the true one: however ragged the alignment,
+every entry begins inside the gutter and a line indented past it is prose. Second, the header comparison
+ran **inside** the span callback, so a file with two spans counted its headers twice and named one gap
+twice; it now runs once per file over the union of its spans, which also makes a split list legal. Third,
+the coverage note keyed on the span count, so a **broken** marker printed *"the marker is opt-in, so zero
+is a pass and not a gap"* in the same run that raised an error about that very file — the two zero states
+are now said separately.
+
+**And the shape of the fourth is worth more than the fix.** The nested-enumeration hole was found by
+**probing** the check, not by measuring the tree: the list contains no such line today, so no amount of
+measuring would have surfaced it. That is
+[check 35](#check-35-and-the-sweep-that-reported-itself-finished-september-8-2026-1655)'s own lesson —
+*a measurement tells you what a check catches here, and only a probe tells you what it would wave
+through* — arriving at its neighbour one day later. The same round also found the branch document citing
+`.SYNOPSIS` where the list lives in `.DESCRIPTION`, in an entry whose whole subject is a citation being
+wrong, and which travels verbatim into `CHANGELOG.md` and then a release note.
+
+**Two bounds are named rather than closed, and the reason is the same in both.** A **stale** entry still
+satisfies its number: renumber a check, add the new entry, and the abandoned line — still describing what
+moved — keeps the old header satisfied. That is #1680's second drift recurring, and reaching it means
+reading an entry's text against a header's, which is a fuzzy rule, and a fuzzy rule on a gate arrives
+with an exemption list. Check 34's ascending rule limits the blast radius to a lingering line rather than
+a wrong live one. And the two zero-state coverage notes **cannot be asserted from the suite**: every
+fixture run invokes a copy of this script inside the fixture, and that copy carries the list, so one
+valid span always exists there. Both are written into the check's own header, because an unstated gap
+reads as coverage.
+
 In short: the **how** (managing the harness, scripts, config, safety guards) is portable; the **what**
 (the plugin lint + drift lint, `branch-info.ps1`, `.claude/settings.json` with the github source, and
 the marketplace/plugin manifests) belongs to this repo.

@@ -39,6 +39,9 @@ $BranchInfoSrc     = Join-Path $RepoRoot 'scripts\lib\branch-info.ps1'
 $NativeCaptureSrc  = Join-Path $RepoRoot 'scripts\lib\native-capture-lib.ps1'
 $EntryScaffoldSrc  = Join-Path $RepoRoot 'scripts\lib\entry-scaffold-lib.ps1'
 $ParkLibSrc        = Join-Path $RepoRoot 'scripts\lib\park-lib.ps1'
+# park-lib dot-sources this one (#1682), guarded -- so a fixture that omits it loses Get-GitParkBacking
+# silently rather than crashing. park-cycle.tests.ps1 is where that cost ten asserts.
+$PorcelainSrc      = Join-Path $RepoRoot 'scripts\lib\git-porcelain-lib.ps1'
 # As in new-branch.tests.ps1: this fixture runs new-branch, which reads the changelog seam through this lib
 # since inbound #967.
 $SeamLibSrc        = Join-Path $RepoRoot 'scripts\lib\seam-lib.ps1'
@@ -125,7 +128,7 @@ function New-Fixture {
         is the script's own default; they are registered for cleanup here rather than guessed at later.
     #>
     param([Parameter(Mandatory = $true)][string]$Label)
-    $dir = Join-Path ([System.IO.Path]::GetTempPath()) ("worktree-lane-test-$PID-$Label")
+    $dir = Join-Path ([System.IO.Path]::GetTempPath()) ("worktree-lane-test-$PID-$Label-$([guid]::NewGuid().ToString('n'))")
     if (Test-Path -LiteralPath $dir) { Remove-Item -Recurse -Force -LiteralPath $dir }
     New-Item -ItemType Directory -Path (Join-Path $dir 'scripts\task') -Force | Out-Null
     New-Item -ItemType Directory -Path (Join-Path $dir 'scripts\lib')  -Force | Out-Null
@@ -135,6 +138,7 @@ function New-Fixture {
     Copy-Item -LiteralPath $NativeCaptureSrc -Destination (Join-Path $dir 'scripts\lib\native-capture-lib.ps1')  -Force
     Copy-Item -LiteralPath $EntryScaffoldSrc -Destination (Join-Path $dir 'scripts\lib\entry-scaffold-lib.ps1')  -Force
     Copy-Item -LiteralPath $ParkLibSrc       -Destination (Join-Path $dir 'scripts\lib\park-lib.ps1')            -Force
+    Copy-Item -LiteralPath $PorcelainSrc     -Destination (Join-Path $dir 'scripts\lib\git-porcelain-lib.ps1')   -Force
     Copy-Item -LiteralPath $SeamLibSrc       -Destination (Join-Path $dir 'scripts\lib\seam-lib.ps1')            -Force
     Copy-Item -LiteralPath $PrIssuesLibSrc   -Destination (Join-Path $dir 'scripts\lib\pr-issues-lib.ps1')       -Force
     Copy-Item -LiteralPath $RemoteAheadLibSrc -Destination (Join-Path $dir 'scripts\lib\remote-ahead-lib.ps1')   -Force
@@ -315,7 +319,7 @@ try {
 
     # --- (h) HandBack refuses a path that is not a worktree of this repo --------------------------
     Write-Host "worktree-lane.ps1 -HandBack -- refuses a foreign path" -ForegroundColor Cyan
-    $foreign = Join-Path ([System.IO.Path]::GetTempPath()) "worktree-lane-test-$PID-foreign"
+    $foreign = Join-Path ([System.IO.Path]::GetTempPath()) "worktree-lane-test-$PID-foreign-$([guid]::NewGuid().ToString('n'))"
     New-Item -ItemType Directory -Path $foreign -Force | Out-Null
     $script:fixtures += $foreign
     $rH = Invoke-WorktreeLane -Dir $fd -From $fd -Arguments @('-HandBack', '-Lane', $foreign)

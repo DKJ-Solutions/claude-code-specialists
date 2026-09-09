@@ -20,7 +20,7 @@ $ErrorActionPreference = 'Stop'
 
 . (Join-Path $PSScriptRoot 'check-plugin-integrity-fixture.ps1')
 
-$Fixture = Join-Path ([System.IO.Path]::GetTempPath()) ("check-plugin-integrity-docs-$PID")
+$Fixture = Join-Path ([System.IO.Path]::GetTempPath()) ("check-plugin-integrity-docs-$PID-$([guid]::NewGuid().ToString('n'))")
 
 # The entry format's levels, composed from the lib rather than typed -- the same rule the entries suite
 # follows. Both pairs shifted one deeper on August 26, 2026, and a fixture stating them in literals is a

@@ -323,7 +323,7 @@ try {
     Assert-True ($r.Code -eq 0 -and $r.Out -match 'could not complete \(exit 3\)') `
         'a crashing check is reported as incomplete rather than as clean, and still exit 0'
 
-    $r = Invoke-Hook -CheckScriptOverride (Join-Path ([System.IO.Path]::GetTempPath()) "no-such-check-$PID.ps1")
+    $r = Invoke-Hook -CheckScriptOverride (Join-Path ([System.IO.Path]::GetTempPath()) "no-such-check-$PID-$([guid]::NewGuid().ToString('n')).ps1")
     Assert-True ($r.Code -eq 0 -and $r.Out -match 'check script not found -- check skipped') `
         'check script missing -- a notice, exit 0, never a strand'
 

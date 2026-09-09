@@ -48,7 +48,7 @@ $ContractLib   = Join-Path $RepoRoot 'scripts\lib\script-contract-lib.ps1'
 $Hook          = Join-Path $RepoRoot 'plugins\dkj-policy\hooks\script-contract-sessioncheck.ps1'
 $BranchInfoSrc = Join-Path $RepoRoot 'scripts\lib\branch-info.ps1'
 $RepoConfigSrc = Join-Path $RepoRoot 'scripts\repo-config.ps1'
-$Fixture       = Join-Path ([System.IO.Path]::GetTempPath()) "script-contract-test-fixture-$PID"
+$Fixture       = Join-Path ([System.IO.Path]::GetTempPath()) "script-contract-test-fixture-$PID-$([guid]::NewGuid().ToString('n'))"
 
 $script:pass = 0
 $script:fail = 0

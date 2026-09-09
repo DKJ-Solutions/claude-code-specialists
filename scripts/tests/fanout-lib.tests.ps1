@@ -30,7 +30,7 @@ $ErrorActionPreference = 'Stop'
 $RepoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
 $Lib      = Join-Path $RepoRoot 'scripts\lib\fanout-lib.ps1'
 $Script   = Join-Path $RepoRoot 'scripts\task\check-fanout.ps1'
-$Fixture  = Join-Path ([System.IO.Path]::GetTempPath()) "fanout-lib-test-$PID"
+$Fixture  = Join-Path ([System.IO.Path]::GetTempPath()) "fanout-lib-test-$PID-$([guid]::NewGuid().ToString('n'))"
 
 . (Join-Path $PSScriptRoot '..\lib\fixture-git-lib.ps1')
 . (Join-Path $PSScriptRoot '..\lib\native-capture-lib.ps1')
@@ -234,6 +234,27 @@ try {
     $lines = @(Format-WorkingCopyShrinkage -Findings (Compare-WorkingCopySnapshot -Before (New-Snap -Entries @{ 'a.txt' = ' M' }) -After (New-Snap) -Bridge (New-Bridge)))
     Assert-True ($lines[0].StartsWith('[ALARM]')) '11: a loss is an [ALARM]'
     Assert-True (($lines -join ' ') -match 'a\.txt') '11: and the path is named, unlike park-lib which is counts-only for a public commit'
+
+    # THE PRINTED PATH IS STRIPPED (#1689). Since git-porcelain-lib decodes a C-quoted path instead of
+    # handing back git's escape, a real path can carry a live ESC byte or a U+202E override -- correct
+    # for comparing, an ANSI/OSC repaint surface if printed raw. sync-main.ps1 states that in those
+    # words at its own call site of the same decoder; this report is the second consumer. The strip is
+    # at the FORMATTER, so the finding object keeps the exact path a caller could act on.
+    $esc = "bad" + [char]0x1B + "[2J.txt"
+    $rtl = "in" + [char]0x202E + "voice.txt"
+    $f = @(Compare-WorkingCopySnapshot -Before (New-Snap -Entries @{ $esc = ' M'; $rtl = ' M' }) -After (New-Snap) -Bridge (New-Bridge))
+    $lines = @(Format-WorkingCopyShrinkage -Findings $f)
+    $joined = ($lines -join ' ')
+    Assert-True ($joined.IndexOf([char]0x1B) -lt 0) '11: no ESC byte survives into a printed [ALARM] line'
+    Assert-True ($joined.IndexOf([char]0x202E) -lt 0) '11: and no U+202E override either'
+    Assert-True ($joined -match 'bad\s\[2J\.txt') '11: the control character became a space, so the name is still recognisable'
+    Assert-True (@($f | Where-Object { $_.Path -eq $esc }).Count -eq 1) '11: and the FINDING still carries the exact path -- only the printed line is stripped'
+    # The rename half bakes the old path into Detail rather than carrying it as a field, so it is
+    # stripped at composition. Same hazard, different site, and the formatter cannot reach it.
+    $before = New-Snap -Entries @{ $esc = ' M' }
+    $after  = New-Snap -Entries @{ 'renamed.txt' = '  ' } -Renames @{ 'renamed.txt' = $esc }
+    $joined = ((@(Format-WorkingCopyShrinkage -Findings (Compare-WorkingCopySnapshot -Before $before -After $after -Bridge (New-Bridge)))) -join ' ')
+    Assert-True ($joined.IndexOf([char]0x1B) -lt 0) "11: nor from a rename's old path, which lives inside Detail"
     $lines = @(Format-WorkingCopyShrinkage -Findings (Compare-WorkingCopySnapshot -Before (New-Snap -Branch 'x') -After (New-Snap -Branch 'y') -Bridge (New-Bridge)))
     Assert-True ($lines[0].StartsWith('[INFO]')) '11: and a not-comparable outcome is an [INFO], not an alarm'
 

@@ -31,6 +31,9 @@ $NativeCaptureSrc = Join-Path $RepoRoot 'scripts\lib\native-capture-lib.ps1'
 # And the shared park implementation itself since #507 -- park-branch is now the thin entry point and
 # Invoke-GitPark does the work, so a fixture without this file has no script at all.
 $ParkLibSrc       = Join-Path $RepoRoot 'scripts\lib\park-lib.ps1'
+# park-lib dot-sources this one (#1682), guarded -- so a fixture that omits it loses Get-GitParkBacking
+# silently rather than crashing. park-cycle.tests.ps1 is where that cost ten asserts.
+$PorcelainSrc     = Join-Path $RepoRoot 'scripts\lib\git-porcelain-lib.ps1'
 
 $script:pass = 0
 $script:fail = 0
@@ -84,13 +87,14 @@ function New-Fixture {
         path is $dir + '.git' and is tracked for cleanup.
     #>
     param([Parameter(Mandatory = $true)][string]$Label)
-    $dir = Join-Path ([System.IO.Path]::GetTempPath()) ("park-branch-test-$PID-$Label")
+    $dir = Join-Path ([System.IO.Path]::GetTempPath()) ("park-branch-test-$PID-$Label-$([guid]::NewGuid().ToString('n'))")
     if (Test-Path -LiteralPath $dir) { Remove-Item -Recurse -Force -LiteralPath $dir }
     New-Item -ItemType Directory -Path (Join-Path $dir 'scripts\task') -Force | Out-Null
     New-Item -ItemType Directory -Path (Join-Path $dir 'scripts\lib')  -Force | Out-Null
     Copy-Item -LiteralPath $ParkBranchSrc    -Destination (Join-Path $dir 'scripts\task\park-branch.ps1')        -Force
     Copy-Item -LiteralPath $NativeCaptureSrc -Destination (Join-Path $dir 'scripts\lib\native-capture-lib.ps1')  -Force
     Copy-Item -LiteralPath $ParkLibSrc       -Destination (Join-Path $dir 'scripts\lib\park-lib.ps1')            -Force
+    Copy-Item -LiteralPath $PorcelainSrc     -Destination (Join-Path $dir 'scripts\lib\git-porcelain-lib.ps1')   -Force
 
     $bareRemote = "$dir.git"
     if (Test-Path -LiteralPath $bareRemote) { Remove-Item -Recurse -Force -LiteralPath $bareRemote }

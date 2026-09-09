@@ -48,7 +48,7 @@ $CutRelease = Join-Path $RepoRoot 'scripts\release\cut-release.ps1'
 # of it. Loaded here because this suite drives the cut as a child process and had no need for the lib until
 # the levels became something a fixture must not hardcode.
 . (Join-Path $RepoRoot 'scripts\lib\entry-scaffold-lib.ps1')
-$FixtureDir = Join-Path ([System.IO.Path]::GetTempPath()) "cut-release-drive-$PID"
+$FixtureDir = Join-Path ([System.IO.Path]::GetTempPath()) "cut-release-drive-$PID-$([guid]::NewGuid().ToString('n'))"
 
 $script:pass = 0
 $script:fail = 0

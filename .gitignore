@@ -59,3 +59,19 @@ $RECYCLE.BIN/
 # September 5, 2026 (#1444). build-release-notes-page.ps1 searches the tree before it refuses or mints
 # one, so an orphan is named instead of silently replaced; moving the folder is still yours to do.
 dkj-policy/releases/page/
+
+# THE HARNESS WRITES THIS, NOT US (issue #1673). A dispatched agent's own worktree lands INSIDE the
+# repo at .claude/worktrees/agent-<id>, which is the harness's choice rather than this repo's -- there is
+# no seam here to move it outside the tree the way worktree-lane.ps1 places a lane in a sibling
+# '<repo>-lanes/' directory instead.
+#
+# ANCHORED, for the same reason /Microsoft/ is: so this can never silence a legitimately-named folder
+# deeper in the tree.
+#
+# THE HONEST COST: ignoring it means a worktree that did NOT get cleaned up is now invisible to
+# `git status`, which used to be the only thing that noticed one standing. `git worktree list` still
+# reports it regardless of this entry -- it reads git's own registry, not the working tree -- which is
+# why check-plugin-integrity.ps1 reads THAT rather than relying on a dirty tree to surface it. Also
+# note: `git worktree remove` leaves the empty `.claude/worktrees/` directory behind (measured), so an
+# empty directory here is not itself evidence that a worktree is still registered.
+/.claude/worktrees/

@@ -190,7 +190,7 @@ function New-GitFixture {
        Get-GitParkBacking. Same conventions as park-cycle.tests.ps1's New-Fixture: symbolic-ref onto
        an unborn HEAD (works whatever init.defaultBranch says locally), gpgsign off (#1287). #>
     param([Parameter(Mandatory = $true)][string]$Label, [switch]$NoOrigin)
-    $dir = Join-Path ([System.IO.Path]::GetTempPath()) ("backing-gate-test-$PID-$Label")
+    $dir = Join-Path ([System.IO.Path]::GetTempPath()) ("backing-gate-test-$PID-$Label-$([guid]::NewGuid().ToString('n'))")
     if (Test-Path -LiteralPath $dir) { Remove-Item -Recurse -Force -LiteralPath $dir }
     New-Item -ItemType Directory -Path $dir -Force | Out-Null
     $bareRemote = "$dir.git"

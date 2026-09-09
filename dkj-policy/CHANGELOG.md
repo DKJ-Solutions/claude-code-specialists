@@ -43,7 +43,349 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**29 / 60 minor entries** <!-- pending-tally -->
+**30 / 68 minor entries** <!-- pending-tally -->
+
+### DEPLOY: docs/file-before-you-cite-the-number · 20260909-114616
+
+The filing rules now say that an issue's number does not exist until the issue does: file first, read
+the number back, then write it into the header, the step list or the commit message. Issues and pull
+requests share one counter, so a predicted number is taken by whichever of the two lands first —
+measured twice in one session, in two branches, both times as a citation that had to be corrected after
+it was already written.
+
+It goes in the shared `findings-become-issues` block rather than in a lens, so it reaches every
+consuming repo through the same release as the rules it sits beside. Thirty-one files carry it; one of
+them is on the always-on path, and the bullet was trimmed 25% on a cost measurement before it landed.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+N/A — a consumer receives one more bullet in a boundaries block they already carry, worth ~110 tokens
+on the one always-on body. It changes no behaviour they can observe and no command they run.
+
+**Score:** N/A
+
+#### Pull Request
+
+A finding's issue number does not exist until the issue does
+
+Plugins: dkj-team-alpha, dkj-team-ecomm, dkj-team-lifehub, dkj-team-shopify
+
+[PR #1706](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1706)
+
+---
+
+### DEPLOY: fix/1664-fixture-temp-path-guid · 20260909-112851
+
+Every temp fixture path in `scripts/tests/` now carries a fresh guid as well as `$PID`, and the rule in
+`test-suite-gate.tests.ps1` requires it — `$PID` alone no longer passes. 96 statements across 53 suites
+were rewritten to `<label>-$PID-<guid>` (98 with the two that arrived from `main` mid-branch), which is
+exactly how `New-ScratchPath` composes a path one layer up: the pid stays in front because it is what
+attributes a leftover to a run that is still alive, and the guid is what nobody can name in advance.
+
+Both of those two are the same shape, and worth naming because it is the one this branch cannot close
+by itself: a suite written on `main` while the rule lived only here arrives green by its own lights and
+guid-less by ours. The second, `fanout-lib.tests.ps1`, composed `fanout-lib-test-$PID` and stood at it
+with both `New-Item -ItemType Directory -Force` and `Remove-Item -Recurse -Force` — the write half and
+the teardown half of exactly the failure above. The gate is what caught each of them on the merge, which
+is the argument for the gate rather than against the branch: once this lands, `main` carries the rule and
+the next such suite is refused where it is written instead of here.
+
+This is the half [#1659](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1659) did not
+close. `$PID` is neither secret nor large, so a composed leaf was a name a local actor could reach
+first — and `New-Item -ItemType Directory -Force` and `Remove-Item -Recurse -Force` both follow a
+reparse point, so a symlink or junction pre-planted there redirected the write *and* the teardown.
+Measured before the repair, this guard excluded from both counts: 100 guid-less paths, with 114
+recursive deletes standing at one of them across 49 files. #1659 covered seven sites in the shipping
+layer and only one of those deleted recursively, so the delete half of the class was almost entirely
+here.
+
+Two guards were also hardened rather than merely satisfied. The by-name allowance for `$tag` and
+`$Guid` — which four sites legitimately need, where one path per *child invocation* is required and
+`$PID` is the same for all of them — is now pinned to a fresh guid **of usable width**, read from the
+parsed syntax rather than the line text. That second half is the review's doing: a start-of-line regex
+was the first shape, and a parameter default, an assignment inside a one-line block and one after a
+semicolon all walked past it while the outer rule went on calling the resulting path safe. And the
+`#1326` continuation-fold cases now match on the live pattern instead of a second copy of it: they were
+still asserting the old alternation, which would have left the file proving a rule it no longer enforced.
+
+The guard costs about 1.5s. Parsing all 84 suites would cost 5.5s, so the parse is gated on the fold the
+scan already performs — only three files name either variable, and a file naming neither cannot hold an
+assignment to one.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A — this reaches no subscriber. It is a hardening of this repo's own test fixtures; nothing in the
+plugins a consumer installs changes, and no consumer-facing behaviour moves. The one thing a consumer
+could notice is second-order: `scripts/README.md`'s fixture convention is the page a consumer writing
+their own suite reads, and it now asks for the guid.
+
+**Score:** N/A
+
+#### Pull Request
+
+Test fixture temp paths carry a guid, so a pre-planted link cannot redirect the write or the recursive delete
+
+[PR #1677](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1677)
+
+---
+
+### DEPLOY: fix/1691-prio-1-colour-collision · 20260909-112411
+
+A `prio-1` badge no longer means two different rungs in one family. It was `0E8A16` — the green a
+reader trained in this repo knows as *"nobody is waiting for it"* — which in both BWJ store repos is
+`low`, one rung **above** the floor, and in one of them `sync` as well. It is now `006B75`, verified
+unused across all three trackers. Nothing refuses a colour, so this was the one part of the
+priority-axis decision that could still go wrong silently: `gh` judges a label's name, and a badge is
+read by a person with no command in it to fail.
+
+**It was repaired from this side rather than the one #1691 proposed, and that is the substance.** The
+issue's own repair edits live labels in two repos this one does not own and would have left future
+adopters in a third state, so it was correctly gated on Dave. Moving `prio-1` instead is one command in
+the repo in front of you, needs no access outside, leaves `adopt-dkj-policy-bwj`'s prescribed hexes
+alone, and keeps the two rows that agree on the rung on purpose.
+
+**What it does not settle, and says so rather than implying otherwise.** #1691 gated two things — the
+outside access *and* the colour itself. Repairing from this side answers the first; `006B75` is this
+session's pick, verified unused before it was taken, and one `gh label edit` to override. Inside a BWJ
+repo the same green still carries two labels, which is a BWJ-internal question this branch does not
+reach. And `FBCA04` stays `prio-2` here and `tier-1` there on a weaker argument than the one the green
+moved for: a misread there gets the *kind* wrong, not the rung.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+N/A — a consumer of the plugins notices nothing. The label lives on this repo's own tracker and the
+prose is a repo-local lens; `adopt-dkj-policy-bwj`, which is what a consumer actually receives, is
+deliberately untouched.
+
+**Score:** N/A
+
+#### Pull Request
+
+The prio-1 badge stops meaning two different rungs in one family
+
+[PR #1702](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1702)
+
+---
+
+### DEPLOY: docs/1653-1654-entry-gate-and-plan-string · 20260909-092020
+
+The entry gate that #1632 built is now documented in both places a reader looks for a gate -- a numbered
+section in the workflow's contributing page and a full section on the `open-pr` skill page -- including the
+part only the code explained: it is a separate gate because the scaffold gate **passes by absence** on a
+document with no entry text, `Get-DevelopmentEntryText`'s whole-text fallback being load-bearing for a
+legacy entry-only file. That it honours `-Force` was findable nowhere and now is.
+
+And the string that made the gate necessary is gone from the guidance. `new-branch` wrote the exact heading
+`### PLAN` into every branch document twice -- once as the heading, once in the blockquote above it -- so any
+edit anchoring on that heading as a plain string found the wrong one; two documents shipped through that door
+(#1632, #1644). The guidance names the first phase by position now. That is also the more correct wording,
+because `StepPhases` is a seam and the literal was already wrong for any repo that renamed its first phase.
+The gate is unchanged and keeps naming the literal in its refusal: every branch open across this change still
+carries both copies.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+Consumers get both halves through the plugin: the guidance block in every branch document written from now
+on, and the two pages that describe the gates. A consumer meeting the entry gate's refusal previously had
+nothing to read behind it -- the message named the cause, but the reason it is a separate gate, and the fact
+that `-Force` gets you past it, existed only in this repo's source.
+
+**Score:** 3
+
+#### Pull Request
+
+Document the entry gate, and stop the guidance quoting the heading it is a rule about
+
+Plugins: dkj-policy
+
+[PR #1662](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1662)
+
+---
+
+### DEPLOY: fix/1673-ignore-agent-worktrees · 20260909-084638
+
+A dispatched agent's worktree lands inside the repo at `.claude/worktrees/agent-<id>`, and nothing
+ignored it -- so the primary checkout read as dirty for as long as one stood, which is a refusal in
+`cut-release.ps1`, in `prune-merged.ps1` on a branch, and in `worktree-lane.ps1 -HandBack`. It is now
+ignored, anchored so it cannot silence a legitimately-named folder deeper in the tree.
+
+The larger half is one `.gitignore` cannot reach. The lint gate and three of the suites walk the tree
+with `Get-ChildItem -Recurse`, which reads the filesystem rather than git, so a nested worktree is a
+second complete copy of the repo they are standing inside: every count doubles (`*-agent.md` 26 to
+52, `*.ps1` 236 to 472) and `check-plugin-integrity.ps1` fails with 26 duplicate-id errors, each one
+accusing the **real** file and naming the worktree's copy as the legitimate claimant. An operator
+reading that has no route back to the cause. The gate now reads `git worktree list --porcelain`
+through the new `Get-NestedWorktreePath` and reports the worktree first, saying in as many words that
+the duplicate findings below it are a consequence rather than real.
+
+The path that finding prints is guarded, which is not incidental: `git worktree add` is not held to
+`check-ref-format` the way a branch name is, so a registered path may carry spaces, shell
+metacharacters or format characters that make a printed line read as something other than what it
+says -- and the finding names the path twice, once as prose and once inside a remedy the reader is
+invited to run. This repo had already answered that shape at
+[#1637](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1637) and
+[#1638](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1638); the answer is reused
+rather than re-derived, so the command reads `<path>` when the real one is unsafe to paste and a note
+says why.
+
+Whether the gate should instead *work through* a nested worktree is left open deliberately and filed
+as [#1678](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1678): it is ~20 walk sites
+plus three suites, it needs a gate of its own or it is enforced by memory, and refusing cleanly is a
+defensible permanent answer.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A. The two things that change behaviour are both repo-local -- the `.gitignore` entry and
+`check-plugin-integrity.ps1`, which is not mirrored into any plugin. A consumer receives the new
+`Get-NestedWorktreePath` in the `dkj-policy` mirror of `worktree-lib.ps1`, but nothing on their side
+calls it yet, so nobody downstream notices this release.
+
+**Score:** N/A
+
+#### Pull Request
+
+Ignore the harness's agent worktree directory
+
+Plugins: dkj-policy
+
+[PR #1684](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1684)
+
+---
+
+### DEPLOY: fix/1689-porcelain-path-decode-once · 20260909-074736
+
+Reading a git path now happens in one place. `Convert-GitQuotedPath` — which decodes git's C-quoted
+form, escape by escape, into the real filename — has moved out of `sync-rules.ps1` and into
+`git-porcelain-lib.ps1`, beside the `core.quotePath` flag that produces the form it decodes. So the
+porcelain reading no longer stops one step short: `park-lib`, `fanout-lib` and `sync-main` all get the
+readable path, and `fanout-lib` loses a limit it had written down as permanent.
+
+**The move went in the opposite direction from the one #1689 proposed, and that is the substance of the
+change.** `sync-rules.ps1` is dependency-free on purpose — the live-theme guard loads it on every
+command inside a catch that returns no live theme id — so making it dot-source anything is a way to
+disarm that guard silently. It never called the function it defined, so it could lose it instead, and
+`sync-main.ps1` takes the lib directly, unguarded, exactly as it already takes two others.
+
+**And a decode obliges a print guard**, which is the second half of the change. Since a decoded
+path can carry a live ESC byte or an RTL override, `fanout-lib`'s loss report now routes every printed
+path through `Get-DisplayPath` and every printed ref through `Get-DisplayRef` -- three sites, one of
+them older than this branch. The strip is at the report, so a finding still carries the exact path.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A — nothing a consumer of the plugins notices, provided the release carries both mirrors, which is
+what the new `sync-main.tests.ps1` assert exists to prove. A consumer running `dkj-team-shopify`
+without `dkj-policy` gets the lib from its own plugin's payload; the readable path in a sync report is
+the only visible difference, and reports are not a published surface.
+
+**Score:** N/A
+
+#### Pull Request
+
+Reading a git path lives once: the quoted-path decoder moves into git-porcelain-lib
+
+Plugins: dkj-policy, dkj-team-shopify
+
+[PR #1696](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1696)
+
+---
+
+### DEPLOY: feat/1680-synopsis-check-list · 20260909-072322
+
+The gate's `.DESCRIPTION` enumerates its checks in prose -- the summary a reader who has not opened four
+thousand lines consults, and the one a lens, a hook, a test-scenario name or a released note quotes a
+number from. It had stopped at `30.` while the code ran to `36.`, and its own item `30.` still described
+the check #1494 renumbered to `33` a month after the list was written, so grepping the list for "check 30"
+answered with a different check. Two more drifts were found on verification and neither was in the report:
+items `9.` and `17.` still read as live checks a month after they were **retired**, and `13b` had no entry
+at all.
+
+**Check 37 now holds that list to the file's own column-0 headers**, because a hand rewrite resets the
+clock rather than stopping it -- the conclusion check 32's header already records after three hand repairs
+of the mirror table. It is opt-in through the same marked-span walk checks 10, 29 and 32 use, so it
+inherits their three refusals for free and no unmarked script becomes a subject; it reads check 34's own
+header pattern, so the two cannot disagree about what a header is; and it asserts **one direction only** --
+every header needs an entry, an entry needs no header. That is what let it be born green rather than with
+an exemption list: three entries legitimately have no header of their own, the two retirement tombstones
+and the consumer-doc guard the suites call check 19. Measured after the repair: 1 span, 37 headers, 37
+claimed, 0 findings, 0 exemptions. Its own first run is the argument for it -- `13b` was reported by the
+check, not by a reader.
+
+The review round moved four things, and three were one defect in different clothes -- a rule read off the
+happy path. An entry must now **start inside the list's gutter**, so a nested enumeration in an entry's
+prose cannot satisfy a header (found by probing the check, not by measuring the tree: the list contains no
+such line today); the header comparison runs once per FILE over the union of its spans, where running it
+per span doubled the count and named one gap twice; and the coverage note now distinguishes "no marker
+anywhere" from "markers present, none of them paired", which used to print the reassuring sentence over a
+run that had just raised an error about that very file. Two bounds are named rather than closed -- a
+STALE entry still satisfies its number, and the two zero-state notes are unreachable from the suite
+because every fixture run copies this script into the fixture -- both written into the check's own header,
+because an unstated gap reads as coverage.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A. `check-plugin-integrity.ps1` is this repo's own gate and is mirrored into no plugin, so nothing here
+reaches a consumer: the repaired list, the new check and its scenarios all stay in the source tree. A
+consumer's own lint script is theirs, and the marker is opt-in, so nothing starts asserting anything on
+their side either.
+
+**Score:** N/A
+
+#### Pull Request
+
+The gate's own check list is held to its headers, and the seven it had lost are back
+
+[PR #1695](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1695)
+
+---
+
+### DEPLOY: fix/1682-porcelain-line-parse · 20260909-071236
+
+The `git status --porcelain` reading lives once, in `scripts/lib/git-porcelain-lib.ps1`, dot-sourced by
+`park-lib` for its uncommitted count and by `fanout-lib` for its per-path snapshot. Both callers had a
+near-verbatim copy of the parse, and two of the three git quirks underneath it were properties of the
+command rather than the parse — so the lib owns the command and its two flags too, with all the
+reasoning in one header instead of half in each.
+
+**It repaired a defect while consolidating, which is the argument for consolidating.** Both copies
+normalised backslashes to forward slashes over *every* path, including the ones `core.quotePath` exists
+to produce, so `"caf\303\251.txt"` read back as `caf/303/251.txt`. Latent in both callers — a count
+still counts and a comparison still matches when both sides mangle identically — and wrong for the
+first caller that looks for the file.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A — nothing a consumer notices. The lib is mirrored into `dkj-policy` because both its callers are,
+so a consumer's `park-cycle` Stop hook keeps working; the behaviour it produces is the same count and
+the same snapshot as before, minus the mangled path nobody had hit yet.
+
+**Score:** N/A
+
+#### Pull Request
+
+The git porcelain line parse lives once, in a lib both callers dot-source
+
+Plugins: dkj-policy
+
+[PR #1694](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1694)
+
+---
 
 ### DEPLOY: docs/1686-priority-axis-decision · 20260909-065028
 
@@ -59,10 +401,14 @@ version would prescribe a convention no gate enforces and hand consumers four la
 for.
 
 **One thing the decision deliberately does not close, and it is now named rather than implied.** The
-same measurement that clears the names indicts the **colours**: `0E8A16` is the floor here and one rung
-above the floor in a BWJ repo, and nothing refuses a colour the way `gh` refuses a name. The lens
+same measurement that clears the names indicts the **colours**: `0E8A16` was the floor here and is one
+rung above the floor in a BWJ repo, and nothing refuses a colour the way `gh` refuses a name. The lens
 carries that table and the instruction not to read a rung off a badge across the two families; the
 repair itself is #1691, because its cheap half edits live labels in two repos this one does not own.
+**That repair has since landed the other way round** — `prio-1` moved off `0E8A16` rather than BWJ's
+`low` moving off it — so this paragraph is the state as this entry was written, and the entry below it
+is what actually happened. The tense is corrected here because this entry is still pending and would
+otherwise ship a sentence that reads as present.
 
 **Score:** 2
 

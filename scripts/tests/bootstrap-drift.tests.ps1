@@ -26,7 +26,7 @@ $RepoRoot   = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
 $Bootstrap  = Join-Path $RepoRoot 'plugins\dkj-teams\dkj-team-alpha\skills\specialists-init\bootstrap.ps1'
 $DriftLint  = Join-Path $RepoRoot 'scripts\lint\check-consumer-drift.ps1'
 $Integrity  = Join-Path $RepoRoot 'scripts\lint\check-plugin-integrity.ps1'
-$Fixture    = Join-Path ([System.IO.Path]::GetTempPath()) "specialists-init-test-fixture-$PID"
+$Fixture    = Join-Path ([System.IO.Path]::GetTempPath()) "specialists-init-test-fixture-$PID-$([guid]::NewGuid().ToString('n'))"
 # Where a FRESH consumer's lenses land as of the seam (issue #221): one flat directory, no per-plugin
 # segment, because <group>-<id> is unique family-wide.
 $Pp         = '.claude\specialists\lenses'
@@ -284,7 +284,7 @@ try {
     # Everything this suite used to assert on the single fixture lives here now: the shape a consumer
     # receives when they chose that way of working.
     Write-Host "bootstrap.ps1 -- script-config scaffolds (#86), workflow plugin enabled" -ForegroundColor Cyan
-    $FixtureWf = Join-Path ([System.IO.Path]::GetTempPath()) "specialists-init-wf-$PID"
+    $FixtureWf = Join-Path ([System.IO.Path]::GetTempPath()) "specialists-init-wf-$PID-$([guid]::NewGuid().ToString('n'))"
     if (Test-Path -LiteralPath $FixtureWf) { Remove-Item -Recurse -Force -LiteralPath $FixtureWf }
     New-Item -ItemType Directory -Path (Join-Path $FixtureWf '.claude') -Force | Out-Null
     [System.IO.File]::WriteAllText((Join-Path $FixtureWf '.claude\settings.json'),
@@ -432,7 +432,7 @@ try {
     #     statement about a plugin that was never this family's. Measured on the machine this suite
     #     runs on, whose own chain enables figma@claude-plugins-official.
     Write-Host "bootstrap.ps1 -- the register proposal is scoped to this marketplace (#1084)" -ForegroundColor Cyan
-    $FixtureMp = Join-Path ([System.IO.Path]::GetTempPath()) "specialists-init-mp-$PID"
+    $FixtureMp = Join-Path ([System.IO.Path]::GetTempPath()) "specialists-init-mp-$PID-$([guid]::NewGuid().ToString('n'))"
     if (Test-Path -LiteralPath $FixtureMp) { Remove-Item -Recurse -Force -LiteralPath $FixtureMp }
     New-Item -ItemType Directory -Path (Join-Path $FixtureMp '.claude') -Force | Out-Null
     [System.IO.File]::WriteAllText((Join-Path $FixtureMp '.claude\settings.json'),
@@ -462,7 +462,7 @@ try {
     # And '"allow": null' means the key EXISTS with a null value, so a Contains() test says yes and
     # @($null) is an array holding one $null -- which shipped '"allow": [null, ...]'.
     Write-Host "bootstrap.ps1 -- a settings.json holding a backslash-u path and a null rule list (#1124)" -ForegroundColor Cyan
-    $FixtureEsc = Join-Path ([System.IO.Path]::GetTempPath()) "specialists-init-esc-$PID"
+    $FixtureEsc = Join-Path ([System.IO.Path]::GetTempPath()) "specialists-init-esc-$PID-$([guid]::NewGuid().ToString('n'))"
     if (Test-Path -LiteralPath $FixtureEsc) { Remove-Item -Recurse -Force -LiteralPath $FixtureEsc }
     New-Item -ItemType Directory -Path (Join-Path $FixtureEsc '.claude') -Force | Out-Null
     $hookCmd = 'powershell -File C:\uadded\check.ps1 && echo <done>'
@@ -495,7 +495,7 @@ try {
     # new one. The bootstrap cannot know what is in there and must not guess, so it reports the FACT and
     # only in the one combination where the two files disagree; asserted here so the notice cannot be
     # lost to a later rewording of this block.
-    $FixtureIgn = Join-Path ([System.IO.Path]::GetTempPath()) "specialists-init-ign-$PID"
+    $FixtureIgn = Join-Path ([System.IO.Path]::GetTempPath()) "specialists-init-ign-$PID-$([guid]::NewGuid().ToString('n'))"
     if (Test-Path -LiteralPath $FixtureIgn) { Remove-Item -Recurse -Force -LiteralPath $FixtureIgn }
     New-Item -ItemType Directory -Path (Join-Path $FixtureIgn '.claude') -Force | Out-Null
     Invoke-FixtureGitIn $FixtureIgn init --quiet
@@ -526,7 +526,7 @@ try {
         [pscustomobject]@{ Name = 'allow-object';   Body = '{ "permissions": { "allow": [ { "x": 1 } ] } }'; Says = "has a 'permissions.allow' that is not a list of rules" },
         [pscustomobject]@{ Name = 'deny-number';    Body = '{ "permissions": { "deny": 7 } }';      Says = "has a 'permissions.deny' that is not a list of rules" }
     )) {
-        $FixtureBad = Join-Path ([System.IO.Path]::GetTempPath()) "specialists-init-bad-$($bad.Name)-$PID"
+        $FixtureBad = Join-Path ([System.IO.Path]::GetTempPath()) "specialists-init-bad-$($bad.Name)-$PID-$([guid]::NewGuid().ToString('n'))"
         if (Test-Path -LiteralPath $FixtureBad) { Remove-Item -Recurse -Force -LiteralPath $FixtureBad }
         New-Item -ItemType Directory -Path (Join-Path $FixtureBad '.claude') -Force | Out-Null
         [System.IO.File]::WriteAllText((Join-Path $FixtureBad '.claude\settings.json'), $bad.Body, $Utf8NoBom)
@@ -613,7 +613,7 @@ try {
     Write-Host "bootstrap.ps1 -- RepoName derived from the git remote (origin)" -ForegroundColor Cyan
     function Test-DerivedRepoName {
         param([string]$OriginUrl, [string]$Expected, [bool]$ShouldDerive, [string]$Label)
-        $gitFix = Join-Path ([System.IO.Path]::GetTempPath()) ("specialists-init-git-$PID-" + $Label)
+        $gitFix = Join-Path ([System.IO.Path]::GetTempPath()) ("specialists-init-git-$PID-" + $Label + '-' + [guid]::NewGuid().ToString('n'))
         if (Test-Path -LiteralPath $gitFix) { Remove-Item -Recurse -Force -LiteralPath $gitFix }
         New-Item -ItemType Directory -Path $gitFix -Force | Out-Null
         try {
@@ -779,7 +779,7 @@ try {
     # compared" was word-for-word the same sentence as "0 drifted of 4 compared". Right for a
     # deliberate teardown, wrong for an accidental loss, and indistinguishable between them.
     Write-Host "check-consumer-drift.ps1 -- a consumer with no lens tree says so (issue #221)" -ForegroundColor Cyan
-    $bare = Join-Path ([System.IO.Path]::GetTempPath()) "drift-bare-consumer-$PID"
+    $bare = Join-Path ([System.IO.Path]::GetTempPath()) "drift-bare-consumer-$PID-$([guid]::NewGuid().ToString('n'))"
     if (Test-Path -LiteralPath $bare) { Remove-Item -Recurse -Force -LiteralPath $bare }
     New-Item -ItemType Directory -Path $bare -Force | Out-Null
     try {
