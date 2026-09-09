@@ -869,11 +869,17 @@ try {
     # refuses. So the placement is measured against the same boundary the gate reads, derived from the
     # wording rather than from a literal '###', because a consumer may translate or re-level either.
     # BY LINE, NOT BY IndexOf, AND THE FIRST DRAFT OF THIS ASSERT GOT IT WRONG IN THE WAY THIS REPO KEEPS
-    # PAYING FOR: a MENTION read as a USE. The guidance block a few lines up quotes the heading it is
+    # PAYING FOR: a MENTION read as a USE. The guidance block a few lines up quoted the heading it is
     # talking about -- "NOTHING BRANCH-SPECIFIC ABOVE `### PLAN`" -- so a substring search for '### PLAN'
-    # lands inside the preamble, which is the exact region this assert exists to prove the note is NOT in.
+    # landed inside the preamble, which is the exact region this assert exists to prove the note is NOT in.
     # It failed loudly, but only because of the third assert; the second one had passed for the wrong
     # reason. A whole-line match cannot confuse the two: a quoted heading is never a line of its own.
+    #
+    # #1654 REMOVED THAT PARTICULAR MENTION -- the guidance names the first phase by position now -- and the
+    # whole-line match STAYS, because it is not what the collision bought. The guidance still quotes other
+    # markers, a consumer may write their own wording into this seam, and the class of defect is a mention
+    # read as a use rather than that one sentence. Narrowing an assert back to a substring on the strength
+    # of one removed string is how a regression written down once gets paid for twice.
     $planHeadingH = ('#' * (Get-BranchCycleSectionLevel)) + ' ' + @((Get-BranchFileWording).StepPhases)[0]
     $cycleLinesH  = [regex]::Split($progressTextH, '\r?\n')
     $planLineH    = [array]::IndexOf($cycleLinesH, $planHeadingH)

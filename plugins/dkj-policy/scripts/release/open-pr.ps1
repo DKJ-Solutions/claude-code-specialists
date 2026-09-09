@@ -835,8 +835,11 @@ nothing for the fold to move into the changelog. Left as it is, the fold would p
 this change's description, and the scaffold gate below cannot see that: it looks for the wording the
 scaffolder left, and a deleted section carries none of it.
 
-The usual cause is not a deliberate deletion. It is an edit that truncated the file at '### PLAN' - a string
-that also occurs INSIDE the guidance blockquote, in the line forbidding branch-specific content above it.
+The usual cause is not a deliberate deletion. It is an edit that anchored on the first phase heading as a
+plain string and truncated the file there. In a document scaffolded before #1654 that string - '### PLAN' -
+occurs TWICE, the second time inside the guidance blockquote above the real heading, so such an edit cuts
+at the wrong one. The guidance names that heading by position now, so a document scaffolded since then
+carries it once; every branch already open still carries both.
 
 The new-branch skill is idempotent: run it on this branch to restore the section, then write what the change
 does. Shipping it as it stands is -Force.
