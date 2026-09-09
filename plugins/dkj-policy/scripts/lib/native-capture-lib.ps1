@@ -248,6 +248,68 @@ function Format-GateSeconds {
     return [string]::Format($script:NativeCaptureInvariant, ('{0:N' + $Decimals + '}'), $Seconds)
 }
 
+function Write-GateCaptureBlock {
+    <#
+        ONE reaped suite's out.txt/err.txt, printed under the header the caller already wrote -- and a
+        VISIBLE note when a writer still held one of them (issue #1731).
+
+        WHY NOT Get-Content, WHICH IS WHAT STOOD HERE. This lib built Read-NativeCaptureFile for exactly
+        the hazard the gate is most exposed to: a grandchild that inherited a suite's redirected stdout
+        handle and outlives it, so the file is still open when the gate reads it the moment WaitForExit
+        returns. Get-Content does not FAIL on that -- measured September 9, 2026, it opens the held file
+        happily and returns whatever was flushed -- so the block printed short and nothing said so. That
+        is this file's own recurring failure shape: a wrong answer arriving as a plausible value. The
+        tolerant reader answers the same read AND says whether a writer held it.
+
+        Read-NativeCaptureFile's docstring used to call itself internal with one caller. That sentence
+        described the callers of the day rather than arguing the gate should not be one, and this is now
+        the second.
+
+        THE NOTE IS PRINTED, NOT RETURNED, because these blocks are read by a person and not by a caller
+        that inspects a flag. WriterHeld on the Utf8 arm becomes ShortRead for a script to branch on; the
+        only consumer here is the reader looking at the console, so a silent field would be the same
+        defect in a new place.
+
+        AND THE NOTE SURVIVES AN EMPTY READ -- that ordering is the point rather than a detail. The
+        whitespace skip below exists so a suite with no stderr does not print a blank block, and it used
+        to run before anything else. A held file that has flushed NOTHING yet is precisely "the child
+        said nothing" against "we read before the flush", which is the ambiguity #1679 named, so skipping
+        it silently would drop the note in the one case it matters most.
+
+        THE SETTLE BUDGET IS THE FULL ONE, because a reaped suite is the clean-exit case
+        Invoke-NativeCaptureUtf8 spends it on: the suite exited of its own accord, so its whole output
+        exists and a lingering handle is a grandchild being reaped rather than a document that ends there.
+
+        COST, MEASURED BEFORE ADOPTING IT (September 9, 2026 -- the check #1731 asked for). On files no
+        writer holds, 170 reads -- 85 suites' worth of both captures -- cost 147 ms through this reader
+        against 67 ms through Get-Content: 0.86 ms against 0.39 ms per file. That is ~80 ms on a run
+        costing ~140 s, and the settle budget is not touched at all in that case; it is spent only where
+        the alternative was a short block nobody could see was short. The decode is byte-identical.
+    #>
+    param(
+        [Parameter(Mandatory = $true)][AllowEmptyCollection()][string[]]$Path
+    )
+
+    # -Encoding Oem matched what a redirected Windows PowerShell child writes (its
+    # [Console]::OutputEncoding is the OEM codepage). Everything in scope here is ASCII by repo
+    # convention, where every candidate decoder agrees; the choice only shows on a high byte that
+    # reached a suite's output from a document it was reading. Get-Content's own `-Encoding Oem`
+    # resolves to this same code page, so the swap changes the decode by nothing -- asserted in the
+    # suite rather than assumed here.
+    $oem = [System.Text.Encoding]::GetEncoding([System.Globalization.CultureInfo]::CurrentCulture.TextInfo.OEMCodePage)
+
+    foreach ($f in @($Path)) {
+        if (-not (Test-Path -LiteralPath $f)) { continue }
+        $read = Read-NativeCaptureFile -Path $f -Encoding $oem `
+                                       -SettleMilliseconds $script:NativeCaptureSettleMilliseconds
+        if ($read.WriterHeld) {
+            Write-Host ("[short read] a writer still held '" + (Split-Path -Leaf $f) + "' after the settle budget -- the block below may be truncated, or empty because nothing had been flushed yet (issue #1731).") -ForegroundColor Yellow
+        }
+        if ([string]::IsNullOrWhiteSpace($read.Text)) { continue }
+        Write-Host $read.Text.TrimEnd()
+    }
+}
+
 function New-ScratchPath {
     <#
         A path under the OS temp directory that NOBODY ELSE CAN NAME IN ADVANCE -- and, with
@@ -526,7 +588,11 @@ function Invoke-NativeCapture {
 function Read-NativeCaptureFile {
     <#
         ONE capture file, read as text, PLUS WHETHER A WRITER STILL HELD IT: { Text; WriterHeld }.
-        Internal to this lib; the -Utf8/timeout arm below is the only caller.
+        Internal to this lib, with TWO callers since #1731: the -Utf8/timeout arm below, and
+        Write-GateCaptureBlock above for the test gate's own capture files. This line used to say the
+        arm was the only one, which described the callers of the day -- it was never an argument that
+        the gate should not be one, and reading it as one is how the gate kept a plain Get-Content for
+        the very hazard this function was built for.
 
         WHY THE TOLERANT READ EXISTS (issue #1252). On a timeout, Invoke-NativeCaptureUtf8 force-kills
         the child's whole process tree with taskkill /T and then waits on the DIRECT child only. A
@@ -1509,16 +1575,11 @@ function Invoke-TestSuiteGate {
                         $failedCaptureFiles.Add($d.OutFile) | Out-Null
                         $failedCaptureFiles.Add($d.ErrFile) | Out-Null
                     }
-                    # -Encoding Oem matches what a redirected Windows PowerShell child writes (its
-                    # [Console]::OutputEncoding is the OEM codepage). Everything in scope here is ASCII by
-                    # repo convention, where every candidate decoder agrees; the choice only shows on a high
-                    # byte that reached a suite's output from a document it was reading.
-                    foreach ($f in @($d.OutFile, $d.ErrFile)) {
-                        if (-not (Test-Path -LiteralPath $f)) { continue }
-                        $text = Get-Content -LiteralPath $f -Raw -Encoding Oem
-                        if ([string]::IsNullOrWhiteSpace($text)) { continue }
-                        Write-Host $text.TrimEnd()
-                    }
+                    # THROUGH THE TOLERANT READER, and it says so when a block may be short -- issue
+                    # #1731. This is the site most exposed to a grandchild still holding the suite's
+                    # capture file: it reads the moment WaitForExit returns. See Write-GateCaptureBlock
+                    # for the encoding, the settle budget and what the swap cost.
+                    Write-GateCaptureBlock -Path @($d.OutFile, $d.ErrFile)
                     $running.Remove($d)
                 }
             }
@@ -1583,12 +1644,7 @@ function Invoke-TestSuiteGate {
                     }
                     # The re-run's own output, whichever way it went: on a pass it is the evidence that
                     # the tree is fine, and on a failure it is the only block carrying a verdict at all.
-                    foreach ($f in @($retryOut, $retryErr)) {
-                        if (-not (Test-Path -LiteralPath $f)) { continue }
-                        $rtext = Get-Content -LiteralPath $f -Raw -Encoding Oem
-                        if ([string]::IsNullOrWhiteSpace($rtext)) { continue }
-                        Write-Host $rtext.TrimEnd()
-                    }
+                    Write-GateCaptureBlock -Path @($retryOut, $retryErr)
                     if ($rc -ne 0) {
                         $failedCaptureFiles.Add($retryOut) | Out-Null
                         $failedCaptureFiles.Add($retryErr) | Out-Null
