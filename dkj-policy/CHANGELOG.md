@@ -43,7 +43,75 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**36 / 82 minor entries** <!-- pending-tally -->
+**36 / 84 minor entries** <!-- pending-tally -->
+
+### DEPLOY: feat/1717-gate-progress-index · 20260909-181938
+
+The test gate now reports its own progress. It prints one line as each lane opens and one as each
+suite leaves one -- `test gate: progress [depth 1] 37/84 started, 30 done, 7 running (+412.6s) --
+started roster-sync.tests.ps1` -- so a 15-30 minute local run no longer goes silent between walls of
+completion-order output. Started is reported as well as done because the queue dequeues longest-first
+(#1358): a done-count alone sits at 0 through exactly the window an operator is asking the question
+in. The `[depth N]` marker is what makes the count dedupable -- the gate's own suite drives the gate
+over a fixture, so a nested run is unavoidable here, and every external way of deriving this number
+failed on it (#1717 measured three, each differently). The `== <suite> ==` header is untouched, and
+no remaining-time estimate is printed: the duration hints are CI's seconds, and #1713 established
+they do not convert to another machine.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A -- the gate is a maintainer's tool. A subscriber of this system never watches it run; what
+reaches them is a release, and this changes nothing about one.
+
+**Score:** N/A
+
+#### Pull Request
+
+Report the test gate's own progress: started, done and running, per suite
+
+Plugins: dkj-policy, dkj-team-shopify
+
+[PR #1739](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1739)
+
+---
+
+### DEPLOY: fix/1728-says-on-merged-captures · 20260909-180707
+
+The two test suites whose capture carries the child's error stream now read it with `Test-Says`, which
+strips whitespace from both sides and compares literally -- so a phrase the error formatter hard-wrapped
+mid-word is still found. 22 asserts converted across `publish-to-business.tests.ps1` and
+`cut-release-drive.tests.ps1`, including the negative direction, where the old form went **green for the
+wrong reason**: it reported absence and had actually measured a line break.
+
+The other six suites #1728 named are left exactly as they are, and that is the finding rather than a
+shortcut. A wrapped phrase needs two conditions together -- a capture that carries the error stream, and
+a script that emits the asserted phrase through `throw`/`Write-Error`/`Write-Warning` rather than
+`Write-Host`. Those six capture stdout only, from scripts with none of the three, so they are immune by
+construction; 311 of the report's 358 sites had no defect behind them. What made the difference
+measurable is written into the test engineer's lens beside the capture rule it completes, because the
+mechanism had until now been recorded only inside the seven suites already repaired -- where nobody
+writing an eighth would find it.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+Nothing here ships to a consumer: both files are this repo's own test suites, and the lens is
+repo-local. A consumer's own suites are subject to the same mechanism, and the rule that now describes
+it lives in a lens rather than in the portable manual -- so this reaches them only if the classification
+is later promoted.
+
+**Score:** N/A
+
+#### Pull Request
+
+Read merged child captures with Test-Says where the error formatter can reach them
+
+[PR #1738](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1738)
+
+---
 
 ### DEPLOY: fix/1731-gate-tolerant-capture-read · 20260909-175551
 
