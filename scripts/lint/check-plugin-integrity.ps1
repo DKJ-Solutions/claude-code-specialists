@@ -280,10 +280,18 @@
          file -- the list a lens, a hook or a release note quotes a number from. Measured (#1680): the
          list stopped at 30 while the code ran to 36, 13b was missing too and no report had noticed,
          its own item 30 described the check #1494 had renumbered to 33, and 9 and 17 still read as
-         live checks a month after they were retired. ONE DIRECTION ONLY, which is what makes it born
-         green: every header needs an entry, an entry needs no header. The reverse is where the
-         exemptions would live -- a retired check's tombstone (9 and 17) and the consumer-doc guard the
-         suites call check 19, which carries no header of its own.
+         live checks a month after they were retired. ONE DIRECTION, which is what makes it born green:
+         every header needs an entry, an entry needs no header -- the reverse is where the exemptions
+         would live, being a retired check's tombstone (9 and 17) and the consumer-doc guard the suites
+         call check 19. An entry is read at the LIST'S OWN INDENT, so a number opening a line deeper
+         than that -- a nested enumeration inside an entry's prose -- is not a claim; counting one
+         would silence the check exactly where the missing entry sits below it. That shape is absent
+         from this list today and was found by PROBING the check rather than by measuring the tree,
+         which is check 35's lesson applied. Two spans in one file are unioned and counted once. NOT
+         held, deliberately: a STALE entry keeps satisfying its number, which is this list's second
+         drift and needs an entry's text read against a header's -- see the code for why that is left
+         open. A script that must SHOW the marker composes it from a variable; there is no fence to
+         hide it behind in a .ps1.
     <!-- /checks:list -->
 
     Exit code: 0 = no errors. 1 = at least one error (usable as a gate in open-pr.ps1).
@@ -4181,15 +4189,58 @@ Write-Coverage -Category 'tool-block' -Checked $toolBlockObliged `
 # span would otherwise make claims; a PowerShell header comment has no fences to mask, and the walk's
 # offsets then address the same bytes this check reads.
 #
+# AN ENTRY IS READ AT THE LIST'S OWN INDENT, and that bound came from PROBING this check rather than from
+# measuring the tree -- which is check 35's own lesson ("a measurement tells you what a check catches
+# here, and only a probe tells you what it would wave through") applied to its neighbour. The shape is a
+# nested enumeration inside an entry's prose: a line opening with '1. ' indented under a paragraph. This
+# list contains none today, so no amount of measuring it would have surfaced this; run past the check,
+# such a line registered a claim. Counting one silences the check exactly where it matters -- drop
+# entries 1 and 2 from the list and the nested pair keeps satisfying headers 1 and 2 forever, gate green,
+# which is the drift this check exists to refuse. The level is taken from the shallowest candidate in
+# each span, by DOT column rather than by leading spaces, because this list is right-aligned on the
+# period (4, 5 and 6 spaces all occur).
+#
+# COUNTED ONCE PER FILE, over the union of its spans. Inside the callback each header was counted per
+# SPAN, so a file carrying two spans reported its header count doubled and named one missing entry twice
+# -- one defect, two owners, which is what the first-occurrence rule for headers above avoids. Two spans
+# is the tolerant reading rather than an error of its own: a list legitimately split in two still
+# enumerates one file.
+#
+# WHAT THIS DOES NOT HOLD, said here rather than left for a reader to discover. A STALE entry still
+# satisfies its number: renumber check 33 to 38, add a '38.' entry, and the abandoned '33.' line -- still
+# describing what is now 38 -- keeps header 33 satisfied. That is #1680's SECOND drift recurring, and it
+# is not reachable from this side without reading an entry's text against a header's text. It is left
+# open deliberately: a keyword-overlap rule is fuzzy, and a fuzzy rule on a gate arrives with an
+# exemption list. Check 34's ascending rule is what limits the blast radius -- a renumber has to move the
+# section and take the last free number -- so the shape is a lingering line, not a wrong live one.
+#
+# THERE IS NO FENCE TO HIDE THE MARKER BEHIND, unlike checks 10, 29 and 32, whose subjects are markdown.
+# A script that must SHOW the marker -- a scaffolder emitting one, or a suite building a fixture that
+# carries one -- composes it from a variable instead ("<!-- $tag -->"), which no marker regex matches.
+# scripts/tests/check-plugin-integrity-commands.tests.ps1 does exactly that, and says why: it is a .ps1
+# in the set this check walks, so a literal marker there would open a span in the SUITE.
+#
+# THE TWO ZERO STATES ARE SAID SEPARATELY, AND THAT BRANCH IS NOT REACHABLE FROM THE SUITE -- stated here
+# rather than left as unexplained coverage. The note below distinguishes "no marker anywhere" (a clean
+# opt-out) from "markers present, not one of them formed a span" (a broken gate), because keying on the
+# span count alone printed the reassuring sentence over a run that had just raised an error about that
+# very file: a true statement reading as a different, false one, which is what Write-Coverage's own
+# docstring exists to prevent. It cannot be asserted in scripts/tests/: every fixture run invokes a COPY
+# of this script inside the fixture, and that copy carries this list -- so one valid span always exists
+# there and both zero states are unreachable. The suite covers the error itself (an unpaired marker) and
+# the opt-out (a file with headers and no marker); the wording of the two zero notes is read, not tested.
+#
 # BORN GREEN: 1 span, 37 header(s), 37 claimed, 0 findings -- once the seven missing entries were
 # written back on the branch that added this.
 $clSpans    = 0
+$clMarked   = 0
 $clChecked  = 0
 $clFindings = 0
 foreach ($psFile in (Get-PsScriptFiles)) {
     $clText = [System.IO.File]::ReadAllText($psFile.FullName, [System.Text.Encoding]::UTF8)
     # The cheap raw test first, as in checks 10, 28, 29 and 32.
     if ($clText -notmatch '<!--\s*/?checks:list\s*-->') { continue }
+    $clMarked++
     $clRel   = $psFile.FullName.Replace($RepoRoot, '.')
     $clLines = $clText -split "`r?`n"
     # Every column-0 numbered header in this file, first occurrence wins. A duplicate is check 34's
@@ -4203,10 +4254,18 @@ foreach ($psFile in (Get-PsScriptFiles)) {
         $clHeaderLines[$clKey] = $i + 1
         $clHeaderKeys.Add($clKey)
     }
+    # THE CLAIMS OF EVERY SPAN IN THE FILE, UNIONED, AND THE COMPARISON MADE ONCE AFTERWARDS. Run inside
+    # the callback it counted each header once PER SPAN, so a file carrying two spans reported its header
+    # count doubled and named one missing entry twice -- one defect, two owners, which is exactly what the
+    # first-occurrence rule above avoids for headers. Two spans is also the tolerant reading rather than an
+    # error of its own: a list legitimately split in two still enumerates one file.
+    $clClaimed   = @{}
+    $clSpanLines = New-Object System.Collections.Generic.List[int]
     Invoke-MarkedSpanWalk -MaskedText $clText -RawText $clText -Marker 'checks:list' `
         -Category 'check-list' -Rel $clRel -OnSpan {
         param($span)
         $script:clSpans++
+        $clSpanLines.Add($span.BeginLineNo)
         # A span in a file with no headers is a claim about nothing, and silence would read as a pass.
         if ($clHeaderKeys.Count -eq 0) {
             $script:clFindings++
@@ -4216,32 +4275,58 @@ foreach ($psFile in (Get-PsScriptFiles)) {
                 " check 34 holds, or the marker is on the wrong file.")
             return
         }
-        $clBody    = $clText.Substring($span.SpanStart, $span.SpanEnd - $span.SpanStart)
-        $clClaimed = @{}
-        foreach ($clRow in ($clBody -split "`r?`n")) {
-            # An entry opens its line, indented, with '<n>[letter]. '. A continuation line is indented
-            # further and starts with prose, and a number quoted mid-sentence is not at a line start --
-            # so neither is a claim, which is what keeps this reading the list rather than the paragraph.
-            if ($clRow -match '^\s+(\d+)([a-z]?)\. ') { $clClaimed["$($Matches[1])$($Matches[2])"] = $true }
+        $clRows = @($clText.Substring($span.SpanStart, $span.SpanEnd - $span.SpanStart) -split "`r?`n")
+        # AN ENTRY MUST START INSIDE THE LIST'S GUTTER, and that bound came from probing this check rather
+        # than from measuring the tree -- check 35's lesson, applied to its neighbour. A number opening a
+        # line is not rare inside an entry's PROSE (a nested enumeration under a paragraph), and counting
+        # one silences the check exactly where it matters: drop entries 1 and 2 from the list and the
+        # nested pair keeps satisfying headers 1 and 2 forever, gate green, which is the drift this check
+        # exists to refuse.
+        #
+        # THE GUTTER IS DERIVED, NOT ASSUMED, and it is a WIDTH rather than a column -- which is the
+        # difference between this and the first attempt. The narrowest '<spaces><n><letter>' prefix in the
+        # span is the gutter: a list right-aligned on the period puts wider keys further left, so the
+        # leading spaces vary (4, 5 and 6 all occur here) while the prefix does not. But the alignment is
+        # not perfect in practice -- 3b and 3c sit one column out -- and requiring the exact prefix width
+        # dropped both, reporting two real entries as missing. So the rule is the weaker and truer one: an
+        # entry's number must BEGIN no deeper than the gutter is wide. Every entry does, however ragged
+        # the alignment; a line indented past the gutter is prose, and that is the whole discriminator.
+        $clPrefixes = @()
+        foreach ($clRow in $clRows) {
+            if ($clRow -match '^(\s+\d+[a-z]?)\. ') { $clPrefixes += $Matches[1].Length }
         }
-        foreach ($clKey in $clHeaderKeys) {
-            $script:clChecked++
-            if ($clClaimed.ContainsKey($clKey)) { continue }
-            $script:clFindings++
-            Add-Error ("[check-list] ${clRel}:$($clHeaderLines[$clKey]): check $clKey has a section header but" +
-                " no entry in the 'checks:list' span at line $($span.BeginLineNo). That list is what a" +
-                " reader who has not opened this file consults, and what a lens, a hook, a test name or a" +
-                " release note quotes a number from -- so a check missing from it is one they cannot cite" +
-                " at all, and the neighbouring numbers then read as covering ground they do not (#1680)." +
-                " Add a '$clKey.' entry saying what it does.")
+        if ($clPrefixes.Count -eq 0) { return }
+        $clGutter = ($clPrefixes | Measure-Object -Minimum).Minimum
+        foreach ($clRow in $clRows) {
+            if ($clRow -notmatch '^(\s+)(\d+)([a-z]?)\. ') { continue }
+            if ($Matches[1].Length -gt $clGutter) { continue }
+            $clClaimed["$($Matches[2])$($Matches[3])"] = $true
         }
+    }
+    # ONCE PER FILE, over the union above. $clSpanLines is empty only when every marker in the file was
+    # malformed, and the walk has already reported that.
+    if ($clHeaderKeys.Count -eq 0 -or $clSpanLines.Count -eq 0) { continue }
+    $clWhere = if ($clSpanLines.Count -eq 1) { "the 'checks:list' span at line $($clSpanLines[0])" }
+               else { "any of this file's $($clSpanLines.Count) 'checks:list' spans (lines $($clSpanLines -join ', '))" }
+    foreach ($clKey in $clHeaderKeys) {
+        $clChecked++
+        if ($clClaimed.ContainsKey($clKey)) { continue }
+        $clFindings++
+        Add-Error ("[check-list] ${clRel}:$($clHeaderLines[$clKey]): check $clKey has a section header but" +
+            " no entry in $clWhere. That list is what a reader who has not opened this file consults, and" +
+            " what a lens, a hook, a test name or a release note quotes a number from -- so a check missing" +
+            " from it is one they cannot cite at all, and the neighbouring numbers then read as covering" +
+            " ground they do not (#1680). Add a '$clKey.' entry saying what it does, at the list's own" +
+            " indent -- a line indented deeper belongs to the entry above it and is not read as a claim.")
     }
 }
 Write-Coverage -Category 'check-list' -Checked $clChecked `
-    -Note $(if ($clSpans -eq 0) {
-        "no 'checks:list' span in this repo's script set. The marker is opt-in, so zero is a pass and not a gap -- but no script's own summary of its numbered checks is being held to those checks by this run"
+    -Note $(if ($clMarked -eq 0) {
+        "no 'checks:list' marker anywhere in this repo's script set. The marker is opt-in, so zero is a pass and not a gap -- but no script's own summary of its numbered checks is being held to those checks by this run"
+    } elseif ($clSpans -eq 0) {
+        "$clMarked file(s) carry a 'checks:list' marker and NOT ONE FORMED A SPAN -- every marker in them is unpaired, and the errors above say which. Nothing was compared: read this as a broken gate rather than as a clean one. Said separately from the zero-marker case deliberately, because the two produce the same count and mean opposite things"
     } else {
-        "column-0 numbered header(s) across $clSpans marked span(s), each held to the list that claims to enumerate them -- $clFindings finding(s). ONE DIRECTION: an entry with no header is deliberately not reported, because a retired check keeps its number as a tombstone and the consumer-doc guard the suites call check 19 carries no header of its own, so the reverse rule would be born needing exactly those exemptions. Check 34 is the sibling and cannot serve this: it holds the headers to EACH OTHER and has no opinion about the prose that summarises them"
+        "column-0 numbered header(s) held to the list that claims to enumerate them, over $clSpans marked span(s) in $clMarked file(s) -- $clFindings finding(s). Counted ONCE PER FILE over the union of its spans, so two spans cannot double the figure or name one gap twice. AN ENTRY MUST START INSIDE THE LIST'S GUTTER, whose width is the narrowest number prefix in the span: a line indented past it is an entry's prose, and counting a nested enumeration there would silence the check where the missing entry sits below it. ONE DIRECTION: an entry with no header is deliberately not reported, because a retired check keeps its number as a tombstone and the consumer-doc guard the suites call check 19 carries no header of its own, so the reverse rule would be born needing exactly those exemptions -- the cost is that a STALE entry still satisfies its number, which is #1680's second drift and is NOT held here. Check 34 is the sibling and cannot serve this: it holds the headers to EACH OTHER and has no opinion about the prose that summarises them"
     })
 # --- Report ---------------------------------------------------------------------------------------------
 if ($errors.Count -eq 0) {

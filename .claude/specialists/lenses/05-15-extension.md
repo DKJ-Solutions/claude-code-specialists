@@ -2320,6 +2320,40 @@ enumerate them"*, so a pattern matching finding *phrases* counted the coverage l
 same trap three patterns in that suite already document, met again by the check that was added to it. The
 assert now matches the finding's leading path, which the coverage line does not have.
 
+**The review round moved four things, and three of them are the same defect wearing different clothes: a
+rule read off the happy path.** The claim reader matched *any* indented line opening with `N. `, so a
+nested enumeration inside an entry's prose would have registered claims — and drop those entries later
+and the nested pair keeps satisfying their headers with the gate green, which is the drift this check
+exists to refuse. The repair is that an entry must **start inside the list's gutter**, whose width is the
+narrowest number prefix in the span. The first attempt required the exact prefix width, which is what a
+*perfectly* right-aligned list would have; this one is not — `3b` and `3c` sit one column out — and it
+reported two real entries as missing. The weaker rule is the true one: however ragged the alignment,
+every entry begins inside the gutter and a line indented past it is prose. Second, the header comparison
+ran **inside** the span callback, so a file with two spans counted its headers twice and named one gap
+twice; it now runs once per file over the union of its spans, which also makes a split list legal. Third,
+the coverage note keyed on the span count, so a **broken** marker printed *"the marker is opt-in, so zero
+is a pass and not a gap"* in the same run that raised an error about that very file — the two zero states
+are now said separately.
+
+**And the shape of the fourth is worth more than the fix.** The nested-enumeration hole was found by
+**probing** the check, not by measuring the tree: the list contains no such line today, so no amount of
+measuring would have surfaced it. That is
+[check 35](#check-35-and-the-sweep-that-reported-itself-finished-september-8-2026-1655)'s own lesson —
+*a measurement tells you what a check catches here, and only a probe tells you what it would wave
+through* — arriving at its neighbour one day later. The same round also found the branch document citing
+`.SYNOPSIS` where the list lives in `.DESCRIPTION`, in an entry whose whole subject is a citation being
+wrong, and which travels verbatim into `CHANGELOG.md` and then a release note.
+
+**Two bounds are named rather than closed, and the reason is the same in both.** A **stale** entry still
+satisfies its number: renumber a check, add the new entry, and the abandoned line — still describing what
+moved — keeps the old header satisfied. That is #1680's second drift recurring, and reaching it means
+reading an entry's text against a header's, which is a fuzzy rule, and a fuzzy rule on a gate arrives
+with an exemption list. Check 34's ascending rule limits the blast radius to a lingering line rather than
+a wrong live one. And the two zero-state coverage notes **cannot be asserted from the suite**: every
+fixture run invokes a copy of this script inside the fixture, and that copy carries the list, so one
+valid span always exists there. Both are written into the check's own header, because an unstated gap
+reads as coverage.
+
 In short: the **how** (managing the harness, scripts, config, safety guards) is portable; the **what**
 (the plugin lint + drift lint, `branch-info.ps1`, `.claude/settings.json` with the github source, and
 the marketplace/plugin manifests) belongs to this repo.

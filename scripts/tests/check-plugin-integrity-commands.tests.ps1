@@ -842,6 +842,73 @@ try {
     Assert-True (-not ($rC62b.Out -match 'listed-unmarked\.ps1')) 'scenario 62: a file with headers and no marker claims nothing, so it is not a subject'
     Assert-True ($rC62b.Out -match '\[check-list\] checked \d+') 'scenario 62: and the check still reports its coverage, so opting out is not the same as not running'
     Remove-Item -LiteralPath $s62bPath -Force
+
+    # --- Scenario 63: a nested enumeration inside an entry's prose is not a claim --------------------
+    #     Found by PROBING the check rather than by measuring the tree -- the real list contains no such
+    #     shape, so no measurement of it would have surfaced this (check 35's lesson, applied to its
+    #     neighbour). A number opening a line is ordinary inside an entry's prose, and counting one as a
+    #     claim silences the check exactly where it matters: the nested pair below would keep satisfying
+    #     headers that had been dropped from the list, with the gate green.
+    Write-Host "check 37 -- a number opening a line inside an entry's prose is not a claim" -ForegroundColor Cyan
+    $s63Path  = Join-Path $s58Dir 'listed-nested.ps1'
+    $s63Lines = @(
+        '<#'
+        '.DESCRIPTION'
+        "    $clOpen"
+        '      1. the first thing.'
+        '      2. the second thing, which documents two cases of its own:'
+        '         3. the first case -- indented past the gutter, so it is prose, not an entry.'
+        '         4. the second case.'
+        "    $clClose"
+        '#>'
+        '# --- 1. the first thing -------------------------------------------------'
+        '$a = 1'
+        ''
+        '# --- 2. the second thing ------------------------------------------------'
+        '$b = 2'
+        ''
+        '# --- 3. the one the nested list would have covered for -------------------'
+        '$c = 3'
+    )
+    [System.IO.File]::WriteAllText($s63Path, (($s63Lines -join "`n") + "`n"), $Utf8NoBom)
+    $rC63 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True ($rC63.Out -match 'listed-nested\.ps1:16:.*check 3 has a section header but no entry') 'scenario 63: the nested 3. does not satisfy header 3 -- the gap is still reported'
+    Assert-Equal 1 ([regex]::Matches($rC63.Out, $ClFindingPattern).Count) 'scenario 63: and the nested 4., which matches no header, adds nothing -- exactly one finding'
+    Remove-Item -LiteralPath $s63Path -Force
+
+    # --- Scenario 64: two spans in one file are unioned and counted once -----------------------------
+    #     Run inside the span callback this counted each header once PER SPAN, so a second span doubled
+    #     the coverage figure and named one missing entry twice -- one defect, two owners, which is what
+    #     the first-occurrence rule for headers already avoids. A split list still enumerates one file,
+    #     so the union is the tolerant reading rather than an error of its own.
+    Write-Host "check 37 -- two spans are read as one list, and a gap is named once" -ForegroundColor Cyan
+    $s64Path  = Join-Path $s58Dir 'listed-twospans.ps1'
+    $s64Lines = @(
+        '<#'
+        '.DESCRIPTION'
+        '    The early checks:'
+        "    $clOpen"
+        '      1. the first thing.'
+        "    $clClose"
+        '    And the later ones:'
+        "    $clOpen"
+        '      2. the second thing.'
+        "    $clClose"
+        '#>'
+        '# --- 1. the first thing -------------------------------------------------'
+        '$a = 1'
+        ''
+        '# --- 2. the second thing ------------------------------------------------'
+        '$b = 2'
+        ''
+        '# --- 3. the one in neither span ------------------------------------------'
+        '$c = 3'
+    )
+    [System.IO.File]::WriteAllText($s64Path, (($s64Lines -join "`n") + "`n"), $Utf8NoBom)
+    $rC64 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-Equal 1 ([regex]::Matches($rC64.Out, $ClFindingPattern).Count) 'scenario 64: the header in neither span is one finding, not one per span'
+    Assert-True ($rC64.Out -match "any of this file's 2 'checks:list' spans \(lines 4, 8\)") 'scenario 64: and the finding names both spans, since either could hold the entry'
+    Remove-Item -LiteralPath $s64Path -Force
 } finally {
     if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture -ErrorAction SilentlyContinue }
 }

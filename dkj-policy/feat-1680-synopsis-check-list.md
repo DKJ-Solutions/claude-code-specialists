@@ -38,7 +38,7 @@
 
 #### What #1680 reported, and what it turned out to be
 
-The gate's `.SYNOPSIS` enumerates its checks in prose, and that list had stopped at `30.` while the code
+The gate's `.DESCRIPTION` enumerates its checks in prose, and that list had stopped at `30.` while the code
 ran to `36.` -- with its own item `30.` describing the check #1494 renumbered to `33` a month after the
 list was written. Verifying it against the tree turned up a third drift the report did not name: items
 `9.` and `17.` still describe checks **retired on August 8, 2026**, reading as live ones.
@@ -59,16 +59,19 @@ argument on its first run by finding a seventh missing entry, `13b`, that no rep
 - [x] Add check 37, opt-in through the existing marked-span walk, holding every column-0 header to that
       list in ONE direction so it is born green with no exemptions
 - [x] Record the shape and the measurements in Sylvester's lens
+- [x] Act on the code review: the gutter rule for entries, the per-file union, the two zero-state
+      coverage notes, and the `.SYNOPSIS`/`.DESCRIPTION` citation in this document
 
 ### TEST
 
-- [x] Five scenarios in the gate's own suite: the missing entry, the entry with no header (the bound),
-      the lettered sub-section, the list in a headerless file, and the unpaired marker plus the opt-out
+- [x] Seven scenarios in the gate's own suite: the missing entry, the entry with no header (the bound),
+      the lettered sub-section, the list in a headerless file, the unpaired marker plus the opt-out, the
+      nested enumeration, and the two spans unioned into one
 - [x] The lint gate and every suite are green
 
 ### DEPLOY: feat/1680-synopsis-check-list
 
-The gate's `.SYNOPSIS` enumerates its checks in prose -- the summary a reader who has not opened four
+The gate's `.DESCRIPTION` enumerates its checks in prose -- the summary a reader who has not opened four
 thousand lines consults, and the one a lens, a hook, a test-scenario name or a released note quotes a
 number from. It had stopped at `30.` while the code ran to `36.`, and its own item `30.` still described
 the check #1494 renumbered to `33` a month after the list was written, so grepping the list for "check 30"
@@ -86,6 +89,17 @@ an exemption list: three entries legitimately have no header of their own, the t
 and the consumer-doc guard the suites call check 19. Measured after the repair: 1 span, 37 headers, 37
 claimed, 0 findings, 0 exemptions. Its own first run is the argument for it -- `13b` was reported by the
 check, not by a reader.
+
+The review round moved four things, and three were one defect in different clothes -- a rule read off the
+happy path. An entry must now **start inside the list's gutter**, so a nested enumeration in an entry's
+prose cannot satisfy a header (found by probing the check, not by measuring the tree: the list contains no
+such line today); the header comparison runs once per FILE over the union of its spans, where running it
+per span doubled the count and named one gap twice; and the coverage note now distinguishes "no marker
+anywhere" from "markers present, none of them paired", which used to print the reassuring sentence over a
+run that had just raised an error about that very file. Two bounds are named rather than closed -- a
+STALE entry still satisfies its number, and the two zero-state notes are unreachable from the suite
+because every fixture run copies this script into the fixture -- both written into the check's own header,
+because an unstated gap reads as coverage.
 
 **Score:** 3
 
