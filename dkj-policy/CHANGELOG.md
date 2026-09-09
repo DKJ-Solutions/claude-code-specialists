@@ -43,7 +43,44 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**27 / 58 minor entries** <!-- pending-tally -->
+**28 / 59 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1679-utf8-short-read-class · 20260909-062511
+
+`Invoke-NativeCapture` now says when a capture was read while a writer still held it, so a caller can
+tell "the child said nothing" from "we read before the flush". Both are an empty `Output` at exit `0`,
+and until now nothing separated them -- so six callers in the shipping scripts resolved the ambiguity
+toward a substantive answer: "no PR", "no issue declared", "the body does not carry the section",
+"the claim was refused". The sharpest refused the merge over a section that had not changed, in a
+gate with no `-Force`. The quietest reported the resolves verification as a clean pass having checked
+nothing. And the one that reaches furthest is the claim step, which told an operator to treat an
+issue as UNCLAIMED on a claim that had in fact landed -- the first move of every issue-driven
+assignment. The read itself is unchanged: `FileShare.ReadWrite` still returns whatever was flushed
+(#1252), it simply no longer does so in silence, and on a clean exit it now waits briefly for the
+handle to release rather than reporting a short read it could have avoided.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+These are the scripts a consumer runs through the workflow plugin, so the wrong verdicts were theirs
+to meet: a merge refused by a gate with no way past it, an already-done check that quietly stopped
+warning, and a claim step that refused a claim it had itself just written. Nothing to do on adoption
+-- the field is additive and every existing caller keeps working -- but the refusals a consumer does
+hit now name the read that failed instead of accusing their document, and the one skipped check that
+cannot be recovered says so in a warning rather than in a dim grey line.
+
+**Score:** 3
+
+#### Pull Request
+
+A short capture on exit 0 is reported as a short read instead of as a substantive answer
+
+Plugins: dkj-policy, dkj-team-shopify
+
+[PR #1690](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1690)
+
+---
 
 ### DEPLOY: docs/1678-nested-worktree-refusal · 20260909-060959
 
