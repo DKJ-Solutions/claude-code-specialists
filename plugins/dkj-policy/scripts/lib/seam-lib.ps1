@@ -30,6 +30,11 @@
     Pure ASCII (repo convention for .ps1).
 #>
 
+# THE FUNCTION-TABLE PROBE (issue #1729). Get-SeamValue below IS the probe this repo tells callers to
+# use instead of an inline Get-Command, so it is the one place that most had to stop being one itself.
+# Unconditional and $PSScriptRoot-relative, so it resolves in the plugin mirror as well as here.
+. (Join-Path $PSScriptRoot 'command-probe-lib.ps1')
+
 function Get-SeamValue {
     <#
         Calls an optional repo-config function, or returns $Default when the repo does not define it.
@@ -37,7 +42,7 @@ function Get-SeamValue {
     #>
     param([Parameter(Mandatory)][string[]]$Name, $Default)
     foreach ($n in $Name) {
-        if (Get-Command $n -ErrorAction SilentlyContinue) { return (& $n) }
+        if (Test-FunctionDefined $n) { return (& $n) }
     }
     return $Default
 }

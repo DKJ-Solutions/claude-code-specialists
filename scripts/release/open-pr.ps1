@@ -770,7 +770,7 @@ Both are honest answers; the gate only refuses to guess.
 # Get-MachineLocalPaths, or an empty return, means the check is silent. Get-BranchMachineLocalFindings
 # degrades to Known = $false when it cannot read the diff, which is silent too.
 $machineLocalNote = ''
-if (Get-Command -Name Get-MachineLocalPaths -ErrorAction SilentlyContinue) {
+if (Test-FunctionDefined 'Get-MachineLocalPaths') {
     $mlPaths = @(Get-MachineLocalPaths)
     if ($mlPaths.Count -gt 0) {
         $mlFinding = Get-BranchMachineLocalFindings -RepoRoot $repoRoot -Trunk (Get-BranchTrunkName) -MachineLocalPaths $mlPaths
@@ -1539,7 +1539,7 @@ if ($existingPr -and -not $SkipTests) {
     # A red required check simply lands in the not-passing list below and refuses the skip.
     # The seam is read defensively: a consumer whose repo-config predates it has no such function, and
     # a missing name is the safe answer (no certificate, the gate runs) rather than an error.
-    $ciCheckName = if (Get-Command -Name 'Get-CiTestCheckName' -ErrorAction SilentlyContinue) { Get-CiTestCheckName } else { '' }
+    $ciCheckName = if (Test-FunctionDefined 'Get-CiTestCheckName') { Get-CiTestCheckName } else { '' }
     $cert = Get-CiTestCertificate -HeadSha ($headSha.Output -join '') `
                                   -PrHeadSha ($prHead.Output -join '') `
                                   -RequiredChecksJson ($reqJson.Output -join "`n") `
@@ -1590,7 +1590,7 @@ if ($push.ExitCode -ne 0) {
 # in order to tell a description heading from a form heading (see below), and a second copy of this
 # resolution is how this repo's accumulation bugs start.
 $descPlaceholderSource = 'the built-in list'
-$descPlaceholders = if (Get-Command -Name Get-PrDescriptionPlaceholder -ErrorAction SilentlyContinue) {
+$descPlaceholders = if (Test-FunctionDefined 'Get-PrDescriptionPlaceholder') {
     $descPlaceholderSource = 'Get-PrDescriptionPlaceholder in scripts/repo-config.ps1'
     @(Get-PrDescriptionPlaceholder)
 } else {
@@ -1872,7 +1872,7 @@ if (-not $Body) {
         # $descPlaceholders / $descPlaceholderSource are resolved once above both paths -- see the block
         # before the "Already open?" branch. #101's approval pattern is still resolved here, because only
         # this path ticks boxes.
-        $approvalPattern = if (Get-Command -Name Get-PrApprovalPattern -ErrorAction SilentlyContinue) {
+        $approvalPattern = if (Test-FunctionDefined 'Get-PrApprovalPattern') {
             Get-PrApprovalPattern
         } else {
             '^- \[ \] (Aangevraagd door Dave|Requested by Dave)'
@@ -1954,8 +1954,8 @@ $bodyFile = New-ScratchPath -Label 'open-pr-body' -Extension '.md'
 # flag is simply omitted -- current behavior, unchanged (the workshop defines neither). Collected
 # as a splatted array of EXTRA args (kept separate from the fixed `gh pr create ...` call below) so
 # the #107 stderr-capture guard keeps its literal, single-line `gh pr create ... 2>&1` shape.
-$assignee = if (Get-Command -Name Get-PrAssignee -ErrorAction SilentlyContinue) { "$(Get-PrAssignee)".Trim() } else { '' }
-$milestone = if (Get-Command -Name Get-PrMilestone -ErrorAction SilentlyContinue) { "$(Get-PrMilestone)".Trim() } else { '' }
+$assignee = if (Test-FunctionDefined 'Get-PrAssignee') { "$(Get-PrAssignee)".Trim() } else { '' }
+$milestone = if (Test-FunctionDefined 'Get-PrMilestone') { "$(Get-PrMilestone)".Trim() } else { '' }
 $extraGhArgs = @()
 if ($assignee) { $extraGhArgs += @('--assignee', $assignee) }
 if ($milestone) { $extraGhArgs += @('--milestone', $milestone) }

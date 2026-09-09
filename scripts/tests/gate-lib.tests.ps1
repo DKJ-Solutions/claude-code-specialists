@@ -692,9 +692,11 @@ try {
     Assert-True ($openPr -match "if \(\`$existingPr -and -not \`$SkipTests\)") 'only where a PR exists and the suites were going to run'
     Assert-True ($openPr -match "'--required'") 'and asks for the REQUIRED checks, i.e. the trunk''s own bar'
     Assert-True ($openPr -match 'Get-CiTestCheckName') 'and reads the seam that names which check proves the suites'
-    # The seam is read through Get-Command, so a consumer whose repo-config predates it gets no
-    # certificate instead of a crash -- the same failure direction as every other refusal here.
-    Assert-True ($openPr -match "Get-Command -Name 'Get-CiTestCheckName'") 'defensively, so an older consumer repo-config does not break the run'
+    # The seam is PROBED before it is called, so a consumer whose repo-config predates it gets no
+    # certificate instead of a crash -- the same failure direction as every other refusal here. The
+    # probe was an inline Get-Command until #1729 and is Test-FunctionDefined now; what this assert is
+    # for is that the call is guarded at all, so it matches the guard rather than the idiom of the day.
+    Assert-True ($openPr -match "Test-FunctionDefined 'Get-CiTestCheckName'") 'defensively, so an older consumer repo-config does not break the run'
     # The sanitiser is loaded by the lib itself, following remote-ahead-lib and entry-scaffold-lib,
     # rather than being added to the caller contract in the header.
     Assert-True ($gateSrc -match "ref-print-lib\.ps1") 'gate-lib loads the prose sanitiser itself'

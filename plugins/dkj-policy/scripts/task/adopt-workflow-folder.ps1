@@ -164,7 +164,7 @@ Assert-WorkflowIsolatedSeamPath -RepoRoot $repoRoot -RelativePath $changelogRel 
 $noteRootFallback  = 'releases/notes'
 $workflowFolder    = Get-WorkflowFolderName -RepoRoot $repoRoot
 $noteRootIsolated  = "$workflowFolder/releases/audience"
-$noteRootAnswered  = [bool](Get-Command -Name 'Get-ReleaseNoteRoot' -ErrorAction SilentlyContinue)
+$noteRootAnswered  = [bool](Test-FunctionDefined 'Get-ReleaseNoteRoot')
 # A DIRECTORY IS NOT A NOTE, and the difference is measurable rather than pedantic: cut-release created a
 # stray releases/notes/<X>.x/ at every cut for a fortnight while writing the note elsewhere (see its own
 # comment at the note write). Git tracks no empty directory, so such a tree appears in no commit and would
@@ -218,7 +218,7 @@ $reportLib = Join-Path $PSScriptRoot '..\lib\check-report-lib.ps1'
 if (Test-Path -LiteralPath $reportLib -PathType Leaf) {
     try {
         . $reportLib
-        if (Get-Command -Name 'Get-EnabledPlugins' -ErrorAction SilentlyContinue) {
+        if (Test-FunctionDefined 'Get-EnabledPlugins') {
             # RepoEnabledIds, not Ids: an enable arriving from the machine layer is not this repo's to
             # document, and a scaffolded page claiming it would be describing somebody's laptop.
             $updateIds = @((Get-EnabledPlugins -RepoRoot $repoRoot).RepoEnabledIds | Where-Object { $_ -like '*@*' })

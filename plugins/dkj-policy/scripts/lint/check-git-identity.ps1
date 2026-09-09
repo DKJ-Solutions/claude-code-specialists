@@ -87,6 +87,12 @@ $ErrorActionPreference = 'Stop'
 # NO SOURCE-REPO GUARD, deliberately, and for the same reason check-unfolded-entry.ps1 gives: a
 # SessionStart hook invokes this from '${CLAUDE_PLUGIN_ROOT}/scripts/lint/' against the current repo,
 # so Assert-OwnCopy would refuse it -- and thereby the hook -- at every session start in the source
+
+# Test-FunctionDefined (issue #1729): the seam probes below read the function table directly rather
+# than through Get-Command, which parses the name as a wildcard pattern and pays a full PATH scan on
+# every miss -- and a miss is the normal case for an optional seam. $PSScriptRoot-relative, so it
+# resolves in the plugin mirror as well as here.
+. (Join-Path $PSScriptRoot '..\lib\command-probe-lib.ps1')
 # repo.
 
 # THE ROOT COMES FROM ONE DEFINITION (#1422), and this script's wrapped variant is the one that BECAME
@@ -98,7 +104,7 @@ $checkLib = Join-Path $PSScriptRoot '..\lib\consumer-check-lib.ps1'
 if (Test-Path -LiteralPath $checkLib -PathType Leaf) { . $checkLib }
 
 $repoRoot = ''
-if (Get-Command Resolve-CheckRepoRoot -ErrorAction SilentlyContinue) {
+if (Test-FunctionDefined 'Resolve-CheckRepoRoot') {
     $repoRoot = Resolve-CheckRepoRoot -RootOverride $RootOverride
 } elseif ($RootOverride) {
     $repoRoot = $RootOverride

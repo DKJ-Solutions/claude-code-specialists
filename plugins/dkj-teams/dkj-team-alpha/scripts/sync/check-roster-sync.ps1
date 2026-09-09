@@ -141,6 +141,12 @@ param(
     [string]$UserHomeOverride = ''
 )
 
+# Test-FunctionDefined (issue #1729): the seam probes below read the function table directly rather
+# than through Get-Command, which parses the name as a wildcard pattern and pays a full PATH scan on
+# every miss -- and a miss is the normal case for an optional seam. $PSScriptRoot-relative, so it
+# resolves in the plugin mirror as well as here.
+. (Join-Path $PSScriptRoot '..\lib\command-probe-lib.ps1')
+
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
@@ -410,8 +416,8 @@ if (Test-Path -LiteralPath $configPath -PathType Leaf) {
             $result.Error = $_.Exception.Message
             return $result
         }
-        if (Get-Command Get-RosterPath -ErrorAction SilentlyContinue) { $result.RosterPath = Get-RosterPath }
-        if (Get-Command Get-RosterIgnoredIds -ErrorAction SilentlyContinue) { $result.IgnoredIds = @(Get-RosterIgnoredIds) }
+        if (Test-FunctionDefined 'Get-RosterPath') { $result.RosterPath = Get-RosterPath }
+        if (Test-FunctionDefined 'Get-RosterIgnoredIds') { $result.IgnoredIds = @(Get-RosterIgnoredIds) }
         return $result
     } $configPath
 

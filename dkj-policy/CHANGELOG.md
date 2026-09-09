@@ -43,7 +43,151 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**35 / 80 minor entries** <!-- pending-tally -->
+**36 / 84 minor entries** <!-- pending-tally -->
+
+### DEPLOY: feat/1717-gate-progress-index · 20260909-181938
+
+The test gate now reports its own progress. It prints one line as each lane opens and one as each
+suite leaves one -- `test gate: progress [depth 1] 37/84 started, 30 done, 7 running (+412.6s) --
+started roster-sync.tests.ps1` -- so a 15-30 minute local run no longer goes silent between walls of
+completion-order output. Started is reported as well as done because the queue dequeues longest-first
+(#1358): a done-count alone sits at 0 through exactly the window an operator is asking the question
+in. The `[depth N]` marker is what makes the count dedupable -- the gate's own suite drives the gate
+over a fixture, so a nested run is unavoidable here, and every external way of deriving this number
+failed on it (#1717 measured three, each differently). The `== <suite> ==` header is untouched, and
+no remaining-time estimate is printed: the duration hints are CI's seconds, and #1713 established
+they do not convert to another machine.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A -- the gate is a maintainer's tool. A subscriber of this system never watches it run; what
+reaches them is a release, and this changes nothing about one.
+
+**Score:** N/A
+
+#### Pull Request
+
+Report the test gate's own progress: started, done and running, per suite
+
+Plugins: dkj-policy, dkj-team-shopify
+
+[PR #1739](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1739)
+
+---
+
+### DEPLOY: fix/1728-says-on-merged-captures · 20260909-180707
+
+The two test suites whose capture carries the child's error stream now read it with `Test-Says`, which
+strips whitespace from both sides and compares literally -- so a phrase the error formatter hard-wrapped
+mid-word is still found. 22 asserts converted across `publish-to-business.tests.ps1` and
+`cut-release-drive.tests.ps1`, including the negative direction, where the old form went **green for the
+wrong reason**: it reported absence and had actually measured a line break.
+
+The other six suites #1728 named are left exactly as they are, and that is the finding rather than a
+shortcut. A wrapped phrase needs two conditions together -- a capture that carries the error stream, and
+a script that emits the asserted phrase through `throw`/`Write-Error`/`Write-Warning` rather than
+`Write-Host`. Those six capture stdout only, from scripts with none of the three, so they are immune by
+construction; 311 of the report's 358 sites had no defect behind them. What made the difference
+measurable is written into the test engineer's lens beside the capture rule it completes, because the
+mechanism had until now been recorded only inside the seven suites already repaired -- where nobody
+writing an eighth would find it.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+Nothing here ships to a consumer: both files are this repo's own test suites, and the lens is
+repo-local. A consumer's own suites are subject to the same mechanism, and the rule that now describes
+it lives in a lens rather than in the portable manual -- so this reaches them only if the classification
+is later promoted.
+
+**Score:** N/A
+
+#### Pull Request
+
+Read merged child captures with Test-Says where the error formatter can reach them
+
+[PR #1738](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1738)
+
+---
+
+### DEPLOY: fix/1731-gate-tolerant-capture-read · 20260909-175551
+
+Closes #1731. The test gate now reads each suite's capture files through `Read-NativeCaptureFile`, the
+tolerant reader this same lib built for a writer that still holds one, instead of a plain
+`Get-Content` -- and prints a visible `[short read]` note naming the file when one was still held.
+Both sites are covered: the pool's reap and the crash re-run added by #1723.
+
+The defect being closed is a silent one. `Get-Content -Raw` does not fail on a held capture file; it
+returns whatever was flushed, so a truncated suite block printed under a correct `== suite ==` header
+with the exit code intact, and nothing said so. That is not a failure a reader could have caught by
+looking harder.
+
+For a session reading a gate run: nothing changes on an ordinary green run. What is new is that a
+short block can no longer arrive looking complete.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+Nothing a subscriber of this repo's plugins sees. The test gate is a maintainer's tool, and a
+consumer's run behaves identically unless a suite of theirs leaves a grandchild holding a capture
+file -- in which case they get a note where they previously got a quietly short block.
+
+**Score:** N/A
+
+#### Pull Request
+
+Read a suite's capture files with the tolerant reader, and say when a block may be short
+
+Plugins: dkj-policy, dkj-team-shopify
+
+[PR #1737](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1737)
+
+---
+
+### DEPLOY: fix/1729-seam-probe-wildcard · 20260909-173557
+
+The optional-seam probe stops going through PowerShell's command searcher. `Test-FunctionDefined`
+(`scripts/lib/command-probe-lib.ps1`) reads the function table directly, and 93 of the 102 call sites
+that used `Get-Command <name> -ErrorAction SilentlyContinue` now call it instead. #1729 counted 68 of
+those, having counted one of the three spellings; the other 9 keep `Get-Command` with a reason each.
+
+The reason is the **miss**, which is what an optional seam normally is: `Get-Command` answers one by
+scanning every `PATH` directory for an executable of that name, measured at **32.5 ms** against
+**0.084 ms** for the replacement, with nothing caching the negative. `sync-main.ps1` makes 10 such
+probes in a row and `build-release-notes-page.ps1` 8, so a consumer that has configured no seams was
+paying roughly a third of a second per run to be told "no" -- a cost that fell hardest on the repos
+that had answered the least. The same call is also the frame that faulted in #1723, and it parses the
+name it is given as a wildcard pattern rather than as a literal; neither of those is what the change
+rests on, and both are recorded with the evidence in the lib's own docstring.
+
+Probes for an EXTERNAL command (`gh`, `git`) deliberately keep `Get-Command` -- it is the only call
+that answers about `PATH` -- and a tree-wide AST gate in the new suite holds the line, with each
+exception named and reasoned rather than listed.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+A consumer gets this through the plugin mirrors, and the saving lands hardest on them: the miss path
+is the default state of a repo that has answered no optional seams, which is every fresh adoption.
+Nothing they run changes shape -- same output, same exit codes, same seams -- so there is nothing to
+migrate and nothing to re-read.
+
+**Score:** 2
+
+#### Pull Request
+
+Probe the function table directly, off the command searcher's wildcard path
+
+Plugins: dkj-policy, dkj-team-alpha, dkj-team-shopify
+
+[PR #1735](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1735)
+
+---
 
 ### DEPLOY: fix/1723-gate-crash-vs-verdict · 20260909-170742
 

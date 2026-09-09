@@ -77,6 +77,11 @@
     Pure ASCII (repo convention for .ps1).
 #>
 
+# THE FUNCTION-TABLE PROBE (issue #1729), for the Get-TestCommands seam below. Unconditional and
+# $PSScriptRoot-relative so it resolves in both plugin mirrors of this file as well as here; it is a
+# leaf with no dependencies of its own, so loading it first is safe.
+. (Join-Path $PSScriptRoot 'command-probe-lib.ps1')
+
 $script:NativeCaptureInvariant = [System.Globalization.CultureInfo]::InvariantCulture
 
 # THE NON-INTERACTIVE ENVIRONMENT every child is bracketed with (inbound #1179). See
@@ -241,6 +246,163 @@ function Format-GateSeconds {
         [int]$Decimals = 0
     )
     return [string]::Format($script:NativeCaptureInvariant, ('{0:N' + $Decimals + '}'), $Seconds)
+}
+
+# THE ENVIRONMENT VARIABLE THAT MAKES A NESTED GATE RUN LEGIBLE (issue #1717). Invoke-TestSuiteGate sets
+# it for the children it spawns, so a gate running INSIDE one of them -- which is not hypothetical:
+# test-suite-gate.tests.ps1 drives the gate over its own fixture, and any consumer testing this lib does
+# the same -- reports depth 2 instead of being indistinguishable from the run that started it. A name
+# nobody else is likely to hold, because this lib is mirrored into every consumer's plugin cache and a
+# generic TEST_GATE_DEPTH would collide with whatever their own tooling means by it.
+$script:GateDepthEnvName = 'DKJ_TEST_GATE_DEPTH'
+
+function Get-GateNestingDepth {
+    <#
+        How deep the gate about to run is nested: 1 at the top level, parent + 1 inside another gate's
+        child -- issue #1717.
+
+        WHY A DEPTH AND NOT A PID. Both tell two runs apart; only a depth says WHICH of them is the one
+        the operator is waiting on. #1717 measured three independent ways of deriving the gate's progress
+        from outside, and the second failed exactly here: a watcher picking the newest
+        'test-suite-gate-<pid>-<guid>' directory silently switched to a FIXTURE's directory mid-run and
+        reported 26 started / 8 finished falling back to 3 / 0, which reads as the gate having restarted.
+        A pid would have separated those two streams without ever saying which was the real one; 'depth 1'
+        does, and it is the same one character to filter on in a CI log.
+
+        MALFORMED IS TREATED AS ABSENT rather than as an error. This value crosses a process boundary
+        into a variable anybody can set, and every wrong reading of it costs exactly one wrong number on
+        a progress line -- so a non-numeric or negative value falls back to the top level, which is what
+        an unnested run reports anyway. It never fails a gate over a diagnostic.
+    #>
+    $parsed = 0
+    $raw = [Environment]::GetEnvironmentVariable($script:GateDepthEnvName, 'Process')
+    if ($raw -and [int]::TryParse("$raw", [ref]$parsed) -and $parsed -gt 0) { return $parsed + 1 }
+    return 1
+}
+
+function Format-GateProgressLine {
+    <#
+        The one line Invoke-TestSuiteGate prints every time a lane opens or a suite leaves one -- the
+        progress signal the gate had none of until issue #1717, September 9, 2026.
+
+        WHAT IT COST TO HAVE NONE. The gate buffers a suite's output until that suite exits and prints
+        it as one block, so for the 15-30 minutes a local run takes the only signal was walls of output
+        arriving in completion order with no index -- no way to tell 20/84 from 70/84 without counting
+        headers by hand, and therefore no way to tell a slow run from a wedged one. That distinction is
+        not cosmetic here: #1443 (an OOM at the default lane count) and #1701 (a subprocess bound
+        exceeded under gate load) are both states where the run really has stopped making progress and
+        looked identical to one that had not.
+
+        STARTED IS REPORTED AS WELL AS DONE, and that is the half a naive fix leaves out. The queue
+        dequeues longest-first since #1358, so with truthful hints the opening lanes hold the heaviest
+        suites and NOTHING completes -- and therefore nothing is printed -- for the first ~15 minutes of
+        an 84-suite run. A done-count alone sits at 0 through exactly the window an operator is asking
+        the question in.
+
+        WHY THE GATE EMITS THIS RATHER THAN A CALLER DERIVING IT. Three independent derivations from
+        outside were tried and all three failed inside one afternoon (#1717): 'grep -c ^== ' on the log
+        reported 175 of 84, because every suite prints headers of that shape and a failing one prints a
+        second; watching the newest capture directory switched to a fixture's mid-run; and counting
+        completed blocks sat at 0 for minutes for the reason above. Each is separately fixable, and the
+        gate is the only party that knows the queue, the lane count and the pool size without inferring
+        any of them.
+
+        IT IS ITS OWN LINE AND DOES NOT TOUCH THE BLOCK HEADER, which is what #1717 proposed as the
+        cheap version ('== [37/84] roster-sync.tests.ps1 =='). Printed immediately ABOVE the header it
+        announces, it reads as that index and costs nothing that shape would have cost: '== <suite> =='
+        stays byte-identical, so the suite's own output remains the very next line (asserted), and
+        nothing that already matches a header has to learn a new one.
+
+        AND IT CARRIES NO REMAINING-TIME ESTIMATE, deliberately. The duration hints the queue is ordered
+        by are CI's seconds, and #1713 corrected this very file for claiming they convert to a local
+        machine by a ratio -- the sign of the difference is not even fixed. An ETA computed from them
+        would be that mistake again, printed 168 times a run. Counts and the gate's own elapsed clock are
+        both measurements; the remainder is left unstated rather than guessed.
+
+        NO SHARD NOTE EITHER, unlike the opening line and the verdict (#1318, #1351). Those two are the
+        lines a session copies into a branch document, where a figure without its scope is unreadable
+        later. This one is ephemeral by design -- it is superseded by the next event -- so it carries
+        what a reader watching a run needs and nothing for the record.
+    #>
+    param(
+        # 'started' or 'done' -- what just happened to $Suite. Not [ValidateSet]: this is a label on a
+        # diagnostic, and a caller passing something else should print oddly rather than throw inside a
+        # gate run.
+        [Parameter(Mandatory = $true)][string]$Action,
+        [Parameter(Mandatory = $true)][string]$Suite,
+        [int]$Started = 0,
+        [int]$Done = 0,
+        [int]$Running = 0,
+        [int]$Total = 0,
+        [double]$Elapsed = 0,
+        [int]$Depth = 1
+    )
+    # Every figure through Format-GateSeconds for the reason that function exists: a number whose meaning
+    # depends on the machine's regional settings is the same defect as an untranslated string (#1159).
+    return ("test gate: progress [depth {0}] {1}/{2} started, {3} done, {4} running (+{5}s) -- {6} {7}" -f `
+        $Depth, $Started, $Total, $Done, $Running, (Format-GateSeconds $Elapsed -Decimals 1), $Action, $Suite)
+}
+
+function Write-GateCaptureBlock {
+    <#
+        ONE reaped suite's out.txt/err.txt, printed under the header the caller already wrote -- and a
+        VISIBLE note when a writer still held one of them (issue #1731).
+
+        WHY NOT Get-Content, WHICH IS WHAT STOOD HERE. This lib built Read-NativeCaptureFile for exactly
+        the hazard the gate is most exposed to: a grandchild that inherited a suite's redirected stdout
+        handle and outlives it, so the file is still open when the gate reads it the moment WaitForExit
+        returns. Get-Content does not FAIL on that -- measured September 9, 2026, it opens the held file
+        happily and returns whatever was flushed -- so the block printed short and nothing said so. That
+        is this file's own recurring failure shape: a wrong answer arriving as a plausible value. The
+        tolerant reader answers the same read AND says whether a writer held it.
+
+        Read-NativeCaptureFile's docstring used to call itself internal with one caller. That sentence
+        described the callers of the day rather than arguing the gate should not be one, and this is now
+        the second.
+
+        THE NOTE IS PRINTED, NOT RETURNED, because these blocks are read by a person and not by a caller
+        that inspects a flag. WriterHeld on the Utf8 arm becomes ShortRead for a script to branch on; the
+        only consumer here is the reader looking at the console, so a silent field would be the same
+        defect in a new place.
+
+        AND THE NOTE SURVIVES AN EMPTY READ -- that ordering is the point rather than a detail. The
+        whitespace skip below exists so a suite with no stderr does not print a blank block, and it used
+        to run before anything else. A held file that has flushed NOTHING yet is precisely "the child
+        said nothing" against "we read before the flush", which is the ambiguity #1679 named, so skipping
+        it silently would drop the note in the one case it matters most.
+
+        THE SETTLE BUDGET IS THE FULL ONE, because a reaped suite is the clean-exit case
+        Invoke-NativeCaptureUtf8 spends it on: the suite exited of its own accord, so its whole output
+        exists and a lingering handle is a grandchild being reaped rather than a document that ends there.
+
+        COST, MEASURED BEFORE ADOPTING IT (September 9, 2026 -- the check #1731 asked for). On files no
+        writer holds, 170 reads -- 85 suites' worth of both captures -- cost 147 ms through this reader
+        against 67 ms through Get-Content: 0.86 ms against 0.39 ms per file. That is ~80 ms on a run
+        costing ~140 s, and the settle budget is not touched at all in that case; it is spent only where
+        the alternative was a short block nobody could see was short. The decode is byte-identical.
+    #>
+    param(
+        [Parameter(Mandatory = $true)][AllowEmptyCollection()][string[]]$Path
+    )
+
+    # -Encoding Oem matched what a redirected Windows PowerShell child writes (its
+    # [Console]::OutputEncoding is the OEM codepage). Everything in scope here is ASCII by repo
+    # convention, where every candidate decoder agrees; the choice only shows on a high byte that
+    # reached a suite's output from a document it was reading. Get-Content's own `-Encoding Oem`
+    # resolves to this same code page, so the swap changes the decode by nothing -- asserted in the
+    # suite rather than assumed here.
+    $oem = [System.Text.Encoding]::GetEncoding([System.Globalization.CultureInfo]::CurrentCulture.TextInfo.OEMCodePage)
+
+    foreach ($f in @($Path)) {
+        if (-not (Test-Path -LiteralPath $f)) { continue }
+        $read = Read-NativeCaptureFile -Path $f -Encoding $oem `
+                                       -SettleMilliseconds $script:NativeCaptureSettleMilliseconds
+        if ($read.WriterHeld) {
+            Write-Host ("[short read] a writer still held '" + (Split-Path -Leaf $f) + "' after the settle budget -- the block below may be truncated, or empty because nothing had been flushed yet (issue #1731).") -ForegroundColor Yellow
+        }
+        if ([string]::IsNullOrWhiteSpace($read.Text)) { continue }
+        Write-Host $read.Text.TrimEnd()
+    }
 }
 
 function New-ScratchPath {
@@ -521,7 +683,11 @@ function Invoke-NativeCapture {
 function Read-NativeCaptureFile {
     <#
         ONE capture file, read as text, PLUS WHETHER A WRITER STILL HELD IT: { Text; WriterHeld }.
-        Internal to this lib; the -Utf8/timeout arm below is the only caller.
+        Internal to this lib, with TWO callers since #1731: the -Utf8/timeout arm below, and
+        Write-GateCaptureBlock above for the test gate's own capture files. This line used to say the
+        arm was the only one, which described the callers of the day -- it was never an argument that
+        the gate should not be one, and reading it as one is how the gate kept a plain Get-Content for
+        the very hazard this function was built for.
 
         WHY THE TOLERANT READ EXISTS (issue #1252). On a timeout, Invoke-NativeCaptureUtf8 force-kills
         the child's whole process tree with taskkill /T and then waits on the DIRECT child only. A
@@ -1249,6 +1415,16 @@ function Invoke-TestSuiteGate {
         the makespan -- the only suite whose shortening moves the total, which is #714's finding and the
         thing every wall-clock question about this pool starts from.
 
+        THE POOL REPORTS ITS OWN PROGRESS (issue #1717, September 9, 2026). Because this function buffers
+        a suite's output until that suite exits, a run used to print one line naming the lane count and
+        then nothing for 15-30 minutes -- so an operator sitting through their own gate could not tell
+        20/84 from 70/84, nor a slow run from a wedged one. It now prints one line as each lane opens and
+        one as each suite leaves one: started, done and running out of this run's own total, with the
+        elapsed clock and the gate's NESTING DEPTH. All of the reasoning -- why started is reported as
+        well as done, why the three external ways of deriving this each failed, why the '== <suite> =='
+        header is untouched, and why no remaining-time estimate is printed -- is in
+        Format-GateProgressLine and Get-GateNestingDepth above, beside the code that shapes the line.
+
         Returns $true when every suite exited 0, $false when any did not, and $true with a warning when
         there is nothing to run -- an empty or missing directory is a repo without suites, not a failure,
         and neither is a shard that drew none of them.
@@ -1298,7 +1474,7 @@ function Invoke-TestSuiteGate {
     # repo-config function, so a repo that defines nothing is untouched and a missing repo-config cannot
     # crash the gate.
     $extraCommands = @()
-    if (Get-Command Get-TestCommands -ErrorAction SilentlyContinue) {
+    if (Test-FunctionDefined 'Get-TestCommands') {
         $extraCommands = @(Get-TestCommands | ForEach-Object { "$_" } | Where-Object { $_.Trim() })
     }
 
@@ -1410,6 +1586,27 @@ function Invoke-TestSuiteGate {
         $scopeLabel = if ($ShardCount -gt 1) { "shard $Shard/$ShardCount -- $($suites.Count) of $poolTotal" } else { "all $($suites.Count)" }
         Write-Host "test gate: running $scopeLabel test suites for $Context ($modeLabel)..." -ForegroundColor Cyan
 
+        # THE PROGRESS SIGNAL, AND THE DEPTH THAT MAKES IT ATTRIBUTABLE -- issue #1717. The reasoning for
+        # both, and for what is deliberately NOT printed, is in Format-GateProgressLine above; here are
+        # only the three moving parts. $startedCount and $doneCount are kept explicitly rather than read
+        # off $suiteTimings and $running, because the reap loop prints between mutating them and a count
+        # derived from a list mid-loop is one refactor away from being off by one.
+        $gateDepth    = Get-GateNestingDepth
+        $startedCount = 0
+        $doneCount    = 0
+        # SET FOR THE CHILDREN, RESTORED IN THE 'finally' BELOW. Start-Process children inherit this
+        # process's environment, so one assignment reaches every suite and every gate a suite runs in
+        # turn. SetEnvironmentVariable rather than $env:NAME = ... for the reason Push-NativeNonInteractiveEnv
+        # states at length: only this form can write $null, and $null is how a variable is REMOVED --
+        # $env:NAME = $null leaves an empty string behind, and empty is not absent.
+        # BOUNDED TO THE POOL, deliberately: Get-TestCommands runs after the 'finally' has put the
+        # variable back, so a consumer's own 'npm test' sees the environment it would have seen before
+        # this change. What that costs is one honest edge -- a gate nested inside such a command reports
+        # depth 1 -- and what it buys is that this lib does not leave a variable behind in a child it
+        # does not print progress for.
+        $gateDepthOuter = [Environment]::GetEnvironmentVariable($script:GateDepthEnvName, 'Process')
+        [Environment]::SetEnvironmentVariable($script:GateDepthEnvName, "$gateDepth", 'Process')
+
         $captureDir = New-ScratchPath -Label 'test-suite-gate' -Directory
         # THE FAILING SUITES' CAPTURE FILES, so the 'finally' below can keep exactly those and delete the
         # rest -- issue #1636. Collected in the reap loop because that is the only place a suite's exit code
@@ -1455,6 +1652,20 @@ function Invoke-TestSuiteGate {
                         # the offset is recorded and not just the duration (issue #1358).
                         StartOffset = $sw.Elapsed.TotalSeconds
                     }) | Out-Null
+                    # ONE LINE PER LANE OPENING -- issue #1717, and this is the half a done-count alone
+                    # cannot report: the queue dequeues longest-first (#1358), so on a truthful hints
+                    # file nothing COMPLETES for the first ~15 minutes of an 84-suite run while the
+                    # opening lanes chew through the heaviest suites. Printed after Start-Process rather
+                    # than before it, so it reports a lane that actually opened.
+                    #
+                    # RUNNING IS DERIVED, NOT COUNTED. started - done is exactly what is in flight,
+                    # because every dequeued suite is one or the other -- whereas $running.Count means
+                    # two different things here and in the reap loop below, where a suite already judged
+                    # is still in the list until $running.Remove. One identity, both call sites.
+                    $startedCount++
+                    Write-Host (Format-GateProgressLine -Action 'started' -Suite $suite.Name `
+                        -Started $startedCount -Done $doneCount -Running ($startedCount - $doneCount) `
+                        -Total $suites.Count -Elapsed $sw.Elapsed.TotalSeconds -Depth $gateDepth) -ForegroundColor DarkGray
                 }
 
                 $done = @($running | Where-Object { $_.Process.HasExited })
@@ -1482,6 +1693,19 @@ function Invoke-TestSuiteGate {
                         # prints its own seconds, which is where that file's real cost is legible.
                         Crashed     = $false
                     }) | Out-Null
+                    # ONE LINE PER SUITE LEAVING A LANE, printed immediately ABOVE the block header it
+                    # announces -- issue #1717. That placement is what makes it read as the index #1717
+                    # asked for ('== [37/84] roster-sync.tests.ps1 ==') while '== <suite> ==' stays byte
+                    # for byte what it was: the suite's own output is still the very next line after the
+                    # header (asserted in this function's suite), and no existing matcher has to change.
+                    #
+                    # THE WORD IS 'done' FOR ALL THREE VERDICTS. The header on the next line already says
+                    # whether the suite passed, FAILED or CRASHED, and a progress counter that also
+                    # classified would be a second place for that judgement to drift from the first.
+                    $doneCount++
+                    Write-Host (Format-GateProgressLine -Action 'done' -Suite $d.Name `
+                        -Started $startedCount -Done $doneCount -Running ($startedCount - $doneCount) `
+                        -Total $suites.Count -Elapsed $sw.Elapsed.TotalSeconds -Depth $gateDepth) -ForegroundColor DarkGray
                     if ($code -eq 0) {
                         Write-Host "== $($d.Name) ==" -ForegroundColor Cyan
                     } elseif (Test-GateSuiteCrashed -ExitCode $code) {
@@ -1504,16 +1728,11 @@ function Invoke-TestSuiteGate {
                         $failedCaptureFiles.Add($d.OutFile) | Out-Null
                         $failedCaptureFiles.Add($d.ErrFile) | Out-Null
                     }
-                    # -Encoding Oem matches what a redirected Windows PowerShell child writes (its
-                    # [Console]::OutputEncoding is the OEM codepage). Everything in scope here is ASCII by
-                    # repo convention, where every candidate decoder agrees; the choice only shows on a high
-                    # byte that reached a suite's output from a document it was reading.
-                    foreach ($f in @($d.OutFile, $d.ErrFile)) {
-                        if (-not (Test-Path -LiteralPath $f)) { continue }
-                        $text = Get-Content -LiteralPath $f -Raw -Encoding Oem
-                        if ([string]::IsNullOrWhiteSpace($text)) { continue }
-                        Write-Host $text.TrimEnd()
-                    }
+                    # THROUGH THE TOLERANT READER, and it says so when a block may be short -- issue
+                    # #1731. This is the site most exposed to a grandchild still holding the suite's
+                    # capture file: it reads the moment WaitForExit returns. See Write-GateCaptureBlock
+                    # for the encoding, the settle budget and what the swap cost.
+                    Write-GateCaptureBlock -Path @($d.OutFile, $d.ErrFile)
                     $running.Remove($d)
                 }
             }
@@ -1578,12 +1797,7 @@ function Invoke-TestSuiteGate {
                     }
                     # The re-run's own output, whichever way it went: on a pass it is the evidence that
                     # the tree is fine, and on a failure it is the only block carrying a verdict at all.
-                    foreach ($f in @($retryOut, $retryErr)) {
-                        if (-not (Test-Path -LiteralPath $f)) { continue }
-                        $rtext = Get-Content -LiteralPath $f -Raw -Encoding Oem
-                        if ([string]::IsNullOrWhiteSpace($rtext)) { continue }
-                        Write-Host $rtext.TrimEnd()
-                    }
+                    Write-GateCaptureBlock -Path @($retryOut, $retryErr)
                     if ($rc -ne 0) {
                         $failedCaptureFiles.Add($retryOut) | Out-Null
                         $failedCaptureFiles.Add($retryErr) | Out-Null
@@ -1592,6 +1806,13 @@ function Invoke-TestSuiteGate {
                 Write-Host ''
             }
         } finally {
+            # THE NESTING DEPTH GOES BACK FIRST -- issue #1717. Before the retention block below, because
+            # this restores process state the caller owns while that one only tidies a temp directory: a
+            # throw in there must not leave the variable set for whatever the caller runs next. Restored
+            # from the value read before the set, so a caller that deliberately set its own (a fixture
+            # driving this gate at a chosen depth) gets its own back -- Push-NativeNonInteractiveEnv's
+            # rule, for the same reason, and the same $null-removes-it form.
+            [Environment]::SetEnvironmentVariable($script:GateDepthEnvName, $gateDepthOuter, 'Process')
             # A RED RUN KEEPS THE FAILING SUITES' OUTPUT; A GREEN ONE KEEPS NOTHING -- issue #1636 --
             # WITH ONE EXCEPTION SINCE #1723: a suite that CRASHED in the pool and then passed on its
             # lone re-run leaves the pool run's two capture files behind on an otherwise green run. That

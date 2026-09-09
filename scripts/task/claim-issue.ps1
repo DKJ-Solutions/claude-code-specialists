@@ -114,7 +114,7 @@ $configPath = Join-Path $repoRoot 'scripts\repo-config.ps1'
 if (Test-Path -LiteralPath $configPath -PathType Leaf) {
     try {
         . $configPath
-        if (Get-Command Get-RepoName -ErrorAction SilentlyContinue) { $repoName = [string](Get-RepoName) }
+        if (Test-FunctionDefined 'Get-RepoName') { $repoName = [string](Get-RepoName) }
     } catch {
         $repoName = ''
     }

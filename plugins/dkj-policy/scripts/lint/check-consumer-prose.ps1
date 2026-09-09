@@ -111,6 +111,12 @@ param(
     [string]$RootDocument = ''
 )
 
+# Test-FunctionDefined (issue #1729): the seam probes below read the function table directly rather
+# than through Get-Command, which parses the name as a wildcard pattern and pays a full PATH scan on
+# every miss -- and a miss is the normal case for an optional seam. $PSScriptRoot-relative, so it
+# resolves in the plugin mirror as well as here.
+. (Join-Path $PSScriptRoot '..\lib\command-probe-lib.ps1')
+
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
@@ -119,7 +125,7 @@ $ErrorActionPreference = 'Stop'
 $checkLib = Join-Path $PSScriptRoot '..\lib\consumer-check-lib.ps1'
 if (Test-Path -LiteralPath $checkLib -PathType Leaf) { . $checkLib }
 
-$repoRoot = if (Get-Command Resolve-CheckRepoRoot -ErrorAction SilentlyContinue) {
+$repoRoot = if (Test-FunctionDefined 'Resolve-CheckRepoRoot') {
     Resolve-CheckRepoRoot -RootOverride $RootOverride
 } elseif ($RootOverride) { $RootOverride } elseif ($env:CLAUDE_PROJECT_DIR) { $env:CLAUDE_PROJECT_DIR } else { (git rev-parse --show-toplevel).Trim() }
 
@@ -163,7 +169,7 @@ if (Test-Path -LiteralPath $repoConfig -PathType Leaf) {
 # which of those documents a consumer-prose check may look in, and both detectors below are handed the
 # same rows. Still guarded rather than required: a tree that carries neither lib gets @() and still has
 # the workflow folder's own pages judged, which is where one of #1389's two measured instances sat.
-$documents = if (Get-Command Get-CheckProseCorpus -ErrorAction SilentlyContinue) {
+$documents = if (Test-FunctionDefined 'Get-CheckProseCorpus') {
     @(Get-CheckProseCorpus -RepoRoot $repoRoot -RootDocument $RootDocument)
 } else { @() }
 

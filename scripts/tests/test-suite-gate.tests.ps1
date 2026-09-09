@@ -106,9 +106,23 @@ function Invoke-Gate {
     # -1 (the default) means "let the real Get-Process answer" -- OS-wide process state is not
     # something this suite controls, so a case that cares about the count stubs it explicitly instead.
     if ($ResidentCount -ge 0) { $psArgs += @('-ResidentCount', "$ResidentCount") }
+    # THE CHILD RUNS AT THE TOP LEVEL, WHATEVER THIS SUITE IS RUNNING UNDER -- issue #1717. The gate
+    # sets DKJ_TEST_GATE_DEPTH for its children, and THIS SUITE IS ONE OF THEM whenever it runs under
+    # the pool: without this, every driver run inherits depth 1 and reports depth 2, while the gate a
+    # fixture suite drives reports 3. Measured on #1717's own branch -- nine asserts holding a literal
+    # depth passed standalone twice and failed under the 30-lane pool, which is the same class the
+    # SetConsoleOutputCP case (inbound #821) is written up for: shared state a fixture must own rather
+    # than inherit. Removed rather than pinned to a value, so the driver's depth is the one an operator
+    # actually sees on their own gate run.
+    $depthHeldByCaller = [Environment]::GetEnvironmentVariable('DKJ_TEST_GATE_DEPTH', 'Process')
+    [Environment]::SetEnvironmentVariable('DKJ_TEST_GATE_DEPTH', $null, 'Process')
     $sw = [System.Diagnostics.Stopwatch]::StartNew()
-    $out = & powershell @psArgs 2>&1
-    $sw.Stop()
+    try {
+        $out = & powershell @psArgs 2>&1
+    } finally {
+        $sw.Stop()
+        [Environment]::SetEnvironmentVariable('DKJ_TEST_GATE_DEPTH', $depthHeldByCaller, 'Process')
+    }
     $lines = @($out | ForEach-Object { "$_" })
     $text  = ($lines -join "`n")
     return [pscustomobject]@{
@@ -741,6 +755,111 @@ exit -1
         }
     }
     Assert-Equal 0 $negOffenders.Count ("no script under scripts/ exits negative (offenders: " + ($negOffenders -join ', ') + ")")
+
+    # --- 9. The progress signal: started, done, and the depth that separates a nested run ----------
+    #
+    # WHAT THIS PINS, AND WHY EACH HALF IS HERE (issue #1717). The gate printed one line naming the lane
+    # count and then nothing until a suite exited, so a 15-30 minute run gave no way to tell 20/84 from
+    # 70/84 -- and no way to tell a slow run from a wedged one, which matters because #1443 (an OOM) and
+    # #1701 (a bound exceeded under load) both look exactly like a slow one from outside.
+    #
+    # THE THREE EXTERNAL DERIVATIONS #1717 TRIED ALL FAILED, and the third is what 9d exists for: the
+    # gate's own suite drives the gate over a fixture, so a watcher that counted every 'test gate' line
+    # in a log counted a fixture's run as the real one. That is not an accident this suite could remove --
+    # a suite that tests the gate necessarily behaves like the gate -- so the depth is what makes the two
+    # separable, and this file is the one place where a nested run genuinely occurs.
+    Write-Host "the progress signal -- and a nested gate run that must not be mistaken for this one" -ForegroundColor Cyan
+    . $LibPath
+
+    # 9a. The line's shape, and its figure under a comma-decimal locale. Same reasoning as case 0: the
+    # elapsed figure goes through Format-GateSeconds, and a culture leak here would print '+1,2s' where
+    # an English reader takes the comma for a thousands separator.
+    $prevCulture = [System.Threading.Thread]::CurrentThread.CurrentCulture
+    try {
+        [System.Threading.Thread]::CurrentThread.CurrentCulture = [System.Globalization.CultureInfo]::GetCultureInfo('nl-NL')
+        Assert-Equal 'test gate: progress [depth 1] 37/84 started, 30 done, 7 running (+1.2s) -- started roster-sync.tests.ps1' `
+            (Format-GateProgressLine -Action 'started' -Suite 'roster-sync.tests.ps1' -Started 37 -Done 30 -Running 7 -Total 84 -Elapsed 1.24 -Depth 1) `
+            'Format-GateProgressLine: the whole line, and its seconds keep the invariant DOT under nl-NL'
+        Assert-Equal 'test gate: progress [depth 2] 1/1 started, 1 done, 0 running (+2,182.4s) -- done a.tests.ps1' `
+            (Format-GateProgressLine -Action 'done' -Suite 'a.tests.ps1' -Started 1 -Done 1 -Running 0 -Total 1 -Elapsed 2182.44 -Depth 2) `
+            'and a nested run says depth 2, with the thousands grouped invariantly too'
+    } finally {
+        [System.Threading.Thread]::CurrentThread.CurrentCulture = $prevCulture
+    }
+
+    # 9b. The depth itself. It crosses a process boundary into a variable anybody can set, so the
+    # malformed cases are the point: each must fall back to the top level rather than fail a gate over a
+    # diagnostic, and 'absent' and 'garbage' must not be distinguishable in the result.
+    $depthVar  = 'DKJ_TEST_GATE_DEPTH'
+    $depthHeld = [Environment]::GetEnvironmentVariable($depthVar, 'Process')
+    try {
+        [Environment]::SetEnvironmentVariable($depthVar, $null, 'Process')
+        Assert-Equal 1 (Get-GateNestingDepth) 'Get-GateNestingDepth: an unset variable is the top level'
+        [Environment]::SetEnvironmentVariable($depthVar, '1', 'Process')
+        Assert-Equal 2 (Get-GateNestingDepth) 'a gate started inside a depth-1 run reports 2'
+        [Environment]::SetEnvironmentVariable($depthVar, '3', 'Process')
+        Assert-Equal 4 (Get-GateNestingDepth) 'and it counts rather than saturating'
+        [Environment]::SetEnvironmentVariable($depthVar, 'deep', 'Process')
+        Assert-Equal 1 (Get-GateNestingDepth) 'a non-numeric value is treated as absent, not as an error'
+        [Environment]::SetEnvironmentVariable($depthVar, '-2', 'Process')
+        Assert-Equal 1 (Get-GateNestingDepth) 'and so is a negative one -- there is no depth 0 to be one below'
+        [Environment]::SetEnvironmentVariable($depthVar, '', 'Process')
+        Assert-Equal 1 (Get-GateNestingDepth) 'an empty value too: empty is not a number'
+    } finally {
+        [Environment]::SetEnvironmentVariable($depthVar, $depthHeld, 'Process')
+    }
+
+    # 9c. A real run: every suite is announced twice, the counters arrive at the total, and the 'done'
+    # line sits DIRECTLY above the block header it announces. That adjacency is the whole reason the
+    # header itself was left untouched -- the line reads as the index #1717 asked for while
+    # '== <suite> ==' stays byte for byte what every matcher already expects.
+    $prog = Join-Path $Fixture 'suites-progress'
+    New-FakeSuite -Dir $prog -Name 'p-one.tests.ps1'   -Body "Write-Host 'MARKER-P1'`r`nexit 0`r`n"
+    New-FakeSuite -Dir $prog -Name 'p-two.tests.ps1'   -Body "Write-Host 'MARKER-P2'`r`nexit 0`r`n"
+    New-FakeSuite -Dir $prog -Name 'p-three.tests.ps1' -Body "Write-Host 'MARKER-P3'`r`nexit 0`r`n"
+    $r = Invoke-Gate -TestsDir $prog -MaxParallel 1
+    Assert-True ($r.Text -match 'GATE-RESULT: True') 'three passing suites: the gate still returns true with the progress lines in it'
+    $startedLines = @($r.Lines | Where-Object { $_ -match 'progress \[depth 1\].+-- started ' })
+    $doneLines    = @($r.Lines | Where-Object { $_ -match 'progress \[depth 1\].+-- done ' })
+    Assert-Equal 3 $startedLines.Count 'one started line per suite -- the signal that exists before anything COMPLETES'
+    Assert-Equal 3 $doneLines.Count    'and one done line per suite'
+    Assert-True ($r.Text -match 'progress \[depth 1\] 1/3 started, 0 done, 1 running') 'the first line reports 1/3 started with nothing done yet'
+    Assert-True ($r.Text -match 'progress \[depth 1\] 3/3 started, 3 done, 0 running') 'and the last reports the pool drained: 3/3 started, 3 done, 0 running'
+    foreach ($s in @('p-one.tests.ps1', 'p-two.tests.ps1', 'p-three.tests.ps1')) {
+        $h = [Array]::IndexOf($r.Lines, "== $s ==")
+        Assert-True ($h -ge 1 -and $r.Lines[$h - 1] -match ('progress \[depth 1\].+-- done ' + [regex]::Escape($s) + '$')) `
+            "${s}: its done line is the line directly ABOVE its header, so the header itself needed no index"
+    }
+    $hp = [Array]::IndexOf($r.Lines, '== p-one.tests.ps1 ==')
+    Assert-True ($hp -ge 0 -and $r.Lines[$hp + 1] -eq 'MARKER-P1') 'and the suite output is STILL the very next line after the header (case 2 property, unbroken)'
+
+    # 9d. THE NESTED RUN, which is this suite's own doing and cannot be removed. A fixture suite drives
+    # the gate itself; its lines must say depth 2, and filtering on depth 1 must leave exactly the outer
+    # run's own two -- the dedup that every external derivation in #1717 got wrong.
+    $nest      = Join-Path $Fixture 'suites-nested'
+    $nestInner = Join-Path $Fixture 'suites-nested-inner'
+    New-FakeSuite -Dir $nestInner -Name 'i-inner.tests.ps1' -Body "Write-Host 'MARKER-INNER'`r`nexit 0`r`n"
+    New-FakeSuite -Dir $nest -Name 'n-drives-a-gate.tests.ps1' -Body (
+        ". '$LibPath'`r`n" +
+        "`$null = Invoke-TestSuiteGate -TestsDir '$nestInner' -Context 'the nested fixture' -MaxParallel 1`r`n" +
+        "exit 0`r`n")
+    $r = Invoke-Gate -TestsDir $nest -MaxParallel 1
+    Assert-True ($r.Text -match 'GATE-RESULT: True') 'a suite that runs a gate of its own still passes'
+    Assert-True ($r.Text -match 'progress \[depth 2\].+-- done i-inner\.tests\.ps1') 'the inner gate reports depth 2'
+    Assert-Equal 2 (@($r.Lines | Where-Object { $_ -match 'progress \[depth 1\]' })).Count `
+        'and filtering on depth 1 leaves exactly the outer run two lines -- one suite, started and done'
+    Assert-Equal 2 (@($r.Lines | Where-Object { $_ -match 'progress \[depth 2\]' })).Count `
+        'while the fixture own run is separable rather than merely present'
+
+    # 9e. The variable does not outlive the run. It is process state the caller owns, and a gate that
+    # left it set would make the caller's NEXT gate report depth 2 -- a wrong number that survives the
+    # run that caused it.
+    $leakHeld = [Environment]::GetEnvironmentVariable($depthVar, 'Process')
+    $leakDir  = Join-Path $Fixture 'suites-leak'
+    New-FakeSuite -Dir $leakDir -Name 'l-one.tests.ps1' -Body "exit 0`r`n"
+    $null = Invoke-TestSuiteGate -TestsDir $leakDir -Context 'the leak check' -MaxParallel 1
+    Assert-Equal "$leakHeld" "$([Environment]::GetEnvironmentVariable($depthVar, 'Process'))" `
+        'the depth variable is exactly what it was before the run -- restored, not merely cleared'
 }
 finally {
     if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture -ErrorAction SilentlyContinue }

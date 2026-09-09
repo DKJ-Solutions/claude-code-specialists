@@ -235,6 +235,9 @@ function New-IntegrityFixture {
     Copy-Item -Path $PrBodyLibSrc -Destination (Join-Path $Fixture 'scripts\lib\pr-body-lib.ps1') -Force
     Copy-Item -Path $MeasureContextSrc -Destination (Join-Path $Fixture 'scripts\lib\measure-context-lib.ps1') -Force
     Copy-Item -Path $SeamLibSrc -Destination (Join-Path $Fixture 'scripts\lib\seam-lib.ps1') -Force
+    # command-probe-lib.ps1 is a sibling of a sibling (#1729): the three libs above dot-source it for
+    # Test-FunctionDefined, so the fixture owes it exactly as it owes ref-print-lib.
+    Copy-Item -LiteralPath (Join-Path $RepoRoot 'scripts\lib\command-probe-lib.ps1') -Destination (Join-Path $Fixture 'scripts\lib\command-probe-lib.ps1') -Force
 
     # The reference PR template check 24 holds, written from the same function the check compares against
     # -- never typed out here, for the reason stated at the dot-source above.

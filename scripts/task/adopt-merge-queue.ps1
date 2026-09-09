@@ -189,7 +189,7 @@ if ($RulesJsonOverride) {
     }
 } else {
     $repoSlug = ''
-    if (Get-Command -Name 'Get-RepoName' -ErrorAction SilentlyContinue) { $repoSlug = [string](Get-RepoName) }
+    if (Test-FunctionDefined 'Get-RepoName') { $repoSlug = [string](Get-RepoName) }
     if (-not $repoSlug) {
         # No seam answer: ask gh what repo this checkout is. A consumer that has not answered
         # Get-RepoName yet is exactly the fresh adoption this command is for, so refusing here would

@@ -2981,7 +2981,7 @@ $ctrChecked = 0
 $ctrSeamRoot = & {
     $ctrCfg = Join-Path $RepoRoot 'scripts\repo-config.ps1'
     if (Test-Path -LiteralPath $ctrCfg) { . $ctrCfg }
-    if (Get-Command Get-ReleaseNoteRoot -ErrorAction SilentlyContinue) { [string](Get-ReleaseNoteRoot) } else { '' }
+    if (Test-FunctionDefined 'Get-ReleaseNoteRoot') { [string](Get-ReleaseNoteRoot) } else { '' }
 }
 # @() around the pipeline, not decoration: with only one of the trees present -- which is every repo
 # until its first cut under this model -- a bare pipeline yields a scalar, and under Set-StrictMode
@@ -3477,7 +3477,7 @@ $pluginLinkBlobBase = & {
     # this check depends on the seam for an ANSWER rather than for advice, and the coverage note says so.
     $plCfg = Join-Path $RepoRoot 'scripts\repo-config.ps1'
     if (Test-Path -LiteralPath $plCfg) { . $plCfg }
-    if (Get-Command Get-RepoBlobUrl -ErrorAction SilentlyContinue) { Get-RepoBlobUrl } else { '' }
+    if (Test-FunctionDefined 'Get-RepoBlobUrl') { Get-RepoBlobUrl } else { '' }
 }
 # THE BRANCH IS READ OUT OF THE SEAM, not assumed to be 'main'. Get-RepoBlobUrl happens to end in
 # '/blob/main/' here, but it is a repo-owned function and a consumer whose trunk is 'master' returns

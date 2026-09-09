@@ -378,7 +378,7 @@ $repo = Get-RepoName
 # would otherwise reach `gh pr merge` as an unknown flag at the one moment this script is about to
 # write to main, which is the worst place to discover a typo in a config file.
 $mergeMethod = 'merge'
-if (Get-Command Get-PrMergeMethod -ErrorAction SilentlyContinue) {
+if (Test-FunctionDefined 'Get-PrMergeMethod') {
     $configuredMethod = Get-PrMergeMethod
     if ($configuredMethod) {
         if (@('merge', 'squash', 'rebase') -notcontains $configuredMethod) {

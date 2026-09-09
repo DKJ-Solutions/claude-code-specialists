@@ -63,6 +63,12 @@ $ErrorActionPreference = 'Stop'
 $guardLib = Join-Path $PSScriptRoot '..\lib\source-repo-guard-lib.ps1'
 if (Test-Path -LiteralPath $guardLib -PathType Leaf) { . $guardLib; Assert-OwnCopy -ScriptPath $PSCommandPath }
 
+# Test-FunctionDefined (issue #1729): the seam probes below read the function table directly rather
+# than through Get-Command, which parses the name as a wildcard pattern and pays a full PATH scan on
+# every miss -- and a miss is the normal case for an optional seam. $PSScriptRoot-relative, so it
+# resolves in the plugin mirror as well as here.
+. (Join-Path $PSScriptRoot '..\lib\command-probe-lib.ps1')
+
 # Dual-context repo root: a consumer running the plugin mirror gets it from CLAUDE_PROJECT_DIR, the
 # workshop root copy falls back to the git root. Same resolution as every other mirrored script, which
 # is what lets both copies stay byte-identical.
@@ -149,7 +155,7 @@ function Get-PresentFunctions {
         $present = @{}
         try { . $args[0] } catch { return $present }
         foreach ($fn in $args[1]) {
-            $present[$fn] = [bool](Get-Command -Name $fn -ErrorAction SilentlyContinue)
+            $present[$fn] = [bool](Test-FunctionDefined $fn)
         }
         return $present
     } $LibPath $Names

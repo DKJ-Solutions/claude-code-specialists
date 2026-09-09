@@ -202,6 +202,9 @@ Copy-Item -LiteralPath $BranchInfoSrc -Destination (Join-Path $fixture 'scripts\
 Copy-Item -LiteralPath $LibSrc -Destination (Join-Path $fixture 'scripts\lib\entry-scaffold-lib.ps1') -Force
 Copy-Item -LiteralPath $SeamLibSrc -Destination (Join-Path $fixture 'scripts\lib\seam-lib.ps1') -Force
 Copy-Item -LiteralPath $NativeCaptureSrc -Destination (Join-Path $fixture 'scripts\lib\native-capture-lib.ps1') -Force
+# command-probe-lib.ps1 is a sibling of a sibling (#1729): the three libs above dot-source it for
+# Test-FunctionDefined, so the fixture owes it exactly as it owes ref-print-lib.
+Copy-Item -LiteralPath (Join-Path $RepoRoot 'scripts\lib\command-probe-lib.ps1') -Destination (Join-Path $fixture 'scripts\lib\command-probe-lib.ps1') -Force
 Copy-Item -LiteralPath $ParkLibSrc -Destination (Join-Path $fixture 'scripts\lib\park-lib.ps1') -Force
 Copy-Item -LiteralPath $PorcelainSrc -Destination (Join-Path $fixture 'scripts\lib\git-porcelain-lib.ps1') -Force
 Copy-Item -LiteralPath $PrIssuesLibSrc -Destination (Join-Path $fixture 'scripts\lib\pr-issues-lib.ps1') -Force
