@@ -319,9 +319,20 @@ if ($Pr) {
     # document, so it must not be decoded with whatever console code page the run inherited. CI runs
     # UTF-8 and would not have shown it; a local run of this gate is where it bites.
     $lockView = Invoke-NativeCapture -Utf8 -FilePath 'gh' -Arguments @('pr', 'view', "$Pr", '--json', 'body')
+    # A SHORT READ COUNTS AS UNREADABLE HERE TOO (issue #1679). The -Utf8 arm can hand back an empty
+    # Output with ExitCode 0, and this gate would then compare the section against an empty body and
+    # report drift that is not there -- the advisory twin of the refusal ship-pr.ps1 makes on the same
+    # read. The reason is carried rather than assumed, because the sentence below was written for a
+    # token or a network and says the wrong thing about a read this run lost.
+    $lockUnread = ''
     if ($lockView.ExitCode -ne 0) {
+        $lockUnread = 'That is a statement about the token or the network, not about the section'
+    } elseif ($lockView.ShortRead) {
+        $lockUnread = 'gh exited 0 but its capture was still being written when it was read, so the body may be truncated -- a re-run normally settles it'
+    }
+    if ($lockUnread) {
         Write-Host "[INFO] PR #$Pr's body could not be read, so the DEPLOY lock was not checked." -ForegroundColor DarkYellow
-        Write-Host '       That is a statement about the token or the network, not about the section.' -ForegroundColor DarkYellow
+        Write-Host "       $lockUnread." -ForegroundColor DarkYellow
     } else {
         $lockBody = ''
         try { $lockBody = [string](($lockView.Output -join "`n") | ConvertFrom-Json).body } catch { $lockBody = '' }

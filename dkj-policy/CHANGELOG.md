@@ -43,7 +43,84 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**27 / 58 minor entries** <!-- pending-tally -->
+**29 / 60 minor entries** <!-- pending-tally -->
+
+### DEPLOY: docs/1686-priority-axis-decision · 20260909-065028
+
+The priority axis exists twice in this family and now says so on purpose. The two schemes -- `prio-1`
+to `prio-4` here, `very low` to `very high` in the BWJ store repos -- stay apart, because the names are
+the only thing that says which motor owns the rung: one is a judgement typed by whoever files, the
+other is derived from an Asana score by a daily sweep, and a single vocabulary would invite a session
+to hand-set a rung that a sweep is about to overwrite. Measured on all three trackers, the two sets are
+disjoint in both directions, so the collision the issue was filed about can only ever produce a refused
+label that names itself -- not an issue filed at a rung meaning something else. And the rule that every
+issue carries a rung stays this repo's own: nothing in the workflow reads a priority, so a portable
+version would prescribe a convention no gate enforces and hand consumers four labels they never asked
+for.
+
+**One thing the decision deliberately does not close, and it is now named rather than implied.** The
+same measurement that clears the names indicts the **colours**: `0E8A16` is the floor here and one rung
+above the floor in a BWJ repo, and nothing refuses a colour the way `gh` refuses a name. The lens
+carries that table and the instruction not to read a rung off a badge across the two families; the
+repair itself is #1691, because its cheap half edits live labels in two repos this one does not own.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+One paragraph reaches a consumer, and it is the half worth having: a BWJ session that reaches for
+`prio-4` and gets a refusal now reads that as the expected answer rather than as a broken setup, and
+is told in the same breath that nothing on their side needs doing. The rule itself deliberately did
+not become theirs to follow.
+
+**Score:** 2
+
+#### Pull Request
+
+The two priority label sets stay apart, and the rule stays repo-local
+
+Plugins: dkj-policy-bwj
+
+[PR #1692](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1692)
+
+---
+
+### DEPLOY: fix/1679-utf8-short-read-class · 20260909-062511
+
+`Invoke-NativeCapture` now says when a capture was read while a writer still held it, so a caller can
+tell "the child said nothing" from "we read before the flush". Both are an empty `Output` at exit `0`,
+and until now nothing separated them -- so six callers in the shipping scripts resolved the ambiguity
+toward a substantive answer: "no PR", "no issue declared", "the body does not carry the section",
+"the claim was refused". The sharpest refused the merge over a section that had not changed, in a
+gate with no `-Force`. The quietest reported the resolves verification as a clean pass having checked
+nothing. And the one that reaches furthest is the claim step, which told an operator to treat an
+issue as UNCLAIMED on a claim that had in fact landed -- the first move of every issue-driven
+assignment. The read itself is unchanged: `FileShare.ReadWrite` still returns whatever was flushed
+(#1252), it simply no longer does so in silence, and on a clean exit it now waits briefly for the
+handle to release rather than reporting a short read it could have avoided.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+These are the scripts a consumer runs through the workflow plugin, so the wrong verdicts were theirs
+to meet: a merge refused by a gate with no way past it, an already-done check that quietly stopped
+warning, and a claim step that refused a claim it had itself just written. Nothing to do on adoption
+-- the field is additive and every existing caller keeps working -- but the refusals a consumer does
+hit now name the read that failed instead of accusing their document, and the one skipped check that
+cannot be recovered says so in a warning rather than in a dim grey line.
+
+**Score:** 3
+
+#### Pull Request
+
+A short capture on exit 0 is reported as a short read instead of as a substantive answer
+
+Plugins: dkj-policy, dkj-team-shopify
+
+[PR #1690](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1690)
+
+---
 
 ### DEPLOY: docs/1678-nested-worktree-refusal · 20260909-060959
 
