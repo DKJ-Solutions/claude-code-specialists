@@ -43,7 +43,44 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**29 / 64 minor entries** <!-- pending-tally -->
+**30 / 65 minor entries** <!-- pending-tally -->
+
+### DEPLOY: docs/1653-1654-entry-gate-and-plan-string · 20260909-092020
+
+The entry gate that #1632 built is now documented in both places a reader looks for a gate -- a numbered
+section in the workflow's contributing page and a full section on the `open-pr` skill page -- including the
+part only the code explained: it is a separate gate because the scaffold gate **passes by absence** on a
+document with no entry text, `Get-DevelopmentEntryText`'s whole-text fallback being load-bearing for a
+legacy entry-only file. That it honours `-Force` was findable nowhere and now is.
+
+And the string that made the gate necessary is gone from the guidance. `new-branch` wrote the exact heading
+`### PLAN` into every branch document twice -- once as the heading, once in the blockquote above it -- so any
+edit anchoring on that heading as a plain string found the wrong one; two documents shipped through that door
+(#1632, #1644). The guidance names the first phase by position now. That is also the more correct wording,
+because `StepPhases` is a seam and the literal was already wrong for any repo that renamed its first phase.
+The gate is unchanged and keeps naming the literal in its refusal: every branch open across this change still
+carries both copies.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+Consumers get both halves through the plugin: the guidance block in every branch document written from now
+on, and the two pages that describe the gates. A consumer meeting the entry gate's refusal previously had
+nothing to read behind it -- the message named the cause, but the reason it is a separate gate, and the fact
+that `-Force` gets you past it, existed only in this repo's source.
+
+**Score:** 3
+
+#### Pull Request
+
+Document the entry gate, and stop the guidance quoting the heading it is a rule about
+
+Plugins: dkj-policy
+
+[PR #1662](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1662)
+
+---
 
 ### DEPLOY: fix/1673-ignore-agent-worktrees · 20260909-084638
 
