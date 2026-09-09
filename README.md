@@ -20,6 +20,7 @@ keeping its own copies, and enables or disables **per plugin** which teams and w
 | **disconnect it again** | [UNINSTALL.md](UNINSTALL.md) — the install page's mirror: the repo teardown and the machine-side removal, in the order they have to happen. |
 | **I already adopted this, under the old plugin names** | [INSTALL.md, migrating from the old plugin names](INSTALL.md#migrating-from-the-old-plugin-names) — a third procedure, neither the quickstart nor first-time adoption: the old ids (`specialists@claude-code-specialists` and its siblings) mapped onto the new teams and workflow. |
 | know **what this promises my repo** | [The plugin serves the consumer's repo](#the-plugin-serves-the-consumers-repo) — the specialists adapt to your way of working; ours is not a standard you inherit. |
+| know **what the words mean** (agent, subagent, scaffold, harness) | [The vocabulary](#the-vocabulary--where-these-plugins-sit-inside-an-agent) — where these plugins sit inside an agent, and why none of them is named after an agent. |
 | know **which plugin does what** | [Teams and workflows](#teams-and-workflows--whats-the-difference) |
 | know **how a specialist is built** | [Manuals — the split model](#manuals--the-split-model) |
 | know **how a repo consumes this** | [Consumption](#consumption) · [Versioning](#versioning) |
@@ -138,6 +139,86 @@ would tell a storefront repo it publishes plugins. One field could not carry bot
 value is never written as a stub either, which is a mechanism rather than a courtesy — a stub returning
 a placeholder overrides a documented fallback that is usually right, so absent beats wrong. Issue
 [#456](https://github.com/DaveKJohn/claude-code-specialists/issues/456); decisions by Dave, August 8, 2026.
+
+## The vocabulary — where these plugins sit inside an agent
+
+**Every plugin in this marketplace is *scaffold*.** Not one of them is an agent, and not one of them is
+a harness. That is worth stating once in the terms the field uses, because three of those terms already
+mean something narrower in this tree — and because a naming proposal built on the overlap reached
+[#1697](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1697) before anything had been
+measured against it.
+
+The anatomy, as [Hugging Face's agent glossary](https://huggingface.co/blog/agent-glossary) defines it —
+*"An agent is a model plus everything around it that lets it act, not just respond"* —
+which the post itself compresses to **Agent = Model + Harness**:
+
+| The term, as the source defines it | What it is here |
+|---|---|
+| **harness** — *"the execution layer inside the agent: it calls the model, handles its tool calls, decides when to stop"* | **Claude Code itself** — plus the **hooks** a plugin ships, which run in that execution layer rather than in the model's context |
+| **model** | whichever Claude model the session runs on |
+| **scaffold** — *"the behavior-defining layer around the model: system prompt, tool descriptions, how the model's responses get parsed, what it remembers across steps"* | **every plugin here** — the personas, the manuals, the agent defs, the skills |
+| **agent** | the **running session**: harness + model + this scaffold. Never a directory and never a file |
+| **subagent** — *"an agent called by another agent to handle a specific subtask"* | what a session spawns from an `agents/*.md` definition |
+| **policy** — *"the behavior an agent follows: given any situation, it defines the probability of taking each possible action"* | what `dkj-policy` encodes, in prose instead of weights: work is finished → open a PR; a merge landed → fold the entry; a finding appears → file an issue |
+
+**The scaffold here has two halves, and they are the same two the next section names in this repo's own
+words.** `dkj-team-*` encodes **who acts** — the personas, their craft rules, their tool access.
+`dkj-policy` encodes **what follows** — given a situation in a repo, which action comes next. "Team" and
+"workflow" are this repo's names for those halves, and they are deliberately not agent-anatomy terms:
+they answer *what does this give me*, which is the question somebody choosing a plugin actually has. The
+bridge is the point of the table above — **the workflow plugin is the policy half of the scaffold** — and
+neither vocabulary has to give way to the other.
+
+**Three of these words carry a second, narrower meaning in this tree. Read them in context:**
+
+- **`scaffold`** is also the empty **`VUL-IN` scaffold** a repo lens starts life as (`bootstrap.ps1`),
+  and the **scaffold gate** that refuses a changelog entry still carrying `new-branch.ps1`'s own wording
+  (`entry-scaffold-lib.ps1`). Both are older than this section and both stay.
+- **`agent`** carries the informal sense — the whole running assistant — alongside Claude Code's
+  structural sense, where it names a **subagent definition** under `agents/` and the main thread is
+  called *the main conversation* instead. This repo means the structural sense wherever it writes *agent
+  def*, and calls the running thing *the session*.
+- **`policy`** is an ML term of art in the source above and an ordinary English word in `dkj-policy`'s
+  name. Both readings land in the same place here, which is unusual and is the reason that name survived
+  review: a document saying *in situation X, do Y* is a policy in either sense.
+
+**`specialist`** is this repo's own word and has no equivalent in either vocabulary: a subagent
+definition carrying a persona, a craft and a repo lens. The core team is nineteen of them — fifteen that
+ship as subagents in `agents/`, and four main-loop personas in `personas/`.
+
+### Why none of this renamed a plugin (Dave, September 9, 2026)
+
+[#1697](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1697) proposed carrying the
+anatomy into the plugin ids: `dkj-policy` → `dkj-agent`, `dkj-policy-bwj` → `dkj-scaffold-bwj`, a new
+`dkj-scaffold-core`, and `dkj-teams`/`dkj-team-*` → `dkj-subagents`/`dkj-subagents-*`. Three of those
+were declined and the reasoning is recorded here, because it is the kind of proposal that arrives again:
+
+- **`dkj-agent` is the one name the source rules out.** *"A policy is not an agent. The policy defines
+  behavior; the agent is the full system that acts."* And `plugins/dkj-policy/**` ships no `agents/`
+  directory at all, so the name would promise subagents the plugin does not carry — the exact failure it
+  was meant to cure.
+- **`scaffold` cannot distinguish one plugin from another**, because on the definition above every
+  plugin here is scaffold. A prefix every member carries is a constant, and a constant belongs in the
+  namespace — which `dkj-` and `@claude-code-specialists` already are. It would also collide with the two
+  established senses listed above, in a tree that has spent real effort keeping them sharp.
+- **`dkj-scaffold-core` cannot reach its own content.** `${CLAUDE_PLUGIN_ROOT}` resolves per installed
+  plugin and does not cross plugin boundaries. `dkj-policy-bwj` already demonstrates the consequence:
+  nested inside `plugins/dkj-policy/` on disk, it still has to cite `CONTRIBUTING-portable.md` by
+  absolute URL. Moving that page into a plugin of its own would break every same-directory link in the
+  workflow's pages plus the skills and hooks that resolve through that variable.
+- **A plugin rename is not a `claude plugin update`.** It is uninstall, install under the new id, and a
+  `settings.json` edit — in every consumer, by hand, plus each consumer's own `SPECIALISTS.md`, whose
+  `@`-import carries the full marketplace path. Three prior rename rounds are recorded in `connectors/`,
+  and each left `check-connectors.ps1` unable to resolve the retired id, skipping that plugin's whole
+  drift check until somebody edited the register.
+
+**The fourth — the team side to `dkj-subagents-*` — survived on the merits and is deferred**, with its
+measured cost and its checklist, in
+[#1698](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1698).
+
+What the anatomy earned instead is this section and each plugin's `displayName` — the label a person
+reads when choosing what to install. Both were free: no id changed, so no consumer has anything to
+migrate.
 
 ## Teams and workflows — what's the difference?
 
