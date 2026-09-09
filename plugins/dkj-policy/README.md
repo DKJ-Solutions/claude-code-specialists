@@ -5,20 +5,26 @@ baseline every consumer inherits and not a standard: it is one answer to *how do
 repo*, offered as something a repo can deliberately pick up. There is no sibling to inherit instead: what
 a repo has until it chooses this one is its own way of working, which it never stopped having.
 
-**And once a repo has picked it up, this workflow's pages take precedence over its own**
-(issue #1699, September 9, 2026). The paragraph above is about the *install*, and it is easy to read as
-a promise about the *obedience* too — it is not. The clearest evidence is a mechanism rather than a
-sentence: this plugin ships a SessionStart check,
-[`check-consumer-prose.ps1`](scripts/lint/check-consumer-prose.ps1), whose supremacy detector reports a
-consuming repo's own always-on prose when it declares that *its* `CLAUDE.md` wins. A way of working that
-detects repos claiming precedence over it is not one that yields to them.
+**And once a repo has picked it up, this workflow's pages take precedence over its own — on the cycle**
+([#1699](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1699), September 9, 2026). The
+paragraph above is about the *install*, and it is easy to read as a promise about the *obedience* too —
+it is not. The scope is the part to read carefully, and the source repo's own `CLAUDE.md` states it in
+the same breath as the precedence: the workflow's page wins where the two disagree, and *"it does not
+replace anything below; it adds the workflow's own mechanics."* So what yields is how work moves — the
+branch, the gates, the fold — and not your repo's answers about itself.
 
 **The two directions are deliberate and not in tension: nothing arrives unasked, and enabling this is
-choosing to be governed by it.** What stays adaptive is the *values* —
-[`CONTRIBUTING-portable.md`](CONTRIBUTING-portable.md) names a **seam** wherever a repo owns the answer,
+choosing to be governed by it.** What stays yours is the *values* —
+[`CONTRIBUTING-portable.md`](CONTRIBUTING-portable.md) names a **seam** wherever a repo owns the answer
 rather than stating one repo's answer as the rule, so the trunk name, the merge method and the audience
 tier remain yours. The cycle is not. And the specialist *teams* are the other way round entirely — a
 craft adapts to the repo it lands in — which is why they are separate plugins rather than one.
+
+**One mechanism makes the direction visible, and it is advisory.** This plugin ships a SessionStart
+check, [`check-consumer-prose.ps1`](scripts/lint/check-consumer-prose.ps1), whose supremacy detector
+reports your repo's own always-on prose when it declares that *your* `CLAUDE.md` wins. It reports and
+refuses nothing — like every session check here — so it tells you which way the rule points rather than
+stopping anything.
 
 **It carries no specialists.** A workflow changes how the existing ones work, not who they are; the
 specialists come from [the teams](https://github.com/DKJ-Solutions/claude-code-specialists/tree/main/plugins/dkj-teams/). Enabling this without `dkj-team-alpha` gives you skills with

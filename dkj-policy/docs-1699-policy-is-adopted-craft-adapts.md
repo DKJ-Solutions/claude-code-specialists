@@ -84,9 +84,52 @@ cover everything that shipped is being split now that it cannot.
       `plugins/README.md` and `plugins/dkj-policy/README.md`: five hits, three of them correct as
       written (see the two dropped items above and the craft test question, which is untouched and is
       what the new bullets point at).
-- [x] Lint gate: 0 errors, including check 34 — both new relative links in the plugin README resolve
-      from that plugin's **own** root as well as in this tree, which is what a consumer gets.
+- [x] Lint gate: 0 errors, including the [plugin-link] check — both new relative links in the plugin
+      README resolve from that plugin's **own** root as well as in this tree, which is what a consumer
+      gets. Cited by NAME rather than by number, deliberately: the review round produced two different
+      numbers for it (30 and 34) and the tree says 30 — which is exactly the drift #1680 was filed
+      about this morning, in this same file's own SYNOPSIS list.
 - [x] The lint gate and every suite, via `open-pr.ps1`.
+
+- [x] Copy edit (Edith) and conclusion red-team (Marlowe). Marlowe returned **WOBBLES on the delivered
+      text while the premise held**: he verified both supremacy citations independently and found them
+      real, dated (August 14, 2026) and attributed to Dave ahead of this branch, so the
+      *"sharpening, not a decision"* framing stands and nothing here goes back to the owner. Six
+      corrections between the two of them, all applied.
+
+#### What the two review passes changed, and one of them was itself wrong
+
+1. **"It wins" was quoted without its scope, which is the half a consumer would over-read.**
+   `CLAUDE.md` states the precedence and its bound in one breath — *"it does not replace anything
+   below; it adds the workflow's own mechanics"* — and the first draft quoted only the first clause on
+   both front pages. Now both carry the bound, and both say what actually yields: how work moves, not a
+   repo's answers about itself.
+2. **The session check was described as if it enforced.** *"A way of working that detects repos claiming
+   precedence over it is not one that yields to them"* reads as enforcement; the check is **advisory**,
+   like every session check this family ships. Both pages now say so in the same sentence that cites
+   it — evidence of which way the rule points, not a gate.
+3. **Marlowe's own qualifier citation did not survive checking, and it is recorded because the same
+   mistake had already been made once on this branch.** He proposed restating *"scoped to what the
+   plugin actually legislates"* from `CONTRIBUTING-portable.md`; a tree-wide search finds that phrase
+   only in an **archived release note** (`dkj-policy/releases/changelog/4.x/4.30.0.md`), which is
+   history and not a live statement. `CLAUDE.md`'s own scoping sentence, verified, is cited instead.
+4. **`[plugin-link]` was cited as "check 34"** — it is 30. The two reviewers disagreed about which, and
+   the branch now cites the check by **name**, which is the shape that does not drift. That is the same
+   defect #1680 was filed about this morning, in the same file's own numbered list.
+5. **Two attribution slips (Edith):** the quoted sentence is not `dkj-policy/CONTRIBUTING.md`'s
+   *opening line* — it is the second bolded paragraph — and its `(Dave, …)` parenthetical had a
+   filename where this repo's house style puts a date. Both corrected.
+6. **The issue citation on the plugin's page was plain text** where every other issue reference in that
+   file is a link. Linked.
+
+#### The audience tier went from 2 to 3 on the red-team's argument
+
+The first answer was **2** — *"noticed if somebody points it out"*. Marlowe held that against the reach:
+this lands on the plugin's own front page and the root README's navigation table, which is the first
+thing a new adopter reads, not a buried subsection. The rubric's 3 is *"noticed the moment they touch
+that part"*, and that is the honest reading. The precedent he cited cuts the same way rather than
+against: #1379's equivalent clarification scored tier 2 as `N/A` because it touched a ranking
+subsection nobody had read, and this change does the opposite with the same fact.
 
 ### DEPLOY: docs/1699-policy-is-adopted-craft-adapts
 
@@ -112,7 +155,7 @@ there, which is true of the install and easy to read as a promise about the rest
 changes, and no value they set changes: the portable page still names a seam wherever the repo owns the
 answer.
 
-**Score:** 2
+**Score:** 3
 
 #### Pull Request
 

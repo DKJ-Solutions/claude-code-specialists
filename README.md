@@ -88,23 +88,28 @@ two kinds of plugin stand in opposite relations to a consumer's own rules:
 - **A team adapts to the repo it lands in.** `dkj-team-alpha` and the add-on teams describe a *craft*,
   and a craft that overrode its host would be worth less, not more — which is what the test question
   below is for.
-- **`dkj-policy` is adopted BY the consumer, and it wins.** The workflow's own page says so in its
-  opening line — *"it sits on top of the repo's `CLAUDE.md` and wins over it on conflict"* (Dave,
-  [`dkj-policy/CONTRIBUTING.md`](dkj-policy/CONTRIBUTING.md)) — [`CLAUDE.md`](CLAUDE.md) restates it
-  from the other side (*"where the two disagree, the plugin's page wins"*), and the evidence that this
-  reaches outward rather than being a local arrangement is a mechanism:
-  [`check-consumer-prose.ps1`](scripts/lint/check-consumer-prose.ps1) ships in the plugin and runs as a
-  **SessionStart check in a consumer**, reporting that repo's own always-on prose when it declares that
-  *its* `CLAUDE.md` wins. A way of working with a detector for repos claiming precedence over it is not
-  one that adapts to them. What stays adaptive is the *values*: the portable page names a **seam**
-  wherever a repo owns the answer.
+- **`dkj-policy` is adopted BY the consumer, and it wins — on the cycle, not on everything.** The
+  workflow's own page says so: *"it sits on top of the repo's `CLAUDE.md` and wins over it on
+  conflict"* (Dave, August 14, 2026, in
+  [`dkj-policy/CONTRIBUTING.md`](dkj-policy/CONTRIBUTING.md)). [`CLAUDE.md`](CLAUDE.md) restates it
+  from the other side **with its scope attached**, and the scope is the half worth quoting: *"where the
+  two disagree, the plugin's page wins. It does not replace anything below; it adds the workflow's own
+  mechanics."* So what yields is the way work moves — the branch, the gates, the fold — and not a
+  repo's answers about itself, which the portable page keeps as a **seam** it never fills in.
+  That this reaches outward at all, rather than being a local arrangement between two files in this
+  repo, is visible in a mechanism the plugin ships:
+  [`check-consumer-prose.ps1`](scripts/lint/check-consumer-prose.ps1) runs as a **SessionStart check in
+  a consumer** and reports that repo's own always-on prose when it declares that *its* `CLAUDE.md`
+  wins. It is **advisory** — like every session check here, it reports and refuses nothing — so read it
+  as evidence of which way the rule points, not as enforcement.
 
 **Opt-in is what reconciles the two, and it describes the INSTALL rather than the obedience.** Nobody
 is handed this way of working: `dkj-policy` is enabled by choice and absent by default, and the
 enforcement moved out with it, so a repo that works differently is told nothing at session start. What
 installing it means is that the consumer has chosen to be governed by it — and from that moment the
-adaptation runs the other way, with the consumer's own page yielding. Both statements were always
-intended; only the first could be written while there was effectively one plugin family.
+adaptation runs the other way, with the consumer's own page yielding on the cycle. The August 8
+sentence is not wrong about what it was about; it is one claim where two are now needed, which is what
+happens to a sentence written while there was effectively one plugin family.
 
 **The exception is the author, and it is a real one.** Dave runs these plugins across several of his
 own repos and deliberately uses one way of working across them, deviating only where the domain forces
