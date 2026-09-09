@@ -134,6 +134,59 @@ consequences:
   failing assert to point at**, deliberately: "it passes here today" is a fact about one checkout, and
   leaving the old capture in the file others copy from is what makes the next instance.
 
+### Which suites need `Test-Says` -- read the capture, then the emitter (September 9, 2026)
+
+The section above says how to CAPTURE. This one says when the captured text has to be READ
+whitespace-insensitively, because the two questions were being answered as one and the answer was
+coming out far too large.
+
+**The mechanism** ([#1512](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1512)): a
+`throw`, a `Write-Error` or a `Write-Warning` reaches a capture through PowerShell's error formatter,
+which hard-wraps at the host's buffer column **inside a word** -- so the phrase the script composed is
+not the phrase the capture carries. `Write-Host` does not go through that formatter and is unaffected.
+`Test-Says` strips all whitespace from both sides and compares literally, which repairs a wrap inside a
+word; normalizing `\s+` to one space does not.
+
+**Two conditions, and BOTH must hold before a suite needs the helper:**
+
+1. **the capture can carry the error stream** -- `2>&1`, a `StandardError.ReadToEnd()` concatenated
+   onto stdout, or `Invoke-NativeCapture` without `-DiscardStderr` (it merges err into `Output`); and
+2. **the script under test emits the asserted phrase through the formatter** -- a `throw`,
+   `Write-Error` or `Write-Warning`, rather than `Write-Host`.
+
+**Measured against the eight suites
+[#1728](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1728) named, whose 358 assert
+sites it called the exposure:**
+
+| suites | sites | condition 1 | genuinely exposed |
+|---|---:|---|---:|
+| `roster-sync`, `connectors`, `script-contract`, `sync-roster`, `adopt-workflow-folder`, `config-blueprint` | 311 | **no** -- stdout only | **0** |
+| `cut-release-drive` | 4 | yes | 0 today, structurally reachable |
+| `publish-to-business` | 13 | yes (`2>&1`) | **3** |
+
+The six are immune **by construction rather than by luck**: each captures stdout only (checked against
+`2>&1`, `StandardError` and `Invoke-NativeCapture` alike) from a script with zero `throw`,
+`Write-Error` and `Write-Warning`. Converting them would have been 311 edits with no defect behind any
+of them -- and #1728 said so itself, in the sentence that is easiest to read past: *"That is the
+exposure, not the defect count."*
+
+**Condition 2 has a trap worth naming**, because it is what shrinks `publish-to-business` from 13 to 3:
+a script may deliberately `Write-Host` the readable part and `throw` only a summary. That one does,
+with the reason in its own code -- *"PowerShell renders a multi-line error message on one line, and the
+whole point of this check is that you can read the list."* So the phrase an assert reads can be
+formatter-free even where the failure that produced it was a `throw`.
+
+**NO TREE-WIDE GATE, and this is the measurement that decided it.** 37 of this repo's suites satisfy
+condition 1. A gate demanding `Test-Says` of all of them would be born with 33 findings, nearly all of
+them about `Write-Host` phrases that cannot wrap -- which is the false-positive rate this repo already
+turned down once, in the stale-path check declined at 124 findings. Condition 2 is what separates them
+and it cannot be read off a suite: it lives in the script under test, one process away.
+
+**The reason this class recurred at all is a documentation defect, not a test defect.** Before this
+section the mechanism was recorded seven times -- once in each suite that had already been repaired --
+and nowhere a person writing an eighth suite would look. `grep Test-Says` finds the fix only if you
+already suspect the problem.
+
 In short: the **how** (automated tests, regression guarding) is portable; the **what** (the
 PowerShell scripts as the test surface, and building out a suite once the lint gate warrants it)
 belongs to this repo.

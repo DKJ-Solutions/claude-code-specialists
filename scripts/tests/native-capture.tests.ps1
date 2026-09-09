@@ -449,6 +449,88 @@ try {
     Assert-True ($missingClock.ElapsedMilliseconds -lt 1500) "and it throws at once rather than spending the settle budget (took $($missingClock.ElapsedMilliseconds)ms of a 3000ms budget)"
 
     # ---------------------------------------------------------------------------------------------
+    Write-Host 'Write-GateCaptureBlock -- the test gate reads through the tolerant reader, and SAYS when a block may be short (#1731)' -ForegroundColor Cyan
+
+    # THE GATE WAS THE ONE FUNCTION IN THIS FILE MOST EXPOSED TO THE HAZARD ABOVE AND THE ONE NOT USING
+    # THE READER BUILT FOR IT: it read each suite's out.txt/err.txt with a plain Get-Content the moment
+    # WaitForExit returned. And Get-Content does not fail on a held file -- the first assert below is
+    # what makes that concrete, and it is the whole reason the defect was invisible. Where ReadAllText
+    # throws (asserted above), Get-Content returns the flushed prefix and says nothing, so a truncated
+    # suite block printed under a correct '== suite ==' header with the exit code intact.
+    $gateHeld = Join-Path $sandbox 'gate-held.txt'
+    [System.IO.File]::WriteAllText($gateHeld, "  [OK] first assertion`n", $utf8NoBom)
+    $gateWriter = New-Object System.IO.FileStream(
+        $gateHeld, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Write, [System.IO.FileShare]::Read)
+    try {
+        $lenient = Get-Content -LiteralPath $gateHeld -Raw -Encoding Oem
+        Assert-True ($null -ne $lenient) 'Get-Content reads a HELD capture file without complaint -- which is why the short block had no symptom'
+
+        # THE NOTE IS THE DELIVERABLE, so it is asserted on the console text rather than on a flag: the
+        # only consumer of these blocks is the person reading them, and a returned field nobody prints
+        # would be the same silence in a new place. 6>&1 captures Write-Host's information stream.
+        $heldText = (@(Write-GateCaptureBlock -Path @($gateHeld) 6>&1 | ForEach-Object { [string]$_ }) -join "`n")
+        Assert-True ($heldText -match '\[short read\]') 'a held capture file prints a visible [short read] note'
+        Assert-True ($heldText -match 'gate-held\.txt') 'and the note names the file, so a reader knows which of the two captures was short'
+        Assert-True ($heldText -match '\[OK\] first assertion') 'and what WAS flushed is still printed -- the note annotates the block, it does not replace it'
+    } finally {
+        $gateWriter.Dispose()
+    }
+
+    # THE NOTE SURVIVES AN EMPTY READ, which is the case it matters most in and the one an early
+    # whitespace skip would swallow: a held file that has flushed nothing is exactly "the child said
+    # nothing" against "we read before the flush".
+    $gateEmptyHeld = Join-Path $sandbox 'gate-held-empty.txt'
+    [System.IO.File]::WriteAllText($gateEmptyHeld, '', $utf8NoBom)
+    $emptyWriter = New-Object System.IO.FileStream(
+        $gateEmptyHeld, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Write, [System.IO.FileShare]::Read)
+    try {
+        $emptyHeldText = (@(Write-GateCaptureBlock -Path @($gateEmptyHeld) 6>&1 | ForEach-Object { [string]$_ }) -join "`n")
+        Assert-True ($emptyHeldText -match '\[short read\]') 'an EMPTY held capture still prints the note rather than being skipped as blank'
+    } finally {
+        $emptyWriter.Dispose()
+    }
+
+    # AND IT DISCRIMINATES: without this, the note could be unconditional and every assert above would
+    # still pass. A settled file prints its block and nothing else; an empty settled file prints
+    # nothing at all, which is the behaviour the gate had before #1731 and must keep -- 85 suites with
+    # no stderr must not add 85 blank lines to the run.
+    $gateSettled = Join-Path $sandbox 'gate-settled.txt'
+    [System.IO.File]::WriteAllText($gateSettled, "  [OK] whole suite`n", $utf8NoBom)
+    $settledText = (@(Write-GateCaptureBlock -Path @($gateSettled) 6>&1 | ForEach-Object { [string]$_ }) -join "`n")
+    Assert-True ($settledText -notmatch '\[short read\]') 'a settled capture prints NO note -- so the note discriminates rather than always firing'
+    Assert-True ($settledText -match '\[OK\] whole suite') 'and its block is printed'
+
+    $gateEmpty = Join-Path $sandbox 'gate-empty.txt'
+    [System.IO.File]::WriteAllText($gateEmpty, '', $utf8NoBom)
+    Assert-Equal 0 (@(Write-GateCaptureBlock -Path @($gateEmpty) 6>&1).Count) 'an empty SETTLED capture prints nothing -- a suite with no stderr adds no blank block'
+
+    # A MISSING FILE IS SKIPPED RATHER THAN THROWN ON, unlike Read-NativeCaptureFile's own contract:
+    # the gate's err.txt may legitimately not exist, and the Test-Path guard is what keeps the reader's
+    # deliberate rethrow from turning that into a red gate.
+    $missingSkipped = $true
+    try { $null = Write-GateCaptureBlock -Path @((Join-Path $sandbox 'gate-not-there.txt')) 6>&1 }
+    catch { $missingSkipped = $false }
+    Assert-True $missingSkipped 'a capture file that was never created is skipped, not thrown on'
+
+    # THE DECODE IS UNCHANGED BY THE SWAP, asserted rather than assumed -- the old site named the
+    # encoding as Get-Content's own '-Encoding Oem' and the new one resolves the OEM code page itself.
+    $oemHere = [System.Text.Encoding]::GetEncoding([System.Globalization.CultureInfo]::CurrentCulture.TextInfo.OEMCodePage)
+    $oemProbe = Join-Path $sandbox 'oem-decode.txt'
+    [System.IO.File]::WriteAllBytes($oemProbe, [byte[]]@(0x61, 0x82, 0x62))   # 'a', a high byte, 'b'
+    Assert-Equal (Get-Content -LiteralPath $oemProbe -Raw -Encoding Oem) `
+                 (Read-NativeCaptureFile -Path $oemProbe -Encoding $oemHere).Text `
+                 'the OEM code page this helper resolves decodes a high byte identically to Get-Content -Encoding Oem'
+
+    # AND THE GATE HAS NO PLAIN READ LEFT, which is the inconsistency #1731 actually filed: the file
+    # held a tolerant reader for a hazard and the function most exposed to it did not use it. Pinned on
+    # the source so a later edit that copies the surrounding pattern back in -- which is exactly how
+    # #1723 gave the exposure a second site -- fails here rather than being noticed by nobody.
+    $libSource = Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\lib\native-capture-lib.ps1') -Raw
+    $gateBody = $libSource.Substring($libSource.IndexOf('function Invoke-TestSuiteGate'))
+    Assert-True ($gateBody -notmatch 'Get-Content[^\r\n]*-Encoding Oem') 'Invoke-TestSuiteGate reads no capture file with a plain Get-Content'
+    Assert-True (@([regex]::Matches($gateBody, 'Write-GateCaptureBlock')).Count -ge 2) 'both of its capture-printing sites -- the pool and the crash re-run -- go through the helper'
+
+    # ---------------------------------------------------------------------------------------------
     Write-Host 'Invoke-NativeCapture -- ShortRead is present on BOTH arms (#1679)' -ForegroundColor Cyan
 
     # THE PROMISE IS THE ONE TimedOut ALREADY MAKES: a caller reads one field without knowing which

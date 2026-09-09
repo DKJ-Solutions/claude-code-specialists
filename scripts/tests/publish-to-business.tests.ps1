@@ -75,6 +75,52 @@ function Assert-Match {
     }
 }
 
+function Test-Says {
+    <# Does the child's captured output contain this phrase, whatever the console did to it?
+
+       THIS SUITE NEEDS IT AND MOST DO NOT, which is the whole of #1728's classification. Invoke-Publish
+       below captures with '2>&1', so $r.Output carries the child's ERROR stream as well as its stdout --
+       and a 'throw' or a 'Write-Warning' reaches a capture through PowerShell's error formatter, which
+       hard-wraps at the host's buffer column INSIDE a word. The phrase the script composed is then not
+       the phrase the capture carries. Write-Host is unaffected, and a suite that captures stdout only
+       never meets this at all (issue #1512; measured again on this branch).
+
+       Strips ALL whitespace from both sides rather than normalizing runs of it: collapsing '\s+' to one
+       space repairs a wrap BETWEEN words and does nothing for a wrap INSIDE one, and the formatter
+       breaks at whatever character sits at the buffer column. Which asserts straddle a break is decided
+       by the render width and by the length of whatever path the message interpolates, so A GREEN RUN
+       IS NOT EVIDENCE -- #1723's site passed for months.
+
+       Literal (IndexOf), so a phrase carrying '(', ')', '.', '[' or ']' needs no escaping;
+       OrdinalIgnoreCase keeps the case-insensitivity that -match had at these call sites. #>
+    param([string]$Text, [string]$Phrase)
+    $haystack = ($Text -replace '\s', '')
+    $needle = ($Phrase -replace '\s', '')
+    return ($haystack.IndexOf($needle, [System.StringComparison]::OrdinalIgnoreCase) -ge 0)
+}
+
+function Assert-Says {
+    param([string]$Text, [string]$Phrase, [string]$Name)
+    if (Test-Says -Text $Text -Phrase $Phrase) {
+        $script:pass++; Write-Host "  [PASS] $Name" -ForegroundColor Green
+    } else {
+        $script:fail++; Write-Host "  [FAIL] $Name`n         wanted to find: '$Phrase'`n         in:             '$Text'" -ForegroundColor Red
+    }
+}
+
+function Assert-DoesNotSay {
+    <# THE NEGATIVE DIRECTION, AND IT IS THE ONE WORTH HAVING. A positive assert that straddles a break
+       goes red on a correct script and sends the reader to the script. A NEGATIVE one goes GREEN for the
+       wrong reason: it reports absence and has actually measured a line break. Here the
+       whitespace-stripping test is the STRICTER of the two, which is the opposite of how it reads. #>
+    param([string]$Text, [string]$Phrase, [string]$Name)
+    if (-not (Test-Says -Text $Text -Phrase $Phrase)) {
+        $script:pass++; Write-Host "  [PASS] $Name" -ForegroundColor Green
+    } else {
+        $script:fail++; Write-Host "  [FAIL] $Name`n         did NOT want to find: '$Phrase'" -ForegroundColor Red
+    }
+}
+
 $scriptUnderTest = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\release\publish-to-business.ps1')).Path
 
 # --- fixture helpers -------------------------------------------------------------------------------
@@ -257,7 +303,7 @@ try {
     Write-Host 'publish-to-business: second run (idempotence)' -ForegroundColor Cyan
     $r = Invoke-Publish -ScriptArgs @('-RepoRoot', $sourceDir, '-TargetRepo', $bareDir)
     Assert-Equal 0 $r.ExitCode 'second run exits 0'
-    Assert-Match $r.Output 'Nothing to publish' 'second run reports nothing to publish'
+    Assert-Says $r.Output 'Nothing to publish' 'second run reports nothing to publish'
     Assert-Equal 1 (Get-TargetCommitCount -BareDir $bareDir) 'second run adds no commit'
 
     # --- 3. a version bump travels as one change ----------------------------------------------------
@@ -278,7 +324,7 @@ try {
     Invoke-FixtureGit -Dir $sourceDir -GitArgs @('commit', '-am', 'fixture: edit alpha payload') | Out-Null
     $r = Invoke-Publish -ScriptArgs @('-RepoRoot', $sourceDir, '-TargetRepo', $bareDir, '-DryRun')
     Assert-Equal 0 $r.ExitCode 'dry run exits 0'
-    Assert-Match $r.Output 'Dry run: nothing committed, nothing pushed' 'dry run says so'
+    Assert-Says $r.Output 'Dry run: nothing committed, nothing pushed' 'dry run says so'
     Assert-Equal 2 (Get-TargetCommitCount -BareDir $bareDir) 'dry run adds no commit'
 
     # --- 5. integrity check: a manifest pointing at a folder that did not travel is a hard stop ----
@@ -287,6 +333,13 @@ try {
     Invoke-FixtureGit -Dir $sourceDir -GitArgs @('commit', '-am', 'fixture: drop beta folder but not its manifest row') | Out-Null
     $r = Invoke-Publish -ScriptArgs @('-RepoRoot', $sourceDir, '-TargetRepo', $bareDir)
     Assert-Equal 1 $r.ExitCode 'a manifest row without its folder is exit 1'
+    # THE ONE Assert-Match LEFT ON A CAPTURE IN THIS FILE, and it stays for two independent reasons.
+    # It is a real regex -- the line is "<name>: source '<path>' did not travel" and the path varies per
+    # fixture, so no literal phrase expresses it and Assert-Says cannot take it. And it does not need to:
+    # publish-to-business.ps1 prints its problem list with Write-Host and folds only the COUNT into the
+    # throw, deliberately ("PowerShell renders a multi-line error message on one line, and the whole
+    # point of this check is that you can read the list"). Write-Host does not go through the error
+    # formatter, so this phrase cannot straddle a wrap however narrow the console is.
     Assert-Match $r.Output "beta.*did not travel" 'the refusal names the plugin and the reason'
     Assert-Equal 2 (Get-TargetCommitCount -BareDir $bareDir) 'nothing was committed on the refusal'
 
@@ -327,7 +380,7 @@ function Get-BusinessMarketplaceRepo { return `$script:BusinessMarketplaceRepo }
     Invoke-FixtureGit -Dir $sourceDir -GitArgs @('commit', '-am', 'fixture: drop the seam again') | Out-Null
     $r = Invoke-Publish -ScriptArgs @('-RepoRoot', $sourceDir)
     Assert-Equal 1 $r.ExitCode 'no target anywhere is exit 1'
-    Assert-Match $r.Output 'Get-BusinessMarketplaceRepo' 'the refusal names the seam to fill in'
+    Assert-Says $r.Output 'Get-BusinessMarketplaceRepo' 'the refusal names the seam to fill in'
 
     # --- 9. a malformed manifest is NAMED, not crashed on -------------------------------------------
     #
@@ -351,8 +404,8 @@ function Get-BusinessMarketplaceRepo { return `$script:BusinessMarketplaceRepo }
     Invoke-FixtureGit -Dir $sourceDir -GitArgs @('commit', '-am', 'fixture: an entry with no source') | Out-Null
     $r = Invoke-Publish -ScriptArgs @('-RepoRoot', $sourceDir, '-TargetRepo', $bareDir)
     Assert-Equal 1 $r.ExitCode 'an entry with no source is exit 1'
-    Assert-Match $r.Output 'sourceless: no source' 'the entry with no source is named, not a StrictMode error'
-    Assert-True ($r.Output -notmatch 'cannot be found on this object') 'and no raw StrictMode property error reaches the reader'
+    Assert-Says $r.Output 'sourceless: no source' 'the entry with no source is named, not a StrictMode error'
+    Assert-DoesNotSay $r.Output 'cannot be found on this object' 'and no raw StrictMode property error reaches the reader'
 
     @'
 {
@@ -363,8 +416,8 @@ function Get-BusinessMarketplaceRepo { return `$script:BusinessMarketplaceRepo }
     Invoke-FixtureGit -Dir $sourceDir -GitArgs @('commit', '-am', 'fixture: manifest without a plugins field') | Out-Null
     $r = Invoke-Publish -ScriptArgs @('-RepoRoot', $sourceDir, '-TargetRepo', $bareDir)
     Assert-Equal 1 $r.ExitCode 'a manifest missing a required field is exit 1'
-    Assert-Match $r.Output "missing the required field 'plugins'" 'the missing field is named'
-    Assert-True ($r.Output -notmatch 'cannot be found on this object') 'and that path stays clean under StrictMode too'
+    Assert-Says $r.Output "missing the required field 'plugins'" 'the missing field is named'
+    Assert-DoesNotSay $r.Output 'cannot be found on this object' 'and that path stays clean under StrictMode too'
 
     # --- 10-16. the published SUBSET (issue #683) ---------------------------------------------------
     #
@@ -383,14 +436,14 @@ function Get-BusinessMarketplaceRepo { return `$script:BusinessMarketplaceRepo }
     $tree = Get-TargetTree -BareDir $filterBareDir
     Assert-True ($tree -contains 'plugins/workflows/flow/.claude-plugin/plugin.json') 'unfiltered: the workflow travelled'
     Assert-True ($tree -contains 'plugins/dkj-teams/core/.claude-plugin/plugin.json') 'unfiltered: the team travelled'
-    Assert-Match $r.Output 'every entry in the manifest' 'unfiltered: the run says it filtered nothing'
+    Assert-Says $r.Output 'every entry in the manifest' 'unfiltered: the run says it filtered nothing'
 
     # 11. the filter: the excluded plugin is gone from the tree AND from the manifest, and the kind
     #     directory it was the only member of is gone with its README.
     $r = Invoke-Publish -ScriptArgs @('-RepoRoot', $filterDir, '-TargetRepo', $filterBareDir,
                                       '-Plugins', 'core,extra')
     Assert-Equal 0 $r.ExitCode 'the filtered run exits 0'
-    Assert-Match $r.Output 'Excluded from this target: flow' 'the filtered run names what it dropped'
+    Assert-Says $r.Output 'Excluded from this target: flow' 'the filtered run names what it dropped'
     $tree = Get-TargetTree -BareDir $filterBareDir
     Assert-True ($tree -notcontains 'plugins/workflows/flow/.claude-plugin/plugin.json') 'the excluded plugin did not travel'
     Assert-True ($tree -notcontains 'plugins/workflows/README.md') 'and the emptied kind directory went with it, README included'
@@ -433,7 +486,7 @@ function Get-BusinessMarketplaceRepo { return `$script:BusinessMarketplaceRepo }
     #      beside it because the exit code names nothing about escaping, and because it is what pins the
     #      path is restored rather than merely left escaped. Parse rather than string-match: an invalid
     #      escape is a PARSER error, not a visible one.
-    Assert-True ($r.Output -notmatch 'not valid JSON') 'the filtered run does not reject the manifest it just wrote'
+    Assert-DoesNotSay $r.Output 'not valid JSON' 'the filtered run does not reject the manifest it just wrote'
     $reparsed = $null
     $parsed = $true
     try { $reparsed = $publishedManifest | ConvertFrom-Json } catch { $parsed = $false }
@@ -450,7 +503,7 @@ function Get-BusinessMarketplaceRepo { return `$script:BusinessMarketplaceRepo }
     $r = Invoke-Publish -ScriptArgs @('-RepoRoot', $filterDir, '-TargetRepo', $filterBareDir,
                                       '-Plugins', 'core,kore')
     Assert-Equal 1 $r.ExitCode 'a keep-list name that matches nothing is exit 1'
-    Assert-Match $r.Output 'kore' 'the refusal names the unmatched entry'
+    Assert-Says $r.Output 'kore' 'the refusal names the unmatched entry'
     Assert-Equal $before (Get-TargetCommitCount -BareDir $filterBareDir) 'and nothing was committed'
 
     # 14. excluding every plugin is an empty marketplace, not a subset.
@@ -468,7 +521,7 @@ function Get-BusinessMarketplaceRepo { return `$script:BusinessMarketplaceRepo }
     $before = Get-TargetCommitCount -BareDir $filterBareDir
     $r = Invoke-Publish -ScriptArgs @('-RepoRoot', $filterDir, '-TargetRepo', $filterBareDir)
     Assert-Equal 1 $r.ExitCode 'an undeclared plugin folder is exit 1'
-    Assert-Match $r.Output 'plugins/dkj-teams/stray travelled but no manifest entry names it' 'the refusal names the stray folder'
+    Assert-Says $r.Output 'plugins/dkj-teams/stray travelled but no manifest entry names it' 'the refusal names the stray folder'
     Assert-Equal $before (Get-TargetCommitCount -BareDir $filterBareDir) 'and nothing was committed on it either'
 
     # 16. the subset seam: without -Plugins the list comes from Get-BusinessMarketplacePlugins.
@@ -481,7 +534,7 @@ function Get-BusinessMarketplacePlugins { return @('core', 'extra') }
     Invoke-FixtureGit -Dir $filterDir -GitArgs @('commit', '-m', 'fixture: add the subset seam') | Out-Null
     $r = Invoke-Publish -ScriptArgs @('-RepoRoot', $filterDir, '-TargetRepo', $filterBareDir)
     Assert-Equal 0 $r.ExitCode 'a run without -Plugins exits 0 once the seam answers'
-    Assert-Match $r.Output 'Excluded from this target: flow' 'and the seam is what excluded the workflow'
+    Assert-Says $r.Output 'Excluded from this target: flow' 'and the seam is what excluded the workflow'
 
     # 17. THE SCRIPT'S OWN COMMIT UNDER A MACHINE THAT SIGNS (#1297). Until the pin, that commit set a
     #     synthetic identity on the command line and left commit.gpgsign to the machine -- so with
@@ -549,16 +602,16 @@ signingkey = ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFixtureKeyNotARealKeyFixtureKe
     $secret    = 'SUPERSECRETTOKENabc123'
     $credUrl   = "https://someuser:$secret@no-such-host-for-tests-xyz.invalid/o/r.git"
     $r = Invoke-Publish -ScriptArgs @('-RepoRoot', $sourceDir, '-TargetRepo', $credUrl)
-    Assert-True ($r.Output -notmatch [regex]::Escape($secret)) 'the token appears nowhere in the output'
-    Assert-Match $r.Output ([regex]::Escape('***@no-such-host-for-tests-xyz.invalid')) 'the userinfo is shown masked instead'
-    Assert-True ($r.Output -notmatch 'someuser') 'and the username goes with it -- userinfo is masked whole'
+    Assert-DoesNotSay $r.Output $secret 'the token appears nowhere in the output'
+    Assert-Says $r.Output '***@no-such-host-for-tests-xyz.invalid' 'the userinfo is shown masked instead'
+    Assert-DoesNotSay $r.Output 'someuser' 'and the username goes with it -- userinfo is masked whole'
 
     # THE OTHER HALF: masking must not touch a URL that has no userinfo, or every ordinary run reads
     # as though something were hidden. Same unreachable-host shape, no credential.
     $plainUrl = 'https://no-such-host-for-tests-xyz.invalid/o/r.git'
     $r = Invoke-Publish -ScriptArgs @('-RepoRoot', $sourceDir, '-TargetRepo', $plainUrl)
-    Assert-Match $r.Output ([regex]::Escape($plainUrl)) 'a URL without userinfo is printed unchanged'
-    Assert-True ($r.Output -notmatch '\*\*\*@') 'and nothing is masked in it'
+    Assert-Says $r.Output $plainUrl 'a URL without userinfo is printed unchanged'
+    Assert-DoesNotSay $r.Output '***@' 'and nothing is masked in it'
 } finally {
     if (Test-Path -LiteralPath $fixtureRoot) {
         Remove-Item -Recurse -Force -LiteralPath $fixtureRoot -ErrorAction SilentlyContinue

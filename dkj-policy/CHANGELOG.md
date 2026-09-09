@@ -43,7 +43,42 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**36 / 81 minor entries** <!-- pending-tally -->
+**36 / 82 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1731-gate-tolerant-capture-read · 20260909-175551
+
+Closes #1731. The test gate now reads each suite's capture files through `Read-NativeCaptureFile`, the
+tolerant reader this same lib built for a writer that still holds one, instead of a plain
+`Get-Content` -- and prints a visible `[short read]` note naming the file when one was still held.
+Both sites are covered: the pool's reap and the crash re-run added by #1723.
+
+The defect being closed is a silent one. `Get-Content -Raw` does not fail on a held capture file; it
+returns whatever was flushed, so a truncated suite block printed under a correct `== suite ==` header
+with the exit code intact, and nothing said so. That is not a failure a reader could have caught by
+looking harder.
+
+For a session reading a gate run: nothing changes on an ordinary green run. What is new is that a
+short block can no longer arrive looking complete.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+Nothing a subscriber of this repo's plugins sees. The test gate is a maintainer's tool, and a
+consumer's run behaves identically unless a suite of theirs leaves a grandchild holding a capture
+file -- in which case they get a note where they previously got a quietly short block.
+
+**Score:** N/A
+
+#### Pull Request
+
+Read a suite's capture files with the tolerant reader, and say when a block may be short
+
+Plugins: dkj-policy, dkj-team-shopify
+
+[PR #1737](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1737)
+
+---
 
 ### DEPLOY: fix/1729-seam-probe-wildcard · 20260909-173557
 
