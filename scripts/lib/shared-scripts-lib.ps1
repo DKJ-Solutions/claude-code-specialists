@@ -409,7 +409,7 @@ function Get-SharedScriptPairs {
             # for guard-live-theme to dot-source this instead of carrying its own copy is exactly the
             # second entry check-report-lib-workflow demonstrates. It is not taken in the branch that
             # introduces the lib: that guard protects a live customer-facing theme, so its refactor is
-            # its own change with its own review.
+            # its own change with its own review -- #1734.
             #
             # NO CONTRACT ROW FOLLOWS: nothing in it is repo-owned. It reads a payload it is handed and
             # takes its exempt-command set from its caller, so there is no seam a consumer answers.

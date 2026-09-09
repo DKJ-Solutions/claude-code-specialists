@@ -54,7 +54,7 @@
     source into TWO plugins, which is what check-report-lib does for its two readers. So the route for
     dkj-team-shopify to dot-source this file is a second registry entry, not a rewrite. It is not taken
     here because guard-live-theme guards a revenue-serving live theme, and putting that refactor in the
-    same branch as a new guard doubles the review surface of both. Filed separately.
+    same branch as a new guard doubles the review surface of both. Filed as #1734.
 
     No Set-StrictMode here: dot-sourcing would change the strict mode of the calling script.
     Pure ASCII (repo convention for .ps1): Windows PowerShell 5.1 reads a BOM-less script as ANSI.
