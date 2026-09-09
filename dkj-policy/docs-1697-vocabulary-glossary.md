@@ -36,7 +36,7 @@
 
 ### PLAN
 
-Phase 0 of the #1697 plan: the glossary section in the root README, then the displayName labels and the marketplace descriptions. No plugin renames -- decided against in the issue's plan comment.
+Phase 0 of the #1697 plan: the glossary section in the root README, then the displayName labels. No plugin renames, and no change to the marketplace descriptions either -- both decided against, the first in the issue's plan comment and the second here, for the reasons below.
 
 #### What this branch is NOT doing, and why
 
