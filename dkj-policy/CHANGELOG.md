@@ -43,7 +43,41 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**29 / 60 minor entries** <!-- pending-tally -->
+**29 / 61 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1682-porcelain-line-parse · 20260909-071236
+
+The `git status --porcelain` reading lives once, in `scripts/lib/git-porcelain-lib.ps1`, dot-sourced by
+`park-lib` for its uncommitted count and by `fanout-lib` for its per-path snapshot. Both callers had a
+near-verbatim copy of the parse, and two of the three git quirks underneath it were properties of the
+command rather than the parse — so the lib owns the command and its two flags too, with all the
+reasoning in one header instead of half in each.
+
+**It repaired a defect while consolidating, which is the argument for consolidating.** Both copies
+normalised backslashes to forward slashes over *every* path, including the ones `core.quotePath` exists
+to produce, so `"caf\303\251.txt"` read back as `caf/303/251.txt`. Latent in both callers — a count
+still counts and a comparison still matches when both sides mangle identically — and wrong for the
+first caller that looks for the file.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A — nothing a consumer notices. The lib is mirrored into `dkj-policy` because both its callers are,
+so a consumer's `park-cycle` Stop hook keeps working; the behaviour it produces is the same count and
+the same snapshot as before, minus the mangled path nobody had hit yet.
+
+**Score:** N/A
+
+#### Pull Request
+
+The git porcelain line parse lives once, in a lib both callers dot-source
+
+Plugins: dkj-policy
+
+[PR #1694](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1694)
+
+---
 
 ### DEPLOY: docs/1686-priority-axis-decision · 20260909-065028
 
