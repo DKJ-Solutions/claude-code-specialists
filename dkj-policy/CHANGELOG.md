@@ -43,7 +43,40 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**36 / 88 minor entries** <!-- pending-tally -->
+**36 / 89 minor entries** <!-- pending-tally -->
+
+### DEPLOY: docs/1744-handbook-enabled-plugins · 20260909-194757
+
+The specialists handbook no longer tells a session the add-on teams are off here. Six places on
+[`../.claude/specialists/README.md`](../.claude/specialists/README.md) carried the same stale premise --
+that `dkj-team-alpha` is the only plugin enabled -- and the reported sentence was the one a reader used
+to explain the empty lenses, so the repair carries the distinction over instead of striking it: the six
+core-team scaffolds are waiting, the eleven from the add-on teams will stay empty, and Chris routes to
+none of the eleven. The index table now says it is the core team's rather than claiming to be complete,
+which it was not -- 19 rows against 30 files in `lenses/`.
+
+Two of the six were stale COUNTS rather than stale claims (*"the fifteen specialists"*, `enabledPlugins`
+spelled as one entry) and both were replaced with a pointer to the file that holds the answer. That is
+this page's own rule about measurements going stale silently, applied to the page -- and it is the half
+that keeps the next plugin from reopening this issue.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A -- `.claude/specialists/README.md` is this repo's own handbook and ships in no plugin, so nothing
+here travels to a consumer. What a consumer holds is `SPECIALISTS.md`'s wording, which was already
+correct and is what this page was reconciled TO.
+
+**Score:** N/A
+
+#### Pull Request
+
+Reconcile the specialists handbook with every plugin being enabled here
+
+[PR #1748](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1748)
+
+---
 
 ### DEPLOY: docs/1743-dated-plugin-name · 20260909-193257
 
