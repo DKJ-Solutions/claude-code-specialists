@@ -36,7 +36,7 @@
 
 ### PLAN
 
-#### The inconsistency, and what verifying it changed
+#### The inconsistency (#1731), and what verifying it changed
 
 `scripts/lib/native-capture-lib.ps1` builds `Read-NativeCaptureFile` for one hazard -- a writer
 still holding a capture file when it is read -- and `Invoke-TestSuiteGate`, in the same file, read
@@ -97,10 +97,10 @@ A returned field nobody prints would have been the same silence in a new place.
 
 ### DEPLOY: fix/1731-gate-tolerant-capture-read
 
-The test gate now reads each suite's capture files through `Read-NativeCaptureFile`, the tolerant
-reader this same lib built for a writer that still holds one, instead of a plain `Get-Content` -- and
-prints a visible `[short read]` note naming the file when one was still held. Both sites are covered:
-the pool's reap and the crash re-run added by #1723.
+Closes #1731. The test gate now reads each suite's capture files through `Read-NativeCaptureFile`, the
+tolerant reader this same lib built for a writer that still holds one, instead of a plain
+`Get-Content` -- and prints a visible `[short read]` note naming the file when one was still held.
+Both sites are covered: the pool's reap and the crash re-run added by #1723.
 
 The defect being closed is a silent one. `Get-Content -Raw` does not fail on a held capture file; it
 returns whatever was flushed, so a truncated suite block printed under a correct `== suite ==` header
