@@ -39,6 +39,10 @@ $ParkCycleSrc     = Join-Path $RepoRoot 'scripts\task\park-cycle.ps1'
 $NativeCaptureSrc = Join-Path $RepoRoot 'scripts\lib\native-capture-lib.ps1'
 $EntryScaffoldSrc = Join-Path $RepoRoot 'scripts\lib\entry-scaffold-lib.ps1'
 $ParkLibSrc       = Join-Path $RepoRoot 'scripts\lib\park-lib.ps1'
+# park-lib dot-sources this one (#1682) and its Get-GitParkBacking cannot answer without it. The
+# dot-source is guarded, so a fixture that omits it does not crash -- it silently loses the backing
+# note, which is what ten asserts in this file measure.
+$PorcelainSrc     = Join-Path $RepoRoot 'scripts\lib\git-porcelain-lib.ps1'
 $PrIssuesSrc      = Join-Path $RepoRoot 'scripts\lib\pr-issues-lib.ps1'
 # Added by #1600: the failure arm composes its divergence sentence with Get-RemoteAheadNote rather than
 # a fourth hand-typed copy, so the fixture needs the lib new-branch and open-pr already share.
@@ -147,6 +151,7 @@ function New-Fixture {
     Copy-Item -LiteralPath $NativeCaptureSrc -Destination (Join-Path $dir 'scripts\lib\native-capture-lib.ps1') -Force
     Copy-Item -LiteralPath $EntryScaffoldSrc -Destination (Join-Path $dir 'scripts\lib\entry-scaffold-lib.ps1') -Force
     Copy-Item -LiteralPath $ParkLibSrc       -Destination (Join-Path $dir 'scripts\lib\park-lib.ps1')           -Force
+    Copy-Item -LiteralPath $PorcelainSrc     -Destination (Join-Path $dir 'scripts\lib\git-porcelain-lib.ps1')  -Force
     Copy-Item -LiteralPath $PrIssuesSrc      -Destination (Join-Path $dir 'scripts\lib\pr-issues-lib.ps1')      -Force
     Copy-Item -LiteralPath $RemoteAheadSrc   -Destination (Join-Path $dir 'scripts\lib\remote-ahead-lib.ps1')   -Force
     Copy-Item -LiteralPath $RefPrintSrc      -Destination (Join-Path $dir 'scripts\lib\ref-print-lib.ps1')      -Force
