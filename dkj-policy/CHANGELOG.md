@@ -43,7 +43,58 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**29 / 61 minor entries** <!-- pending-tally -->
+**29 / 62 minor entries** <!-- pending-tally -->
+
+### DEPLOY: feat/1680-synopsis-check-list · 20260909-072322
+
+The gate's `.DESCRIPTION` enumerates its checks in prose -- the summary a reader who has not opened four
+thousand lines consults, and the one a lens, a hook, a test-scenario name or a released note quotes a
+number from. It had stopped at `30.` while the code ran to `36.`, and its own item `30.` still described
+the check #1494 renumbered to `33` a month after the list was written, so grepping the list for "check 30"
+answered with a different check. Two more drifts were found on verification and neither was in the report:
+items `9.` and `17.` still read as live checks a month after they were **retired**, and `13b` had no entry
+at all.
+
+**Check 37 now holds that list to the file's own column-0 headers**, because a hand rewrite resets the
+clock rather than stopping it -- the conclusion check 32's header already records after three hand repairs
+of the mirror table. It is opt-in through the same marked-span walk checks 10, 29 and 32 use, so it
+inherits their three refusals for free and no unmarked script becomes a subject; it reads check 34's own
+header pattern, so the two cannot disagree about what a header is; and it asserts **one direction only** --
+every header needs an entry, an entry needs no header. That is what let it be born green rather than with
+an exemption list: three entries legitimately have no header of their own, the two retirement tombstones
+and the consumer-doc guard the suites call check 19. Measured after the repair: 1 span, 37 headers, 37
+claimed, 0 findings, 0 exemptions. Its own first run is the argument for it -- `13b` was reported by the
+check, not by a reader.
+
+The review round moved four things, and three were one defect in different clothes -- a rule read off the
+happy path. An entry must now **start inside the list's gutter**, so a nested enumeration in an entry's
+prose cannot satisfy a header (found by probing the check, not by measuring the tree: the list contains no
+such line today); the header comparison runs once per FILE over the union of its spans, where running it
+per span doubled the count and named one gap twice; and the coverage note now distinguishes "no marker
+anywhere" from "markers present, none of them paired", which used to print the reassuring sentence over a
+run that had just raised an error about that very file. Two bounds are named rather than closed -- a
+STALE entry still satisfies its number, and the two zero-state notes are unreachable from the suite
+because every fixture run copies this script into the fixture -- both written into the check's own header,
+because an unstated gap reads as coverage.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A. `check-plugin-integrity.ps1` is this repo's own gate and is mirrored into no plugin, so nothing here
+reaches a consumer: the repaired list, the new check and its scenarios all stay in the source tree. A
+consumer's own lint script is theirs, and the marker is opt-in, so nothing starts asserting anything on
+their side either.
+
+**Score:** N/A
+
+#### Pull Request
+
+The gate's own check list is held to its headers, and the seven it had lost are back
+
+[PR #1695](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1695)
+
+---
 
 ### DEPLOY: fix/1682-porcelain-line-parse · 20260909-071236
 
