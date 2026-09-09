@@ -56,6 +56,33 @@ circle for a given block, search the sentinel across the plugins — e.g.
 `scripts/agents/build-agent-defs.ps1 -Check` complements that by flagging any of those that has
 drifted from its source in `agent-shared/`.
 
+**A UNIVERSAL BLOCK'S COST IS NOT UNIFORM, AND THAT IS THE FACT THE TIER MODEL ABOVE DOES NOT CARRY**
+([#1705](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1705), September 9, 2026).
+Of `findings-become-issues`'s 30 carriers, exactly **one** sits on the always-on path: Chris's persona
+body, which `CLAUDE.md` imports through `SPECIALISTS.md` on every turn. The other 29 are paid per
+invocation — the agent defs carry these blocks in the **body**, not in the frontmatter `description`
+that Claude Code loads for every enabled plugin. So a bullet appended to a universal block is paid
+**once per session in every consuming repo**, plus once per invocation twenty-nine times over, and the
+word *universal* makes that sound cheaper than it is.
+
+**The test before appending to one, therefore: would you put this bullet in Chris's body on its own?**
+If the answer is no, it belongs in a narrower block rather than in a universal one — the generator
+already supports several independently-named regions per file, so the cost of a new circle is a name
+and a source file. And there is no cheap middle: `Get-SharedBlockText` reads the source file **whole**,
+so a source cannot carry a header that stays behind. Anything written into it travels to all 30.
+
+**#1705 asked the sharper version of that question — is every bullet of `findings-become-issues` one
+every carrier needs? — and the answer was measured per bullet and the split DECLINED.** Seven of the
+eight are universal on their face: what a finding is, that an inconsistency is one, that a tracker has
+to exist before you promise it, the filing bar, file-before-you-cite, that filing needs no permission,
+and that the question is *"does it still stand"* rather than *"may I"*. The eighth reads narrow — it is
+about reading the issue that produced a **guardrail** before proposing to change it, which sounds like
+Sylvester's and Sebastian's business — and it generalises on reading to *"read why a thing exists
+before proposing to change it"*, which no carrier is exempt from. A block whose every bullet answers
+one question (*how do I file what I found*) is coherent, and splitting it to save one bullet's bytes
+would trade a real cost for a real seam. What the measurement is worth is the paragraph above it: the
+bar, so the next bullet is weighed rather than appended.
+
 ### Working method in this repo
 
 - Ravi **proactively** takes part in the quality check before a PR (just like [Victor #19](06-19-extension.md)
