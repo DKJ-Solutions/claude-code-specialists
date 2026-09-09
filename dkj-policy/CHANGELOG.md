@@ -43,7 +43,47 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**27 / 57 minor entries** <!-- pending-tally -->
+**27 / 58 minor entries** <!-- pending-tally -->
+
+### DEPLOY: docs/1678-nested-worktree-refusal · 20260909-060959
+
+The lint gate's tree walks are filesystem walks, so a worktree registered inside the repo is a second
+complete copy of the tree it is standing in: every recursive count from the root doubles exactly
+(`*-agent.md` 26 to 52, `*.ps1` 233 to 466) and the gate fails with 26 duplicate-id errors, each one
+accusing the **real** file. #1673 repairs what an operator reads. What it deliberately left open, and
+what this branch answers, is whether the gate should instead be made to work *through* such a worktree
+-- roughly twenty `Get-ChildItem -Recurse` sites plus the suites that walk the root, behind a shared
+predicate and a meta-check of its own.
+
+It should not, and the exclusion is now recorded as DECLINED beside the gate's other measured-and-
+declined rules, so the option is priced rather than re-argued the next time somebody meets the 26
+errors. Four grounds, each measured on this tree: the lint half of `Invoke-WorkflowGates` returns
+before the test gate is ever reached, so on the documented route the doubling suites never run and
+excluding the path from them buys a caller nothing; the report's price was one suite too high --
+`template-selfcontained.tests.ps1` walks `plugins/`, not the root, and its count is unmoved by a probe
+worktree, leaving two rather than three; a predicate every future walk must remember to call is the
+enforced-by-memory shape #1665 was filed against, in a file already carrying 36 numbered checks; and
+`worktree-lane.ps1` has already decided where a worktree belongs, placing lanes outside the tree for
+exactly this reason. The residual is stated rather than left to be found: under `-SkipLint` those two
+suites still take a doubled set in silence, which is what that switch means everywhere here.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+N/A. One repo lens changes and nothing else -- no script, no manifest, no plugin payload. The gate it
+describes is `check-plugin-integrity.ps1`, which is not mirrored into any plugin, so a consumer
+receives nothing from this and their own gate's answer to the same fork stays theirs.
+
+**Score:** N/A
+
+#### Pull Request
+
+The lint gate refuses a nested worktree rather than walking through one
+
+[PR #1688](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1688)
+
+---
 
 ### DEPLOY: feat/1685-prio-labels · 20260909-055712
 
