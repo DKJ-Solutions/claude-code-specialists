@@ -578,7 +578,18 @@ function Get-ScriptDotSourceTargets {
     # choice: every caller of this walk runs under Set-StrictMode -Version Latest, where reading an
     # unset variable throws -- so even the "is it initialised yet" test would have to be the first
     # thing to fail. See the assignment beside the records above.
-    $cacheKey = "$Path|$RepoRoot"
+    # THE KEY CARRIES THE FILE'S IDENTITY, NOT ONLY ITS PATH (issue #1693). It was "$Path|$RepoRoot",
+    # which is correct for the caller this memo was built for -- a SessionStart check reading repo files
+    # that nothing rewrites mid-run -- and wrong for any caller that writes a file, reads it, rewrites
+    # it and reads again. That is not hypothetical: fixture-dep-lib.ps1's own suite does exactly that
+    # to make one lib mean something different between sections, and on a path-only key two of its
+    # asserts went red on a stale answer, reading as a bug in the walk rather than in the cache.
+    # The stat costs ~0.13 ms per call against a re-parse of thousands of lines, and it turns a memo
+    # that is correct only while every caller remembers not to rewrite a file -- the enforced-by-memory
+    # shape -- into one that is correct by construction. The Test-Path above guarantees the file is
+    # there, so Get-Item cannot fail here.
+    $stat = Get-Item -LiteralPath $Path
+    $cacheKey = "$Path|$RepoRoot|$($stat.LastWriteTimeUtc.Ticks)|$($stat.Length)"
     if ($script:DotSourceCache.ContainsKey($cacheKey)) { return @($script:DotSourceCache[$cacheKey]) }
 
     $tokens = $null

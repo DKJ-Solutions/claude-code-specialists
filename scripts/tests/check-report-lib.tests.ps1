@@ -34,7 +34,7 @@ function Assert-True {
     else { $script:fail++; Write-Host "  [FAIL] $Label" -ForegroundColor Red }
 }
 
-$Fixture = Join-Path ([System.IO.Path]::GetTempPath()) "check-report-lib-test-$PID"
+$Fixture = Join-Path ([System.IO.Path]::GetTempPath()) "check-report-lib-test-$PID-$([guid]::NewGuid().ToString('n'))"
 
 try {
     Write-Host "== check-report-lib.tests: lens locations and the seam ==" -ForegroundColor Cyan

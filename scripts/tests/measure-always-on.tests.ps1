@@ -70,7 +70,7 @@ $MIDDOT = C 0xB7
 # $PID in the fixture path, per the suite convention in scripts/README.md: the test gate is a throttled
 # PARALLEL scheduler, so two runs at one fixed path tear down each other's tree mid-assert and the
 # visible result is a red gate naming a subject that is fine.
-$Fixture = Join-Path ([System.IO.Path]::GetTempPath()) ("measure-always-on-$PID")
+$Fixture = Join-Path ([System.IO.Path]::GetTempPath()) ("measure-always-on-$PID-$([guid]::NewGuid().ToString('n'))")
 if (Test-Path $Fixture) { Remove-Item -Recurse -Force $Fixture }
 New-Item -ItemType Directory -Path $Fixture -Force | Out-Null
 $Utf8NoBom = New-Object System.Text.UTF8Encoding $false

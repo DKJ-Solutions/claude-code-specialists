@@ -26,7 +26,7 @@ $ErrorActionPreference = 'Stop'
 
 $RepoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
 $Lib      = Join-Path $RepoRoot 'scripts\lib\session-cache-lib.ps1'
-$Fixture  = Join-Path ([System.IO.Path]::GetTempPath()) "session-cache-lib-test-$PID"
+$Fixture  = Join-Path ([System.IO.Path]::GetTempPath()) "session-cache-lib-test-$PID-$([guid]::NewGuid().ToString('n'))"
 $Utf8     = New-Object System.Text.UTF8Encoding $false
 
 $script:pass = 0
