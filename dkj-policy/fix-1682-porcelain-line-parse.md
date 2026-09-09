@@ -107,6 +107,29 @@ before it ships.
       `sync-main` calls `Convert-GitQuotedPath` at five sites; three of the six occurrences are
       comments, so it is three. Corrected in the lib, the mirror and the issue body.
 
+- [x] The test gate caught a regression the review round did not: `park-cycle.tests.ps1`, 10 of 91
+      asserts red. Five fixture suites hand-list the libs they copy into a fixture tree, and
+      `git-porcelain-lib.ps1` was in none of them, so `park-lib`'s **guarded** dot-source found
+      nothing and `Get-GitParkBacking` answered without a backing note. Added to all five
+      (`park-cycle` 91, `park-branch` 31, `new-branch` 255, `entry-scaffold` 796, `worktree-lane` 35 --
+      all green). Filed the general gap as
+      [#1693](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1693).
+
+#### What that regression says about the guard, since this branch wrote the guard
+
+`park-lib` and `fanout-lib` dot-source the new lib **guarded** — `Test-Path` first — and the registry
+entry states the reason: a consumer whose mirror predates this entry must not crash on load. That is
+right for a consumer and it is exactly what made this failure quiet. In a fixture the file is absent
+for a different reason (nobody listed it), and the guard turns "this lib is missing" into "the backing
+note is empty", which is a wrong answer rather than a refusal.
+
+The two suites #1682 named that exercise `park-lib` — `park-branch` and `park-commit` — stayed green
+throughout, because neither asserts the backing note. Only `park-cycle` does, and #1682 did not name
+it. So the four-suite list in the issue was one short, and the gate is what said so.
+
+The four other fixtures were repaired **before** they went red, on the same reasoning: each copies
+`park-lib`, so each is one new assert away from the same failure.
+
 #### A dispatched subagent moved this checkout off the branch, mid-review
 
 While the two reviewers ran, something switched the primary checkout from this branch to `main` --

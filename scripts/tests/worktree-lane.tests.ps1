@@ -39,6 +39,9 @@ $BranchInfoSrc     = Join-Path $RepoRoot 'scripts\lib\branch-info.ps1'
 $NativeCaptureSrc  = Join-Path $RepoRoot 'scripts\lib\native-capture-lib.ps1'
 $EntryScaffoldSrc  = Join-Path $RepoRoot 'scripts\lib\entry-scaffold-lib.ps1'
 $ParkLibSrc        = Join-Path $RepoRoot 'scripts\lib\park-lib.ps1'
+# park-lib dot-sources this one (#1682), guarded -- so a fixture that omits it loses Get-GitParkBacking
+# silently rather than crashing. park-cycle.tests.ps1 is where that cost ten asserts.
+$PorcelainSrc      = Join-Path $RepoRoot 'scripts\lib\git-porcelain-lib.ps1'
 # As in new-branch.tests.ps1: this fixture runs new-branch, which reads the changelog seam through this lib
 # since inbound #967.
 $SeamLibSrc        = Join-Path $RepoRoot 'scripts\lib\seam-lib.ps1'
@@ -135,6 +138,7 @@ function New-Fixture {
     Copy-Item -LiteralPath $NativeCaptureSrc -Destination (Join-Path $dir 'scripts\lib\native-capture-lib.ps1')  -Force
     Copy-Item -LiteralPath $EntryScaffoldSrc -Destination (Join-Path $dir 'scripts\lib\entry-scaffold-lib.ps1')  -Force
     Copy-Item -LiteralPath $ParkLibSrc       -Destination (Join-Path $dir 'scripts\lib\park-lib.ps1')            -Force
+    Copy-Item -LiteralPath $PorcelainSrc     -Destination (Join-Path $dir 'scripts\lib\git-porcelain-lib.ps1')   -Force
     Copy-Item -LiteralPath $SeamLibSrc       -Destination (Join-Path $dir 'scripts\lib\seam-lib.ps1')            -Force
     Copy-Item -LiteralPath $PrIssuesLibSrc   -Destination (Join-Path $dir 'scripts\lib\pr-issues-lib.ps1')       -Force
     Copy-Item -LiteralPath $RemoteAheadLibSrc -Destination (Join-Path $dir 'scripts\lib\remote-ahead-lib.ps1')   -Force
