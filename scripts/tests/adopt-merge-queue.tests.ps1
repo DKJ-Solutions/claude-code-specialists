@@ -49,7 +49,7 @@ $ErrorActionPreference = 'Stop'
 
 $RepoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
 $Script   = Join-Path $RepoRoot 'scripts\task\adopt-merge-queue.ps1'
-$Fixture  = Join-Path ([System.IO.Path]::GetTempPath()) "adopt-merge-queue-test-fixture-$PID"
+$Fixture  = Join-Path ([System.IO.Path]::GetTempPath()) "adopt-merge-queue-test-fixture-$PID-$([guid]::NewGuid().ToString('n'))"
 
 $script:pass = 0
 $script:fail = 0

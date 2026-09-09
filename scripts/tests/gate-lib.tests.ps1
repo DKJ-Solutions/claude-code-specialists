@@ -59,7 +59,7 @@ function Assert-True {
 Assert-True (Test-Path -LiteralPath $LibPath) 'gate-lib.ps1 exists at its registered source path'
 . $LibPath
 
-$FixtureRoot = Join-Path ([System.IO.Path]::GetTempPath()) "gate-lib-tests-$PID"
+$FixtureRoot = Join-Path ([System.IO.Path]::GetTempPath()) "gate-lib-tests-$PID-$([guid]::NewGuid().ToString('n'))"
 $Utf8NoBom   = New-Object System.Text.UTF8Encoding $false
 $script:seq  = 0
 

@@ -410,7 +410,7 @@ try {
     Assert-True ($r.Code -eq 0 -and $r.Out -match 'this checkout is just behind origin' -and $r.Out -match 'git pull --ff-only' -and $r.Out -notmatch 'its fold never ran') `
         'the fold already landed on origin -- the hook reports the stale checkout, never the skipped-fold sentence'
 
-    $r = Invoke-Hook -Dir (New-Tree -Label 'hook-nocheck') -CheckScriptOverride (Join-Path ([System.IO.Path]::GetTempPath()) "no-such-check-$PID.ps1")
+    $r = Invoke-Hook -Dir (New-Tree -Label 'hook-nocheck') -CheckScriptOverride (Join-Path ([System.IO.Path]::GetTempPath()) "no-such-check-$PID-$([guid]::NewGuid().ToString('n')).ps1")
     Assert-True ($r.Code -eq 0 -and $r.Out -match 'check script not found -- check skipped') `
         'check script missing -- a notice, exit 0, never a strand'
 }

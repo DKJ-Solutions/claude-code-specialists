@@ -28,7 +28,7 @@ $ErrorActionPreference = 'Stop'
 
 $RepoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
 $Skill    = Join-Path $RepoRoot 'plugins\dkj-teams\dkj-team-alpha\skills\specialists-teardown\SKILL.md'
-$Fixture  = Join-Path ([System.IO.Path]::GetTempPath()) "specialists-preflight-fixture-$PID"
+$Fixture  = Join-Path ([System.IO.Path]::GetTempPath()) "specialists-preflight-fixture-$PID-$([guid]::NewGuid().ToString('n'))"
 
 $script:pass = 0
 $script:fail = 0

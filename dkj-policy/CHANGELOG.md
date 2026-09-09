@@ -43,7 +43,177 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**30 / 65 minor entries** <!-- pending-tally -->
+**30 / 69 minor entries** <!-- pending-tally -->
+
+### DEPLOY: feat/1693-fixture-lib-dep-check · 20260909-120859
+
+A test suite that builds its fixture by hand-listing the libs it copies can no longer go stale against
+what those libs dot-source. The dot-source is guarded on purpose -- a consumer whose plugin mirror
+predates a lib must not crash on load -- and in a fixture that same guard turns *"nobody listed this
+dependency"* into *"the function is undefined"*, which in one case surfaced as an empty return value
+rather than an error: ten asserts red in one suite while three others exercising the same lib stayed
+green, each one assert away from the same failure. The new suite reads what each lib actually
+dot-sources, including through the variable this tree does it with, and holds every fixture's copy list
+against the whole dependency closure.
+
+It had nothing to check when it was written -- no lib dot-sourced a sibling -- so it was proven against
+the one real instance rather than against an invented one: reconstructed read-only from the branch that
+introduced the first lib-to-lib dependency, the pre-repair state yields exactly one finding naming the
+right pair, and the repaired state yields none. **That branch has since merged**, so the gate now
+measures a live closure through `park-lib` and `fanout-lib` and comes back clean over twelve subjects --
+confirming its repair of the five copy lists rather than waiting for a first subject to exist. The two
+false findings a naive version produced are what shaped it: the destination is the subject rather than
+any path in the command, and a repo-owned seam the caller supplies is not a debt a fixture owes.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A -- nothing here travels. The lib is not in the shared-script registry and the gate reads this
+repo's own `scripts/tests/`, so a consumer receives no file, no new check and no new failure mode from
+it. What it protects is the tree that ships their plugin: the ten red asserts it exists to catch were
+in a branch repairing a shared lib, and a stale fixture there is a defect that reaches a release
+looking green.
+
+**Score:** N/A
+
+#### Pull Request
+
+A test fixture's lib copy list is held against what those libs dot-source
+
+Plugins: dkj-policy
+
+[PR #1707](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1707)
+
+---
+
+### DEPLOY: docs/file-before-you-cite-the-number · 20260909-114616
+
+The filing rules now say that an issue's number does not exist until the issue does: file first, read
+the number back, then write it into the header, the step list or the commit message. Issues and pull
+requests share one counter, so a predicted number is taken by whichever of the two lands first —
+measured twice in one session, in two branches, both times as a citation that had to be corrected after
+it was already written.
+
+It goes in the shared `findings-become-issues` block rather than in a lens, so it reaches every
+consuming repo through the same release as the rules it sits beside. Thirty-one files carry it; one of
+them is on the always-on path, and the bullet was trimmed 25% on a cost measurement before it landed.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+N/A — a consumer receives one more bullet in a boundaries block they already carry, worth ~110 tokens
+on the one always-on body. It changes no behaviour they can observe and no command they run.
+
+**Score:** N/A
+
+#### Pull Request
+
+A finding's issue number does not exist until the issue does
+
+Plugins: dkj-team-alpha, dkj-team-ecomm, dkj-team-lifehub, dkj-team-shopify
+
+[PR #1706](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1706)
+
+---
+
+### DEPLOY: fix/1664-fixture-temp-path-guid · 20260909-112851
+
+Every temp fixture path in `scripts/tests/` now carries a fresh guid as well as `$PID`, and the rule in
+`test-suite-gate.tests.ps1` requires it — `$PID` alone no longer passes. 96 statements across 53 suites
+were rewritten to `<label>-$PID-<guid>` (98 with the two that arrived from `main` mid-branch), which is
+exactly how `New-ScratchPath` composes a path one layer up: the pid stays in front because it is what
+attributes a leftover to a run that is still alive, and the guid is what nobody can name in advance.
+
+Both of those two are the same shape, and worth naming because it is the one this branch cannot close
+by itself: a suite written on `main` while the rule lived only here arrives green by its own lights and
+guid-less by ours. The second, `fanout-lib.tests.ps1`, composed `fanout-lib-test-$PID` and stood at it
+with both `New-Item -ItemType Directory -Force` and `Remove-Item -Recurse -Force` — the write half and
+the teardown half of exactly the failure above. The gate is what caught each of them on the merge, which
+is the argument for the gate rather than against the branch: once this lands, `main` carries the rule and
+the next such suite is refused where it is written instead of here.
+
+This is the half [#1659](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1659) did not
+close. `$PID` is neither secret nor large, so a composed leaf was a name a local actor could reach
+first — and `New-Item -ItemType Directory -Force` and `Remove-Item -Recurse -Force` both follow a
+reparse point, so a symlink or junction pre-planted there redirected the write *and* the teardown.
+Measured before the repair, this guard excluded from both counts: 100 guid-less paths, with 114
+recursive deletes standing at one of them across 49 files. #1659 covered seven sites in the shipping
+layer and only one of those deleted recursively, so the delete half of the class was almost entirely
+here.
+
+Two guards were also hardened rather than merely satisfied. The by-name allowance for `$tag` and
+`$Guid` — which four sites legitimately need, where one path per *child invocation* is required and
+`$PID` is the same for all of them — is now pinned to a fresh guid **of usable width**, read from the
+parsed syntax rather than the line text. That second half is the review's doing: a start-of-line regex
+was the first shape, and a parameter default, an assignment inside a one-line block and one after a
+semicolon all walked past it while the outer rule went on calling the resulting path safe. And the
+`#1326` continuation-fold cases now match on the live pattern instead of a second copy of it: they were
+still asserting the old alternation, which would have left the file proving a rule it no longer enforced.
+
+The guard costs about 1.5s. Parsing all 84 suites would cost 5.5s, so the parse is gated on the fold the
+scan already performs — only three files name either variable, and a file naming neither cannot hold an
+assignment to one.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A — this reaches no subscriber. It is a hardening of this repo's own test fixtures; nothing in the
+plugins a consumer installs changes, and no consumer-facing behaviour moves. The one thing a consumer
+could notice is second-order: `scripts/README.md`'s fixture convention is the page a consumer writing
+their own suite reads, and it now asks for the guid.
+
+**Score:** N/A
+
+#### Pull Request
+
+Test fixture temp paths carry a guid, so a pre-planted link cannot redirect the write or the recursive delete
+
+[PR #1677](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1677)
+
+---
+
+### DEPLOY: fix/1691-prio-1-colour-collision · 20260909-112411
+
+A `prio-1` badge no longer means two different rungs in one family. It was `0E8A16` — the green a
+reader trained in this repo knows as *"nobody is waiting for it"* — which in both BWJ store repos is
+`low`, one rung **above** the floor, and in one of them `sync` as well. It is now `006B75`, verified
+unused across all three trackers. Nothing refuses a colour, so this was the one part of the
+priority-axis decision that could still go wrong silently: `gh` judges a label's name, and a badge is
+read by a person with no command in it to fail.
+
+**It was repaired from this side rather than the one #1691 proposed, and that is the substance.** The
+issue's own repair edits live labels in two repos this one does not own and would have left future
+adopters in a third state, so it was correctly gated on Dave. Moving `prio-1` instead is one command in
+the repo in front of you, needs no access outside, leaves `adopt-dkj-policy-bwj`'s prescribed hexes
+alone, and keeps the two rows that agree on the rung on purpose.
+
+**What it does not settle, and says so rather than implying otherwise.** #1691 gated two things — the
+outside access *and* the colour itself. Repairing from this side answers the first; `006B75` is this
+session's pick, verified unused before it was taken, and one `gh label edit` to override. Inside a BWJ
+repo the same green still carries two labels, which is a BWJ-internal question this branch does not
+reach. And `FBCA04` stays `prio-2` here and `tier-1` there on a weaker argument than the one the green
+moved for: a misread there gets the *kind* wrong, not the rung.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+N/A — a consumer of the plugins notices nothing. The label lives on this repo's own tracker and the
+prose is a repo-local lens; `adopt-dkj-policy-bwj`, which is what a consumer actually receives, is
+deliberately untouched.
+
+**Score:** N/A
+
+#### Pull Request
+
+The prio-1 badge stops meaning two different rungs in one family
+
+[PR #1702](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1702)
+
+---
 
 ### DEPLOY: docs/1653-1654-entry-gate-and-plan-string · 20260909-092020
 
@@ -273,10 +443,14 @@ version would prescribe a convention no gate enforces and hand consumers four la
 for.
 
 **One thing the decision deliberately does not close, and it is now named rather than implied.** The
-same measurement that clears the names indicts the **colours**: `0E8A16` is the floor here and one rung
-above the floor in a BWJ repo, and nothing refuses a colour the way `gh` refuses a name. The lens
+same measurement that clears the names indicts the **colours**: `0E8A16` was the floor here and is one
+rung above the floor in a BWJ repo, and nothing refuses a colour the way `gh` refuses a name. The lens
 carries that table and the instruction not to read a rung off a badge across the two families; the
 repair itself is #1691, because its cheap half edits live labels in two repos this one does not own.
+**That repair has since landed the other way round** — `prio-1` moved off `0E8A16` rather than BWJ's
+`low` moving off it — so this paragraph is the state as this entry was written, and the entry below it
+is what actually happened. The tense is corrected here because this entry is still pending and would
+otherwise ship a sentence that reads as present.
 
 **Score:** 2
 

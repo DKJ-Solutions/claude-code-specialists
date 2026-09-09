@@ -438,7 +438,7 @@ The four exist in the repo since that day:
 | `prio-4` | `B60205` | Highest — takes precedence over other work. A broken gate, or a wrong answer a gate reports as authority. |
 | `prio-3` | `D93F0B` | Ahead of the ordinary backlog. Real, and it costs something every time it is met. |
 | `prio-2` | `FBCA04` | Worth doing, no pressure. The ordinary backlog, and the common answer. |
-| `prio-1` | `0E8A16` | Lowest — nobody is waiting for it. A question parked for the owner, or a tidy-up. |
+| `prio-1` | `006B75` | Lowest — nobody is waiting for it. A question parked for the owner, or a tidy-up. |
 
 **Exactly one, which is a property the obvious command does not give you.** Set it with `--label` on
 the `gh issue create` that files the finding. On an issue that already carries a rung, `--add-label`
@@ -451,7 +451,10 @@ gh issue edit <n> --add-label prio-2                         # only for one that
 
 That is the same rule `dkj-policy-bwj` states for its own four buckets, where the Asana sweep removes
 the other three as it sets one — and it is worth knowing that set exists: `very low`/`low`/`high`/`very
-high`, on three of the same colour codes, in the BWJ store repos. **Different vocabulary, different
+high`, on **two** of the same colour codes, in the BWJ store repos. It was three until
+[#1691](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1691) moved `prio-1` off the
+green the two families disagreed about; the two that remain are the two that agree on the rung, and the
+colour block further down is where that is settled. **Different vocabulary, different
 motor** — that one is derived from an Asana `Prio-Score`, this one is a judgement typed by whoever
 files — so a session moving between the two repo families reaches for a label the other does not have,
 and `gh` fails outright on a label that does not exist.
@@ -508,34 +511,60 @@ half is one `scripts/repo-config.ps1` function stating this repo's own scheme �
 exactly like `Get-ReleaseAudienceTier` and `Get-ShopifyRepoHasNoStore`. Nothing reads it today, so
 nothing is built today.
 
-**WHAT THE DECISION DOES NOT CLOSE, AND IT IS NOT THE NAMES: THE COLOURS DISAGREE ON THE BOTTOM HALF.**
-Raised by the conclusion red-team on the deciding branch, and measured with `gh label list --json
-name,color` on all three trackers rather than read off the table above:
+**THE COLOURS DISAGREED ON THE BOTTOM HALF UNTIL SEPTEMBER 9, 2026, AND THE FIX CAME FROM THIS SIDE**
+([#1691](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1691)). Raised by the
+conclusion red-team on the deciding branch, and measured with `gh label list --json name,color` on all
+three trackers rather than read off the table above — then re-measured on pickup, where it held exactly
+and turned out to be one label worse than filed:
 
 | Colour | Here | In a BWJ repo | Same rung? |
 |---|---|---|---|
-| `B60205` | `prio-4` — top of four | `very high` — top of four | yes |
-| `D93F0B` | `prio-3` — third of four | `high` — third of four | yes |
-| `0E8A16` | `prio-1` — **the floor** | `low` — **second of four** | **no** |
-| `FBCA04` | `prio-2` — second of four | *(no counterpart)* | — |
+| `B60205` | `prio-4` — top of four | `very high` — top of four | yes, deliberately |
+| `D93F0B` | `prio-3` — third of four | `high` — third of four | yes, deliberately |
+| `FBCA04` | `prio-2` — second of four | `tier-1` — **a different axis entirely** | n/a — see below |
+| `006B75` | `prio-1` — the floor | *(unused in the family)* | — |
+| `0E8A16` | *(no counterpart any more)* | `low` — second of four; in xoxowildhearts **also `sync`** | — |
 | `c2e0c6` | *(no counterpart)* | `very low` — the floor | — |
 
-So the two agree on the top two colours and disagree on the bottom two, and the green a reader trained
-here knows as *"nobody is waiting for it"* is one rung **above** the floor over there — where the actual
-floor wears a pale mint this repo does not use at all. **Nothing refuses a colour.** The whole safety
-argument above is about a label's NAME, which `gh` judges; a badge colour is read by a person scanning
-an issue list, and there is no command in it to fail. That is the same *goes-wrong-silently* shape
-[#1686](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1686) was filed to name, moved
-from the text onto an axis the decision's own reasoning does not reach.
+**`prio-1` was `0E8A16` and is now `006B75`.** The green a reader trained here knew as *"nobody is
+waiting for it"* was one rung **above** the floor over there, where the floor wears a pale mint this
+repo does not use. And in **one** of the two BWJ repos — `xoxowildhearts` — `0E8A16` turned out to
+carry a second label as well, `sync`, which the filing had not caught; in `smartwatchbanden` that same
+label is grey (`6e7781`), so the doubling is that one store's alone. **Nothing refuses a colour**: the whole safety argument above is about a label's
+NAME, which `gh` judges, and a badge is read by a person scanning an issue list with no command in it to
+fail. That is [#1686](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1686)'s own
+*goes-wrong-silently* shape, moved onto an axis its reasoning does not reach.
 
-**It is left open deliberately, and it is not left unrecorded.** The cheap repair — re-colouring BWJ's
-`low` away from `0E8A16` — is one `gh label edit --color` per store and touches neither `asana-mirror.ps1`
-(which matches by name) nor its suite. But it is an edit to **live labels in two repos this one does not
-own**, and doing only the half that lives here (the hex codes
-`adopt-dkj-policy-bwj`'s step 4 prescribes) would leave the fleet in a third state, since that skill is
-additive and never rewrites an existing label. Both halves therefore belong to one change and to Dave:
-filed as [#1691](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1691). **Until then, do
-not read a rung off a badge colour across the two families** — read the name.
+**Why this side and not the BWJ side, which is what #1691 proposed.** Re-colouring BWJ's `low` is an
+edit to live labels in **two repos this one does not own**, and doing only the half that lives here —
+the hex codes `adopt-dkj-policy-bwj`'s step 4 prescribes — would leave the fleet in a third state,
+since that skill is additive and never rewrites an existing label. Both halves therefore belonged to one
+change and to Dave. Moving **`prio-1`** instead is one `gh label edit` in the repo in front of you: it
+needs no access outside, it leaves that skill's prescribed hexes untouched so no future adopter gets a
+third answer, and it keeps the two rows that agree on purpose. `006B75` was verified unused across all
+three trackers before it was taken.
+
+**`FBCA04` is left alone, and the residual risk is named rather than dismissed** — the conclusion
+red-team on this branch is why that sentence is not the one first written. It is `prio-2` here and
+`tier-1` in a BWJ repo, a **reach** label rather than a rung, so the two are not answers to the same
+question. What that does **not** buy is safety by the argument used to repair the green: *"a badge is
+read by a person with no command in it to fail"* says nothing about axes, and a reader scanning yellow
+does not stop to check whether the label under it is a rung before reacting — `tier-1` sits on a BWJ
+issue independently of that issue's prio label, so both can be on one row. So the reason it is left is
+weaker than the reason the green was moved: the misread cannot make a *rung* wrong, only a *kind*, and
+changing it would break this repo's own readable ramp, which is now teal → yellow → orange → red. No
+instance of either misread has been observed.
+
+**And `006B75` was chosen on exact-hex uniqueness, which is not perceptual distinctness** — the same
+red-team's other catch. It sits 14 degrees of hue and 0.03 of lightness from `help wanted`'s `008672`,
+so at badge size the two dark teals are close, and one means *"nobody is waiting for it"* while the
+other means the opposite. Accepted rather than churned, and measured first: `help wanted` has been used
+**once** in this repo's whole history, on the closed #1215, and never on a pull request. The costs of
+moving again are real — a third colour for `prio-1` inside one day would re-stale this block, the
+changelog entry above it and the badge on every issue already labelled. What is also given up, and is
+worth stating because it was not free: the floor no longer wears green, so the traffic-light reading
+every sighted reader brings to a badge is one rung off in this repo. **Read the name, not the badge**,
+remains the standing rule for anything but the two rows marked deliberate.
 
 **It is a separate axis from the prefix→label mapping in
 [step 2](#classifying-naming-and-creating-a-branch), which is about a PULL REQUEST.** `enhancement`,

@@ -23,7 +23,7 @@ $ErrorActionPreference = 'Stop'
 
 . (Join-Path $PSScriptRoot 'check-plugin-integrity-fixture.ps1')
 
-$Fixture = Join-Path ([System.IO.Path]::GetTempPath()) ("check-plugin-integrity-commands-$PID")
+$Fixture = Join-Path ([System.IO.Path]::GetTempPath()) ("check-plugin-integrity-commands-$PID-$([guid]::NewGuid().ToString('n'))")
 
 try {
     New-IntegrityFixture -Fixture $Fixture

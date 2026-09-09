@@ -48,7 +48,7 @@ $ContractLib   = Join-Path $RepoRoot 'scripts\lib\script-contract-lib.ps1'
 $Hook          = Join-Path $RepoRoot 'plugins\dkj-policy\hooks\script-contract-sessioncheck.ps1'
 $BranchInfoSrc = Join-Path $RepoRoot 'scripts\lib\branch-info.ps1'
 $RepoConfigSrc = Join-Path $RepoRoot 'scripts\repo-config.ps1'
-$Fixture       = Join-Path ([System.IO.Path]::GetTempPath()) "script-contract-test-fixture-$PID"
+$Fixture       = Join-Path ([System.IO.Path]::GetTempPath()) "script-contract-test-fixture-$PID-$([guid]::NewGuid().ToString('n'))"
 
 $script:pass = 0
 $script:fail = 0
@@ -788,6 +788,35 @@ function Get-RosterIgnoredIds { return @() }
     $r = Invoke-Hook @('-CheckScriptOverride', $missing)
     Assert-Equal 0 $r.Code 'hook missing check script: exit 0'
     Assert-Match 'not found -- check skipped' $r.Out 'hook missing check script: notice'
+
+    # --- 10. Get-ScriptDotSourceTargets' memo is keyed on the FILE, not the path (issue #1693) ----
+    #
+    # THE ASSERT LIVES HERE BECAUSE THIS IS THE LIB THAT OWNS THE MEMO. It was keyed on
+    # "$Path|$RepoRoot", which is correct for this suite's own caller -- a SessionStart check reading
+    # repo files nothing rewrites mid-run -- and wrong for any caller that writes a file, reads it,
+    # rewrites it and reads again. fixture-dep-lib.ps1 became exactly that caller when it stopped
+    # carrying a second AST walker of its own, and on the path-only key two of its asserts went red on
+    # a stale answer, reading as a bug in the walk rather than in the cache.
+    #
+    # Asserted from the shared lib's side as well as from that caller's, because whoever edits this
+    # memo next reads this file, and an assert two libs away is one nobody will find.
+    $memoDir = Join-Path $Fixture 'memo'
+    New-Item -ItemType Directory -Path (Join-Path $memoDir 'scripts\lib') -Force | Out-Null
+    $memoLib = Join-Path $memoDir 'scripts\lib\memo-probe-lib.ps1'
+    $memoDep = Join-Path $memoDir 'scripts\lib\memo-dep-lib.ps1'
+    [System.IO.File]::WriteAllText($memoDep, "function Get-MemoDep { 'dep' }`n")
+    [System.IO.File]::WriteAllText($memoLib, @'
+$memoProbeDep = Join-Path $PSScriptRoot 'memo-dep-lib.ps1'
+if (Test-Path -LiteralPath $memoProbeDep -PathType Leaf) { . $memoProbeDep }
+'@)
+    $firstRead = @(Get-ScriptDotSourceTargets -Path $memoLib -RepoRoot $memoDir)
+    Assert-Equal 1 $firstRead.Count 'memo key: the first read finds the dot-sourced sibling'
+
+    # A different last-write tick is what the key must notice; the sleep is what guarantees one.
+    Start-Sleep -Milliseconds 20
+    [System.IO.File]::WriteAllText($memoLib, "function Get-MemoProbe { 'nothing dot-sourced now' }`n")
+    $secondRead = @(Get-ScriptDotSourceTargets -Path $memoLib -RepoRoot $memoDir)
+    Assert-Equal 0 $secondRead.Count 'memo key: a rewrite at the SAME path is read again rather than served from the memo'
 } finally {
     if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture -ErrorAction SilentlyContinue }
 }

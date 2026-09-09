@@ -72,8 +72,8 @@ function Assert-Says {
 }
 
 $Utf8NoBom = New-Object System.Text.UTF8Encoding $false
-$fakeBin = Join-Path ([System.IO.Path]::GetTempPath()) ("verify-resolved-bin-$PID")
-$callLog = Join-Path ([System.IO.Path]::GetTempPath()) ("verify-resolved-calls-$PID.log")
+$fakeBin = Join-Path ([System.IO.Path]::GetTempPath()) ("verify-resolved-bin-$PID-$([guid]::NewGuid().ToString('n'))")
+$callLog = Join-Path ([System.IO.Path]::GetTempPath()) ("verify-resolved-calls-$PID-$([guid]::NewGuid().ToString('n')).log")
 $prevPath = $env:PATH
 $prevEap = $ErrorActionPreference
 

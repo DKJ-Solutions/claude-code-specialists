@@ -82,7 +82,7 @@ $EMDASH = C 0x2014
 $EMDASH_BAD = C 0xE2, 0x20AC, 0x201D
 
 $Utf8NoBom = New-Object System.Text.UTF8Encoding $false
-$Fixture = Join-Path ([System.IO.Path]::GetTempPath()) ("mojibake-fix-$PID")
+$Fixture = Join-Path ([System.IO.Path]::GetTempPath()) ("mojibake-fix-$PID-$([guid]::NewGuid().ToString('n'))")
 New-Item -ItemType Directory -Path $Fixture -Force | Out-Null
 
 function Invoke-Fix {

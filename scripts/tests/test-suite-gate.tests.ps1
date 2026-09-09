@@ -78,7 +78,7 @@ function Assert-Says {
     }
 }
 
-$Fixture   = Join-Path ([System.IO.Path]::GetTempPath()) "test-suite-gate-test-$PID"
+$Fixture   = Join-Path ([System.IO.Path]::GetTempPath()) "test-suite-gate-test-$PID-$([guid]::NewGuid().ToString('n'))"
 $Utf8NoBom = New-Object System.Text.UTF8Encoding $false
 
 # THE CAPTURE DIRECTORIES A RED FIXTURE RUN DELIBERATELY LEAVES BEHIND (issue #1636), removed in this
@@ -171,6 +171,97 @@ function Join-BacktickContinuation {
         $out.Add([pscustomobject]@{ Line = $start; Text = $stmt })
     }
     ,$out
+}
+
+function Get-FakeFreshAssignment {
+    <#
+        Every place a suite gives one of the "holds a fresh value" variable names a value that is NOT a
+        fresh guid of usable width. Returns 'file:line' strings, empty when the file is clean.
+
+        WHY THIS READS THE PARSED SYNTAX AND NOT THE LINE TEXT. The rule above accepts '$tag' in a fixture
+        path BY NAME, so this is the check that makes the name mean something -- and a start-of-line regex
+        was the first shape, which Sebastian broke three ways on the branch that introduced it (#1664):
+
+            param([string]$tag = 'fixed-value')       a parameter default -- idiomatic, and not an
+                                                      assignment statement at all
+            if (-not $tag) { $tag = 'literal' }       an assignment inside a one-line block
+            $x = 1; $tag = 'literal'                  a semicolon-joined statement
+
+        None of the three starts its physical line with the assignment, so none was seen, while the outer
+        rule went on calling the resulting path safe because the text '$tag' appeared on it. That is the
+        same class of defect this tree has twice repaired elsewhere by moving a guard onto the AST -- see
+        source-repo-guard.tests.ps1, where a whole-file match on a lib's NAME could not tell loading it
+        from talking about it. The parser has no start-of-line notion, so all three forms are ordinary
+        nodes to it and the evasions are not evasions.
+
+        AND THE WIDTH IS BOUNDED, because 'contains NewGuid' is not the same claim as 'is unguessable'.
+        [Guid]::NewGuid().ToString('N').Substring(0, 1) names a guid and yields four bits, which a
+        neighbour pre-plants sixteen times. The two real call sites take 8 hex characters (32 bits), which
+        is far beyond a blind local pre-plant, so the floor sits there rather than at the full 32.
+
+        THE NAME IS READ FROM UserPath AND THE SCOPE STRIPPED HERE, not from UnqualifiedPath, which is the
+        property that obviously ought to serve and returns an EMPTY STRING on Windows PowerShell 5.1 --
+        measured on this machine, 5.1.26100.9278, for '$tag', '$script:tag' and '[string]$Guid' alike. The
+        first version of this function used it and therefore matched nothing at all: every one of the six
+        cases below reported 0, while the AST walk around it was already correct. It is worth naming
+        because the failure is silent in the dangerous direction -- a guard that finds nothing looks
+        exactly like a tree with nothing to find, and the only reason it was caught is that these cases
+        assert a positive count rather than merely asserting the suite stays green.
+    #>
+    param([Parameter(Mandatory = $true)][string]$Path, [Parameter(Mandatory = $true)][string[]]$Names)
+
+    $MinHexWidth = 8
+    $found = @()
+    $leaf  = Split-Path -Leaf $Path
+
+    $tokens = $null; $errors = $null
+    $ast = [System.Management.Automation.Language.Parser]::ParseFile($Path, [ref]$tokens, [ref]$errors)
+    # A suite that does not parse is a separate, louder problem than this one, and every suite in this
+    # tree parses (the gate runs them). Returning nothing is right: reporting a parse error here would
+    # attribute it to the fixture convention.
+    if ($errors -and $errors.Count) { return $found }
+
+    # UserPath carries the scope ('script:tag'); take what follows the last colon. Empty for a plain name.
+    function Get-BareVarName {
+        param($VariablePath)
+        $u = "$($VariablePath.UserPath)"
+        if ($u -match '^[A-Za-z]+:(.*)$') { return $Matches[1] }
+        return $u
+    }
+
+    function Test-FreshEnough {
+        param($ValueAst, [int]$MinWidth)
+        if ($null -eq $ValueAst) { return $false }
+        $text = $ValueAst.Extent.Text
+        if ($text -notmatch 'NewGuid') { return $false }
+        # A truncation narrows it; anything else keeps the full guid.
+        foreach ($m in [regex]::Matches($text, 'Substring\(\s*\d+\s*,\s*(\d+)\s*\)')) {
+            if ([int]$m.Groups[1].Value -lt $MinWidth) { return $false }
+        }
+        return $true
+    }
+
+    # (a) ordinary assignments -- wherever they sit: inside a block, after a semicolon, in a loop body.
+    foreach ($node in $ast.FindAll({ $args[0] -is [System.Management.Automation.Language.AssignmentStatementAst] }, $true)) {
+        $left = $node.Left
+        # '$tag = ...' and '[string]$tag = ...' both reach the variable through a convert expression.
+        while ($left -is [System.Management.Automation.Language.ConvertExpressionAst]) { $left = $left.Child }
+        if ($left -isnot [System.Management.Automation.Language.VariableExpressionAst]) { continue }
+        if ($Names -notcontains (Get-BareVarName -VariablePath $left.VariablePath)) { continue }
+        if (Test-FreshEnough -ValueAst $node.Right -MinWidth $MinHexWidth) { continue }
+        $found += ('{0}:{1}' -f $leaf, $node.Extent.StartLineNumber)
+    }
+
+    # (b) parameter defaults -- not assignment statements, and the form a regex on '^\s*$tag\s*=' can
+    # never see. A default is a value the variable holds whenever the caller omits it.
+    foreach ($node in $ast.FindAll({ $args[0] -is [System.Management.Automation.Language.ParameterAst] }, $true)) {
+        if ($Names -notcontains (Get-BareVarName -VariablePath $node.Name.VariablePath)) { continue }
+        if ($null -eq $node.DefaultValue) { continue }
+        if (Test-FreshEnough -ValueAst $node.DefaultValue -MinWidth $MinHexWidth) { continue }
+        $found += ('{0}:{1}' -f $leaf, $node.Extent.StartLineNumber)
+    }
+
+    return $found
 }
 
 try {
@@ -540,7 +631,7 @@ finally {
     }
 }
 
-# --- Every suite's temp fixture must be per-process ------------------------------------------------
+# --- Every suite's temp fixture must be UNGUESSABLE, not merely per-process -----------------------
 #
 # THE FAILURE THIS PREVENTS, measured on August 11, 2026. Running one suite by hand while the gate was
 # running produced TWO failing asserts in connectors.tests.ps1 -- a suite that passes on its own. Nothing
@@ -548,6 +639,28 @@ finally {
 # tore down the other's tree mid-assert. The visible result is a red gate naming a subject that is fine,
 # which is the most expensive kind of false failure because the obvious next move is to go and read the
 # subject.
+#
+# AND SINCE #1664 IT PREVENTS A SECOND, LARGER ONE -- which is why the rule asks for a guid and no longer
+# accepts $PID alone. $PID is neither secret nor large, so a composed fixture leaf is a name a local actor
+# can reach FIRST: New-Item -ItemType Directory -Force and Remove-Item -Recurse -Force both follow a
+# reparse point, so a symlink or junction pre-planted at that exact path redirects the write AND the
+# teardown. Measured September 8, 2026 across these suites, this guard excluded from both counts: 100
+# guid-less composed paths, and 114 recursive deletes standing at one of them across 49 files. That is
+# the same class #1659 closed in the shipping layer, and the delete half is the part #1659 had almost
+# none of -- one site of its seven.
+#
+# THE TWO QUESTIONS ARE NOT THE SAME QUESTION, and conflating them is what left the exposure standing for
+# a month. $PID answers "will two concurrent runs tear down each other's tree" -- correctly, and it is
+# still required for the reason below. It says nothing about whether somebody who can write to the temp
+# directory can be there first, because it is not a secret. Only a value nobody can name in advance
+# answers that, and nothing can be pre-planted at a name that does not exist until the moment it is used.
+#
+# $PID STAYS IN FRONT OF THE GUID, exactly as New-ScratchPath composes it (scripts/lib/native-capture-lib.ps1).
+# It buys nothing against an attacker and is not there for that: it is what makes a leftover attributable
+# to a run that is still alive, which is what this suite's own retained-capture note (#1636) prints for a
+# reader -- and what its gate-capture lookup at the top of this file GLOBS on ('<label>-<pid>-*'). That
+# lookup is the one place in scripts/tests that reads a temp leaf back by name, and it already tolerates a
+# guid suffix, which is what established that the $PID spelling was nowhere load-bearing (#1664).
 #
 # WHY THIS SUITE OWNS THE RULE. Since #512 the gate is a throttled PARALLEL scheduler, so concurrency is
 # this file's subject. There is no collision WITHIN one gate run -- each fixture name is unique per suite
@@ -557,53 +670,85 @@ finally {
 # MEASURED BEFORE BEING WRITTEN: 38 of the temp paths in these suites already carried $PID or a GUID and
 # 14 did not, across 11 files. So this asserts a convention the suites had already chosen, rather than
 # imposing a new one -- which is also why the 14 repaired sites carry no explanatory comment: the 38 that
-# were already right do not either, and a comment on half of them would read as the odd case.
+# were already right do not either, and a comment on half of them would read as the odd case. The same
+# reasoning is why the 96 sites #1664 rewrote carry none: after it, EVERY site is guid-keyed, so a comment
+# would mark the ordinary case.
 #
-# THE SUBJECT IS THE DISCRIMINATOR, NOT THE SPELLING. $PID, a fresh GUID and a per-case label built on top
-# of either all pass; a bare literal does not. Two suites legitimately use a GUID rather than $PID because
-# they create one file PER CHILD INVOCATION and $PID would be the same for all of them.
+# THE SUBJECT IS THE DISCRIMINATOR, NOT THE SPELLING. A fresh GUID inline, or a variable holding one, or a
+# per-case label built on top of either, all pass; $PID alone and a bare literal do not. The two accepted
+# variable names are pinned by the assert below, so the by-name allowance cannot decay into a fixed value.
 #
 # And the spelling includes the LINE BREAKS. Backtick continuations are folded first, so the unit judged
 # is a statement rather than a physical line: a discriminator on the far side of a `-continuation is in
 # view, and a path split so that GetTempPath() and Join-Path land on different lines is still seen (#1326).
 Write-Host ''
-Write-Host 'every suite keeps its temp fixture per-process' -ForegroundColor Cyan
+Write-Host 'every suite keeps its temp fixture unguessable' -ForegroundColor Cyan
 # This file is the guard, not a fixture-building suite -- it carries GetTempPath()/Join-Path in its
 # own prose and in the #1326 fold cases below, which are test DATA rather than paths a run creates.
-# Its one real fixture ($Fixture, at the top) is $PID-keyed. A guard scanning itself only re-checks
-# its own example strings, so it is left out.
+# Its one real fixture ($Fixture, at the top) is guid-keyed like every other. A guard scanning itself
+# only re-checks its own example strings, so it is left out.
 $self = 'test-suite-gate.tests.ps1'
 $suiteFiles = @(Get-ChildItem -Path (Join-Path $RepoRoot 'scripts\tests') -Filter '*.ps1' -File |
     Where-Object { $_.Name -ne $self })
 Assert-True ($suiteFiles.Count -gt 20) "the scan found the suites (saw $($suiteFiles.Count) files)"
 
+# The two accepted variable names, declared before the scan because BOTH checks below read them: the
+# discriminator is built from them, and the second check reads their assignments.
+#
+# A path is safe when its name carries a value NOBODY CAN NAME IN ADVANCE: a fresh guid inline, or one of
+# these two variables holding one. $PID is no longer enough on its own (#1664) and neither is $Label --
+# the latter varies within a run and repeats across them, which is exactly the case that was wrong in
+# bootstrap-drift.
+$FreshValueVars = @('tag', 'Guid')
+$discriminator = 'NewGuid|' + (($FreshValueVars | ForEach-Object { '\$' + $_ + '\b' }) -join '|')
+
+# ONE PASS, AND THE EXPENSIVE HALF IS GATED ON THE CHEAP ONE. Reading and folding these ~84 files costs
+# ~0.55s and the matching is noise beside it, so both checks share the walk -- #1664 first added the
+# second one as a second identical walk, which Nolan measured at 0.64s of pure duplication.
+#
+# The AST parse is the part that had to be bounded rather than merely shared. Parsing all 84 files costs
+# ~5.5s, which would have made the fix for that 0.64s duplicate eight times worse than the duplicate; but
+# only THREE files in this tree so much as name one of these variables, and parsing those three costs
+# ~1.5s. So the fold above -- already paid for -- decides whether the parse happens at all. A file naming
+# neither name has no assignment to either and nothing for the parser to find, so the gate cannot hide an
+# offender: the token it screens on is the same one the offending assignment must contain.
+$nameProbe = '\$(?:[A-Za-z]+:)?(?:' + ($FreshValueVars -join '|') + ')\b'
 $tempLines = New-Object System.Collections.Generic.List[pscustomobject]
+$fakeFresh = @()
 foreach ($sf in $suiteFiles) {
     $folded = Join-BacktickContinuation ([System.IO.File]::ReadAllLines($sf.FullName))
+    $namesFreshVar = $false
     foreach ($stmt in $folded) {
+        if (-not $namesFreshVar -and $stmt.Text -match $nameProbe) { $namesFreshVar = $true }
         if ($stmt.Text -notmatch 'GetTempPath\(\)') { continue }
         # This file's own guard quotes the API in prose above; only statements that BUILD a path count.
         if ($stmt.Text -notmatch 'Join-Path') { continue }
         $tempLines.Add([pscustomobject]@{ File = $sf.Name; Line = $stmt.Line; Text = $stmt.Text.Trim() })
     }
+    if ($namesFreshVar) { $fakeFresh += @(Get-FakeFreshAssignment -Path $sf.FullName -Names $FreshValueVars) }
 }
 Assert-True ($tempLines.Count -gt 40) "the scan really read the temp paths (found $($tempLines.Count))"
 
-# A path is safe when its name carries something that differs between two concurrent processes: $PID, or a
-# variable holding a freshly generated value. $Label alone is NOT enough -- it varies within a run and
-# repeats across them, which is exactly the case that was wrong in bootstrap-drift.
-$unsafe = @($tempLines | Where-Object { $_.Text -notmatch '\$PID|\$tag|\$Guid|NewGuid' })
-Assert-Equal 0 $unsafe.Count ("every temp fixture path is per-process (offenders: " +
+$unsafe = @($tempLines | Where-Object { $_.Text -notmatch $discriminator })
+Assert-Equal 0 $unsafe.Count ("every temp fixture path is unguessable (offenders: " +
     (@($unsafe | ForEach-Object { "$($_.File):$($_.Line)" }) -join ', ') + ')')
+
+Assert-Equal 0 $fakeFresh.Count ("every `$tag/`$Guid is assigned from a fresh guid of usable width " +
+    "(offenders: " + ($fakeFresh -join ', ') + ')')
 
 # --- The continuation fold, exercised directly (#1326) ---------------------------------------------
 #
 # The scan above trusted the discriminator to sit on the same physical line as the GetTempPath()/
 # Join-Path pair. A backtick continuation puts it on the next line, and the assert then reported a
 # path that is in fact per-process -- measured on fix/guard-coverage-comment-counts (#1321), where a
-# helper carrying both $PID and a fresh GUID was named as an offender. These two cases pin the fold:
+# helper carrying both $PID and a fresh GUID was named as an offender. These three cases pin the fold:
 # a split SAFE path must fold to one statement with its discriminator visible, and a split BARE
-# literal must still be caught.
+# literal must still be caught -- as must a split $PID-ONLY path, since #1664.
+#
+# THEY MATCH ON $discriminator RATHER THAN ON A COPY OF IT. Spelling the pattern out a second time here
+# is what let the two halves drift apart: these cases were still asserting the pre-#1664 alternation
+# (which accepted $PID) after the rule above had stopped accepting it, so the file would have gone on
+# proving a rule it no longer enforced -- green, and about nothing.
 Write-Host ''
 Write-Host 'a backtick continuation does not hide the discriminator' -ForegroundColor Cyan
 $splitSafe = Join-BacktickContinuation @(
@@ -613,15 +758,67 @@ $splitSafe = Join-BacktickContinuation @(
 Assert-Equal 1 $splitSafe.Count 'a backtick continuation folds to a single statement'
 Assert-True (($splitSafe[0].Text -match 'GetTempPath\(\)') -and ($splitSafe[0].Text -match 'Join-Path')) `
     'the folded statement still carries both path markers'
-Assert-True ($splitSafe[0].Text -match '\$PID|\$tag|\$Guid|NewGuid') `
+Assert-True ($splitSafe[0].Text -match $discriminator) `
     'and the discriminator after the continuation is now in view'
 
 $splitBare = Join-BacktickContinuation @(
     '    $p = Join-Path ([System.IO.Path]::GetTempPath()) `',
     '        "fixed-fixture-name.ps1"'
 )
-Assert-True ($splitBare[0].Text -notmatch '\$PID|\$tag|\$Guid|NewGuid') `
+Assert-True ($splitBare[0].Text -notmatch $discriminator) `
     'a bare literal split across a continuation is still reported'
+
+# THE CASE #1664 ADDED, and the only one that separates the new rule from the old. A $PID-keyed path is
+# still per-process, so the pre-#1664 alternation called it safe; it is guessable, so this rule does not.
+# Without this case the tightening is asserted nowhere -- every other case here passes under both
+# patterns, which is exactly how a regex change can look proven while nothing tests it.
+$splitPidOnly = Join-BacktickContinuation @(
+    '    $p = Join-Path ([System.IO.Path]::GetTempPath()) `',
+    '        "srguard-$PID-$Label.ps1"'
+)
+Assert-True ($splitPidOnly[0].Text -notmatch $discriminator) `
+    'a $PID-only path is reported now, per-process though it is (#1664)'
+Assert-True ($splitPidOnly[0].Text -match '\$PID') `
+    'and it is reported BECAUSE of the guid, not because $PID went missing'
+
+# --- The by-name allowance cannot be faked (#1664, after Sebastian's review) -----------------------
+#
+# The rule above accepts '$tag' in a fixture path by NAME, so Get-FakeFreshAssignment is what stops that
+# name being given a predictable value. These cases are the three forms that defeated its first,
+# regex-on-the-line shape, plus the width floor -- each written to a real file, because the subject is a
+# parser and a parser needs something to parse.
+Write-Host ''
+Write-Host 'the $tag/$Guid allowance cannot be faked' -ForegroundColor Cyan
+$astProbe = Join-Path $Fixture 'astprobe'
+New-Item -ItemType Directory -Path $astProbe -Force | Out-Null
+
+function Test-FakeFresh {
+    param([string]$Label, [string]$Body)
+    $p = Join-Path $astProbe ("$Label.ps1")
+    [System.IO.File]::WriteAllText($p, $Body, $Utf8NoBom)
+    return @(Get-FakeFreshAssignment -Path $p -Names @('tag', 'Guid'))
+}
+
+Assert-Equal 1 (Test-FakeFresh 'paramdefault' "function F {`n    param([string]`$tag = 'fixed-value')`n}`n").Count `
+    'a parameter default holding a literal is reported -- the form no line regex can see'
+Assert-Equal 1 (Test-FakeFresh 'inblock'      "if (-not `$tag) { `$tag = 'literal' }`n").Count `
+    'an assignment inside a one-line block is reported'
+Assert-Equal 1 (Test-FakeFresh 'semicolon'    "`$x = 1; `$tag = 'literal'`n").Count `
+    'an assignment after a semicolon is reported'
+Assert-Equal 1 (Test-FakeFresh 'scoped'       "`$script:tag = `$PID`n").Count `
+    'a scope prefix does not hide it, and `$PID is not a fresh value'
+Assert-Equal 1 (Test-FakeFresh 'narrow'       "`$tag = [Guid]::NewGuid().ToString('N').Substring(0, 1)`n").Count `
+    'a guid truncated to four bits is reported -- naming NewGuid is not the same claim as being unguessable'
+Assert-Equal 1 (Test-FakeFresh 'typed'        "[string]`$tag = 'literal'`n").Count `
+    'a type constraint on the left does not hide it'
+
+# And the honest forms stay silent, so the check is not simply refusing the name.
+Assert-Equal 0 (Test-FakeFresh 'okfull'   "`$tag = [guid]::NewGuid().ToString('n')`n").Count `
+    'a full fresh guid passes'
+Assert-Equal 0 (Test-FakeFresh 'okwidth'  "`$tag = [Guid]::NewGuid().ToString('N').Substring(0, 8)`n").Count `
+    'and so does the 8-character slice the two real call sites use'
+Assert-Equal 0 (Test-FakeFresh 'okother'  "`$other = 'literal'`n").Count `
+    'a variable outside the allowance is not this check subject'
 
 Write-Host ''
 Write-Host "Result: $script:pass pass, $script:fail fail." -ForegroundColor $(if ($script:fail -eq 0) { 'Green' } else { 'Red' })
