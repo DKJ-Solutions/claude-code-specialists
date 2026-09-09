@@ -2436,6 +2436,14 @@ Write-Host "ship-pr: PR #$pr merged (--$mergeMethod)." -ForegroundColor Green
 # detached, which reads as 'HEAD'): the session moved, its checkout is not this script's to touch, and
 # the fold runs in a throwaway worktree instead.
 #
+# AND SINCE #1753 IT IS CHOSEN ON THE TREE'S CLEANLINESS AS WELL AS ON HEAD'S LOCATION -- because the two
+# outcomes measured above were never conditional on HEAD having MOVED. They are what an unclean tree does
+# to `git checkout main`, and the arm that runs it kept running it whenever HEAD was where this script
+# left it. Both were still live on the ordinary foreground run, and PR #1752 hit the second one: the edit
+# did not collide, the checkout succeeded, the uncommitted path travelled to the trunk -- and the ff-only
+# merge one block down then failed on that same path, which is the first outcome arriving one step later.
+# Step 2b had already read exactly this and declined the trunk on it; step 5 simply did not ask.
+#
 # 'ALREADY ON main' IS NOW THE ORDINARY ARM RATHER THAN THE ODD ONE (issue #1073). Step 2b puts the
 # primary checkout back on the trunk as soon as the PR exists, so on a normal run this `git checkout
 # main` is a no-op that the script takes on purpose. Nothing here needed changing for that -- the arm
@@ -2491,6 +2499,11 @@ function Remove-ShipFoldWorktree {
     }
 }
 
+# ONE DEFINITION FOR THE THREE REMEDIES BELOW THAT PRINT IT. It was composed separately inside each of
+# the two refusal arms, and #1753 would have added a third copy of a line that is the same in all of
+# them -- so it is hoisted here, above the first arm that can reach it.
+$foldScript = Join-Path $PSScriptRoot 'fold-changelog-entry.ps1'
+
 $foldTree = $null
 $headRead = Invoke-NativeCapture -FilePath 'git' -Arguments @('rev-parse', '--abbrev-ref', 'HEAD')
 $headLine = @($headRead.Output | Where-Object { $_ -and "$_".Trim() }) | Select-Object -First 1
@@ -2499,7 +2512,24 @@ $headLine = @($headRead.Output | Where-Object { $_ -and "$_".Trim() }) | Select-
 # costs the two outcomes above.
 $headNow = if ($headRead.ExitCode -eq 0 -and $headLine) { "$headLine".Trim() } else { '' }
 
-if ($headNow -eq $branch -or $headNow -eq 'main') {
+# AND SO DOES AN UNCLEAN TREE (issue #1753). The `git checkout main` below is the SAME checkout step 2b
+# declined before the CI wait -- "a checkout would take them to the trunk or fail on them" -- and until
+# this read it was made anyway, after the merge instead of before it, which is where that cost stops
+# being recoverable. Measured shipping PR #1752: one unrelated uncommitted path, dragged onto the trunk
+# by this line, and the ff-only merge below then failed on it. Merged, not folded.
+#
+# READ HERE RATHER THAN REUSED FROM STEP 2B, and the CI wait is why: that reading was taken before the
+# longest step in the run, and this arm turns on what the tree holds NOW. The verdict itself is
+# Get-FoldTreeDecision's, and tested there -- including why the trunk arm is exempt from the dirt test.
+$statusAtFold = Invoke-NativeCapture -FilePath 'git' -Arguments @('status', '--porcelain')
+# AN UNREADABLE STATUS COUNTS AS DIRTY, which is the opposite of step 2b's best-effort posture and is
+# deliberate: there, an unreadable answer costs a convenience (the tree stays on its branch); here it
+# would cost the fold. The worktree arm is correct whatever the tree holds, so guessing toward it is
+# free -- one temporary directory -- while guessing the other way is the half-state above.
+$statusAtFoldLines = if ($statusAtFold.ExitCode -eq 0) { @($statusAtFold.Output) } else { @('?? <unreadable>') }
+$foldDecision = Get-FoldTreeDecision -Head $headNow -ShipBranch $branch -TrunkBranch 'main' -StatusLines $statusAtFoldLines
+
+if ($foldDecision.InPlace) {
     $co = Invoke-NativeCapture -FilePath 'git' -Arguments @('checkout', 'main')
     $co.Output | ForEach-Object { Write-Host $_ }
     # A BARE "git checkout main failed" USED TO BE THE WHOLE MESSAGE HERE, and this is the exact line the
@@ -2509,7 +2539,6 @@ if ($headNow -eq $branch -or $headNow -eq 'main') {
     # took 'main' while step 3 watched CI. So say the same thing the worktree arm below says: the state
     # the repo is actually in, and the two commands that finish the job by hand.
     if ($co.ExitCode -ne 0) {
-        $foldScript = Join-Path $PSScriptRoot 'fold-changelog-entry.ps1'
         Write-Error @"
 PR #$pr IS MERGED but NOT folded -- this tree could not check out main.
 
@@ -2529,17 +2558,18 @@ release trips over it. Fold from the tree that HOLDS main -- fold-changelog-entr
     }
 } else {
     $foldTree = New-ScratchPath -Label "ship-pr-fold-$pr"
-    # $headNow IS A SECOND REF NAME AND GETS THE SAME STRIP (issue #1623). It is read off HEAD exactly as
-    # $branch was, so leaving it raw beside a stripped $branchShown would sanitise one half of this
-    # sentence and print the other -- and this half is the one naming the branch somebody moved TO, which
-    # the reader has no other line to learn from. The raw $headNow above stays raw: it is compared, not
-    # printed, and stripping it would break the comparison it exists for.
-    Write-Host "ship-pr: HEAD is on '$(Get-DisplayRef -Ref $headNow)', not '$branchShown' -- this checkout moved while CI ran." -ForegroundColor Yellow
+    # THE SENTENCE COMES FROM THE DECISION, not from this arm (issue #1753). There are three ways to
+    # reach it now -- HEAD moved, HEAD unreadable, the tree unclean -- and a hard-coded "this checkout
+    # moved while CI ran" is false on two of them. The composer owns its own wording, which is also what
+    # keeps #1623's strip on it: $headNow IS a second ref name, read off HEAD exactly as $branch was, so
+    # leaving it raw beside a stripped $branchShown would sanitise one half of this sentence and print
+    # the other. Get-FoldTreeDecision runs both names through Get-DisplayRef for that reason, and its
+    # suite asserts it. The raw $headNow stays raw here: it is compared, not printed.
+    Write-Host "ship-pr: $($foldDecision.Reason)" -ForegroundColor Yellow
     Write-Host "  Folding in a throwaway worktree instead, so nothing here is touched: $foldTree" -ForegroundColor Yellow
     $wtAdd = Invoke-NativeCapture -FilePath 'git' -Arguments @('worktree', 'add', $foldTree, 'main')
     $wtAdd.Output | ForEach-Object { Write-Host $_ }
     if ($wtAdd.ExitCode -ne 0) {
-        $foldScript = Join-Path $PSScriptRoot 'fold-changelog-entry.ps1'
         Write-Error @"
 PR #$pr IS MERGED but NOT folded -- no worktree on main could be added at $foldTree.
 
@@ -2581,22 +2611,41 @@ $foldRoot = if ($foldTree) { $foldTree } else { $repoRoot }
 # upstream, entry file still in the root -- and reports it as a ship still in progress. The lib's
 # non-interactive environment closes the measured cause; the bound is what turns any remaining stall
 # into a message naming this step.
+
+# THE STATE SENTENCE, WRITTEN ONCE FOR ALL THREE EXITS BELOW THIS LINE (issue #1753). Everything from
+# here on runs AFTER the merge, so every failure past it is the merged-but-unfolded half-state -- and
+# only one of the three said so. The timed-out fetch carried the full sentence; the plain fetch failure
+# said "git fetch of origin failed." and the ff-only failure "git merge --ff-only of origin/main
+# failed.", which is the arm that actually fired on PR #1752. Two adjacent arms of one block, and the
+# one a reader meets was the quiet one -- so the difference between them is now only the FIRST line,
+# which is the half that genuinely differs.
+$mergedNotFoldedNote = @"
+
+PR #$pr IS MERGED; only the fold is outstanding. The branch document is still on the trunk and every
+gate stays green until a release trips over it.
+
+Deal with what git reported above -- an unclean tree is the common one, and its paths are named in
+that output -- then fold by hand from a tree standing on an up-to-date main:
+
+  git checkout main; git fetch --prune origin; git merge --ff-only origin/main
+  & "$foldScript" -Branch $($branchPaste.Token) -Push$branchPasteNoteBlock
+"@
 $fetch = Invoke-NativeCapture -FilePath 'git' -Arguments @('-C', $foldRoot, 'fetch', '--prune', 'origin') `
                               -TimeoutSeconds $NativeCaptureNetworkTimeoutSeconds
 $fetch.Output | ForEach-Object { Write-Host $_ }
 if ($fetch.ExitCode -ne 0) {
     Remove-ShipFoldWorktree -Path $foldTree
     if ($fetch.TimedOut) {
-        Write-Error "git fetch of origin did not answer within $NativeCaptureNetworkTimeoutSeconds seconds -- see the [timeout] lines above. PR #$pr IS MERGED; only the fold is outstanding. Fix the credential and fold by hand: scripts\release\fold-changelog-entry.ps1 -Push"
+        Write-Error "git fetch of origin did not answer within $NativeCaptureNetworkTimeoutSeconds seconds -- see the [timeout] lines above. Fix the credential first.$mergedNotFoldedNote"
     } else {
-        Write-Error "git fetch of origin failed."
+        Write-Error "git fetch of origin failed.$mergedNotFoldedNote"
     }
     exit 1
 }
 
 $ff = Invoke-NativeCapture -FilePath 'git' -Arguments @('-C', $foldRoot, 'merge', '--ff-only', 'origin/main')
 $ff.Output | ForEach-Object { Write-Host $_ }
-if ($ff.ExitCode -ne 0) { Remove-ShipFoldWorktree -Path $foldTree; Write-Error "git merge --ff-only of origin/main failed."; exit 1 }
+if ($ff.ExitCode -ne 0) { Remove-ShipFoldWorktree -Path $foldTree; Write-Error "git merge --ff-only of origin/main failed.$mergedNotFoldedNote"; exit 1 }
 
 # The fold, its commit AND its push are all fold-changelog-entry.ps1's job (-Push implies -Commit).
 # This used to be a fold followed by `git add -A` + commit + push right here, and that was a real
