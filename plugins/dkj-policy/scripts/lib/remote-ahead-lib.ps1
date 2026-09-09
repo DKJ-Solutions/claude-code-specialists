@@ -90,13 +90,19 @@ function Get-RemoteAheadNote {
     # such a commit. There is no third reading in which git legitimately answers nothing.
     #
     # WHAT PRODUCES IT: THE -Utf8 ARM CAN RETURN A SHORT READ WITH EXIT CODE 0. That arm redirects to files
-    # and Read-NativeCaptureFileText opens them with FileShare.ReadWrite deliberately (issue #1252), so a
+    # and Read-NativeCaptureFile opens them with FileShare.ReadWrite deliberately (issue #1252), so a
     # grandchild still holding the handle past a clean exit yields whatever was flushed -- a truncated or
     # empty document, reported as success. That trade is right where it was made (a killed tree's tail
     # beats an unrelated IO exception) and is not weakened here: the repair is this caller no longer
     # reading "empty" as "absent". Observed under the test gate on a loaded machine, where the count
     # survived and the tip did not -- the two captures take different code paths, which is why one can
     # fail alone.
+    #
+    # SINCE #1679 THE LIB SAYS THIS OUTRIGHT -- $tip.ShortRead -- so the inference below is no longer the
+    # only way to reach it. It is kept as an inference on purpose: an empty capture here provably cannot
+    # be legitimate (the rev-list above already counted the commit, and `--format=%h` always yields its
+    # abbreviated hash), so this caller is correct WITHOUT the field and stays correct if a future arm
+    # cannot supply it. What the field would buy is a sharper sentence, not a different verdict.
     #
     # THREE REASONS, NAMED SEPARATELY, because the reader's next move differs: a non-zero git is a repo
     # or ref problem, an empty capture on exit 0 is this run's own read, and a tip that strips to nothing

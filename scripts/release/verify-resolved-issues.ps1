@@ -87,6 +87,29 @@ if ($view.ExitCode -ne 0) {
 }
 
 $declared = @(Get-ClosedIssueNumbers -Text ($view.Output -join "`n"))
+
+# A SHORT READ MUST NOT BECOME "DECLARED NOTHING" (issue #1679). The -Utf8 arm can return an empty or
+# truncated Output with ExitCode 0, and this was the quietest site in that class: an empty capture gave
+# $declared.Count -eq 0, and the line below then reported the resolves verification as a clean pass over
+# nothing -- the whole check skipped, in green, on a machine loaded enough to lose the read.
+#
+# AND THE EMPTY CAPTURE IS AMBIGUOUS HERE IN A WAY IT IS NOT ELSEWHERE, which is why the ShortRead field
+# rather than a test on the text is what separates them. `--json body -q .body` prints NOTHING for a PR
+# whose body is genuinely empty: measured September 9, 2026, 0 bytes at exit 0. So "empty means the read
+# failed" would be false at this exact call, and a PR with no body would be reported as an error.
+if ($view.ShortRead) {
+    if ($declared.Count -eq 0) {
+        # Nothing was read AND nothing can be concluded, so this says so instead of passing.
+        Write-Warning "could not establish what PR #$Pr declares: gh exited 0 but its capture was still being written when it was read, so the body this run holds may be truncated -- the issue-closing check was skipped. Verify by hand with: gh issue list --repo $Repo --state open"
+        exit 0
+    }
+    # SOMETHING was read, so verifying it beats verifying nothing -- but the list may be short a marker,
+    # which is the half a reader cannot see. Verified below with the incompleteness stated, rather than
+    # discarded: the issues that ARE named still get their state checked, and #1439's rule applies to the
+    # sentence, not to the work -- a degraded answer is only wrong when it arrives undeclared.
+    Write-Warning "PR #$Pr's body came back as a short read (gh exited 0 with its capture still being written), so the list below may be INCOMPLETE -- an issue whose 'Resolves' marker fell outside what was read is not verified. Re-run to check the rest."
+}
+
 if ($declared.Count -eq 0) {
     Write-Host "issue check: PR #$Pr declared no issue to close -- nothing to verify." -ForegroundColor DarkGray
     exit 0
