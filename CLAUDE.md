@@ -365,9 +365,15 @@ The constitution above, concretely implemented here:
   `free`, so it qualifies through the public clause — which is exactly why the constraint was invisible
   from here, and why the policy was wrong in the one repo that set it
   ([#1540](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1540)). A prescription a
-  consumer cannot follow turns their correct state into an open gap. **Taking the `merge_queue` rule off
-  `main-ci-gate` is a ruleset change and therefore Dave's own act**, so read the queue as live here until
-  he has made it; nothing below depends on which way that goes.
+  consumer cannot follow turns their correct state into an open gap. **And the `merge_queue` rule is off
+  `main-ci-gate` as of September 9, 2026**
+  ([#1720](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1720)) — so a merge here lands
+  the ordinary way: `ship-pr.ps1` merges directly and folds in its own step 5. Nothing below changes with
+  it, because every runner named there was kept for the GitHub UI merge button, which no repo can retire.
+  What stood here was a conditional waiting on a ruleset change nothing reports back on, so it went on
+  handing every session the wrong answer from the day it was satisfied; the measurement is in
+  [Sylvester's lens](.claude/specialists/lenses/05-15-extension.md) and the writing lesson in
+  [Tessa's](.claude/specialists/lenses/06-16-extension.md).
 - **And one guard fires *after* the merge, on the trunk.** The fold runs from `ship-pr.ps1`, as the
   shipping session's own step once its own merge call returns — so a merge that session never observes
   never folds: a PR merged from the GitHub UI, or, while the merge queue is live on `main-ci-gate`

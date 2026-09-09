@@ -181,6 +181,31 @@ infrastructure.
   ruleset rather than a rule, so nothing about the remedy changes. What changes is the diagnosis, and that
   is the half a session actually reads a red run with.
 
+  **AND THE FOURTH ENTRY IS GONE AGAIN — THE LIST IS BACK TO THREE** (measured September 9, 2026,
+  [#1720](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1720)). The same command on the
+  same ruleset id:
+
+  ```
+  $ gh api repos/DKJ-Solutions/claude-code-specialists/rulesets/19008062 --jq '[.rules[].type]'
+      ["deletion","non_fast_forward","required_status_checks"]
+  ```
+
+  So the three-rule list above is the live one again, `required_status_checks` is once more the only rule
+  a direct push has to be bypassed for, and a rejected push reports **one** line rather than two. The
+  September 6 block stays exactly where it is: it is what a reader needs the day a run from that window is
+  being read back, and deleting it would leave run 34020828593's two-line refusal unexplained. **Read this
+  pair as the shape of the whole section** — each block is what was true on its date, and the newest one is
+  the answer to "what does the ruleset hold *now*".
+
+  **AND THE ONE THING TO CHECK BEFORE TRUSTING ANY OF THEM: a ruleset is GitHub-side state, so nothing in
+  this tree changes when it changes.** No commit records it, no gate reads it, and no session is told. That
+  is why every block here carries the command rather than only its output — the record is a dated
+  measurement, not a fact the repo maintains, and the way to know which block is current is to run the
+  command again. The removal above has no date of its own for exactly that reason — September 9 is when it
+  was *measured*, not when it happened, and nobody can now say which. That gap is why the always-on
+  sentence in [`CLAUDE.md`](../../../CLAUDE.md#claude-code-specialistss-safety-implementation) went on
+  handing out the wrong answer for a stretch nobody can now put a length on (#1720).
+
   **AND THE BYPASS THAT ANSWERS BOTH CANNOT BE GRANTED TO THE ACTOR THAT NEEDS IT** (September 6, 2026,
   [#1506](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1506)). The paragraph above is
   right that a bypass actor bypasses the *ruleset* rather than a rule, so one grant would answer both

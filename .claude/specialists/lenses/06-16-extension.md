@@ -245,3 +245,44 @@ and counted.
 is wrong when typed and wrong again after the next edit.** Neither claim needed one — *throughout* and
 *elsewhere in this file* are true without maintenance. Before writing a count into prose, ask what the
 next edit does to it; and never take `grep -c` for an occurrence count, which is `grep -o | wc -l`.
+
+### A conditional in always-on prose needs a detector behind it, or it is not written as a conditional
+
+Behind the `merge_queue` paragraph in
+[`CLAUDE.md`](../../../CLAUDE.md#claude-code-specialistss-safety-implementation). Measured
+September 9, 2026 ([#1720](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1720)).
+
+**What stood there was a sentence waiting on somebody else's act**: taking the `merge_queue` rule off
+`main-ci-gate` was Dave's to do, so the paragraph told every session to *read the queue as live here
+until he has made it*. That is a correct instruction and an honest one — right up to the moment the act
+happens. Then it silently inverts: the condition is satisfied, nothing in the tree changed, and a
+document loaded on **every turn** goes on handing out precisely the answer it was written to stop
+handing out. Neither the date it inverted nor how long it stood that way can now be recovered.
+
+**The reason this shape is worse than an ordinary stale claim** is that it reads as diligent. A flat
+wrong statement is somebody's error and a reader may doubt it; a conditional announces that its author
+thought about the future, so a reader trusts it *more* the older it gets. And its subject here was
+GitHub-side state — a ruleset — which no commit records, no gate reads and no session is told about, so
+there was never going to be a signal.
+
+**So the test before writing one: what, in this repo, will notice the day the condition flips?** Three
+answers, in order of preference.
+
+1. **A detector, and then the prose points at it rather than predicting.** This is what the repo already
+   does everywhere it can — `check-unfolded-entry.ps1`, the floor checks, the roster sync. If a check can
+   hold the fact, the sentence's job is to name the check.
+2. **Write the state that holds, dated, and let the next measurement supersede it.** The form the
+   specialist lenses use: each block is what was true on its date, newest last, and the command is
+   printed so a reader can re-measure rather than trust. Nothing goes stale silently, because nothing
+   claims to be permanent.
+3. **A conditional — only where the condition is one the reader can evaluate themselves on the spot.**
+   *"while the merge queue is live on `main-ci-gate`"* survives the same repair untouched, and that is
+   the distinction: it qualifies a mechanism a consumer checks against their own trunk, rather than
+   waiting on an event in this repo that no reader is positioned to observe.
+
+**Nothing mechanical was misled here, and that is the measurement worth keeping.** `ship-pr.ps1` reads
+the trunk's own rules before it merges and adapts whatever the prose says, so no gate failed and no merge
+went wrong. What the sentence corrupted was a **session's reasoning** — it would expect the script to
+enqueue and the fold to arrive from `fold-on-merge.yml`, when in fact this session's own step 5 folds.
+That is the class of defect an always-on document is uniquely able to cause and uniquely unable to
+report, which is why the bar for a forward-looking sentence is highest exactly there.
