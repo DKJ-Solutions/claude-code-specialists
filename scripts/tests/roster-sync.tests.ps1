@@ -31,7 +31,7 @@ $ErrorActionPreference = 'Stop'
 
 $RepoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
 $Script   = Join-Path $RepoRoot 'scripts\sync\check-roster-sync.ps1'
-$Fixture  = Join-Path ([System.IO.Path]::GetTempPath()) "roster-sync-test-fixture-$PID"
+$Fixture  = Join-Path ([System.IO.Path]::GetTempPath()) "roster-sync-test-fixture-$PID-$([guid]::NewGuid().ToString('n'))"
 
 $Marketplace = 'claude-code-specialists'
 $PluginName  = 'dkj-team-alpha'

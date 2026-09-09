@@ -62,7 +62,7 @@ Write-Host "== the partition: a clean cover, over a real gate run ==" -Foregroun
 
 # Twelve suites, named so that alphabetical order is unambiguous and a stride is distinguishable from a
 # contiguous block. Each one prints its own name and exits 0.
-$fixtureDir = Join-Path ([System.IO.Path]::GetTempPath()) ("ci-shard-fixture-$PID")
+$fixtureDir = Join-Path ([System.IO.Path]::GetTempPath()) ("ci-shard-fixture-$PID-$([guid]::NewGuid().ToString('n'))")
 if (Test-Path -LiteralPath $fixtureDir) { Remove-Item -Recurse -Force -LiteralPath $fixtureDir }
 New-Item -ItemType Directory -Path $fixtureDir -Force | Out-Null
 
@@ -229,7 +229,7 @@ Assert-True (($emptyHints -join ',') -eq ($noHints[0] -join ',')) 'an EMPTY hint
 
 Write-Host "== the hints file: a bad one degrades to the stride rather than failing the gate ==" -ForegroundColor Cyan
 
-$hintDir = Join-Path ([System.IO.Path]::GetTempPath()) ("ci-shard-hints-$PID")
+$hintDir = Join-Path ([System.IO.Path]::GetTempPath()) ("ci-shard-hints-$PID-$([guid]::NewGuid().ToString('n'))")
 if (Test-Path -LiteralPath $hintDir) { Remove-Item -Recurse -Force -LiteralPath $hintDir }
 New-Item -ItemType Directory -Path $hintDir -Force | Out-Null
 $hintFile = Join-Path $hintDir 'suite-durations.json'

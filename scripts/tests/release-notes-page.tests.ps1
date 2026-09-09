@@ -34,7 +34,7 @@ $ErrorActionPreference = 'Stop'
 
 $RepoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
 $Script   = Join-Path $RepoRoot 'scripts\release\build-release-notes-page.ps1'
-$Fixture  = Join-Path ([System.IO.Path]::GetTempPath()) "release-notes-page-test-fixture-$PID"
+$Fixture  = Join-Path ([System.IO.Path]::GetTempPath()) "release-notes-page-test-fixture-$PID-$([guid]::NewGuid().ToString('n'))"
 
 . (Join-Path $RepoRoot 'scripts\lib\native-capture-lib.ps1')
 

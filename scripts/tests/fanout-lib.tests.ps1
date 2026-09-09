@@ -30,7 +30,7 @@ $ErrorActionPreference = 'Stop'
 $RepoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
 $Lib      = Join-Path $RepoRoot 'scripts\lib\fanout-lib.ps1'
 $Script   = Join-Path $RepoRoot 'scripts\task\check-fanout.ps1'
-$Fixture  = Join-Path ([System.IO.Path]::GetTempPath()) "fanout-lib-test-$PID"
+$Fixture  = Join-Path ([System.IO.Path]::GetTempPath()) "fanout-lib-test-$PID-$([guid]::NewGuid().ToString('n'))"
 
 . (Join-Path $PSScriptRoot '..\lib\fixture-git-lib.ps1')
 . (Join-Path $PSScriptRoot '..\lib\native-capture-lib.ps1')

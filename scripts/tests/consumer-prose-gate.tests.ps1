@@ -566,7 +566,7 @@ try {
     Assert-True ($r.Code -eq 0 -and $r.Out -match 'contradicts the plugin' -and $r.Out -match '\[ERROR\]') `
         'a declaration present -- a compact summary carrying the [ERROR] detail, still exit 0'
 
-    $r = Invoke-Hook -Dir $clean -CheckScriptOverride (Join-Path ([System.IO.Path]::GetTempPath()) "no-such-check-$PID.ps1")
+    $r = Invoke-Hook -Dir $clean -CheckScriptOverride (Join-Path ([System.IO.Path]::GetTempPath()) "no-such-check-$PID-$([guid]::NewGuid().ToString('n')).ps1")
     Assert-True ($r.Code -eq 0 -and $r.Out -match 'check script not found -- check skipped') `
         'check script missing -- a notice, exit 0, never a strand'
 }

@@ -86,7 +86,7 @@ $script:gitFixtures = @()
 function New-GitFixture {
     <# A throwaway repo with a bare 'origin' -- same conventions as backing-gate.tests.ps1. #>
     param([Parameter(Mandatory = $true)][string]$Label, [switch]$NoOrigin)
-    $dir = Join-Path ([System.IO.Path]::GetTempPath()) ("machine-local-test-$PID-$Label")
+    $dir = Join-Path ([System.IO.Path]::GetTempPath()) ("machine-local-test-$PID-$Label-$([guid]::NewGuid().ToString('n'))")
     if (Test-Path -LiteralPath $dir) { Remove-Item -Recurse -Force -LiteralPath $dir }
     New-Item -ItemType Directory -Path $dir -Force | Out-Null
     $bareRemote = "$dir.git"

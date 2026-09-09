@@ -35,7 +35,7 @@ $RepoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
 $Hook     = Join-Path $RepoRoot 'plugins\dkj-policy\hooks\cycle-autopark.ps1'
 # $PID in the fixture path: the gate is a throttled PARALLEL scheduler, so two runs at one fixed temp
 # path tear down each other's tree mid-assert. Same reasoning as the sibling hook suites.
-$Fixture  = Join-Path ([System.IO.Path]::GetTempPath()) "cycle-autopark-tests-$PID"
+$Fixture  = Join-Path ([System.IO.Path]::GetTempPath()) "cycle-autopark-tests-$PID-$([guid]::NewGuid().ToString('n'))"
 
 $Ascii = New-Object System.Text.ASCIIEncoding
 $script:pass = 0

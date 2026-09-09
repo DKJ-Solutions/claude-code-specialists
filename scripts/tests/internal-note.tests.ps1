@@ -72,7 +72,7 @@ function New-Fixture {
         # the notes where it repointed them, or it asserts the refusal rather than the seam (issue #947).
         [string]$NotesRoot = 'dkj-policy/releases/changelog'
     )
-    $dir = Join-Path ([System.IO.Path]::GetTempPath()) "internal-note-test-$PID-$Label"
+    $dir = Join-Path ([System.IO.Path]::GetTempPath()) "internal-note-test-$PID-$Label-$([guid]::NewGuid().ToString('n'))"
     if (Test-Path -LiteralPath $dir) { Remove-Item -Recurse -Force -LiteralPath $dir }
     New-Item -ItemType Directory -Path (Join-Path $dir 'scripts\release') -Force | Out-Null
     Copy-Item -LiteralPath $ScriptSrc -Destination (Join-Path $dir 'scripts\release\new-internal-note.ps1') -Force

@@ -78,7 +78,7 @@ $RepoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
 # command is worse than an unjudged production one, and why the count decides the exit code.
 . (Join-Path $PSScriptRoot '..\lib\fixture-git-lib.ps1')
 $Script   = Join-Path $RepoRoot 'scripts\task\plugin-versions.ps1'
-$Fixture  = Join-Path ([System.IO.Path]::GetTempPath()) "plugin-versions-test-$PID"
+$Fixture  = Join-Path ([System.IO.Path]::GetTempPath()) "plugin-versions-test-$PID-$([guid]::NewGuid().ToString('n'))"
 $Utf8     = New-Object System.Text.UTF8Encoding $false
 
 . (Join-Path $RepoRoot 'scripts\lib\native-capture-lib.ps1')

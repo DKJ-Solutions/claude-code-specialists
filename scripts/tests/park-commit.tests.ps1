@@ -63,7 +63,7 @@ function New-Fixture {
         NativeCommandError before an exit code can be judged.
     #>
     param([Parameter(Mandatory)][string]$Label)
-    $dir = Join-Path ([System.IO.Path]::GetTempPath()) ("park-commit-test-$PID-$Label")
+    $dir = Join-Path ([System.IO.Path]::GetTempPath()) ("park-commit-test-$PID-$Label-$([guid]::NewGuid().ToString('n'))")
     if (Test-Path -LiteralPath $dir) { Remove-Item -Recurse -Force -LiteralPath $dir }
     New-Item -ItemType Directory -Path $dir -Force | Out-Null
 
@@ -205,7 +205,7 @@ Assert-Equal 'park: feat/all-v1 (all outstanding work)' (Get-Subject -Dir $d5) '
 # which would make the return value dead code and open-pr's own refusal message unreachable. Induced
 # with a directory that is not a git repo at all, so `git add` fails deterministically on every machine.
 Write-Host "`n== 6. a git failure is a return value, not an exception ==" -ForegroundColor Cyan
-$d6 = Join-Path ([System.IO.Path]::GetTempPath()) "park-commit-test-$PID-notarepo"
+$d6 = Join-Path ([System.IO.Path]::GetTempPath()) "park-commit-test-$PID-notarepo-$([guid]::NewGuid().ToString('n'))"
 if (Test-Path -LiteralPath $d6) { Remove-Item -Recurse -Force -LiteralPath $d6 }
 New-Item -ItemType Directory -Path $d6 -Force | Out-Null
 $script:fixtures += $d6

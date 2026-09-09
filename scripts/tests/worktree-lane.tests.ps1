@@ -128,7 +128,7 @@ function New-Fixture {
         is the script's own default; they are registered for cleanup here rather than guessed at later.
     #>
     param([Parameter(Mandatory = $true)][string]$Label)
-    $dir = Join-Path ([System.IO.Path]::GetTempPath()) ("worktree-lane-test-$PID-$Label")
+    $dir = Join-Path ([System.IO.Path]::GetTempPath()) ("worktree-lane-test-$PID-$Label-$([guid]::NewGuid().ToString('n'))")
     if (Test-Path -LiteralPath $dir) { Remove-Item -Recurse -Force -LiteralPath $dir }
     New-Item -ItemType Directory -Path (Join-Path $dir 'scripts\task') -Force | Out-Null
     New-Item -ItemType Directory -Path (Join-Path $dir 'scripts\lib')  -Force | Out-Null
@@ -319,7 +319,7 @@ try {
 
     # --- (h) HandBack refuses a path that is not a worktree of this repo --------------------------
     Write-Host "worktree-lane.ps1 -HandBack -- refuses a foreign path" -ForegroundColor Cyan
-    $foreign = Join-Path ([System.IO.Path]::GetTempPath()) "worktree-lane-test-$PID-foreign"
+    $foreign = Join-Path ([System.IO.Path]::GetTempPath()) "worktree-lane-test-$PID-foreign-$([guid]::NewGuid().ToString('n'))"
     New-Item -ItemType Directory -Path $foreign -Force | Out-Null
     $script:fixtures += $foreign
     $rH = Invoke-WorktreeLane -Dir $fd -From $fd -Arguments @('-HandBack', '-Lane', $foreign)
