@@ -115,10 +115,26 @@ $e = ConvertFrom-GitPorcelainLine -Line ' M "path with spaces.txt"'
 Assert-Equal 'path with spaces.txt' $e.Path 'quoted path: quotes stripped, inner spaces kept'
 
 # core.quotePath escapes a non-ASCII byte rather than emitting it, which is the whole point of lesson 2:
-# the escape sequence is ASCII and every candidate code page agrees on it. The parse must leave it
-# alone -- decoding it would put the guess back that the flag exists to remove.
+# the escape sequence is ASCII and every candidate code page agrees on it. SINCE #1689 THE ESCAPE IS
+# DECODED HERE, by Convert-GitQuotedPath, which moved into this lib from sync-rules.ps1 -- byte by byte,
+# downstream of the wire, so the answer still owes nothing to the console code page. Until then this
+# function stripped the quotes and left '\303\251' standing.
+#
+# The expected value is composed from a code point rather than typed: the script layer is pure ASCII
+# (.claude/rules/language-layers.md), and sync-rules.tests.ps1 composes the same string the same way.
+$accented = 'caf' + [char]0x00E9 + '.txt'
 $e = ConvertFrom-GitPorcelainLine -Line ' M "caf\303\251.txt"'
-Assert-Equal 'caf\303\251.txt' $e.Path 'quoted non-ASCII: the escape is carried through, not decoded'
+Assert-Equal $accented $e.Path 'quoted non-ASCII: the escape decodes back to the real filename'
+Assert-True ($null -ne (Get-Command Convert-GitQuotedPath -ErrorAction SilentlyContinue)) 'and the decoder that did it is defined by THIS lib (#1689), not reached across from sync-rules'
+# The rename halves go through the same path, so both sides of an arrow decode.
+$e = ConvertFrom-GitPorcelainLine -Line 'R  "caf\303\251.txt" -> "the\303\251.txt"'
+Assert-Equal ('the' + [char]0x00E9 + '.txt') $e.Path 'rename, escaped: the new path decodes'
+Assert-Equal $accented $e.From 'rename, escaped: and so does the old one'
+# A REAL BACKSLASH IN A FILENAME SURVIVES THE DECODE, which is why the separator rule must not run over
+# a quoted path: git escapes one as '\\' and the decoder unpacks it to a literal backslash that is part
+# of the name. Normalising afterwards would put lesson 4 back one layer along.
+$e = ConvertFrom-GitPorcelainLine -Line ' M "back\\slash.txt"'
+Assert-Equal 'back\slash.txt' $e.Path 'quoted backslash: decoded to one literal backslash, and NOT normalised to a slash'
 
 $e = ConvertFrom-GitPorcelainLine -Line ' M scripts\lib\park-lib.ps1'
 Assert-Equal 'scripts/lib/park-lib.ps1' $e.Path 'backslashes are normalised to forward slashes'
