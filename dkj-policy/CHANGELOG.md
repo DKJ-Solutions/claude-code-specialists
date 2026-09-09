@@ -43,7 +43,32 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**36 / 87 minor entries** <!-- pending-tally -->
+**36 / 88 minor entries** <!-- pending-tally -->
+
+### DEPLOY: docs/1743-dated-plugin-name · 20260909-193257
+
+`README.md`'s one dated measurement names its subject as it was spelled on the day it was taken --
+`team-alpha`, not the `dkj-team-alpha` two later rename sweeps left there -- and says what it is
+called today, so the figure can still be re-verified against the tag it came from. The rule behind it
+(#952: a dated measurement keeps the name it was written with) is now in Tessa's lens, where a sweep
+can meet it beforehand; until now it existed only in the commit messages of the renames that observed
+it.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+N/A -- this repo's own README and one repo lens. A consumer receives neither.
+
+**Score:** N/A
+
+#### Pull Request
+
+Name the plugin in README's August 8 measurement as it was spelled on that date
+
+[PR #1746](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1746)
+
+---
 
 ### DEPLOY: fix/1742-test-flattener · 20260909-192047
 
