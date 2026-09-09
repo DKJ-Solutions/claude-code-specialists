@@ -72,8 +72,24 @@ halves are answered here, and one is answered by declining:
 - [x] `test-suite-gate.tests.ps1` case 9, +20 asserts: the line's shape under nl-NL, the depth's five
       malformed inputs, a real run's counters, the header adjacency, the nested run at depth 2, and
       that the variable does not outlive the run
-- [x] `test-suite-gate.tests.ps1` green: 150 pass, 0 fail
+- [x] `test-suite-gate.tests.ps1` green standalone: 150 pass, 0 fail
+- [x] **And green as a gate CHILD, which standalone did not prove.** The first `open-pr` run failed
+      1 of 86 -- this suite -- with nine asserts holding a literal depth: the gate sets
+      `DKJ_TEST_GATE_DEPTH` for its children, and this suite *is* one of them under the pool, so every
+      driver run inherited depth 1 and reported 2, and the gate a fixture suite drives reported 3.
+      Fixed in the fixture rather than in the asserts: `Invoke-Gate` now removes the variable around
+      each child launch, so the driver's depth is the one an operator sees. Re-verified by running the
+      suite with `DKJ_TEST_GATE_DEPTH=1` set, which is the exact condition that failed
 - [x] The lint gate and the full suite pool via `open-pr.ps1`
+
+#### The lesson, recorded where it happened
+
+Shared state a fixture must OWN rather than inherit -- the same class as the `SetConsoleOutputCP`
+cross-talk this lib documents from inbound #821. The suite that tests the gate necessarily runs as a
+gate child, so any literal it asserts about the gate's environment is true standalone and false under
+the pool. The docstring's own rule (#1033: *"a suite green under the gate and red standalone is
+reporting a real defect"*) held in the mirror direction here: red under the gate, green standalone,
+and it was a real defect -- in the test, not in the subject.
 
 ### DEPLOY: feat/1717-gate-progress-index
 
