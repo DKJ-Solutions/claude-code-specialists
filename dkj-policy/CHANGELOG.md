@@ -43,7 +43,7 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**2 / 10 minor entries** <!-- pending-tally -->
+**3 / 11 minor entries** <!-- pending-tally -->
 
 ### DEPLOY: fix/1773-retired-plugin-name-records · 20260910-095038
 
@@ -86,6 +86,44 @@ tidy-machine reports install records under a retired plugin name
 Plugins: dkj-policy
 
 [PR #1783](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1783)
+
+---
+
+### DEPLOY: fix/1775-connector-unregistered-plugin · 20260910-095035
+
+`check-connectors.ps1` no longer goes silent about a plugin that a consumer has **enabled** but that
+consumer's `connectors/<repo>.json` does not **list**. Such a plugin was never handed to the per-plugin
+loop, so nothing about it was checked -- not the extension inventory, not the machine version -- and
+nothing was printed either, which made the register unauditable against the settings file it exists to
+describe. A new check 5 reports each one as an `[INFO]`, and adds a non-counting `[UNLISTED]` line for
+the repo the session is actually in, on the same terms and with the same `Test-IsSessionRepo` scoping as
+`[INVENTORY]`. Only ids naming this repo's own marketplace are in scope; a retired id still counts,
+because the register records what a consumer has.
+
+Measured here before the change: of the six plugins this repo enables, exactly one produced a line --
+the other five, one of them merely coinciding with a differently-named retired entry, were checked by
+nothing and reported by nothing. The asymmetry had been written down as acceptable on the ground that
+its population was zero; that stopped being true on September 8, 2026, and this is the repair rather
+than a second note saying so.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+A consumer running `dkj-policy` gets the new verdict at session start through
+`connector-sessioncheck.ps1`: where their own register entry is behind their own enabled set, the
+session now says so in one line instead of saying nothing. It changes nothing that was working and
+adds no failure -- the marker is non-counting, so it never turns a clean run red.
+
+**Score:** 2
+
+#### Pull Request
+
+check-connectors reports a plugin enabled in a consumer but absent from its register
+
+Plugins: dkj-policy
+
+[PR #1782](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1782)
 
 ---
 
