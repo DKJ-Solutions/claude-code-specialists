@@ -385,20 +385,24 @@ Write-ConsumerRank -Title 'RANK 3 -- the floor: the always-on closure (CLAUDE.md
 # The two slices that are already gated, echoed so the picture is complete
 # ---------------------------------------------------------------------------------------------------
 Write-Host ''
-Write-Host '  ALREADY MECHANICAL -- the two greps #1380 recorded as proportionate. Each has its own' -ForegroundColor Cyan
-Write-Host '  SessionStart hook, so these lines are an echo and never this report''s own finding.' -ForegroundColor DarkGray
+Write-Host '  ALREADY MECHANICAL -- the two greps #1380 recorded as proportionate. Both run from the' -ForegroundColor Cyan
+Write-Host '  consumer-prose-sessioncheck hook, so these lines are an echo, never this report''s own finding.' -ForegroundColor DarkGray
 
-# THE SKIP IS THE HOOKS' SKIP, AND IT IS COPIED RATHER THAN RE-DECIDED. Both check-retired-doc-name.ps1
-# and check-supremacy-declaration.ps1 return [OK] without looking in the repo that PUBLISHES the workflow
-# -- its pages narrate a rename history and declare a rank correctly, so the detectors would be right
-# about the strings and wrong about the repo. The detector FUNCTIONS carry no such skip: it lives in the
-# entry scripts. Calling the functions here without it would print findings under a heading that says
-# "each has its own SessionStart hook" while that hook prints [OK] two lines away -- which is a report
-# contradicting the gate it claims to be echoing.
+# THE SKIP IS THE HOOK'S SKIP, AND IT IS COPIED RATHER THAN RE-DECIDED. check-consumer-prose.ps1 returns
+# [OK] for both detectors without looking in the repo that PUBLISHES the workflow -- its pages narrate a
+# rename history and declare a rank correctly, so the detectors would be right about the strings and
+# wrong about the repo. The detector FUNCTIONS carry no such skip: it lives in the entry script. Calling
+# the functions here without it would print findings under a heading that says they run from a
+# SessionStart hook while that hook prints [OK] two lines away -- which is a report contradicting the
+# gate it claims to be echoing.
+#
+# ONE SCRIPT AND ONE HOOK SINCE #1421, which merged check-retired-doc-name.ps1 and
+# check-supremacy-declaration.ps1 into check-consumer-prose.ps1 and their two hooks into
+# consumer-prose-sessioncheck -- one day after both were built and before either had shipped.
 $retired = @()
 $supremacy = @()
 if ($isSourceRepo) {
-    Write-Host '    [skipped] both, exactly as their own checks skip the repo that publishes the workflow.' -ForegroundColor DarkGray
+    Write-Host '    [skipped] both, exactly as their own check skips the repo that publishes the workflow.' -ForegroundColor DarkGray
 } else {
     $retired = @(Get-RetiredDocNameMention -RepoRoot $repoRoot -Documents $documents)
     $supremacy = @(Get-SupremacyDeclaration -RepoRoot $repoRoot -Documents $documents)
@@ -409,7 +413,7 @@ if (-not $isSourceRepo -and $retired.Count -eq 0) {
 } else {
     foreach ($f in $retired) {
         # Rel is the CONSUMER's path and is sanitized; Name is the retired filename, which comes out of
-        # the plugin's own table -- the same split check-retired-doc-name.ps1 makes, and for its reason.
+        # the plugin's own table -- the same split check-consumer-prose.ps1 makes, and for its reason.
         Write-Host "    [retired-name] $(Format-SafePathToken -Value $f.Rel):$($f.Line)  '$($f.Name)'" -ForegroundColor Yellow
     }
 }

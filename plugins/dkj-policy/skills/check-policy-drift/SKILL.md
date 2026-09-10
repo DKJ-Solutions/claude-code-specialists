@@ -32,7 +32,7 @@ the plugin's portable pages + skills        (the shared law)
 
 A restatement is a copy, and a copy does not fail on the day it is written -- only on the day the
 plugin's answer moves under it and the copy does not move with it. The measured instance is
-[#1378](https://github.com/DaveKJohn/claude-code-specialists/issues/1378): `cut-release`'s own mechanics
+[#1378](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1378): `cut-release`'s own mechanics
 fix a cut-then-push order, a consumer's `CLAUDE.md` documented push-then-cut, and the disagreement did
 not read as drift -- it read as that repo's constitution exercising a supremacy it had declared in
 writing.
@@ -42,7 +42,7 @@ run it; this page assumes it.
 
 ## What it is NOT -- and read this before comparing it to #1380
 
-[#1380](https://github.com/DaveKJohn/claude-code-specialists/issues/1380) measured a manifest-driven
+[#1380](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1380) measured a manifest-driven
 prose check and **declined** it: a section restating a law almost always also names the mechanism it is
 talking about, so a pointer test cannot tell correct deference from restatement-with-citation-and-
 override. **That decline is about a script deciding what a sentence means, and it stands.**
@@ -64,14 +64,21 @@ So the script's output is an **agenda**, not a verdict. It ends by printing exac
 same two functions rather than rebuilding either -- one definition each, the way `check-branch-entry`
 calls `open-pr`'s own:
 
-| check | what it reads | its caller |
+| detector | what it reads | its caller |
 |---|---|---|
-| `check-retired-doc-name` ([#1389](https://github.com/DaveKJohn/claude-code-specialists/issues/1389)) | a **filename** this workflow's branch document has been renamed away from | the `retired-doc-name-sessioncheck` hook |
-| `check-supremacy-declaration` ([#1415](https://github.com/DaveKJohn/claude-code-specialists/issues/1415)) | `CLAUDE.md` sitting **directly beside** `wins`/`wint` -- the rank order stated upside down | the `supremacy-declaration-sessioncheck` hook |
+| `Get-RetiredDocNameMention` ([#1389](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1389)) | a **filename** this workflow's branch document has been renamed away from | the `consumer-prose-sessioncheck` hook |
+| `Get-SupremacyDeclaration` ([#1415](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1415)) | `CLAUDE.md` sitting **directly beside** `wins`/`wint` -- the rank order stated upside down | the `consumer-prose-sessioncheck` hook |
 
-They are labelled as already-gated in the output, so a clean line here is not read as coverage those
-hooks do not give. **In the repo that publishes the workflow both are skipped**, exactly as their own
-entry scripts skip it -- its pages narrate a rename history and state the rank correctly, so the
+**One caller for both, because there is one script.** Each detector was built with its own entry script
+and its own hook -- `check-retired-doc-name.ps1` / `retired-doc-name-sessioncheck` and
+`check-supremacy-declaration.ps1` / `supremacy-declaration-sessioncheck` -- and
+[#1421](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1421) folded the pair into a
+single `check-consumer-prose.ps1` behind one hook, one day later and before either had shipped. So those
+four names are history: `consumer-prose-sessioncheck` is the only one a consumer has ever seen.
+
+They are labelled as already-gated in the output, so a clean line here is not read as coverage that
+hook does not give. **In the repo that publishes the workflow both are skipped**, exactly as their own
+entry script skips it -- its pages narrate a rename history and state the rank correctly, so the
 detectors would be right about the strings and wrong about the repo.
 
 ## What it prints
@@ -94,7 +101,7 @@ Every exclusion in there is load-bearing -- the changelog and `releases/` (a fol
 names the rule of its own day), plugin-shipped payload, and the per-branch document.
 
 **Everything printed out of your files is sanitized**
-([#1419](https://github.com/DaveKJohn/claude-code-specialists/issues/1419)): this output is read back
+([#1419](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1419)): this output is read back
 into a session, so a raw echo would let untrusted text choose how loudly it is reported. A quoted
 phrase is a preview -- square brackets show as round ones -- and the output says so when it quotes one.
 
@@ -114,7 +121,7 @@ both lines.
 
 **And check the fourth move before you report anything.** A law a rank 1 page explicitly **declines** to
 answer -- `cut-release`'s *"No seam, deliberately"* is the measured instance
-([#1388](https://github.com/DaveKJohn/claude-code-specialists/issues/1388)) -- is not a copy of
+([#1388](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1388)) -- is not a copy of
 anything: the plugin asked the consumer to write that answer down, and its prose is the only place it is
 ever written. The two are told apart by asking whether a plugin page states the law's answer *anywhere*.
 
