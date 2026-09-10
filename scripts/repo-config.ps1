@@ -50,6 +50,15 @@ function Get-RepoBlobUrl {
 # claude-plugins-bwj: the name is the key in every consumer's enabledPlugins
 # ('dkj-subagents-alpha@claude-code-specialists'), so aligning it with the repo name would break that line in
 # every consuming repo. Decision by Dave, August 14, 2026.
+#
+# AMENDED September 10, 2026 (#1769) -- the paragraph above stays as written, both readings legible.
+# Dave has decided to rename this marketplace from 'claude-code-specialists' to 'dkj-claude-plugins',
+# accepting the exact cost the August 14 reasoning identified (every consumer's enabledPlugins key
+# breaks; no redirect for a marketplace name). It runs as a phased migration -- decision and plan on
+# #1769, fase 0 is this prep branch. WHAT IS NOT DECIDED YET: whether this business MIRROR follows the
+# source's new name or keeps 'claude-code-specialists' for its own consumers -- that is fase 4, and the
+# August 14 reasoning still applies to the mirror in isolation. No name is changed anywhere in fase 0;
+# this comment is the only edit.
 $script:BusinessMarketplaceRepo = 'BWJ-ecommerce/claude-plugins-bwj'
 
 function Get-BusinessMarketplaceRepo {
