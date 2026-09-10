@@ -367,13 +367,130 @@ function Get-OrphanInstallRecords {
 
         $orphans += [pscustomobject]@{
             ProjectPath = $path
-            Plugin      = [string]$r.Plugin
+            # THE FIELD IS 'Id', AND IT USED TO BE 'Plugin' -- which no producer writes. Get-InstallRecord
+            # projects every record onto Id/Scope/Version/GitCommitSha/InstallPath/ProjectPath/
+            # InstalledAt/LastUpdated, so the old read resolved to $null on every real record and lane 8
+            # printed its finding with the plugin name missing: ' -> C:\gone'. Nothing caught it because
+            # this lib's own fixture hand-wrote a Plugin field, and no assert ever read the value back --
+            # the classification was always right, only the label was gone. Found while extending this
+            # function for #1773; the suite now asserts the id itself.
+            Id          = [string]$r.Id
             Reason      = 'the checkout this record was written for is not on this machine any more (moved, renamed, or deleted)'
             Command     = ''
         }
     }
 
     return @($orphans)
+}
+
+function Get-RetiredNameInstallRecords {
+    <#
+    .SYNOPSIS
+        Plugin install records naming a plugin its own marketplace no longer lists, for a checkout that
+        is still there -- the mirror image of Get-OrphanInstallRecords.
+
+    .DESCRIPTION
+        THE TWO ARE ONE DEFECT FROM OPPOSITE ENDS: a record naming something that no longer exists. Lane
+        8 answers it for the CHECKOUT half and says so in its own title -- "a checkout that is not on
+        this machine" -- and its probe is purely the record's projectPath, so a record whose PLUGIN NAME
+        is gone while its checkout is alive is not an orphan by that test and was measured by nothing
+        (issue #1773).
+
+        AND THE PLUGIN-NAME HALF IS THE ONE THIS WORKFLOW GENERATES ITSELF. A rename is a deliberate act
+        the source repo performs -- it performed two in two days, #1697 and #1698 -- and each one turns
+        every existing install record into dead weight, on every machine and in every checkout that had
+        the plugin. Measured after #1698: five records under three retired naming generations, none of
+        them reported by any lane, while `claude plugin list` read as seventeen plugins and four of the
+        six ENABLED plugins had no install record at all (the state #1764 caused). The signal that would
+        have named the real problem was buried in noise nothing could clear.
+
+        IT IS REPORT-ONLY, like its sibling -- but for the opposite reason. There the two candidate
+        actions (re-install at the new path, or drop a dead record) are indistinguishable from disk, so
+        nothing guesses. Here the action is unambiguous, and what is deliberate is not acting: an
+        uninstall removes an install record, which is the kind of bookkeeping this workflow hands over
+        rather than performs. The caller renders the verb.
+
+        THE TEST IS SCOPED PER MARKETPLACE, WHICH IS THE ONE THING A CARELESS VERSION GETS WRONG. A
+        record can legitimately name a plugin from a DIFFERENT marketplace this machine also uses, so
+        the question is never "is this name in a manifest" but "is this name in the manifest of the
+        marketplace this record names". A marketplace absent from $LivePluginNames is UNKNOWN and never
+        reported -- the caller could not read that clone, and an authority you could not read is not
+        evidence of absence.
+
+    .PARAMETER Records
+        Objects carrying at least an Id ('<plugin>@<marketplace>') and a ProjectPath -- Get-InstallRecord's
+        AllRecords projection.
+
+    .PARAMETER LivePluginNames
+        A hashtable from marketplace name to the plugin names that marketplace currently lists. The
+        caller reads each clone's own marketplace.json for this and adds a key only for a clone it could
+        actually parse. An EMPTY list for a key is treated as unknown too: 'this marketplace ships
+        nothing' and 'the read produced nothing' are indistinguishable from in here, and silence beats
+        declaring every record for that marketplace dead.
+
+    .PARAMETER PathExists
+        A hashtable from project path to $true/$false, exactly as Get-OrphanInstallRecords takes it.
+        Only a record whose checkout is PROVEN PRESENT is reported here: a missing one is lane 8's
+        finding, an unprobed one is nobody's, and a record with no projectPath at all is machine-wide --
+        the paste-ready uninstall carries the record's own scope, which a pathless record does not have,
+        so it is left alone for the same reason lane 8 leaves it alone.
+    #>
+    param(
+        $Records = @(),
+        [hashtable]$LivePluginNames = @{},
+        [hashtable]$PathExists = @{}
+    )
+
+    $retired = @()
+    foreach ($r in @($Records)) {
+        if ($null -eq $r) { continue }
+        $id = [string]$r.Id
+        if (-not $id) { continue }
+
+        # EXACTLY TWO PARTS. plugin-versions.ps1 reads parts[0] and parts[-1] because it starts from an
+        # id a settings file DECLARED and has to make a best effort; this function is deciding whether
+        # to tell somebody a plugin is dead, so an id it cannot split unambiguously is one it says
+        # nothing about.
+        $parts = $id -split '@'
+        if ($parts.Count -ne 2) { continue }
+        $name = [string]$parts[0]
+        $mp   = [string]$parts[1]
+        if (-not $name -or -not $mp) { continue }
+
+        $path = [string]$r.ProjectPath
+        if (-not $path) { continue }
+        if (-not $PathExists.ContainsKey($path)) { continue }
+        if (-not $PathExists[$path]) { continue }
+
+        if (-not $LivePluginNames.ContainsKey($mp)) { continue }
+        $live = @($LivePluginNames[$mp] | Where-Object { $_ })
+        if ($live.Count -eq 0) { continue }
+
+        # ORDINAL AND CASE-SENSITIVE, the position Get-PluginRootByName already takes for this exact
+        # comparison: a plugin name is a path segment on a case-sensitive filesystem and an install id,
+        # so 'Alpha' is a different plugin from 'alpha'.
+        $isLive = $false
+        foreach ($ln in $live) {
+            if ([string]::Equals([string]$ln, $name, [System.StringComparison]::Ordinal)) { $isLive = $true; break }
+        }
+        if ($isLive) { continue }
+
+        $retired += [pscustomobject]@{
+            ProjectPath = $path
+            Id          = $id
+            Plugin      = $name
+            Marketplace = $mp
+            Scope       = [string]$r.Scope
+            Version     = [string]$r.Version
+            Reason      = "marketplace '$mp' no longer lists a plugin called '$name' -- the record is dead weight from a rename or a removal"
+            # THE VERB ONLY, per this lib's header: the caller renders the id through the paste guard and
+            # appends the record's own scope. Which scope matters -- `--scope project` REFUSES to remove a
+            # record sitting at local (inbound #315), and a session start alone is enough to create one.
+            Command     = 'claude plugin uninstall'
+        }
+    }
+
+    return @($retired)
 }
 
 # The leaf New-ScratchPath composes: '<label>-<pid>-<32 hex guid>', a direct child of the temp root.

@@ -291,7 +291,7 @@ function Get-SharedScriptPairs {
             # would measure the CLI and the network rather than this script. It is also the only
             # registered script that could time itself, which is a good enough reason on its own.
             # ---------------------------------------------------------------------------------------
-            # The whole-machine tidy (September 10, 2026). A CONDUCTOR: six of its ten lanes call a
+            # The whole-machine tidy (September 10, 2026). A CONDUCTOR: six of its eleven lanes call a
             # script that is already registered here and already has its own suite, so mirroring it
             # adds one entry point rather than ten mechanisms. It is registered for the ordinary
             # reason every consumer accumulates the same residue -- finished branches, lanes that
