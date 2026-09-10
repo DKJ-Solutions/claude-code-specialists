@@ -43,7 +43,40 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**3 / 12 minor entries** <!-- pending-tally -->
+**3 / 13 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1779-stale-lib-line-count · 20260910-101138
+
+Seven docstring sentences across five libs sized `entry-scaffold-lib.ps1` at "three thousand lines" where it
+measures 8,289 -- each of them in the sentence carrying a layer or dependency decision, so the stale figure
+argued for the decision at a third of its real strength. They now say "thousands", which cannot go stale
+upward, and `release-lib.ps1` records why the number is deliberately absent. The two sites that sized the
+load of `release-lib` rather than the lib itself named a figure that understated either reading; both now
+name the dependency chain instead.
+
+The defect class is the point rather than the arithmetic: a size written into prose drifts with every commit
+to the file it describes, and it gets copied rather than re-measured -- `check-connectors.ps1` declined to
+call into `release-lib` and cited this docstring as its evidence (#1775), which is how one stale number
+became two.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+N/A -- comments inside this repo's own script layer. No behaviour changes, no consumer-facing text moves,
+and nothing a subscriber of a service could notice.
+
+**Score:** N/A
+
+#### Pull Request
+
+Correct the stale entry-scaffold-lib line count in the layer-decision docstrings
+
+Plugins: dkj-policy
+
+[PR #1787](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1787)
+
+---
 
 ### DEPLOY: docs/1774-settings-reflow · 20260910-100232
 
