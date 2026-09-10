@@ -960,6 +960,23 @@ infrastructure.
     worse than predictably red and is still the fourth self-healing meaning #1539's triage exists to keep
     out. The list below therefore stays **three**: a stand-down is this job declining to answer a question
     a successor run is already queued to answer, not a way of failing.
+
+    **AND THE SAME RACE RUN THE OTHER WAY LANDS ON `ship-pr`, WITH A CODE OF ITS OWN** (issue
+    [#1792](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1792), measured here on
+    2026-09-10, shipping PR #1789). With the queue retired (#1720) both runners fold on the ordinary
+    path, so the loser is sometimes the **session** — and the two losses were never equally cheap: a red
+    CI job is read once and closed, while `ship-pr`'s `-ne 0` ended a *correct* ship by reporting a
+    failure and leaving the session's local `main` diverged 1/1, which `CLAUDE.md` reserves every obvious
+    way out of (`reset --hard`, a rebase on a shared branch) to Dave. The fold's redundant-commit verdict
+    now exits **3** — its second and last code of its own — and `ship-pr` reads it as a stood-down
+    success, carries on through steps 5b/6, and prints in a step 5c the two commands that realign this
+    checkout: a `backup/fold-<branch>` ref, then `reset --keep origin/main` (trunk checked out here) or
+    `branch -f main origin/main` (nothing holds it). **`2` and `3` are not merged**, because after `2`
+    nothing was written and after `3` a commit is on the local trunk — and neither script repairs it, so
+    conflating them would either invent a leftover or hide one. **Both codes have one testable end each
+    in `fold-changelog.tests.ps1`**: `exit 3` from exactly one place, and `ship-pr.ps1`'s own reading
+    pinned as source text, because that orchestrator has no suite of its own and `-ne 0` is precisely
+    what stayed the tested behaviour on the caller side through #1586.
   - **#1544 — the concurrency group is constant per trunk.** Keyed on `github.sha` it was its own group
     every run and serialised nothing, so two trunk pushes close together raced — and this job *pushes*.
     `github.ref` keeps `cancel-in-progress: false` (no fold dropped) and adds queueing (no race). Same

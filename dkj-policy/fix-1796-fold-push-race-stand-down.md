@@ -36,16 +36,27 @@
 
 ### PLAN
 
-#### What #1796 asked for, and the one thing it assumed
+#### What #1796 asked for, and what happened to its one assumption
 
-The report names the repair sites correctly and predicts the code (`3`). What it assumes is that
-#1792's repair has already introduced that code -- *"1 before #1792"*. It has not: #1792 is open, its
-branch carries the scaffold and nothing else, and it is claimed by another account. So the code is
-created here, as this repair's own precondition, and `ship-pr` is deliberately left reading `-ne 0`.
+The report names the repair sites correctly and predicts the code (`3`), assuming #1792's repair had
+already introduced it -- *"1 before #1792"*. At pickup it had not: #1792 was open, its branch carried
+the scaffold and nothing else. So the code was written here as this repair's own precondition.
 
-That is not a repair of #1792 and must not be read as one: what #1792 has to decide is whether a
-session on a REAL trunk may accept a redundant local commit -- a different question with a different
-answer. It now has a code to key on if it decides yes.
+**Then #1792 merged (PR #1797) while this branch sat in CI, and had written the same code, in the same
+place, on the same measurement.** Two sessions found the two sides of one race within hours and both
+reached for `3` independently. The staleness guard caught the collision at the merge and refused --
+which is the guard doing exactly its job.
+
+Resolved in #1792's favour on the shared file: `scripts/release/fold-changelog-entry.ps1` is theirs
+wholesale, since it landed first and the semantics were identical. What remains here is the half they
+did not touch -- the **runner's** side of the race.
+
+#### The two readers answer the same code differently, and that is the point
+
+`ship-pr.ps1` stands down and then **tells the operator about the redundant commit** (#1792's step 5c),
+because it is sitting on a trunk somebody has to live with. `fold-on-merge.yml` stands down and says
+nothing further, because its workspace is thrown away when the run ends. One code, two callers, two
+correct answers -- the difference is whose trunk it is.
 
 ### CREATE
 
@@ -77,15 +88,18 @@ halves: the other fold landing before the job's pre-pass reads the trunk (exit `
 of a run can close, because the window opens after it. The second half folded, committed, and came back
 a non-fast-forward, and the job went red on a trunk that was already correct.
 
-`fold-changelog-entry.ps1` now signals that case with its own exit code, `3`, earned by a measurement
-rather than by the push having failed: every entry the run folded is already upstream, present with an
-identical body. The runner stands down on it, and the redundant commit it leaves behind dies with the
-ephemeral workspace. A push refused for any other reason -- a ruleset `GH013`, a credential, or a
-non-fast-forward where one entry is upstream and another is genuinely new -- is still exit `1` and still
-red, which is what keeps this from becoming a blanket "ignore a failed push".
+`fold-changelog-entry.ps1` signals that case with exit code `3` -- introduced by #1792 hours earlier for
+the session's side of the same race, and earned by a measurement rather than by the push having failed:
+every entry the run folded is already upstream, present with an identical body. The runner stands down
+on it, and the redundant commit it leaves behind dies with the ephemeral workspace. A push refused for
+any other reason -- a ruleset `GH013`, a credential, or a non-fast-forward where one entry is upstream
+and another is genuinely new -- is still exit `1` and still red, which is what keeps this from becoming
+a blanket "ignore a failed push".
 
-`ship-pr.ps1` still reads `-ne 0` and is untouched: its fold commit lands on a real trunk somebody has
-to live with, so whether a session may accept one is #1792's question rather than this one's.
+So one code now has two readers that answer it differently, on purpose: `ship-pr.ps1` stands down and
+then reports the redundant commit, because it sits on a trunk somebody has to live with; this runner
+stands down and says nothing more, because its workspace is discarded. The suite that owns the code
+pins both readers -- the workflow's half was asserted nowhere until now, only the template it ships.
 
 The header's three-cause triage could not tell a ruleset rejection from a non-fast-forward -- the
 report's own point -- so cause 3 now names the difference in the reader's terms: `GH013` names a rule

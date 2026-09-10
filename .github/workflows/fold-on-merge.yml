@@ -128,6 +128,13 @@
 # (#1792), where it lands on a trunk somebody has to live with, here it dies with the runner and there
 # is nothing left to clean up.
 #
+# THE CODE ITSELF IS #1792'S, AND THAT IS WHY IT IS TRUSTWORTHY HERE. Both sides of this race were found
+# and repaired within hours of each other -- #1792 from the session's side, this from the runner's -- and
+# both reached for the same third code independently, on the same measurement, before either knew of the
+# other. So exit 3 is not a signal invented for this file's convenience: it is the fold script's own
+# verdict, defined and asserted where the fold lives, with two callers that read it and answer it
+# differently. Read its EXIT CODES block before adding a third reader.
+#
 # NO CONCURRENCY CANCELLATION, AND A CONSTANT GROUP (issue #1544), unlike unfolded-entry.yml's read-only
 # report -- that one can let a later run supersede an earlier one, because both report the same fact.
 # This one WRITES and pushes to main: cancel-in-progress: false so no fold is dropped (the silent skip
@@ -234,8 +241,9 @@ jobs:
           # THE COMMIT THIS ONE LEAVES BEHIND IS WHY IT IS A SEPARATE CODE AND NOT MERGED INTO 2. A run
           # that ends here HAS committed, redundantly, in this runner's workspace -- which is thrown away
           # when the job ends, so there is nothing to clean up and no half-state for anybody to inherit.
-          # That reasoning is this job's alone: it is exactly what does NOT hold for ship-pr.ps1, whose
-          # commit sits on a real trunk, which is why that caller still reads `-ne 0` (issue #1792).
+          # ship-pr.ps1 stands down on the same code (issue #1792) and CANNOT stop there: its commit sits
+          # on a real trunk, so its step 5c prints the commands to preserve and realign it. Two readers,
+          # one code, and deliberately different answers -- the difference is whose trunk it is.
           if ($foldExitCode -eq 3) {
             Write-Host "Stood down: the fold's push lost the race, and every entry it carried is already on the trunk with an identical body -- so the trunk holds what this job exists to put there."
             Write-Host "  The redundant commit is local to this runner's workspace and dies with it. See fold-on-merge.yml's header (#1796)."
