@@ -581,7 +581,7 @@ function Get-ScriptDotSourceTargets {
     # hook, so its runtime is paid at every session. Measured when the walk was first wired in: 3,625 ms
     # over the 23 records, essentially the whole cost of the check -- because the transitive closure
     # re-parses the same libs for every record that reaches them, and entry-scaffold-lib.ps1 alone is
-    # over three thousand lines. The recursive directory scan was NOT the cost (108 ms per forty calls);
+    # thousands of lines. The recursive directory scan was NOT the cost (108 ms per forty calls);
     # re-parsing was. Keyed on the repo root too, since the same file resolves differently against a
     # different consumer.
     # DECLARED AT LOAD TIME, NOT LAZILY, and that is a strict-mode requirement rather than a style
