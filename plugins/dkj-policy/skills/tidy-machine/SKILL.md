@@ -1,18 +1,18 @@
 ---
 name: tidy-machine
 description: >-
-  Clear the clutter this workflow leaves behind on a machine, in one command and ten lanes: finished
+  Clear the clutter this workflow leaves behind on a machine, in one command and eleven lanes: finished
   branches, stale worktree lanes, branches whose pull request was CLOSED without merging, expired
   backup branches, old stashes, an unfolded changelog entry, the ~/.claude plugin administration,
-  install records pointing at a checkout that is gone, plugin/marketplace staleness, and fixture trees
-  under the scratch root. It DELETES only what prune-merged can already prove -- an ancestor of the
-  trunk, or a tip that is the head commit of a merged PR -- and everything else it classifies and
-  hands over with the command, paste-ready. Use it when branches have piled up, as the closing tidy-up
+  install records pointing at a checkout that is gone or naming a plugin the marketplace has retired,
+  plugin/marketplace staleness, and fixture trees under the scratch root. It DELETES only what
+  prune-merged can already prove -- an ancestor of the trunk, or a tip that is the head commit of a
+  merged PR -- and everything else it classifies and hands over with the command, paste-ready. Use it when branches have piled up, as the closing tidy-up
   of a working session, when a lane worktree has outlived its branch, or when you want to know which
   of the trees under your temp directory belong to runs that have ended.
 ---
 
-# tidy-machine -- the whole-machine tidy, in ten lanes
+# tidy-machine -- the whole-machine tidy, in eleven lanes
 
 `prune-merged` answers one question extremely well: **was this branch merged?** This command answers
 the ones next to it, and calls `prune-merged` for that one rather than re-deciding it.
@@ -78,12 +78,12 @@ powershell -NoProfile -File "${CLAUDE_PLUGIN_ROOT}/scripts/maintenance/tidy-mach
 |---|---|
 | `-DryRun` | change nothing anywhere, including in the one lane that would otherwise act -- it is passed through to `prune-merged` |
 | `-CheckoutOnly` | lanes 1-6 only |
-| `-MachineOnly` | lanes 7-10 only. Useful mid-flight, when you want the `~/.claude` and scratch answers without anything reading the branch list |
+| `-MachineOnly` | lanes 7-11 only. Useful mid-flight, when you want the `~/.claude` and scratch answers without anything reading the branch list |
 | `-MaxAgeDays <n>` | how old a `backup/*` branch or a stash must be to be reported. Default 14 |
 | `-MinFixtureAgeHours <n>` | how old a scratch tree must be before its dead pid counts. Default 24 |
 | `-Remote <name>` | the remote `prune-merged` fetches and prunes. Default `origin` |
 
-## The ten lanes
+## The eleven lanes
 
 **Per checkout:**
 
@@ -104,10 +104,40 @@ powershell -NoProfile -File "${CLAUDE_PLUGIN_ROOT}/scripts/maintenance/tidy-mach
 | 8 | **install records pointing at a checkout that is gone** | reports |
 | 9 | plugin and marketplace staleness | → `plugin-versions.ps1` |
 | 10 | **fixture trees under the scratch root** | attributes -- **never deletes** |
+| 11 | **install records under a plugin name the marketplace has retired** | reports, with the uninstall |
 
-Six of the ten are a call into a script that already exists and already has its own suite. Only four
+Six of the eleven are a call into a script that already exists and already has its own suite. Only five
 carry new logic, and that logic is pure and lives in `tidy-lib.ps1`, which is what lets its suite drive
 the classifier over states no machine here has ever been in.
+
+### Lanes 8 and 11 are one defect from opposite ends
+
+Both answer *"this record names something that no longer exists"*, and neither can see the other's half.
+Lane 8 probes the record's **checkout**; lane 11 asks whether the **plugin name** is still in the
+manifest of the marketplace that record names. A record can be dead by either, and the remedies are
+opposites -- re-install at the new path, or drop a record nothing will ever use again -- which is why
+they are two lanes and not one.
+
+**Lane 11 exists because this workflow generates its own instances of it.** A rename is a deliberate act,
+and each one turns every existing install record into dead weight on every machine that had the plugin.
+Measured in the source repo after two renames in two days (#1697, #1698): five records under three
+retired naming generations, reported by no lane, while `claude plugin list` read as seventeen plugins and
+four of the six *enabled* plugins had no install record at all. The signal that would have named the real
+problem was buried in noise nothing could clear
+([#1773](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1773)).
+
+Three things about what it prints:
+
+- **The authority is each marketplace's own clone under `~/.claude`, per marketplace.** A record can
+  legitimately name a plugin from a different marketplace this machine also uses, so the question is
+  never *"is this name in a manifest"*. A clone this run could not read gets no answer at all and every
+  record naming it stays silent -- an authority you could not read is not evidence of absence.
+- **The `--scope` in the printed command is the record's own**, never a fixed `project`:
+  `claude plugin uninstall ... --scope project` refuses to remove a record sitting at `local` (inbound
+  #315), and a session start alone is enough to create one.
+- **Most findings belong to another checkout on this machine**, and the run says so per line. An
+  uninstall is keyed on the directory it runs in, so those commands have to be run *there*. The register
+  is machine-wide; visiting another repository is not something this script does.
 
 ### Lane 1 runs first, and the order is load-bearing
 
