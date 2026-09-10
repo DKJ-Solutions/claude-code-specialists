@@ -234,7 +234,7 @@ function Format-SafePathToken {
 function Format-SafeProseToken {
     <# The prose-shaped sibling, for a finding that ECHOES A LINE OF THE CONSUMER'S OWN TEXT (#1419).
 
-       WHY A THIRD FUNCTION RATHER THAN EITHER EXISTING ONE. check-retired-doc-name.ps1 prints the
+       WHY A THIRD FUNCTION RATHER THAN EITHER EXISTING ONE. check-consumer-prose.ps1 prints the
        offending line out of a consumer's markdown so the reader recognises what to repair, and neither
        sibling can carry it: Format-SafeToken's id charset deletes most of a sentence (every ':', '(',
        ',' and quote in it), and Format-SafePathToken -- exactly right for a path -- deletes the square
@@ -244,9 +244,17 @@ function Format-SafeProseToken {
        CONTROL CHARACTERS ARE REMOVED, AND THE LINE SAYS SO. Same class and same reasoning as the
        sibling, with Format-SuspectToken's doctrine attached rather than assumed: this line is echoed
        BECAUSE somebody is about to edit it, so a reader shown a silently altered preview would go
-       hunting for text that is not in the file. A newline cannot actually reach here -- the caller has
-       already split the document into lines -- and that is a property of today's one caller, not of
-       this function.
+       hunting for text that is not in the file. NO NEWLINE SURVIVES THIS FUNCTION, FOR ANY CALLER --
+       and that is a guarantee of the code below, not a property of who calls it: the '\s+' collapse
+       runs FIRST and '\s' matches a newline, so multi-line input arrives here legitimately and leaves
+       as a single line. WHICH IS WHY THAT COLLAPSE IS LOAD-BEARING and must not be dropped as cosmetic
+       or moved behind a condition. Callers deliberately send un-split text, and the measured one is
+       check-claude-home.ps1's parse error: ConvertFrom-Json's message EMBEDS the offending document,
+       newlines and all, and that document is attacker-shaped by construction. This used to read as a
+       claim about "today's one caller" pre-splitting into lines, which was false for two existing
+       callers by then and handed the next reader exactly the wrong licence (#1813). No census here for
+       command-probe-lib.ps1's reason: a list of call sites is a snapshot that goes stale silently while
+       the tree keeps being written, and 'grep' is the inventory.
 
        SQUARE BRACKETS ARE SUBSTITUTED, NOT DELETED, and this is the one place the three siblings
        deliberately differ. The property that matters is only that no marker can FORM, and '(ERROR)'
