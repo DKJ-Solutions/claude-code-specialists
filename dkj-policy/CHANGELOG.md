@@ -43,7 +43,45 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**1 / 1 minor entry** <!-- pending-tally -->
+**2 / 2 minor entries** <!-- pending-tally -->
+
+### DEPLOY: docs/1820-marketplace-remove-machine-wide · 20260910-231520
+
+`INSTALL.md`'s three migration sequences now say that step 3's `claude plugin marketplace remove` is
+machine-wide over install records, and a new section states what that means for a machine with more than
+one checkout. It also splits step 3, which is two commands with two different reaches: `remove` drops the
+registration for the whole machine and is run once, while `marketplace add … --scope project` writes the
+source key into the repo it is run in and is owed to every checkout. So the first checkout runs the whole
+sequence and each one after it skips step 2 and the `remove`, then runs the `add` and step 4. The section
+carries the measured record counts, both of the CLI's failure messages verbatim — the second reads as a
+`--scope` mistake by the operator and is not one — and the bounds of what was measured. The same
+mechanism is now a hard rule in the system administrator's portable manual, so it travels to every
+consumer rather than living only on this page.
+
+Before this, a reader with three checkouts was told by the page's own per-checkout framing to run the
+sequence three times, and the first run silently made steps 2 and 3 impossible in the other two — with
+two error messages that name a missing plugin or the wrong scope rather than the cause.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+A consumer migrating more than one checkout hits this on the second one, and the page gave them a red
+error at a step its own step 3 had already made impossible. Nothing was broken on their machine and the
+CLI's wording says otherwise. It is a procedure repair on the page consumers are told to follow, so it
+reaches anyone still to migrate.
+
+**Score:** 3
+
+#### Pull Request
+
+State that marketplace remove ends the other checkouts' migration
+
+Plugins: dkj-subagents-alpha
+
+[PR #1825](https://github.com/DKJ-Solutions/dkj-claude-plugins/pull/1825)
+
+---
 
 ### DEPLOY: fix/1769-flag-day-register-and-install-page · 20260910-224248
 
