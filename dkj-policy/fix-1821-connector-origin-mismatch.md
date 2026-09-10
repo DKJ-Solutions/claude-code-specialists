@@ -64,9 +64,12 @@ session start.
 
 ### TEST
 
-- [x] `scripts/tests/connectors.tests.ps1`: cover the three arms that can be fixtured -- a checkout
-      whose `origin` disagrees (the finding fires and the plugin verdicts are withheld), one that
-      agrees (unchanged), and one that cannot be asked (unchanged).
+- [x] `scripts/tests/connectors.tests.ps1`: cover all four arms -- a checkout whose `origin`
+      disagrees (the finding fires and the plugin verdicts are withheld), one that agrees (both URL
+      shapes), one that cannot be asked (not a work tree, and a work tree with no `origin`), and
+      this repo's own rename history. The last is reproduced against the real values in
+      `scripts/repo-config.ps1` rather than a stub, the same coupling the suite's existing check-6
+      scenario already carries, so a future rename of this repo updates both together.
 - [x] The existing suites stay green -- `connectors.tests.ps1` and `connector-sessioncheck.tests.ps1`.
 - [ ] Review round on the diff: code review, copy edit, security.
 
