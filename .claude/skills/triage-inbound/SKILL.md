@@ -55,6 +55,20 @@ just advice.
   it at the tip folded cleanly. **Both halves generalise** — where a report cites a CI run as evidence,
   open that run's own output before building on it, and where a repro reproduces the reported symptom,
   check what the working copy is standing on before calling it confirmed.
+- **A third instance of the first pattern, on a proposed repair's own premise rather than its symptom:
+  the report argues "nothing currently makes this comparison," and the tree already makes it three
+  times over.** [#1802](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1802), picked up
+  September 10, 2026, the day it was filed. Its three underlying findings about `~/.claude`'s plugin
+  administration stood; the proposed repair's justification did not survive a grep of the tree it was
+  filed against — `plugin-versions.ps1`, `check-connectors.ps1` check 4, and `tidy-machine.ps1` lane 11
+  each already answer the question the report said nothing answered. What did stand underneath the false
+  premise was narrower and real: a `continue` in check-connectors' retired-plugin branch skipped a whole
+  block, including the one check inside it whose subject did not depend on the reason the other two were
+  skipped. Full measurement in
+  [Sylvester's lens](../../specialists/lenses/05-15-extension.md#the-retired-id-continue-and-the-block-it-silently-skipped-september-10-2026-1802).
+  **The generalisation:** an "absence" claim behind a proposed mechanism is exactly as checkable as a
+  "presence" claim behind a proposed close, and it fails the same way when a single file is read instead
+  of a search across the tree.
 - **The second failure pattern: it still stands, but its reasoning has expired.** #469 is the easy case —
   the item was repaired, so verifying it closes it.
   [#456](https://github.com/DaveKJohn/claude-code-specialists/issues/456) is the case that looks like it

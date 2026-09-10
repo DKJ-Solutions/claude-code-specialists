@@ -24,6 +24,14 @@
          -> [INFO] (inbound signal: update the register or bring the change back here), plus a
          non-counting [INVENTORY] line the session hook surfaces when that drifted register is
          the one describing the repo the session is in -- the only case a reader here can act on.
+      3b. Per plugin whose name the marketplace has RETIRED: the extension inventory and the version
+         comparison need that plugin's source folder, which a retired name has none of, so both are
+         skipped -- but the install-record question needs no source folder and is asked anyway (#1802).
+         Retired AND enabled there AND no record for that checkout -> [INFO], plus the same
+         [NOT-INSTALLED-HERE] promotion check 4 makes for the session's own repo. It is the one state
+         where 'claude plugin install <id>' is NOT the way out, because the catalogue no longer declares
+         that id, so the finding hands over the migration instead. Until #1802 a retired id skipped the
+         whole block and this fact went unsaid for exactly the consumers worst affected by it.
       4. Per plugin: machine record older than source -> [ERROR]; no record/no administration -> [INFO]
          (machine-specific, not a gate breach). The record comes from Get-InstallRecord
          (check-report-lib.ps1) -- the shared reader of ~/.claude/plugins/installed_plugins.json this
@@ -420,7 +428,50 @@ foreach ($mf in $manifestFiles) {
                     # [INFO]-silence rule the other administrative markers follow applies -- the
                     # session hook surfaces only [ERROR], so this shows on a deliberate run and does
                     # not interrupt anybody's session start over somebody else's repo.
-                    Write-Info "$shown is not a plugin this marketplace declares any more -- this consumer has not migrated to the current names yet. Correct as it stands: the register records what they HAVE, so it changes when they do. Their plugin block is skipped, so nothing below is checked for it."
+                    #
+                    # WHAT IS SKIPPED IS NAMED BY WHAT IT NEEDS, not as "everything below" (#1802).
+                    # The extension inventory and the version comparison both read the plugin's SOURCE
+                    # FOLDER, which a retired name no longer has -- so those genuinely cannot run. The
+                    # install-record question needs no source folder at all: it asks whether this
+                    # machine holds a record for that projectPath, and the answer is as available for a
+                    # retired id as for a current one. It is answered below.
+                    Write-Info "$shown is not a plugin this marketplace declares any more -- this consumer has not migrated to the current names yet. Correct as it stands for the REGISTER: it records what they HAVE, so it changes when they do. The extension inventory and the version comparison need this plugin's source folder, which a retired name has none of, so both are skipped for it."
+
+                    # AND THE ONE QUESTION THAT SURVIVES THE RETIREMENT IS ASKED HERE (#1802), because
+                    # this 'continue' is what hid the worst state this check can see. Until now a retired
+                    # id skipped the whole plugin block, check 4 among it -- and check 4 holds the only
+                    # sentence in the tree that says a checkout LOADS NONE OF IT. So the two consumers
+                    # #1802 measured as worst, both of them enabling nothing but retired ids, were the two
+                    # this check could say least about: every one of their plugin blocks left here, and the
+                    # register reported them as "correct as it stands".
+                    #
+                    # THE WAY OUT IS NOT check 4's COMMAND, which is why this is not a copy of it.
+                    # 'claude plugin install <retired id>' cannot repair this: install resolves the id
+                    # against the marketplace catalogue, and the catalogue is precisely what no longer
+                    # declares that name. So the record finding here hands over the MIGRATION instead --
+                    # re-enable under the current name, then install that -- and says why the obvious
+                    # command is the wrong one, since a reader who has just been told a plugin is not
+                    # installed will otherwise reach for it and be told nothing useful by the failure.
+                    #
+                    # [INFO] for a walked connector, on the standing other-machine rule (Dave, July 20,
+                    # 2026): a consumer used from another machine has no record here either, so the state
+                    # is not conclusive from this vantage point. Promoted to the non-counting
+                    # [NOT-INSTALLED-HERE] only for the repo the session is actually in, where that second
+                    # reading does not exist -- the same scoping, and the same marker, check 4 uses for the
+                    # same fact about a current id.
+                    # The null check is explicit rather than left to -and's short-circuit: under
+                    # -SkipVersions $consumerInstalled is $null by design, and a reader of this condition
+                    # should not have to derive that the operator order is what keeps it safe.
+                    if (-not $SkipVersions -and $null -ne $consumerInstalled -and $consumerInstalled.Exists -and $consumerInstalled.Readable -and ($consumerEnabled.Ids -contains $p.id)) {
+                        $retiredRecords = @()
+                        if ($consumerInstalled.RecordsById.ContainsKey($p.id)) { $retiredRecords = @($consumerInstalled.RecordsById[$p.id]) }
+                        if ($retiredRecords.Count -eq 0) {
+                            Write-Info "and there is no machine record for it either, while it IS enabled in $($consumerEnabled.LayerById[$p.id]) -- so a session in that checkout loads none of this plugin (no skills, no subagents, no hooks), and that repo cannot report it, because the hook that would is inside the plugin that is not loading. 'claude plugin install $shown --scope project' will NOT fix it: the marketplace no longer declares that id. The way out is the migration -- enable the plugin under its current name, then install that (see INSTALL.md)."
+                            if (Test-IsSessionRepo $checkout) {
+                                Write-Host "  [NOT-INSTALLED-HERE] '$shown' is enabled in $($consumerEnabled.LayerById[$p.id]) but is BOTH a retired plugin name and without an install record for this checkout -- a session here loads none of it (no skills, no subagents, no hooks), and cannot say so itself. Re-installing under this id is not the fix: the marketplace no longer declares it. Migrate the enable to the plugin's current name and install that (see INSTALL.md)." -ForegroundColor Yellow
+                            }
+                        }
+                    }
                 }
                 'no-source' {
                     Write-Failure "$shown is declared by the marketplace but its source folder is missing from this checkout -- plugin block skipped. That is a defect in this repo, not in the consumer."

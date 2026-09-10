@@ -312,6 +312,16 @@ foreach ($id in $ids) {
         if ($pathless.Count -ge 1) {
             $verdict = "cannot determine for this checkout -- only a path-less (machine-wide) record exists"
         } else {
+            # ITS OWN CODE, BECAUSE IT IS THE ONE UNDETERMINED VERDICT THAT IS NOT BOOKKEEPING (#1802).
+            # Every other 'cannot determine' on this page reports something about a cache or an
+            # administration this checkout does not own -- which is the stated ground for keeping them
+            # all quiet in -Brief. This one reports that the settings say to load a plugin and the
+            # machine has no record of it here: the session is loading none of it, right now, in the
+            # checkout the reader is standing in. The rule -Brief states for an [ERROR] is "the only
+            # verdict a reader closes with a command here and now", and this is the sole indeterminate
+            # branch that hands one over -- the $action two lines down. Sharing 'indeterminate' meant
+            # that rule and this row's own contents disagreed.
+            $code = 'not-installed'
             $verdict = "cannot determine -- not installed in this checkout (enabled declaratively only)"
         }
         $action = "install here: claude plugin install $id --scope project"
@@ -466,7 +476,12 @@ $behind = @($rows | Where-Object { @('behind', 'clone-behind') -contains $_.Code
 # that does nothing. And it is not 'up to date' either: the clone genuinely holds newer commits, which
 # is the fact somebody reading this report came for.
 $unreleased = @($rows | Where-Object { $_.Code -eq 'unreleased' })
-$unknown = @($rows | Where-Object { $_.Code -eq 'indeterminate' })
+# 'not-installed' RIDES IN THIS BUCKET FOR THE DEFAULT VIEW, on purpose (#1802). It is still a
+# 'cannot determine' line to a person reading the full report, so every sentence below that counts
+# undetermined rows keeps counting it and none of them had to be re-derived. What changed is only its
+# MARKER in -Brief, which splits it back out -- the severity question and the bucket question have
+# different answers, and conflating them is what would have made this a wider change than it is.
+$unknown = @($rows | Where-Object { @('indeterminate', 'not-installed') -contains $_.Code })
 $total = $rows.Count
 
 # --- brief mode: marker lines a session start can carry, and nothing else -----------------------
@@ -496,6 +511,25 @@ if ($Brief) {
     #>
     $behindOnly = @($rows | Where-Object { $_.Code -eq 'behind' })
     $staleClone = @($rows | Where-Object { $_.Code -eq 'clone-behind' })
+    # THE SECOND [ERROR] VERDICT, AND THE ONLY ONE ADDED SINCE #1591 SET THE SPLIT (#1802). It passes
+    # that split's own test rather than widening it: a plugin enabled here with no install record for
+    # this checkout is loading nothing, in this checkout, and the row carries the one command that
+    # repairs it. Everything the split deliberately keeps quiet is unchanged -- a stale clone is still
+    # [INFO], unreleased clone commits are still [INFO], and every remaining 'cannot determine' is
+    # still [INFO], because each of those is a fact about a cache or an administration this checkout
+    # does not own. This one is a fact about this checkout.
+    #
+    # WHAT IT CANNOT REACH, said plainly so nobody reads more into it than it does: a checkout where NO
+    # enabled plugin has a record loads no hooks either, so nothing invokes this mode there and no
+    # marker of any severity appears. That is the #1802 life-hub state, and it is structurally out of
+    # reach from inside the affected checkout -- the vantage point that can see it is
+    # check-connectors.ps1 in the source repo, walking the register. What this marker fixes is the
+    # PARTIAL case: some plugins loaded, one enabled and never installed, and until now the reader was
+    # told so at the quietest marker the tool has.
+    $notInstalled = @($rows | Where-Object { $_.Code -eq 'not-installed' })
+    # Undetermined MINUS the row just split out, so the summary's own parts stay disjoint and the
+    # tally still adds up to $total. $unknown itself keeps both codes for the default view above.
+    $undetermined = @($unknown | Where-Object { $_.Code -eq 'indeterminate' })
     # 'unreleased' IS [INFO] BY THE SAME RULE AS A STALE CLONE, and it is the case that rule was
     # written for without knowing it: the only verdict worth an [ERROR] is the one a reader closes
     # with a command here and now, and this one has no command at all (#1772). Before the split it was
@@ -532,7 +566,7 @@ if ($Brief) {
         $safeId = Format-SuspectToken -Value ([string]$row.Id)
         $safeVerdict = Format-SafeProseToken -Value ([string]$row.Verdict) -MaxLength 400
         $safeAction = Format-SafeProseToken -Value ([string]$row.Action) -MaxLength 200
-        if ($row.Code -eq 'behind') {
+        if (@('behind', 'not-installed') -contains $row.Code) {
             $line = "[ERROR] ${safeId}: $safeVerdict"
             if ($safeAction) { $line += " -- $safeAction" }
             Write-Host $line
@@ -543,9 +577,10 @@ if ($Brief) {
     }
 
     $parts = @("$($behindOnly.Count) behind")
+    if ($notInstalled.Count -gt 0) { $parts += "$($notInstalled.Count) enabled but not installed here" }
     if ($staleClone.Count -gt 0) { $parts += "$($staleClone.Count) ahead of a stale clone" }
     if ($unreleased.Count -gt 0) { $parts += "$($unreleased.Count) on the released version with unreleased clone commits" }
-    if ($unknown.Count -gt 0)    { $parts += "$($unknown.Count) undetermined" }
+    if ($undetermined.Count -gt 0) { $parts += "$($undetermined.Count) undetermined" }
     $parts += "$($good.Count) up to date"
     Write-Host "[SUMMARY] $total plugin(s) enabled here: $($parts -join ', ')."
     exit 0

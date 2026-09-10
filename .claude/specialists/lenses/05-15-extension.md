@@ -2769,6 +2769,59 @@ wrong, and now carries a citation. The report's own author named the hazard in i
 not apply it to itself: *"that choice was made on my measurement of what the validator accepts, and I did
 not measure whether an accepted form loads."* The measurement missing at the top was the same one.
 
+#### The retired-id `continue`, and the block it silently skipped (September 10, 2026, #1802)
+
+**#1802's proposed repair rests on a premise that was false when filed, and the tree already falsifies it
+three times over.** It reported three findings about the `~/.claude` plugin administration on Dave's
+machine and proposed: *"a check that compares a repo's `enabledPlugins` keys against the install records
+for that `projectPath` and reports a key with no matching record. That is the one comparison nothing
+currently makes."* Grepped rather than taken on faith: three readers already make it.
+[`plugin-versions.ps1`](../../../scripts/task/plugin-versions.ps1) prints exactly that verdict — its
+`not-installed` code's own line, `cannot determine -- not installed in this checkout (enabled
+declaratively only)`, with `claude plugin install <id> --scope project` as its action. Check 4 of
+[`check-connectors.ps1`](../../../scripts/sync/check-connectors.ps1)'s no-install-record branch makes
+the same comparison for a different vantage point and states the consequence in prose: a session in
+that checkout loads none of that plugin, "and that repo cannot report it -- the hook that would is
+inside the plugin that is not loading," plus a `[NOT-INSTALLED-HERE]` promotion for the session's own
+repo (#533). And
+[`tidy-machine.ps1`](../../../scripts/maintenance/tidy-machine.ps1) lane 11 (#1773) — landed the same day
+#1802 was filed — cleans up install records under a retired plugin name, which is #1802's own finding 3;
+lane 8 (#1449) covers its orphan-record sibling. **A report's claim that "nothing currently makes this
+comparison" is a claim about the tree, and it is checked against the tree** — the same discipline the
+`triage-inbound` skill already applies to a proposed repair's mechanism or a symptom's currency, applied
+here to an assertion of absence, and worth an entry there in its own right (below).
+
+**The wider shape the report implied was also already declined, by name, in the tree it was filed
+against.** `tidy-machine.ps1`'s own docstring, in its "IT VISITS NO OTHER CHECKOUT" paragraph: *"Dave's
+second answer on September 10, 2026 was 'this checkout plus the machine-wide lanes' rather than 'every
+checkout the machine knows about'"*. A mechanism that walked every consumer checkout to answer #1802's
+question directly was on the table the same day and was the reverse of what got built.
+
+**What did stand, underneath the false premise, was a real and narrow defect: a `continue` that skipped a
+whole block silenced every check inside it, including the one check whose subject did not depend on the
+reason for skipping.** In `check-connectors.ps1`'s `'retired'` branch, a plugin id the marketplace no
+longer declares hits `continue` before check 4 ever runs. The reason for the block being unreachable is
+that two of its three checks — the extension inventory and the version comparison — read the plugin's
+*source folder*, which a retired name has none of. **Check 4's install-record question needs no source
+folder at all**: it asks whether this machine holds a record for that `projectPath`, and the answer is as
+available for a retired id as for a current one. The `continue` did not distinguish the two, so it
+silenced a check whose vantage point had nothing to do with the reason the other two were skipped. For a
+consumer enabling nothing but retired ids — both of #1802's worst-measured cases, life-hub and
+thumbnail-generator — the one check with a vantage point on "this checkout loads nothing" was exactly the
+one that never ran, and the register reported them as "correct as it stands." Sylvester's repair asks the
+install-record question inside that same `'retired'` switch arm too, and splits `plugin-versions.ps1`'s
+one actionable indeterminate verdict out to its own `not-installed` code — the marker split in its
+`-Brief` block — so it reads as `[ERROR]` there rather than riding quietly in the same bucket as every
+other "cannot determine" line that is genuinely bookkeeping.
+
+**The generalisable half: guarding a block on one condition is only as narrow as the condition, and a
+block can hold checks that do not all share it.** `continue` inside a `switch` arm reads as "this whole
+case is inapplicable," which is true of two thirds of what it was skipping and false of the third. The
+question worth asking before writing one is not "does this block apply" but "does *every* check inside
+it depend on the reason it does not" — the same shape as the mention-vs-use question checks 11/12/18
+already ask of a printed command or a mirrored parameter, arriving here as a skipped branch instead of an
+unheld one.
+
 In short: the **how** (managing the harness, scripts, config, safety guards) is portable; the **what**
 (the plugin lint + drift lint, `branch-info.ps1`, `.claude/settings.json` with the github source, and
 the marketplace/plugin manifests) belongs to this repo.
