@@ -1562,7 +1562,13 @@ $rOther = Invoke-Fold -Dir $devR -Branch 'feat/raced-thing-v1' -ExtraArgs @('-Pu
 Assert-Equal 0 $rOther.ExitCode                                         'raced fold: (fixture) the other device folds and pushes cleanly'
 
 $rR = Invoke-Fold -Dir $dirR -Branch 'feat/raced-thing-v1' -ExtraArgs @('-Push', '-SkipTrunkCheck')
-Assert-Equal 1 $rR.ExitCode                                             'raced fold: the run ends non-zero'
+# EXIT CODE 3, AND THE NUMBER IS THE POINT (inbound #1796) -- the same argument as exit 2 above, for the
+# narrow half of the same race. fold-on-merge.yml translates exactly this code into a stood-down green,
+# because the trunk already holds what that job exists to put there and the redundant commit is in a
+# workspace that dies with the run. Pinned here rather than left as "non-zero" -- which is what this
+# assert said while pinning 1 -- because the workflow and the adopt-merge-queue template now BOTH read
+# it, across a release boundary each.
+Assert-Equal 3 $rR.ExitCode                                             'raced fold: the run ends on 3 -- the code fold-on-merge.yml stands down on (#1796)'
 # The five facts that had to be established BY HAND in the measured incident -- a fetch, a log of
 # HEAD..origin/main, a grep of the remote changelog, a count, and a body diff -- are each asserted here,
 # because each one is separately derivable and each was separately missing.
@@ -1579,6 +1585,43 @@ Assert-True ($rR.Output -notmatch 'the state this flag exists to avoid') `
 # reserve to the operator, so the one thing this script must never do here is tidy up after itself.
 $headR = ((Invoke-Git -Dir $dirR -GitArgs @('log', '-1', '--pretty=%s')) -join '').Trim()
 Assert-True ($headR -match '^fold: feat/raced-thing-v1')                'raced fold: the local fold commit is left exactly where it is'
+# AND THAT COMMIT IS EXACTLY WHY 3 IS ITS OWN CODE RATHER THAN A SECOND WAY TO SPELL 2 (inbound #1796).
+# A caller standing down on 3 accepts a local commit it will not push -- safe in fold-on-merge.yml's
+# ephemeral workspace, which the assert above proves is what is being left behind, and NOT safe for a
+# session on a real trunk (#1792). Exit 2 leaves nothing at all, asserted at 'no fold commit was made'
+# above; the pair of asserts is what keeps the two codes from being merged by a later reader.
+
+# AND NO SECOND PATH MAY REACH THAT CODE, the same property exit 2 is held to above. 3 says "every entry
+# this run folded is already upstream, measured" -- so a refusal that has NOT made that measurement, or
+# one that can follow a partial fold, must never return it.
+$foldSrcTextR = [System.IO.File]::ReadAllText($FoldSrc, [System.Text.Encoding]::UTF8)
+$exit3Count = ([regex]::Matches($foldSrcTextR, '(?m)^\s*exit\s+3\s*$')).Count
+Assert-Equal 1 $exit3Count 'raced fold: exit 3 is returned from exactly ONE place in the fold script'
+Assert-True ($foldSrcTextR -match '(?ms)Do NOT push this commit by hand.*?exit 3') `
+    'raced fold: and that one place is the redundant-fold verdict itself, not some later failure'
+Assert-True ($foldSrcTextR -like '*#1796*') 'raced fold: the verdict cites the issue that explains why its code is its own'
+
+# AND THE OTHER SIDE OF THE AGREEMENT IS PINNED HERE TOO (inbound #1796). Both stand-down codes cross a
+# boundary this script cannot see: adopt-merge-queue.ps1's emitted template, which its own suite asserts,
+# and THIS repo's own .github/workflows/fold-on-merge.yml, which until now nothing did. A code is only a
+# contract while both ends read it, and the end that goes unasserted is the one that drifts -- so the
+# reader of the codes is checked in the suite that owns them, rather than left to the workflow's comments.
+$foldYml = Join-Path $RepoRoot '.github\workflows\fold-on-merge.yml'
+if (Test-Path -LiteralPath $foldYml) {
+    $foldYmlText = [System.IO.File]::ReadAllText($foldYml, [System.Text.Encoding]::UTF8)
+    Assert-True ($foldYmlText -match '(?ms)if \(\$foldExitCode -eq 2\) \{.*?exit 0') `
+        "this repo's own fold-on-merge.yml stands down on exit 2 (#1586)"
+    Assert-True ($foldYmlText -match '(?ms)if \(\$foldExitCode -eq 3\) \{.*?exit 0') `
+        "this repo's own fold-on-merge.yml stands down on exit 3 too (#1796)"
+    Assert-Equal 2 (@([regex]::Matches($foldYmlText, '\$foldExitCode -eq \d')).Count) `
+        'and on exactly those two codes -- a third would need its own ground, so the count is what is pinned'
+    Assert-True ($foldYmlText -notmatch '\$foldExitCode -ne 0') `
+        'and neither stand-down is a blanket "any non-zero is fine"'
+} else {
+    # Stated rather than skipped in silence: a consumer running this suite has no such workflow, and a
+    # pass over a file that is not there proves nothing about the one that is.
+    Write-Host "  (no .github/workflows/fold-on-merge.yml in this checkout -- the reader half is unasserted here.)" -ForegroundColor DarkYellow
+}
 
 # THE FALSE POSITIVE THAT WOULD BE WORSE THAN THE DEFECT. A push refused by an ORDINARY divergence must
 # still get the ordinary advice: that commit is real work, and telling its author not to push it would
@@ -1598,7 +1641,10 @@ Invoke-Git -Dir $devV -GitArgs @('commit', '--quiet', '-m', 'unrelated work') | 
 Invoke-Git -Dir $devV -GitArgs @('push', '--quiet')                           | Out-Null
 
 $rV = Invoke-Fold -Dir $dirV -Branch 'feat/diverged-thing-v1' -ExtraArgs @('-Push', '-SkipTrunkCheck')
-Assert-Equal 1 $rV.ExitCode                                             'diverged: the run still ends non-zero'
+# 1 AND NOT 3, WHICH IS THE HALF THAT KEEPS #1796 FROM BECOMING "IGNORE A FAILED PUSH". Both cases here
+# are a push refused as a non-fast-forward; only the one above can prove the entry is already upstream.
+# This one carries work the trunk does not have, so it stays red in fold-on-merge.yml exactly as before.
+Assert-Equal 1 $rV.ExitCode                                             'diverged: the run still ends on 1 -- NOT the stood-down code, because nothing was proved redundant'
 Assert-True ($rV.Output -match 'has NO entry on')                       'diverged: it says the entry is NOT upstream'
 Assert-True ($rV.Output -match 'the state this flag exists to avoid')   'diverged: so the ordinary "push by hand" advice stands'
 Assert-True ($rV.Output -notmatch 'Do NOT push this commit by hand')    'diverged: and it is NOT called a duplicate'

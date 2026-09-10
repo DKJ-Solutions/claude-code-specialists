@@ -253,6 +253,21 @@ try {
     Assert-True ($fold -notmatch '\$foldExitCode -ne 0') 'and the stand-down is not a blanket "any non-zero is fine"'
     Assert-True ($fold -like '*#1586*') 'and the runner carries the issue that explains why that one code is green'
 
+    # AND ON THE NARROW HALF OF THE SAME RACE (#1796). Exit 2 is the other fold landing BEFORE the
+    # pre-pass; exit 3 is it landing between the pre-pass and this runner's own push, which no check at
+    # the top of a run can close. The fold earns 3 by measuring that every entry it carried is already
+    # upstream, so the trunk holds what this job exists to put there -- and the redundant commit it
+    # leaves behind is in a workspace that dies with the run.
+    Assert-True ($fold -match '(?m)^\s*if \(\$foldExitCode -eq 3\) \{\s*$') `
+        'the placed fold runner branches on the fold exit code 3 too (#1796)'
+    Assert-True ($fold -match '(?ms)if \(\$foldExitCode -eq 3\) \{.*?exit 0') 'and exits 0 on that one as well -- the second stand-down'
+    Assert-True ($fold -like '*#1796*') 'and carries the issue that explains why the narrow half needs its own code'
+    # THE TWO CODES ARE THE WHOLE STAND-DOWN LIST. A third would have to be argued for on its own
+    # ground, so this counts rather than merely checking the two are present -- the same property the
+    # fold script's own suite asserts at its source.
+    Assert-Equal 2 (@([regex]::Matches($fold, '\$foldExitCode -eq \d')).Count) `
+        'and exactly TWO exit codes are stood down on -- 2 and 3, and nothing else'
+
     # --- 3. Additive: a re-run never overwrites -----------------------------------------------------
     Write-Host '-- 3. a re-run is additive --' -ForegroundColor Cyan
     $edited = '# my own fold runner'
