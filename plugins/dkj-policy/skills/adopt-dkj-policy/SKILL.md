@@ -440,17 +440,32 @@ A red run of that job has **three** entirely different causes, and only the log 
 1. the **checkout** failing on the token -- rule this out first, it is the only one that leaves every
    later step `skipped` and the fold step with no last lines at all;
 2. the fold **refusing** -- it ran and declined; its own last lines say why;
-3. the fold **succeeding** and its push being rejected by the ruleset -- a clean fold above a `GH013`.
+3. the fold **succeeding** and its push being rejected **by the ruleset** -- a clean fold above a `GH013`.
+   Read the rejection rather than the exit code: a push refused as a **non-fast-forward** wears this
+   cause's clothes and is not it -- that one is the race below. `GH013` names a rule and a ruleset; a
+   non-fast-forward names a ref and tells you to fetch first.
 
 **Read the fold step's own last lines before concluding anything** -- once there is a fold step to read.
 
-**One refusal is deliberately not on that list, because it no longer turns the job red** (inbound #1586).
-Where a second merge lands between the job's checkout and the fold, the fold's trunk-freshness guard
-refuses -- correctly, on an entry somebody else has by then already folded -- and the placed runner
-**stands down green** instead: exit code `2` from the fold, which nothing else in that script returns. It
-is lossless because that guard fires in a pre-pass, before a single entry is folded, and because the push
-that moved your trunk queues its own run of the same job behind this one. So a `Stood down:` line in the
-log is the job working, not a fold that went missing -- and every **other** non-zero code still fails.
+**Two refusals are deliberately not on that list, because neither turns the job red any more.** They are
+the two halves of one race -- another fold reaching your trunk while this job is folding the same entry --
+and they are separate codes because what has been *written* by the time each fires is different:
+
+- **exit `2`, the wide half** (inbound #1586). The other fold landed **before** the job's pre-pass read
+  the trunk, so the fold's trunk-freshness guard refuses having written nothing at all. It is lossless
+  because that guard fires in a pre-pass, before a single entry is folded, and because the push that moved
+  your trunk queues its own run of the same job behind this one.
+- **exit `3`, the narrow half** (inbound #1796). The other fold landed in the window **between** that
+  pre-pass and this job's own push, which no check at the top of a run can close. Entries were folded, a
+  commit was made, and the push came back a non-fast-forward. The fold earns this code by **measuring**
+  that every entry it carried is already upstream with an identical body -- so your trunk holds exactly
+  what the job exists to put there. The redundant commit is local to the runner's ephemeral workspace and
+  dies with it, which is why the placed runner may stand down here while a session folding onto a real
+  trunk may not.
+
+A `Stood down:` line in the log is the job working, not a fold that went missing -- and every **other**
+non-zero code still fails, including a non-fast-forward the fold could **not** prove redundant (one entry
+upstream, another genuinely new), because that commit carries work your trunk does not have.
 
 ### Exit code
 

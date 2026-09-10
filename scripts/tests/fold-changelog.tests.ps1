@@ -1568,7 +1568,12 @@ $rR = Invoke-Fold -Dir $dirR -Branch 'feat/raced-thing-v1' -ExtraArgs @('-Push',
 # has no other way to tell "somebody else folded it" from "the fold refused or crashed", so reading 1
 # there reported a hard failure over a correct ship and left the session's trunk diverged. It was pinned
 # at 1 here, which is what made that the tested behaviour rather than an oversight.
-Assert-Equal 3 $rR.ExitCode                                             'raced fold: the run ends on 3 -- the code ship-pr.ps1 stands down on (#1792)'
+#
+# AND IT HAS A SECOND READER, WHICH IS WHY THE PIN MATTERS MORE THAN ITS FIRST OWNER SAID (issue #1796).
+# fold-on-merge.yml loses the SAME race from the other side and stands down on the same code -- so this
+# one number is now read across two independent boundaries, ship-pr's and adopt-merge-queue.ps1's emitted
+# template, each reaching consumers by its own route. Both readers are asserted below.
+Assert-Equal 3 $rR.ExitCode                                             'raced fold: the run ends on 3 -- the code ship-pr.ps1 (#1792) and fold-on-merge.yml (#1796) both stand down on'
 # The five facts that had to be established BY HAND in the measured incident -- a fetch, a log of
 # HEAD..origin/main, a grep of the remote changelog, a count, and a body diff -- are each asserted here,
 # because each one is separately derivable and each was separately missing.
@@ -1585,6 +1590,13 @@ Assert-True ($rR.Output -notmatch 'the state this flag exists to avoid') `
 # reserve to the operator, so the one thing this script must never do here is tidy up after itself.
 $headR = ((Invoke-Git -Dir $dirR -GitArgs @('log', '-1', '--pretty=%s')) -join '').Trim()
 Assert-True ($headR -match '^fold: feat/raced-thing-v1')                'raced fold: the local fold commit is left exactly where it is'
+# AND THAT COMMIT IS EXACTLY WHY 3 IS ITS OWN CODE RATHER THAN A SECOND WAY TO SPELL 2. Standing down on
+# 3 means ACCEPTING a local commit that will not be pushed -- which is why the two readers answer it
+# differently rather than identically: ship-pr.ps1 tells the operator about it (#1792, step 5c), because
+# it is sitting on a trunk they have to live with, while fold-on-merge.yml simply exits 0 (#1796),
+# because its workspace is thrown away when the run ends. Exit 2 leaves nothing at all, asserted at 'no
+# fold commit was made' above; the pair of asserts is what keeps the two codes from being merged by a
+# later reader who sees only that both are "the race".
 
 # AND NO SECOND PATH MAY REACH CODE 3 EITHER (issue #1792), the same property the exit-2 block above
 # asserts and for a sharper reason: ship-pr.ps1 reads 3 as "the fold happened, carry on shipping". A
@@ -1608,6 +1620,28 @@ Assert-True ($shipSrcText -match '(?ms)\$foldExit\s+-eq\s+3.*?\}\s*elseif\s*\(\s
     'raced fold: and its hard-failure arm is an elseif, so 3 cannot fall through into it'
 Assert-True ($shipSrcText -like '*#1792*')                              'raced fold: ship-pr.ps1 cites the issue that explains why 3 is not a failure'
 
+# AND THE SECOND READER OF THAT SAME CODE, ACROSS A DIFFERENT BOUNDARY (issue #1796). ship-pr.ps1 loses
+# this race from the session's side; fold-on-merge.yml loses it from the runner's, and stands down on the
+# same 3. Its half was asserted nowhere -- only the emitted template in adopt-merge-queue.tests.ps1 was,
+# and that reaches consumers by a plugin release while THIS file reaches them by that template, so the two
+# ends drift independently. A code is only a contract while every end that reads it is pinned.
+$foldYml = Join-Path $RepoRoot '.github\workflows\fold-on-merge.yml'
+if (Test-Path -LiteralPath $foldYml) {
+    $foldYmlText = [System.IO.File]::ReadAllText($foldYml, [System.Text.Encoding]::UTF8)
+    Assert-True ($foldYmlText -match '(?ms)if \(\$foldExitCode -eq 2\) \{.*?exit 0') `
+        'raced fold: fold-on-merge.yml stands down on exit 2 (#1586)'
+    Assert-True ($foldYmlText -match '(?ms)if \(\$foldExitCode -eq 3\) \{.*?exit 0') `
+        'raced fold: and on exit 3 too (#1796)'
+    Assert-Equal 2 (@([regex]::Matches($foldYmlText, '\$foldExitCode -eq \d')).Count) `
+        'raced fold: on exactly those two codes -- a third would need its own ground, so the count is pinned'
+    Assert-True ($foldYmlText -notmatch '\$foldExitCode -ne 0') `
+        'raced fold: and neither stand-down is a blanket "any non-zero is fine"'
+} else {
+    # Stated rather than skipped in silence: a consumer running this suite has no such workflow, and a
+    # pass over a file that is not there proves nothing about the one that is.
+    Write-Host "  (no .github/workflows/fold-on-merge.yml in this checkout -- that reader is unasserted here.)" -ForegroundColor DarkYellow
+}
+
 # THE FALSE POSITIVE THAT WOULD BE WORSE THAN THE DEFECT. A push refused by an ORDINARY divergence must
 # still get the ordinary advice: that commit is real work, and telling its author not to push it would
 # strand the entry for good.
@@ -1628,7 +1662,8 @@ Invoke-Git -Dir $devV -GitArgs @('push', '--quiet')                           | 
 $rV = Invoke-Fold -Dir $dirV -Branch 'feat/diverged-thing-v1' -ExtraArgs @('-Push', '-SkipTrunkCheck')
 # PINNED AT 1, NOT MERELY NON-ZERO (issue #1792). This is the case that must NOT borrow the raced fold's
 # 3: the entry is not upstream, so the commit carries work, and a caller standing down on it would report
-# a successful ship over a trunk that never got the entry.
+# a successful ship over a trunk that never got the entry -- or, in fold-on-merge.yml's case (#1796),
+# report green over a trunk the entry never reached. Both readers depend on this staying 1.
 Assert-Equal 1 $rV.ExitCode                                             'diverged: the run still ends on 1 -- NOT the stand-down code'
 Assert-True ($rV.Output -match 'has NO entry on')                       'diverged: it says the entry is NOT upstream'
 Assert-True ($rV.Output -match 'the state this flag exists to avoid')   'diverged: so the ordinary "push by hand" advice stands'
