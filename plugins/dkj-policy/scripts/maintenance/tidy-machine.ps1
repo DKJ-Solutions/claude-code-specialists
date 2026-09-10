@@ -146,6 +146,7 @@ if (Test-Path -LiteralPath $guardLib -PathType Leaf) { . $guardLib; Assert-OwnCo
 . (Join-Path $PSScriptRoot '..\lib\worktree-lib.ps1')
 . (Join-Path $PSScriptRoot '..\lib\ref-print-lib.ps1')
 . (Join-Path $PSScriptRoot '..\lib\check-report-lib.ps1')
+. (Join-Path $PSScriptRoot '..\lib\command-probe-lib.ps1')
 . (Join-Path $PSScriptRoot '..\lib\tidy-lib.ps1')
 
 # Repo root -- dual context: if a consumer runs the shared plugin mirror, CLAUDE_PROJECT_DIR supplies
@@ -168,7 +169,9 @@ $cfg = Join-Path $repoRoot 'scripts\repo-config.ps1'
 if (Test-Path -LiteralPath $cfg -PathType Leaf) {
     try {
         . $cfg
-        if (Get-Command 'Get-TrunkBranchName' -ErrorAction SilentlyContinue) { $trunk = Get-TrunkBranchName }
+        # Test-FunctionDefined, never Get-Command (issue #1729): Get-Command reads its argument as a
+        # WILDCARD pattern, so a seam function whose name carried a bracket would be missed silently.
+        if (Test-FunctionDefined 'Get-TrunkBranchName') { $trunk = Get-TrunkBranchName }
     } catch {
         Write-Warning "scripts\repo-config.ps1 could not be loaded -- assuming the trunk is '$trunk'. ($($_.Exception.Message))"
     }
