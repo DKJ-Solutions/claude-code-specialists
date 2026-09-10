@@ -1274,6 +1274,40 @@ Write-Host "  Open that second terminal in a lane: scripts\task\worktree-lane.ps
 # share and the tail length are flat across all four, so what moves is the trunk's own rate, which
 # is exactly #1592's title -- two sound decisions that do not converge ON A BUSY TRUNK.
 #
+# AND WHAT DRIVES THE RATE IS CONCURRENCY, NOT THE TRUNK'S RATE -- which is where the paragraph above
+# stops one step short (issue #1719, closed 2026-09-10 with no converger built). Re-measured over the
+# 24 successful laps after #1715: 2 voided (8.3%). Neither sits in a busy stretch. They sit at 12.5
+# and 28.3 minutes since the previous trunk move, while laps cut 1.6 minutes after one came through
+# clean -- so "a busy trunk" predicts the wrong laps. What the two share is that ANOTHER PR WAS OPEN
+# AT THE SAME TIME:
+#
+#   tight concurrent pairs that lost a lap        2 of 5 (#1740+#1741, #1751+#1752)
+#   PRs not in such a pair that lost a lap        0 of 10
+#
+# The three surviving pairs were saved by ordering alone, not by margin: the second branch's
+# certifying run started 7, 3 and 1.7 minutes AFTER the first branch's merge landed. With two
+# branches in flight this is a coin flip decided by seconds; with one it is zero.
+#
+# AND MERE OVERLAP IS NOT THE PREDICATE EITHER, which is worth stating because it is the reading a
+# `gh pr list` would suggest. #1733 sat open for 285 minutes and overlapped 14 of the other 19 PRs
+# in the sample without voiding any of them -- it was parked, waiting for a person. What collides is
+# two branches both ACTIVELY CERTIFYING, so the population to count is concurrent CI laps and not
+# concurrent open PRs.
+#
+# SO THE CHEAP MITIGATION IS A SEQUENCING HABIT AND NOT A MECHANISM, and that is what closed #1719
+# against its own ranked options (Mergify, an Actions merge train, a Cloudflare Worker broker). Ship
+# one branch at a time and this gate has nothing to refuse; detect-and-rebase (#1546) handles the
+# residue correctly at one extra CI lap. What would reopen it is parallel shipping becoming the norm
+# -- several branches routinely in flight, or a second person shipping into this trunk -- and the
+# figure to re-measure then is the CONCURRENT-PAIR rate, not the flat per-lap one.
+#
+# PREDICATE, since the row above insists on one: population as recorded above, one row per successful
+# `ci.yml` `pull_request` lap, 2026-09-09 16:00:35Z .. 2026-09-10 07:15Z. Window per lap
+# [run.created_at, run.updated_at] -- the NARROWER end, not the last check of any kind, so on the
+# window this block records the rate can only be >= 8.3%. Discount: `^fold:` on the subject, which is
+# coarser than Test-IsFoldOnlyCommit and is the open half of the residual noted above. n=5 pairs, so
+# read the 2-of-5 as an order of magnitude rather than as 40%.
+#
 # THE OBJECTION THAT MADE THIS EXPENSIVE DOES NOT HOLD, and that is the finding that decided it.
 # #1602 priced this as reversing #831, on the ground that #831 wants the wait to SEE a red
 # non-required check. It does, and it still does -- but a red non-required check has never gated the

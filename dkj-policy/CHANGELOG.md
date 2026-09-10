@@ -43,4 +43,35 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**Nothing pending.** The last release took every entry. <!-- pending-tally -->
+**0 / 1 patch entry** <!-- pending-tally -->
+
+### DEPLOY: docs/1719-concurrent-pair-voiding-rate · 20260910-075556
+
+Anyone changing `ship-pr.ps1`'s staleness gate now reads why it refuses, not just how often. The
+block already carried the rate and (since #1750) its predicate; what it did not carry is the driver.
+Issue #1719 measured it while being closed: the refusal tracks two branches CERTIFYING at the same
+time -- 2 of 5 tight concurrent pairs lost a lap against 0 of 10 PRs outside such a pair -- and not
+the trunk's own commit rate, which the paragraph above it had reached for. The practical consequence
+is recorded with it: shipping one branch at a time drives the row to zero at no cost, which is why
+#1719 closed against its own ranked converger options instead of building one. The measurement's
+window, population and discount are stated, so the next reader can compare rather than re-argue.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A -- a comment block inside a maintenance script. No consumer of this repo's plugins reads it and
+no released behaviour changes; the mirror moves only so the drift lint stays green.
+
+**Score:** N/A
+
+#### Pull Request
+
+Record the concurrent-pair voiding rate beside the step-3b predicate
+
+Plugins: dkj-policy
+
+[PR #1759](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1759)
+
+---
+
