@@ -43,7 +43,27 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**2 / 6 minor entries** <!-- pending-tally -->
+**2 / 7 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/connector-record-catch-up · 20260910-092155
+
+This repo's own connector record described two plugins while the repo runs six, so five of them sat outside `check-connectors.ps1` entirely -- one skipped behind an `[INFO]` for the retired `dkj-team-alpha@` id, and four never looped over at all because a plugin absent from the array is silent rather than reported. The record now names all six at the ids the 4.33.0 rename gave them, with each inventory counted from the marketplace clone's payload rather than carried forward, and the note says what the two gaps cost in the register of the repo that owns the check. The half this does not do is the checker itself: the 2026-08-21 argument for leaving the silent route unreported rested on its population being zero, that stopped being true on 2026-09-08, and #1775 carries it.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A -- `connectors/` is this repo's own register of who consumes what, read by a maintenance script here. It ships in no plugin and reaches no consumer of the specialists system.
+
+**Score:** N/A
+
+#### Pull Request
+
+Catch this repo's own connector record up to the six plugins it has
+
+[PR #1776](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1776)
+
+---
 
 ### DEPLOY: fix/1764-agents-manifest-file-list · 20260910-085218
 
