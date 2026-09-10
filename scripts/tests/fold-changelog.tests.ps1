@@ -1562,7 +1562,13 @@ $rOther = Invoke-Fold -Dir $devR -Branch 'feat/raced-thing-v1' -ExtraArgs @('-Pu
 Assert-Equal 0 $rOther.ExitCode                                         'raced fold: (fixture) the other device folds and pushes cleanly'
 
 $rR = Invoke-Fold -Dir $dirR -Branch 'feat/raced-thing-v1' -ExtraArgs @('-Push', '-SkipTrunkCheck')
-Assert-Equal 1 $rR.ExitCode                                             'raced fold: the run ends non-zero'
+# EXIT CODE 3, AND THE NUMBER IS THE POINT (issue #1792), for the same reason the pre-pass's 2 is. Every
+# assert below establishes that the fold HAPPENED -- upstream, once, with a matching body -- and the one
+# caller standing on the far side of this race is ship-pr.ps1, which merged the PR seconds earlier. It
+# has no other way to tell "somebody else folded it" from "the fold refused or crashed", so reading 1
+# there reported a hard failure over a correct ship and left the session's trunk diverged. It was pinned
+# at 1 here, which is what made that the tested behaviour rather than an oversight.
+Assert-Equal 3 $rR.ExitCode                                             'raced fold: the run ends on 3 -- the code ship-pr.ps1 stands down on (#1792)'
 # The five facts that had to be established BY HAND in the measured incident -- a fetch, a log of
 # HEAD..origin/main, a grep of the remote changelog, a count, and a body diff -- are each asserted here,
 # because each one is separately derivable and each was separately missing.
@@ -1579,6 +1585,28 @@ Assert-True ($rR.Output -notmatch 'the state this flag exists to avoid') `
 # reserve to the operator, so the one thing this script must never do here is tidy up after itself.
 $headR = ((Invoke-Git -Dir $dirR -GitArgs @('log', '-1', '--pretty=%s')) -join '').Trim()
 Assert-True ($headR -match '^fold: feat/raced-thing-v1')                'raced fold: the local fold commit is left exactly where it is'
+
+# AND NO SECOND PATH MAY REACH CODE 3 EITHER (issue #1792), the same property the exit-2 block above
+# asserts and for a sharper reason: ship-pr.ps1 reads 3 as "the fold happened, carry on shipping". A
+# refusal that borrowed it would turn a genuinely unfolded trunk into a reported success -- the one
+# outcome worse than the hard failure this change removes. The two codes also have to stay distinct: 2
+# says nothing was written, 3 says a commit is sitting on the local trunk.
+$exit3Count = ([regex]::Matches($foldSrcTextExit, '(?m)^\s*exit\s+3\s*$')).Count
+Assert-Equal 1 $exit3Count 'raced fold: exit 3 is returned from exactly ONE place in the fold script'
+Assert-True ($foldSrcTextExit -match '(?ms)Do NOT push this commit by hand.*?exit 3') `
+    'raced fold: and that one place is the redundant-commit verdict, not some later failure'
+Assert-True ($foldSrcTextExit -match '(?ms)EXIT CODES\..*?3 folded and committed') `
+    'raced fold: the header documents 3 alongside the other two, so a caller can read the contract'
+
+# THE READER OF THAT CODE, PINNED ACROSS THE FILE BOUNDARY. ship-pr.ps1 drives live git/gh and has no
+# suite of its own (its own header says so), so its half of this contract is asserted here as text --
+# exactly what the exit-2 asserts above do for fold-on-merge.yml's half. Without it the contract has one
+# testable end, which is how `-ne 0` stayed the tested behaviour on the caller side through #1586.
+$shipSrcText = [System.IO.File]::ReadAllText((Join-Path $RepoRoot 'scripts\release\ship-pr.ps1'), [System.Text.Encoding]::UTF8)
+Assert-True ($shipSrcText -match '\$foldExit\s+-eq\s+3')                'raced fold: ship-pr.ps1 reads exit 3 specifically'
+Assert-True ($shipSrcText -match '(?ms)\$foldExit\s+-eq\s+3.*?\}\s*elseif\s*\(\s*\$foldExit\s+-ne\s+0\s*\)') `
+    'raced fold: and its hard-failure arm is an elseif, so 3 cannot fall through into it'
+Assert-True ($shipSrcText -like '*#1792*')                              'raced fold: ship-pr.ps1 cites the issue that explains why 3 is not a failure'
 
 # THE FALSE POSITIVE THAT WOULD BE WORSE THAN THE DEFECT. A push refused by an ORDINARY divergence must
 # still get the ordinary advice: that commit is real work, and telling its author not to push it would
@@ -1598,7 +1626,10 @@ Invoke-Git -Dir $devV -GitArgs @('commit', '--quiet', '-m', 'unrelated work') | 
 Invoke-Git -Dir $devV -GitArgs @('push', '--quiet')                           | Out-Null
 
 $rV = Invoke-Fold -Dir $dirV -Branch 'feat/diverged-thing-v1' -ExtraArgs @('-Push', '-SkipTrunkCheck')
-Assert-Equal 1 $rV.ExitCode                                             'diverged: the run still ends non-zero'
+# PINNED AT 1, NOT MERELY NON-ZERO (issue #1792). This is the case that must NOT borrow the raced fold's
+# 3: the entry is not upstream, so the commit carries work, and a caller standing down on it would report
+# a successful ship over a trunk that never got the entry.
+Assert-Equal 1 $rV.ExitCode                                             'diverged: the run still ends on 1 -- NOT the stand-down code'
 Assert-True ($rV.Output -match 'has NO entry on')                       'diverged: it says the entry is NOT upstream'
 Assert-True ($rV.Output -match 'the state this flag exists to avoid')   'diverged: so the ordinary "push by hand" advice stands'
 Assert-True ($rV.Output -notmatch 'Do NOT push this commit by hand')    'diverged: and it is NOT called a duplicate'
