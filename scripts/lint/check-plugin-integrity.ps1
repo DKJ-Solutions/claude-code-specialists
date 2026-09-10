@@ -292,6 +292,20 @@
          drift and needs an entry's text read against a header's -- see the code for why that is left
          open. A script that must SHOW the marker composes it from a variable; there is no fence to
          hide it behind in a .ps1.
+     38. a plugin's 'agents' key, in both directions: every entry held to the shape the INSTALLER
+         accepts -- an existing .md file inside the plugin root, never a directory and never a glob --
+         and every *-agent.md a plugin ships held to the list that has to name it. Measured (#1764):
+         all four team plugins shipped v4.33.0 with "agents": "./subagents/", this gate reported 0
+         error(s) over them, and 'claude plugin install' answered 'agents: Invalid input' on every
+         one -- four of six uninstallable by any consumer for a whole release. Checks 1 and 2 read the
+         same manifests and neither has an opinion about a FIELD's shape, which is how that passed.
+         The plugins reference is what misled #1698 and is wrong: it prints ["./agents/", ...] as
+         legal and this validator rejects it at element 0, while 'commands' accepts the same
+         directory. The two directions fail differently -- a bad element makes the installer refuse
+         the whole plugin, an omitted def installs fine and never loads -- and only the first is
+         reachable by 'claude plugin validate', which is why that CLI is not delegated to. A plugin
+         with NO key is held to the convention instead: a def outside agents/ is declared by nothing.
+         A nested plugin root's files are its own, not its parent's.
     <!-- /checks:list -->
 
     Exit code: 0 = no errors. 1 = at least one error (usable as a gate in open-pr.ps1).
@@ -4408,6 +4422,175 @@ Write-Coverage -Category 'check-list' -Checked $clChecked `
         "$clMarked file(s) carry a 'checks:list' marker and NOT ONE FORMED A SPAN -- every marker in them is unpaired, and the errors above say which. Nothing was compared: read this as a broken gate rather than as a clean one. Said separately from the zero-marker case deliberately, because the two produce the same count and mean opposite things"
     } else {
         "column-0 numbered header(s) held to the list that claims to enumerate them, over $clSpans marked span(s) in $clMarked file(s) -- $clFindings finding(s). Counted ONCE PER FILE over the union of its spans, so two spans cannot double the figure or name one gap twice. AN ENTRY MUST START INSIDE THE LIST'S GUTTER, whose width is the narrowest number prefix in the span: a line indented past it is an entry's prose, and counting a nested enumeration there would silence the check where the missing entry sits below it. ONE DIRECTION: an entry with no header is deliberately not reported, because a retired check keeps its number as a tombstone and the consumer-doc guard the suites call check 19 carries no header of its own, so the reverse rule would be born needing exactly those exemptions -- the cost is that a STALE entry still satisfies its number, which is #1680's second drift and is NOT held here. Check 34 is the sibling and cannot serve this: it holds the headers to EACH OTHER and has no opinion about the prose that summarises them"
+    })
+# --- 38. a plugin's 'agents' key: the shape the installer accepts, and every def it ships ------------
+# THE GATE CALLED A MANIFEST SOUND THAT THE INSTALLER REFUSES OUTRIGHT (issue #1764, September 10, 2026).
+# Checks 1 and 2 read every plugin.json -- check 1 for the marketplace's view of it, check 2 for valid JSON
+# and a non-empty name -- and neither has ever had an opinion about a FIELD's accepted shape. So all four
+# team plugins shipped in v4.33.0 with "agents": "./subagents/", this gate reported 0 error(s) over them,
+# CI agreed, and 'claude plugin install <id>@claude-code-specialists --scope project' answered
+# 'Validation errors: agents: Invalid input' on every one. Four of the six plugins in the marketplace could
+# not be installed at all, by any consumer, for a whole release.
+#
+# THE ACCEPTED SHAPE, MEASURED AGAINST THE LIVE VALIDATOR rather than read off the reference (Claude Code
+# 2.1.267, 'claude plugin validate <path>'):
+#
+#     "./subagents/"                        agents: Invalid input
+#     ["./subagents/"]                      agents.0: Invalid input   -- the array is fine, the element is not
+#     "./subagents"   (no trailing slash)   agents: Invalid input     -- nor is the slash the objection
+#     ["./subagents/*.md"]                  Path not found            -- no glob is expanded
+#     "./subagents/04-18-agent.md"          passes                    -- a bare string IS one element
+#     ["./x-agent.md", "./y-agent.md"]      passes
+#
+# So 'agents' is string|string[] over paths to EXISTING .md FILES. A directory is not a legal element in
+# either form. THE REFERENCE SAYS OTHERWISE AND IS WRONG: it lists 'agents' among the fields that replace
+# their default directory and prints ["./agents/", "./custom-agents/reviewer.md"] as the way to keep the
+# default and add more -- an example this validator rejects at element 0. 'commands': ["./subagents/"]
+# passes on the same manifest, so the two fields genuinely diverge where the docs treat them alike. That is
+# upstream and is not this repo's to repair; what IS this repo's is not trusting the reference again.
+#
+# WHY THE DOC WAS BELIEVED, which is the part worth keeping. #1698 renamed each team's agents/ directory to
+# subagents/ and justified reaching for the key on exactly that sentence -- "it is permitted by the plugin
+# format: the reference documents an 'agents' key (string or array) that replaces the default directory."
+# The premise was read, not run. One 'claude plugin validate' on that branch would have answered it.
+#
+# TWO DIRECTIONS, AND THE SECOND IS WHY A GATE AND NOT A ONE-OFF FIX. Dave chose (September 10, 2026) to
+# keep the subagents/ name and list the files, over renaming back to agents/ and dropping the key -- so this
+# repo now carries a hand-maintained list of 26 paths across four manifests, which is the shape this file
+# exists to refuse. A specialist added tomorrow without touching its manifest would silently not ship, and
+# nothing else in the tree looks: the roster check counts SPECIALISTS.md rows against the defs on disk and
+# reads a manifest never. So completeness is held here, in the same check as the shape:
+#
+#   the shape        -- an element that is not an existing .md file inside the plugin root. The installer
+#                       refuses the WHOLE PLUGIN, and #1764 is what that costs.
+#   the completeness -- an agent def the plugin ships that no element names. It installs fine and simply
+#                       never loads, with every gate green.
+#
+# AND A THIRD SHAPE, which is #1698's own defect stated as a rule: a plugin holding defs OUTSIDE the default
+# agents/ directory with no key at all declares nothing, so convention discovery finds none of them. That is
+# the state the rename would have produced had it not reached for the key, and it reads as a clean gate too.
+#
+# NOT DELEGATED TO 'claude plugin validate', though it is the authority the table above came from. It would
+# be the shape half and only that -- it has no opinion about a def the list omits, which is the finding
+# Dave's chosen repair actually needs -- and it would put a CLI on this gate's critical path, in CI and in
+# every consumer, for an answer thirty lines of PowerShell give offline.
+#
+# A NESTED PLUGIN ROOT IS NOT ITS PARENT'S CONTENT. plugins/dkj-policy/dkj-policy-bwj sits inside
+# plugins/dkj-policy, so a plain recursive scan would credit the child's files to the parent and demand the
+# parent declare them. Neither ships an agent def today, so nothing bites -- which is exactly why it is
+# handled now rather than after it does.
+#
+# BORN GREEN, over the repair in the same branch: 4 plugin(s) declaring 26 def(s), 26 named, 0 findings, 0
+# exemptions. Against the tree as v4.33.0 shipped it the same reader reports 4 -- one per team plugin -- so
+# it fires on what it was written for rather than merely passing.
+$akPlugins  = 0
+$akDeclared = 0
+$akFindings = 0
+$akRoots    = @($publishedPlugins)
+foreach ($akPlugin in $akRoots) {
+    if (-not (Test-Path -LiteralPath $akPlugin.ManifestPath -PathType Leaf)) { continue }
+    $akManifest = Test-JsonFile -Path $akPlugin.ManifestPath
+    if (-not $akManifest) { continue }
+    $akRel         = $akPlugin.RelativeRoot
+    $akManifestRel = $akPlugin.ManifestPath.Replace($RepoRoot, '.')
+    $akRootPrefix  = $akPlugin.Root.TrimEnd('\') + '\'
+
+    # THE PLUGIN'S OWN DEFS: every *-agent.md under its root that does not belong to a plugin nested
+    # deeper. Discovered from disk rather than from a list, which is the whole point of the check.
+    $akOwnDefs = @()
+    foreach ($akFile in @(Get-ChildItem -LiteralPath $akPlugin.Root -Recurse -Filter '*-agent.md' -File -ErrorAction SilentlyContinue)) {
+        $akOwner = $true
+        foreach ($akOther in $akRoots) {
+            $akOtherPrefix = $akOther.Root.TrimEnd('\') + '\'
+            if ($akOtherPrefix -eq $akRootPrefix) { continue }
+            if ($akOtherPrefix.StartsWith($akRootPrefix, [System.StringComparison]::OrdinalIgnoreCase) -and
+                $akFile.FullName.StartsWith($akOtherPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+                $akOwner = $false
+                break
+            }
+        }
+        if ($akOwner) { $akOwnDefs += $akFile }
+    }
+
+    $akPlugins++
+    $akHasKey = ($akManifest.PSObject.Properties.Name -contains 'agents') -and $null -ne $akManifest.agents
+    if (-not $akHasKey) {
+        # NO KEY IS THE CONVENTION, and the convention is the literal directory 'agents/'. A def anywhere
+        # else is undeclared and unreachable.
+        $akStrays = @($akOwnDefs | Where-Object { $_.FullName -notmatch '(?i)\\agents\\' })
+        if ($akStrays.Count -gt 0) {
+            $akFindings++
+            Add-Error ("[agents-key] ${akManifestRel}: declares no 'agents' key, so Claude Code discovers" +
+                " agent defs by convention from '$akRel\agents\' only -- and this plugin ships" +
+                " $($akStrays.Count) def(s) outside it, starting with" +
+                " '$($akStrays[0].FullName.Replace($RepoRoot, '.'))'. None of them loads in any consumer." +
+                " Either move them under agents\, or list them in an 'agents' array -- paths to .md FILES," +
+                " because a directory is not a legal element (#1764).")
+        }
+        continue
+    }
+
+    # string|string[]: a bare string is one element, which is what the validator accepts.
+    $akEntries = if ($akManifest.agents -is [string]) { @([string]$akManifest.agents) } else { @($akManifest.agents) }
+    $akNamed = @{}
+    foreach ($akEntry in $akEntries) {
+        $akDeclared++
+        if ($akEntry -isnot [string] -or [string]::IsNullOrWhiteSpace([string]$akEntry)) {
+            $akFindings++
+            Add-Error ("[agents-key] ${akManifestRel}: an 'agents' entry is not a non-empty string. The" +
+                " field is string|string[] over paths to .md files; anything else the installer refuses as" +
+                " 'agents: Invalid input', and the whole plugin then fails to install (#1764).")
+            continue
+        }
+        $akEntryText = [string]$akEntry
+        if ($akEntryText -notmatch '(?i)\.md$') {
+            $akFindings++
+            Add-Error ("[agents-key] ${akManifestRel}: 'agents' entry '$akEntryText' does not name a .md" +
+                " file. The installer refuses it -- a DIRECTORY is not a legal element in either the string" +
+                " or the array form, and no glob is expanded, whatever the plugins reference says about" +
+                " replacing the default directory (measured against Claude Code 2.1.267, #1764). List each" +
+                " agent def by its own path.")
+            continue
+        }
+        $akResolved = $null
+        try { $akResolved = [System.IO.Path]::GetFullPath((Join-Path $akPlugin.Root ($akEntryText -replace '/', '\'))) } catch {}
+        if (-not $akResolved -or -not $akResolved.StartsWith($akRootPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+            $akFindings++
+            Add-Error ("[agents-key] ${akManifestRel}: 'agents' entry '$akEntryText' resolves outside the" +
+                " plugin root '$akRel'. What is registered here gets published, so a path leaving the" +
+                " plugin cannot travel with it -- the same containment rule check 1 holds a marketplace" +
+                " source to.")
+            continue
+        }
+        if (-not (Test-Path -LiteralPath $akResolved -PathType Leaf)) {
+            $akFindings++
+            Add-Error ("[agents-key] ${akManifestRel}: 'agents' entry '$akEntryText' names no file that" +
+                " exists. The installer reports that as a path-not-found and refuses the plugin, so a" +
+                " renamed or deleted def takes the whole install down rather than just itself.")
+            continue
+        }
+        $akNamed[$akResolved.ToLowerInvariant()] = $true
+    }
+
+    # COMPLETENESS, the direction the installer has no opinion about: a def on disk that the list omits
+    # loads for nobody, and every other check here stays green over it.
+    foreach ($akDef in $akOwnDefs) {
+        if ($akNamed.ContainsKey($akDef.FullName.ToLowerInvariant())) { continue }
+        $akFindings++
+        Add-Error ("[agents-key] ${akManifestRel}: ships" +
+            " '$($akDef.FullName.Replace($RepoRoot, '.'))' but no 'agents' entry names it, so it does not" +
+            " load in any consumer. Once the key is present it REPLACES convention discovery, so the list" +
+            " is the only way in -- which is why this repo holds it to the directory rather than to memory" +
+            " (#1764). Add the path, keeping the list in the order its neighbours are in.")
+    }
+}
+Write-Coverage -Category 'agents-key' -Checked $akPlugins `
+    -Note $(if ($akRoots.Count -eq 0) {
+        'no published plugin root resolved at all, so no manifest was read -- read this as a broken gate rather than a clean one; check 1 says why'
+    } elseif ($akDeclared -eq 0) {
+        "published plugin(s) read and NOT ONE declares an 'agents' key. That is a pass where every plugin keeps its defs in the default agents\ directory, and the stray-def rule is what proves it -- but no entry's shape was measured in this run"
+    } else {
+        "published plugin(s) read, $akDeclared 'agents' entry(s) held to the shape the installer accepts -- an EXISTING .md FILE inside the plugin root, never a directory and never a glob -- and every *-agent.md each plugin ships held to the list that has to name it: $akFindings finding(s). BOTH DIRECTIONS, because they fail differently: a bad element makes the installer refuse the whole plugin (#1764 -- four of six uninstallable for a release), while a def the list omits installs fine and simply never loads. Checks 1 and 2 are the siblings and cannot serve this: they read the same manifests for the marketplace's view and for valid JSON with a name, and neither has an opinion about a field's accepted shape, which is why this gate reported 0 error(s) over manifests 'claude plugin validate' refuses outright. Not delegated to that CLI either: it is the authority this shape was measured against, but it is silent on the omitted def and would put a CLI on this gate's path in CI and in every consumer"
     })
 # --- Report ---------------------------------------------------------------------------------------------
 if ($errors.Count -eq 0) {
