@@ -43,7 +43,42 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**5 / 20 minor entries** <!-- pending-tally -->
+**5 / 21 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1781-agents-key-one-normaliser · 20260910-124041
+
+The manifest's `agents` key has one reader. It is `string|string[]`, a bare string being one entry, and
+two scripts each carried their own reading of it: check 38 `[agents-key]` in `check-plugin-integrity.ps1`,
+normalising to a list in order to validate each element, and `Get-DeclaredAgentCount` in
+`measure-skill-lib.ps1`, normalising to a count. Both now call `Get-ManifestAgentEntries` in
+`plugin-tree-lib.ps1` -- the lib built to end exactly this, one layer up, when five separate copies each
+encoded their own idea of where a plugin lives.
+
+Nothing behaves differently today, and the point is that it cannot start to. The two copies agreed and
+both were asserted, so what was unguarded was that they could not DISAGREE: if the installer ever accepts
+a third form, one copy learns it and the other does not, and the failure is silent in opposite directions
+-- the gate passes a manifest it should refuse, or `measure-skill` reports an agent count that is not the
+plugin's. The guard against the copies returning is structural rather than a convention: the suite asserts
+on source text that neither caller carries its own reading and that the normaliser holds exactly one.
+
+**Score:** 1
+
+#### What makes this deploy extra special
+
+Both libs travel in the `dkj-policy` mirror, so a consumer receives the refactor -- but no behaviour
+changes for them: every existing assert holds unmodified. Nothing to notice.
+
+**Score:** N/A
+
+#### Pull Request
+
+One reading of the manifest 'agents' key, shared by check 38 and measure-skill-lib
+
+Plugins: dkj-policy
+
+[PR #1799](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1799)
+
+---
 
 ### DEPLOY: fix/1792-fold-race-stand-down · 20260910-121848
 
