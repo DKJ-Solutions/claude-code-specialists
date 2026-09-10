@@ -12,8 +12,10 @@
     IT DOES NOT RUN `claude`, AND THAT IS THE POINT OF THE LIB. The parse is the one fragile thing in
     the measurement -- it reads a human-formatted table whose shape the CLI owns -- so the functions
     that do the reading take strings and are pinned here against CAPTURED output. The fixture below is
-    the real `claude plugin details dkj-subagents-alpha@dkj-claude-plugins` output at v4.17.0, all 19 rows,
-    so the sum cross-check is genuinely exercised rather than mocked to agree with itself.
+    the real `claude plugin details` output at v4.17.0, all 19 rows, so the sum cross-check is genuinely
+    exercised rather than mocked to agree with itself. The marketplace half of the id it names was
+    carried forward by the #1769 rename and is NOT part of the capture: the parse never reads that
+    name, so the shape is still the one that was measured.
 
     THE THREE THINGS THIS FILE EXISTS TO CATCH, each of which was a live defect during the build:
 

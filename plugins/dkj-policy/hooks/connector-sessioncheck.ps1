@@ -7,7 +7,7 @@
     Runs in EVERY repo that has the plugin (consumers and the workshop itself). Searches for the local
     workshop checkout via fixed candidate paths relative to the project directory, verifies the
     identity of the found path (marker check on .claude-plugin/marketplace.json with name
-    'claude-code-specialists' -- Sean guardrail: never run a script purely on a path guess), and
+    'dkj-claude-plugins' -- Sean guardrail: never run a script purely on a path guess), and
     runs scripts/sync/check-connectors.ps1 there. Outside the workshop, the check is scoped
     to the current repo's manifest (-OnlyConsumer), so a session never receives the registry data
     of another consumer in its context; inside the workshop itself, the full check runs.

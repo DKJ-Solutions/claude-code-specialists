@@ -1241,7 +1241,7 @@ function Get-LensFamily {
        to derive it, and in the plugin-cache layout (~/.claude/plugins/cache/<marketplace>/<plugin>/
        <version>/) that derivation yields the MARKETPLACE name instead of the plugin family. A repo
        installed through 'specialists@dkj-claude-plugins' therefore got its lenses written to
-       .claude/plugins/claude-code-specialists/<plugin>/, while every reader looked only under
+       .claude/plugins/dkj-claude-plugins/<plugin>/, while every reader looked only under
        'claude-specialists' -- so existing lenses were reported as missing, and following that advice
        would have produced a second copy of every lens on a second path. The family is a property of
        the plugin family, not of the marketplace it happens to be fetched from, so it is fixed here:
