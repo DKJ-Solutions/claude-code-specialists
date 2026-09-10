@@ -58,7 +58,7 @@ session start.
 
 ### CREATE
 
-- [ ] `scripts/sync/check-connectors.ps1`: check 1b -- four arms (agree / this repo's own retired
+- [x] `scripts/sync/check-connectors.ps1`: check 1b -- four arms (agree / this repo's own retired
       spelling / disagree / question could not be asked), placed after the checkout resolves and
       before anything reads its settings, with the `.DESCRIPTION` list updated to match.
 
