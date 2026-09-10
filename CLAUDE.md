@@ -232,14 +232,31 @@ July 20, 2026; sharpened July 21 and July 26, 2026.
 
 ### Repo citation — one owner name
 
-**Cite this repo as `DKJ-Solutions/claude-code-specialists`** in every new GitHub URL, `gh --repo`
-argument, and `owner/name` reference in prose. It was transferred from the personal account
-`DaveKJohn` into the `DKJ-Solutions` organisation on September 2, 2026, and `DaveKJohn/…` now resolves
-only through a **transfer redirect this repo does not control** — it holds just as long as nothing is
-created at the old path, which is why `DaveKJohn/claude-code-specialists` must never be recreated (the
-canonical-channel note in [`README.md`](README.md#consumption)). The machine layer already treats the
-new name as canonical — `scripts/repo-config.ps1` states it once as the single source, and a fresh
-marketplace install uses it — so this is the same canon extended to prose.
+**Cite this repo as `DKJ-Solutions/dkj-claude-plugins`** in every new GitHub URL, `gh --repo`
+argument, and `owner/name` reference in prose. **Two renames sit behind that one line, and they
+retired different halves of it on different days** — which is why both old spellings still appear in
+the tree and why neither may ever be recreated:
+
+- **The owner**, September 2, 2026: transferred from the personal account `DaveKJohn` into the
+  `DKJ-Solutions` organisation, so `DaveKJohn/…` resolves only through a redirect.
+- **The name**, September 10, 2026: `claude-code-specialists` became `dkj-claude-plugins` (fase 3 of
+  [#1769](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1769)), so
+  `DKJ-Solutions/claude-code-specialists` resolves only through a redirect too.
+
+Both redirects are **transfer redirects this repo does not control**, and each holds just as long as
+nothing is created at its old path — which is why neither `DaveKJohn/claude-code-specialists` nor
+`DKJ-Solutions/claude-code-specialists` may ever be recreated (the canonical-channel note in
+[`README.md`](README.md#consumption)). The machine layer states the current answer once, in
+`scripts/repo-config.ps1`, and a fresh marketplace install uses it; this is that canon extended to
+prose.
+
+**And the retired NAME is data the tooling reads, not only prose to correct.** Three of this
+workflow's CI runners are scaffolded into a consumer and check this repository out by name, so every
+consumer scaffolded before September 10 still names `claude-code-specialists` — the runner keeps
+working on the redirect, while the guard over it matches on the name half and would see nothing. So
+`Get-RetiredRepoNames` in [`scripts/repo-config.ps1`](scripts/repo-config.ps1) states the retired
+names and `check-connectors.ps1` matches them alongside the current one. **The list only grows.** The
+same reasoning the check already carried for the old owner, one axis over.
 
 Both spellings resolve today, so nothing is broken and the dead-link gate is right not to flag the
 mix; the cost is that new writing copies whichever example sits nearest, and the tree held 133 `.md`
@@ -257,18 +274,19 @@ reasons" rule above has nothing to act on. A checkout cloned before the transfer
 `remote: This repository moved`; every push of the `v4.32.0` cut did exactly that
 ([#1562](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1562)). Repoint such a
 checkout in one command — `git remote set-url origin
-https://github.com/DKJ-Solutions/claude-code-specialists.git` — and the redirect stops being
-load-bearing there. It is the same fragility as the prose citation: the redirect holds only while
+https://github.com/DKJ-Solutions/dkj-claude-plugins.git` — and the redirect stops being
+load-bearing there. **Since September 10, 2026 a checkout can be behind on either half or both**, and
+the one command repairs all three states, because it writes the whole URL rather than patching a part
+of it. It is the same fragility as the prose citation: the redirect holds only while
 nothing is created at the old path.
 
-**A second rename is pending on this same citation**
-([#1769](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1769)). The slug itself
-becomes `dkj-claude-plugins`, in one coordinated flag day with the marketplace name — after which
-`DKJ-Solutions/claude-code-specialists` resolves only through a transfer redirect, under exactly the
-rule above: nothing may ever be created at the old path. **Until that day the instruction above is
-unchanged**, and the ~830 existing slug citations are deliberately left to drift rather than swept — a
-sweep now would have to be redone at the flag day. The marketplace-name half is already built on
-`feat/1769-marketplace-rename-source`, which does not merge until fase 3.
+**That second rename happened on September 10, 2026, and the ~830 existing slug citations are still
+deliberately left to drift** rather than swept — the same correct-on-edit rule as the owner half above,
+for the same reason: both spellings resolve, so nothing is broken, and a sweep buys prose consistency
+at the price of a diff nobody can review. What was NOT left to drift is every place the name is read
+rather than displayed: `Get-RepoName`, the `repository:` line the consumer scaffolders write, the
+matcher that finds it again, and the marketplace source in `.claude/settings.json`. **The test is
+whether something RESOLVES the name or merely prints it** — a citation may lag, a lookup may not.
 
 ### Structure — where everything lives
 

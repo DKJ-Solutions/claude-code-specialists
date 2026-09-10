@@ -43,7 +43,152 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**7 / 23 minor entries** <!-- pending-tally -->
+**9 / 27 minor entries** <!-- pending-tally -->
+
+### DEPLOY: feat/1808-remote-runner-read · 20260910-182243
+
+Check 6 asks whether a consumer's CI runners still name paths that exist in this tree -- and it could
+only ask it about a consumer checked out on the machine running it. That is the register's standing
+behaviour and right for every other check there, but it lands badly on this one: those runners name a
+path *into this tree*, written once at adoption into a file this tree cannot reach, so the consumer most
+likely to carry a stale one is the one nobody visits -- which is the one least likely to be checked out
+where you happen to be. Measured here: of six registered connectors, three were `[SKIP]`, including both
+of the two whose runners were red.
+
+`-RemoteRunners` closes that from the other end. An absent consumer's workflow files are read from its
+default branch in one `gh api graphql` call and judged by the same function the local half calls, so the
+finding, the repair suggestion and the escaping-path refusal are identical -- with the branch named,
+because a reader who cannot open the file needs to know which revision was judged. It stays **off by
+default**: this script is what `connector-sessioncheck.ps1` runs at every session start, and the suite
+asserts that with the switch off not one `gh` call is made. And where the read cannot be made it says so
+and quotes what the API answered, per connector, rather than falling through to a silence that on this
+particular check would read as an all-clear.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+Nothing changes for anybody who does not type the switch, and that is asserted rather than claimed. What
+the switch buys is the one question about an absent consumer that can honestly be answered from
+anywhere, and the one this register most wants answered: a stale runner path is a required check red on
+every pull request in a repository nobody is visiting, which is precisely why nobody has noticed.
+
+**Score:** 2
+
+#### Pull Request
+
+check-connectors can judge the CI runners of a consumer that is not checked out here, on request
+
+[PR #1814](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1814)
+
+---
+
+### DEPLOY: fix/1807-bwj-connectors-davekokbwj-checkout · 20260910-174934
+
+`connectors/`: both BWJ manifests (`smartwatchbanden`, `xoxowildhearts`) now list
+`../../davekokbwj/<repo>` as a third `localCheckout` candidate, appended rather than replacing
+the `bwjecommerce/` ones. On the maintenance machine the checkouts live under `davekokbwj/`, so
+`check-connectors.ps1` was emitting a false `[SKIP] checkout ... not present` that exits 0 and
+suppresses the whole connector block for both consumers. #1524 made this field a candidate list
+so no machine's layout would be evicted; its fix then evicted `davekokbwj/`. The list is
+first-match and additive, so this restores the evicted layout without losing the ones that are
+true on other machines.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A -- register data internal to this repo; no subscriber of any service reaches it.
+
+**Score:** N/A
+
+#### Pull Request
+
+Append the davekokbwj/ layout to both BWJ connectors' localCheckout candidates
+
+[PR #1811](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1811)
+
+---
+
+### DEPLOY: fix/1805-consumer-gate-path-drift · 20260910-174142
+
+Three CI runners this workflow scaffolds do not vendor the script they run: they check this repository
+out beside the consumer's tree and run a path into it. The dependency therefore points the wrong way --
+a path INTO this tree, written into a file this tree cannot reach, by a scaffolder that runs once at
+adoption -- and when `plugins/workflows/contributing-davekjohn/` became `plugins/dkj-policy/`, two
+consumers went red on every pull request with nothing anywhere saying so.
+
+Both ends are now held. `check-connectors.ps1` reads the runners a registered consumer actually has and
+reports a path this tree no longer holds, naming where that script went; and the two scaffolder suites
+derive the emitted path from the emitted file instead of pinning it as a literal, so a move here goes
+red the day it lands rather than in somebody else's repository days later. The `ref: main` pin
+stays and its argument is completed: tracking the tip protects a consumer from a stale convention and
+exposes them to a moved script, and only the first half was ever written down.
+
+The detector reads a consumer's own file, so it is treated as untrusted throughout: a reference that
+does not stay under the checkout is reported as its own finding and never resolved against this disk,
+and every value printed -- the workflow filename included -- goes through `Format-SafePathToken`
+before it reaches a line the session hooks forward.
+
+**And the report's own figure was wrong, which is worth stating because the wrong one is the more
+quotable.** #1805 dates the break to August 3 and calls it five weeks; the gate script did not exist
+until August 20, the path those consumers name existed only from August 26, and it stopped resolving
+on September 5 -- five DAYS before the measurement. August 3 belongs to a different move of the same
+folder. The defect is unchanged; its duration is out by a factor of seven, and the corrected timeline
+sits with the `git log` it comes off in `consumer-runner-lib.ps1`'s header.
+
+**The detector reaches a consumer whose checkout is present on the machine running it, which is the
+register's standing limit rather than a new one** -- an absent checkout is `[SKIP]`, as it is for every
+other check there. Filed as #1808 rather than widened here, because reading a consumer's workflow over
+the network would put a `gh` call per connector into a script SessionStart runs.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+A consumer running these runners gets the failure class reported instead of discovered: either from
+the register, or -- if they pin a tag instead -- from a page that now states the trade honestly. Nothing
+changes for a consumer whose paths are current, which is most of them.
+
+**Score:** 3
+
+#### Pull Request
+
+A consumer's CI runners no longer break silently when a shared script moves here
+
+Plugins: dkj-policy
+
+[PR #1809](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1809)
+
+---
+
+### DEPLOY: fix/1803-plugin-versions-paste-safe-id · 20260910-155349
+
+`plugin-versions.ps1` no longer builds a paste-ready `claude plugin ...` command out of an
+`enabledPlugins` id -- an arbitrary string from a settings file -- unless both halves of the id pass
+their slug check. Where they do not, the command is withheld and a one-line reason takes its place,
+following the `Get-PasteableRef` doctrine (#1594). The guard, which #1591 had scoped to a single
+install command, now covers all 19 command sites and both output modes; the default view additionally
+sanitizes every field it prints, the way `-Brief` already did.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+N/A -- an internal hardening of a diagnostic script's output. No subscriber of a service reaches this
+code path or its output.
+
+**Score:** N/A
+
+#### Pull Request
+
+Withhold the enabledPlugins id from every command plugin-versions.ps1 prints when it is not a valid slug
+
+Plugins: dkj-policy
+
+[PR #1806](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1806)
+
+---
 
 ### DEPLOY: fix/1802-retired-id-hides-install-verdict · 20260910-145059
 

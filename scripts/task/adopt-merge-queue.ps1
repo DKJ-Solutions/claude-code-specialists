@@ -167,7 +167,7 @@ $trunk = Get-BranchTrunkName
 # beside the consumer's, exactly as adopt-workflow-folder's branch-entry.yml does, and for the same
 # reason: there is ONE definition of the fold and of the resolves check in this system, and a runner
 # that carried a hand-written copy would be a second one, free to drift from the first.
-$sharedRepo = 'DKJ-Solutions/claude-code-specialists'
+$sharedRepo = 'DKJ-Solutions/dkj-claude-plugins'
 $sharedRef  = 'main'
 $sharedPath = '.workflow-scripts'
 $pluginDir  = "$sharedPath/plugins/dkj-policy/scripts"

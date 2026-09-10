@@ -24,11 +24,37 @@
 #>
 
 # The GitHub repo where this workshop lives (owner/name). Single place this is stated.
-$script:RepoName = 'DKJ-Solutions/claude-code-specialists'
+$script:RepoName = 'DKJ-Solutions/dkj-claude-plugins'
 
 function Get-RepoName {
     <# owner/name of this repo, e.g. for `gh ... --repo`. #>
     return $script:RepoName
+}
+
+# --- Names this repo has been renamed AWAY from (Dave, September 10, 2026; issue #1769) -----------
+#
+# A rename does not reach the files other repositories already hold. Three of this workflow's CI
+# runners are scaffolded INTO a consumer and check this repository out by name --
+# `repository: <owner>/<name>` -- so every consumer scaffolded before a rename goes on naming the old
+# one. Those runners keep working, because GitHub answers a transfer redirect; what stops working is
+# the GUARD over them. check-connectors' check 6 finds a runner by matching the name half of that
+# `repository:` line, and after a rename it matches nothing -- so every consumer reads as clean, which
+# is indistinguishable from being clean and is the exact silence #1805 was filed to end.
+#
+# SO THE RETIRED NAMES ARE DATA, not a sweep. They are read alongside Get-RepoName and never expire:
+# a consumer's runner is repaired when that consumer is next touched for its own reasons, and until
+# then the guard has to be able to see it. This is the same reasoning check 6 already carries for the
+# old OWNER (its scenario 12c) -- a transfer left `DaveKJohn/` in consumers that still resolve -- one
+# axis over: owner and name are renamed by different acts and expire on different days.
+#
+# NEWEST FIRST, and the list only ever grows. 'claude-code-specialists' was this repo's name until
+# September 10, 2026. Read as an optional function, so a repo that has never been renamed simply does
+# not define it and check 6 matches on the current name alone.
+$script:RetiredRepoNames = @('claude-code-specialists')
+
+function Get-RetiredRepoNames {
+    <# Name halves this repo has previously been called, newest first. Empty = never renamed. #>
+    return $script:RetiredRepoNames
 }
 
 function Get-RepoBlobUrl {
@@ -995,7 +1021,7 @@ function Get-ReleaseNoteWording {
 #
 # THE PAGE'S OWN NAME. It is what a reader sees in the tab and at the top, so it is the repo's to
 # say rather than the script's. Without it the script falls back to the name half of Get-RepoName,
-# which is a real answer -- 'claude-code-specialists' -- and simply not the one to send anybody.
+# which is a real answer -- 'dkj-claude-plugins' -- and simply not the one to send anybody.
 # THE PRODUCT'S NAME AND NOTHING ELSE. It read 'Claude Specialists -- release notes' until August 21,
 # 2026, which put those words on the page twice. This answer is the masthead's EYEBROW and half the window
 # title; the heading itself is the template's own 'Release notes'. What the page IS belongs to the

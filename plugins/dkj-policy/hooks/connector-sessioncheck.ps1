@@ -252,9 +252,20 @@ try {
     } else {
         # The project directory itself (the workshop consumes itself), a sibling checkout, or the
         # convention <root>\<owner>\<repo> one level higher.
+        #
+        # BOTH REPO NAMES, and the list is ADDITIVE rather than replaced (#1769). The source repo was
+        # renamed from 'claude-code-specialists' to 'dkj-claude-plugins' on September 10, 2026, and a
+        # checkout's FOLDER name is not the repo's: a clone made before that day still sits in a folder
+        # named after the old slug, and renaming it would unlink the plugin install record, which is
+        # keyed on the folder path. So both spellings are candidates and neither expires -- a path that
+        # does not resolve costs one Test-Path, while a missing candidate costs a [SKIP] line that
+        # ASSERTS the source checkout is absent, which is the silent failure #1524 was made of.
         $candidates = @(
             $cwd,
+            (Join-Path $cwd '..\dkj-claude-plugins'),
             (Join-Path $cwd '..\claude-code-specialists'),
+            (Join-Path $cwd '..\..\DKJ-Solutions\dkj-claude-plugins'),
+            (Join-Path $cwd '..\..\DaveKJohn\dkj-claude-plugins'),
             (Join-Path $cwd '..\..\DaveKJohn\claude-code-specialists')
         )
     }

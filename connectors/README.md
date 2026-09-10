@@ -159,15 +159,32 @@ be thorough about machines nobody uses.
 
 [`scripts/sync/check-connectors.ps1`](../scripts/sync/check-connectors.ps1) runs the two-way
 check across all manifests: plugin still enabled, registered extensions present (outbound),
-unregistered extensions flagged (inbound), the machine version against the source, and per
-consumer the content drift check
+unregistered extensions flagged (inbound), the machine version against the source, whether the
+consumer's CI runners still name paths that exist here (#1805 — the one check whose subject is a path
+*into* this tree), and per consumer the content drift check
 ([`check-consumer-drift.ps1`](../scripts/lint/check-consumer-drift.ps1)). Run it at the
 start of a workday or session:
 
 ```powershell
-.\scripts\sync\check-connectors.ps1              # everything
-.\scripts\sync\check-connectors.ps1 -SkipDrift   # registry checks only (fast)
+.\scripts\sync\check-connectors.ps1                  # everything
+.\scripts\sync\check-connectors.ps1 -SkipDrift       # registry checks only (fast)
+.\scripts\sync\check-connectors.ps1 -RemoteRunners   # also judge the CI runners of absent consumers
 ```
+
+**`-RemoteRunners` is the one switch here that turns something ON, and it exists because of a blind
+spot rather than for speed** (#1808). Every other check reads the consumer's local checkout, so a
+consumer that is not checked out on the machine you are running from is `[SKIP]` and nothing about it
+is read — which is correct for an extension inventory or a machine record, and lands badly on the CI
+runner check: those runners name a path *into this tree*, and a consumer nobody visits is exactly the
+one whose stale path nobody has noticed. Measured September 10, 2026: of the six registered
+connectors, three were `[SKIP]` on this machine, including both of the two whose runners were red.
+
+With the switch, an absent consumer's `.github/workflows/*.yml` are read from its default branch over
+the GitHub API and judged by the same code the local half uses. It is **off by default and stays
+that way**: this script is what `connector-sessioncheck.ps1` runs at every session start, and a
+network call per absent connector does not belong on that path. Where the read cannot be made — no
+`gh`, no credential, a repository this token cannot see — it says so per connector and quotes what the
+API answered, rather than falling through to a silence that would read as an all-clear.
 
 Syncing itself remains **pull-based per consumer**: each connected repo pulls changes in its own
 session, under its own governance — this registry signals, it never writes cross-repo.
