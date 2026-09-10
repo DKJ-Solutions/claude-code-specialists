@@ -43,7 +43,33 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**40 / 96 minor entries** <!-- pending-tally -->
+**40 / 97 minor entries** <!-- pending-tally -->
+
+### DEPLOY: docs/1757-rename-merge-retired-names · 20260910-071046
+
+A session merging `main` into a branch whose base predates a repo-wide rename now has a one-line
+warning, in the exact spot it would look, that git's rename detection moves the files but not the
+retired names inside the lines the branch adds -- plus the by-hand `git diff | grep` one-liner to
+catch them before they land on the trunk. Prevents a repeat of the near-miss on PR #1733, where six
+new files citing retired plugin names were caught only by hand.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+N/A -- the note lives in a repo lens under `.claude/specialists/lenses/`, which does not travel to
+consuming repos, and the trigger (a branch parked across `dkj-team-*` -> `dkj-subagents-*`) is
+specific to the repo that ships the plugins. No subscriber of a consuming repo is reached.
+
+**Score:** N/A
+
+#### Pull Request
+
+Warn that a rename-detected merge into a stale branch is silent about retired names in the lines it adds
+
+[PR #1758](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1758)
+
+---
 
 ### DEPLOY: fix/1734-guard-live-theme-uses-command-guard-lib · 20260909-221442
 
