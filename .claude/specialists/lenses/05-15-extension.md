@@ -1710,9 +1710,10 @@ it measured 8,289 — and each figure sat in the sentence that carried a layer o
 the stale number argued for that decision at a third of its real strength. Check 16 misses the class twice over and
 both misses are structural: `lines` is not in its unit list (`$figurePattern`,
 [`check-plugin-integrity.ps1:2426`](../../../scripts/lint/check-plugin-integrity.ps1)), and a `.ps1`
-comment is not in its `$consumerDocs` file set — that second gap is real, is where both recorded
-instances of the class happened, and is filed on its own as
-[#1790](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1790) rather than answered here.
+comment is not in its `$consumerDocs` file set — that second gap is real and is where both recorded
+instances of the class happened. It was filed on its own as
+[#1790](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1790) — measured and declined in
+its own right, write-up below.
 The proposal was a check of its own: a sentence naming a repo file and giving a line count for it, held
 against that file's actual length.
 
@@ -1807,12 +1808,60 @@ the next reader re-runs it instead of trusting it"* is in
 and describes #1779 exactly. But it **predates** #1779, and #1779 is seven sites that did not follow it
 — so it is a rule already measured failing, not one shown to suffice. Two things keep it as the answer
 anyway, and neither is that it works reliably: no digit-anchored gate can see the form the failure took,
-and the enforcement gap that *is* addressable — a figure gate reaching script docstrings at all — is a
-different subject with its own file set, now
-[#1790](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1790). What the rule
+and the one enforcement gap that *looked* addressable — a figure gate reaching script docstrings at all —
+was measured under [#1790](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1790) and
+declined too (below). What the rule
 demonstrably buys is legibility after the fact: `check-connectors.ps1:119` followed it, went stale by a
 line inside one fast-forward, and is **still correct to read**, because the sentence says how to
 re-derive it. That is the property worth insisting on, and it is not the same thing as prevention.
+
+**Extending check 16's file set to `.ps1` COMMENTS was measured and declined** (September 10, 2026,
+[#1790](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1790)). This is the second gap
+#1784 named — not `lines` as a unit, but the byte-shaped pattern check 16 already runs, pointed at
+script comments, where both recorded instances of the class ([#1779](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1779),
+[#1775](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1775)) actually happened. The
+narrow question was: should `$figurePattern` read `scripts/**` and `plugins/**/scripts/**` comments as
+well as `$consumerDocs`?
+
+**THE REASON THAT SETTLES IT: check 16's gateability claim is true of consumer prose and false of a
+`.ps1`.** Its docstring argues the byte-shaped haystack needs no heuristic because *"there is no
+authored, non-measured reason to write '939,860 bytes'"*. In a script there are two. **A design ceiling
+is an authored byte figure** — `script-contract-lib.ps1:459` and `build-release-notes-page.ps1:215`
+both write "32 KB per mark and 64 KB in total", beside the literals `$maxPerMark = 32KB` /
+`$maxTotal = 64KB` that enforce them. **And a `.ps1` has no fence**, which is the markup boundary check
+16 leans on to tell prose from code: in a script "everything outside a fence" is the whole file, so the
+pattern reads numeric literals, `Write-Host "... / 1KB)) KB"` interpolation and
+`Assert-Equal 0 $deadRow.Bytes 'a missing import costs 0 bytes'` as prose.
+
+**Measured against `main` at `130a4794`, over `scripts/*.ps1` with check 16's own pattern and window
+logic: 49 pattern hits, 26 flagged, and not one is a real defect.** The plugin mirrors under
+`plugins/dkj-policy/scripts/` and `plugins/dkj-subagents/dkj-subagents-shopify/scripts/` add 26 more raw
+hits — the triple-report the issue predicted — but the source-tree number sinks it on its own. The
+flagged sites fall into classes no regex separates from a defect:
+
+| class | why it is not a defect |
+|---|---|
+| encoding / mojibake prose | "the two UTF-8 bytes of U+00B7", "Windows-1252 bytes", "middot (U+00B7, bytes C2 B7)" — the digit-then-`bytes` shape fires on codepoint arithmetic, which this repo's script comments carry in a dozen places (the BOM / code-page trap) |
+| an ANSI escape in a test string | `"fix/a$([char]0x1B)[31mb"` yields "1mb" off `\x1B[31m` + a following `b`, and `-match` is case-insensitive — three sites in `ref-print-lib.tests.ps1` alone |
+| an authored design ceiling | `32 KB per mark`, `64 KB in total`, and the `32KB` / `64KB` literals beside them — the "no authored reason" premise, false here |
+| code read as prose | numeric literals, `Write-Host` size interpolation, `Assert-*` message strings — no fence, so no prose/code line |
+| check 16's own test fixtures | `check-plugin-integrity-entries.tests.ps1` holds "288 bytes" eight times as deliberate fixture data for this very check |
+| check 16's own docstring | "939,860 bytes" and "~/.claude/settings.json at 22 bytes" are cited there as illustrations of the class |
+| a degenerate constant | "0 bytes" meaning empty output (`native-capture-lib.ps1`, `ship-pr.ps1`) — it cannot drift |
+| a one-time historical delta | `subagent-shared-lib.ps1:38` — "dropping it takes those 178 lines from 17,332 to 13,027 bytes", a past-tense record of what one edit did |
+| a hedged approximate size | "~203 KB of portable prose", "~72MB of heap" — `~` is not in `$figureBinding` |
+
+**The one script comment that already does what the check would ask is
+`verify-resolved-issues.ps1:98`** — "measured September 9, 2026, 0 bytes at exit 0" — which carries a
+date and passes. That is the writing rule working, not a gate.
+
+**Same verdict and same shape as #1784.** The digit-anchored pattern cannot see #1779's actual form,
+it penalises the comments that measure and say so, and the mirror multiplication triples every finding.
+The unit list stays byte-shaped **and** the file set stays `$consumerDocs`-only; both are deliberate,
+and this measurement is why. **Revisit condition**: if a present-tense `` `<file>` is N KB `` claim
+carrying a decision ever reaches three or four live sites in script comments, revisit — but a file-set
+extension needs a PowerShell-aware comment extractor first, not `.ps1` bolted onto `$consumerDocs`,
+because the classes above are what "no fence" costs.
 
 **The PR template that caused the collision is itself the change** (Dave, August 9, 2026). It now carries
 one section — the changelog entry — because `open-pr.ps1` composes the body from
