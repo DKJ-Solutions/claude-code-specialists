@@ -182,6 +182,28 @@ merge, and do not treat a green run from an earlier day as proof.
 
 ### TEST
 
+**Na de catch-up merge en vóór de LAST-commits: lint 0 errors, alle 91 suites groen** (407s), inclusief
+de nieuwe cases die met #1804 meekwamen.
+
+**Na de LAST-commits: lint 0 errors, 90 van 91 suites groen.** `connectors.tests.ps1` valt, op één
+assert -- case 6, *"self-manifest (workshop consumes itself): exit code 0"*. Die case draait
+`check-connectors.ps1` tegen de **echte** `connectors/claude-code-specialists.json`, en die noemt deze
+repo's plugins nog als `<plugin>@claude-code-specialists` terwijl `.claude/settings.json` sinds de
+LAST-commit `@dkj-claude-plugins` zegt. De check ziet dus een consumer die iets anders inschakelt dan
+zijn register beweert, en dat is precies wat hij hoort te melden.
+
+**Dit is het gevolg van besluit A en niet van een fout.** Besluit A (Dave, 10 september 2026) stelt
+`connectors/**` uit tot fase 3, per consumer. Deze repo is zijn eigen consumer, dus zijn register
+verschuift pas op de vlagdag -- en tot dat moment staan zijn register en zijn settings uit elkaar. Het
+besluit is niet aangepast; het staat hier alleen met zijn prijs erbij.
+
+**Wat dat kost op de vlagdag, en wat er dus besloten moet worden.** `open-pr.ps1` blokkeert op een
+vallende suite. De bron-PR van fase 3 kan dus niet openen zonder óf `-SkipTests`, óf het verplaatsen
+van de self-connector in diezelfde branch. Dat tweede is verdedigbaar -- voor de *self*-connector vallen
+de migratie en het vastleggen ervan in één commit samen, wat het doctrine-bezwaar ("een migratie claimen
+die niemand heeft uitgevoerd") niet raakt -- maar het is een wijziging van besluit A en dus niet van deze
+branch.
+
 ### DEPLOY: feat/1769-marketplace-rename-source
 
 **Score:**

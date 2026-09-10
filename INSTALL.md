@@ -564,7 +564,7 @@ layout as of `v4.5.0`, which the table above is read off, and to the marketplace
 @~/.claude/plugins/marketplaces/claude-code-specialists/plugins/specialists/personas/01-01-persona.md
 
 # after -- the line you want
-@~/.claude/plugins/marketplaces/claude-code-specialists/plugins/dkj-subagents/dkj-subagents-alpha/personas/01-01-persona.md
+@~/.claude/plugins/marketplaces/dkj-claude-plugins/plugins/dkj-subagents/dkj-subagents-alpha/personas/01-01-persona.md
 ```
 
 **If neither literal matches your file, do not conclude the repair is not yours** — apply the shape test
@@ -1203,7 +1203,7 @@ looked in the wrong scope. Do not answer it by re-running the install either: a 
 a **second, machine-wide record** beside the project one. For **what changed**, read
 [`CHANGELOG.md`](dkj-policy/CHANGELOG.md) and [`releases/`](dkj-policy/releases/history.md) — and you already have both,
 because your marketplace source is a git clone of the whole repository at
-`~/.claude/plugins/marketplaces/claude-code-specialists/`, not a per-plugin extract.
+`~/.claude/plugins/marketplaces/dkj-claude-plugins/`, not a per-plugin extract.
 
 **A plugin folder used to carry its own `CHANGELOG.md` and a `RELEASE.md` card; both were removed on
 August 8, 2026.** They existed to give you a history inside the plugin cache, and the sentence above is

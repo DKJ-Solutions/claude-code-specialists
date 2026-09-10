@@ -366,7 +366,7 @@ the model reads a stale column -- which looks exactly like a board that works.
 ## 6 -- point the repo's governance at the rule
 
 Add a line to the repo's `CLAUDE.md` (or a repo lens) pointing at
-`~/.claude/plugins/marketplaces/claude-code-specialists/plugins/dkj-policy/dkj-policy-bwj/WORKFLOW-portable.md`
+`~/.claude/plugins/marketplaces/dkj-claude-plugins/plugins/dkj-policy/dkj-policy-bwj/WORKFLOW-portable.md`
 so a session reads the BWJ ticket rule the same way it reads the other portable pages.
 
 ## 7 -- scaffold the sync-log folder (chapter two)

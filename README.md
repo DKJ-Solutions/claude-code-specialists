@@ -993,7 +993,7 @@ release you are on. Every plugin bumps in lockstep, so any one of them answers t
 
 For **what changed** in that release, read [`CHANGELOG.md`](dkj-policy/CHANGELOG.md) and
 [`dkj-policy/releases/`](dkj-policy/releases/) in the marketplace clone you already have —
-`~/.claude/plugins/marketplaces/claude-code-specialists/`. See [Consumption](#consumption) above for
+`~/.claude/plugins/marketplaces/dkj-claude-plugins/`. See [Consumption](#consumption) above for
 the mechanics.
 
 A newly added **skill** additionally needs a session restart before it becomes visible, and the
