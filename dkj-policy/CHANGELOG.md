@@ -43,7 +43,39 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**1 / 5 minor entries** <!-- pending-tally -->
+**2 / 6 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1764-agents-manifest-file-list · 20260910-085218
+
+The four team plugins can be installed again. Every one of them shipped `v4.33.0` with
+`"agents": "./subagents/"`, which the installer refuses outright -- `agents: Invalid input` -- so four
+of the six plugins in this marketplace could not be installed by anybody for a whole release, while
+this repo's own lint gate and CI both reported `0 error(s)` over them. Each manifest now lists its
+subagent files, which is the only shape the field accepts, and check 38 holds the class shut at both
+ends: an entry that is not an existing `.md` file inside the plugin (what #1764 measured) and a def on
+disk that no entry names (what a hand-maintained list of 26 paths is exposed to next).
+
+**Score:** 5
+
+#### What makes this deploy extra special
+
+A consumer on `v4.33.0` cannot install four of the six plugins at all, and the failure is a validation
+error rather than a missing feature -- so there is no partial state to work around. After a
+`claude plugin marketplace update` the installs succeed again. Nothing else about the plugins changes:
+the `subagents/` directory keeps its name, every specialist keeps its id, and no consumer has to edit
+anything of their own.
+
+**Score:** 5
+
+#### Pull Request
+
+The four team plugins install again -- the agents key lists its subagent files, and the gate holds it to the directory
+
+Plugins: dkj-subagents-alpha, dkj-subagents-ecomm, dkj-subagents-lifehub, dkj-subagents-shopify
+
+[PR #1770](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1770)
+
+---
 
 ### DEPLOY: feat/tidy-machine-skill · 20260910-084037
 
