@@ -105,7 +105,14 @@ the repair is unaffected; the wording is corrected here rather than inherited.
       assertion in that section inherited the same hole.
 - [x] `scripts/tests/ref-print-lib.tests.ps1` -- the space refusal is pinned with its reason, because it
       reads as the pattern's weakest point and #1768 proposed removing it.
-- [x] `tidy-lib.tests.ps1` 46 passed / 0 failed; `ref-print-lib.tests.ps1` 444 pass / 0 fail.
+- [x] **The first draft of that third assertion was refused by another gate, and the refusal was
+      right.** It probed with `Get-Command -Name ... -ErrorAction SilentlyContinue`, the idiom #1729
+      retired tree-wide, and `command-probe-lib.tests.ps1` caught it in the full run. This probe is a
+      MISS by design, which is that idiom's expensive case: a bare `Get-Command` answers a miss by
+      scanning all 19 PATH directories for an executable of that name, uncached. Now
+      `Test-FunctionDefined`.
+- [x] `tidy-lib.tests.ps1` 46 passed / 0 failed; `ref-print-lib.tests.ps1` 444 pass / 0 fail;
+      `command-probe-lib.tests.ps1` 16/16.
 
 ### DEPLOY: fix/1768-path-paste-one-answer
 
