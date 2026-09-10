@@ -36,21 +36,77 @@
 
 ### PLAN
 
-Repair 2 chosen by Dave: keep subagents/, list every .md in each plugin's agents key, plus a lint check holding each list to the directory's actual contents. Measured: agents accepts string|string[] of .md file paths only -- no directory, no glob (claude plugin validate 2.1.267).
+Repair 2 chosen by Dave: keep subagents/, list every .md in each plugin's agents key, plus a lint check
+holding each list to the directory's actual contents. Measured: agents accepts string|string[] of .md
+file paths only -- no directory, no glob (claude plugin validate 2.1.267).
+
+#### What was verified before any of it was built
+
+The report (#1764) named a symptom, a cause and two candidate repairs, and all three were held against
+the tree rather than taken on trust:
+
+- **Symptom, still standing.** `claude plugin install dkj-subagents-lifehub@claude-code-specialists
+  --scope project` answers `Validation errors: agents: Invalid input`, verbatim as reported.
+- **Cause, confirmed structurally.** `git show 2ef95c42^:plugins/dkj-teams/dkj-team-alpha/.claude-plugin/plugin.json`
+  carries no `agents` key at all -- the directory was `agents/` and Claude Code found it by convention.
+  #1698 renamed it to `subagents/` and added `"agents": "./subagents/"` to point at it.
+- **The reasoning behind #1698's key, EXPIRED.** Its point 3 reads *"it is permitted by the plugin
+  format: the reference documents an `agents` key in `plugin.json` (string or array) that replaces the
+  default directory."* The premise is false for a directory, so the repair is not a reversal of a sound
+  decision but the repair of one built on an unrun sentence.
+- **The accepted shape, measured rather than read**, with `claude plugin validate` (read-only, no
+  install) on Claude Code 2.1.267 -- two findings the report did not have:
+  - **no glob**: `["./subagents/*.md"]` fails with `Path not found`, so a self-maintaining list is not
+    available. That is what makes the gate below load-bearing rather than tidy.
+  - **the reference is wrong, and `commands` is the control.** The plugins reference lists `agents`
+    among the fields that replace their default directory and prints `["./agents/",
+    "./custom-agents/reviewer.md"]` as the way to keep the default and add more -- rejected at element
+    0. `"commands": ["./subagents/"]` passes on the same manifest. Upstream, not ours to repair;
+    queued as Claude Code feedback in this session.
 
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [x] the four `plugin.json` manifests: `"agents"` as an array of every `.md` in that plugin's
+      `subagents/`, generated from the directory rather than typed. 15 + 3 + 5 + 3 = 26 entries.
+- [x] `claude plugin validate` passes on all four plugins and on the marketplace.
+- [x] `scripts/lint/check-plugin-integrity.ps1` check 38 `[agents-key]`, in both directions -- the
+      installer's accepted shape, and every `*-agent.md` a plugin ships held to the list that has to
+      name it. Plus the third shape: no key at all with defs outside `agents/`.
+- [x] its entry in that script's own `checks:list` span, which check 37 holds it to.
+- [x] `INSTALL.md`'s #1698 migration section, which stated the key as `"agents": "./subagents/"` --
+      the broken form, documented as the design. The repair created that contradiction, so it is
+      repaired here rather than filed: same sentence, same key. It now also tells a consumer who met
+      the refusal on `v4.33.0` what it was and that nothing on their side caused it.
 
 ### TEST
 
+- [x] eleven scenarios in `check-plugin-integrity-docs.tests.ps1`, scenario 1 being the manifest
+      v4.33.0 actually shipped -- so the suite proves the check fires on the defect and not only that
+      the repair passes.
+- [x] the full lint gate green on this tree, with `[agents-key] checked 6 -- ... 26 'agents' entry(s)`.
+- [x] all suites green.
+
 ### DEPLOY: fix/1764-agents-manifest-file-list
 
-**Score:**
+The four team plugins can be installed again. Every one of them shipped `v4.33.0` with
+`"agents": "./subagents/"`, which the installer refuses outright -- `agents: Invalid input` -- so four
+of the six plugins in this marketplace could not be installed by anybody for a whole release, while
+this repo's own lint gate and CI both reported `0 error(s)` over them. Each manifest now lists its
+subagent files, which is the only shape the field accepts, and check 38 holds the class shut at both
+ends: an entry that is not an existing `.md` file inside the plugin (what #1764 measured) and a def on
+disk that no entry names (what a hand-maintained list of 26 paths is exposed to next).
+
+**Score:** 5
 
 #### What makes this deploy extra special
 
-**Score:**
+A consumer on `v4.33.0` cannot install four of the six plugins at all, and the failure is a validation
+error rather than a missing feature -- so there is no partial state to work around. After a
+`claude plugin marketplace update` the installs succeed again. Nothing else about the plugins changes:
+the `subagents/` directory keeps its name, every specialist keeps its id, and no consumer has to edit
+anything of their own.
+
+**Score:** 5
 
 #### Pull Request
 

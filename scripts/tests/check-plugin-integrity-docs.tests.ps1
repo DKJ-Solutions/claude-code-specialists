@@ -808,6 +808,162 @@ try {
     Remove-Item -LiteralPath $spManuals -Recurse -Force -ErrorAction SilentlyContinue
     Remove-Item -LiteralPath $spPersonas -Recurse -Force -ErrorAction SilentlyContinue
 
+    # --- check 38: the 'agents' key -- the installer's shape, and every def named -------------------
+    # THE PRE-REPAIR TREE IS THE FIRST SCENARIO, deliberately. #1764's whole point is that the gate
+    # reported 0 error(s) over four manifests 'claude plugin install' refuses outright, so a suite that
+    # only proved the repaired shape passes would prove nothing about the defect. Scenario 1 below writes
+    # exactly what v4.33.0 shipped.
+    #
+    # BOTH DIRECTIONS ARE EXERCISED because they fail differently and only one is reachable by
+    # 'claude plugin validate': a bad element makes the installer refuse the whole plugin, an omitted def
+    # installs fine and never loads.
+    #
+    # NO -Full IS NEEDED even though this check reads agent defs: it does its own discovery rather than
+    # reusing $agentDefs, so -SkipCheck agent-def (this suite's default) does not narrow it. Asserted
+    # below rather than assumed -- that is exactly the shape the fixture header warns about.
+    Write-Host "check 38: the 'agents' key -- shape and completeness" -ForegroundColor Cyan
+    $akManifest = Join-Path $Fixture 'plugins\dkj-subagents\dkj-subagents-alpha\.claude-plugin\plugin.json'
+    $akSubagents = Join-Path $Fixture 'plugins\dkj-subagents\dkj-subagents-alpha\subagents'
+    $akManifestOrig = [System.IO.File]::ReadAllText($akManifest, [System.Text.Encoding]::UTF8)
+    New-Item -ItemType Directory -Path $akSubagents -Force | Out-Null
+    $akDefA = Join-Path $akSubagents '01-01-agent.md'
+    $akDefB = Join-Path $akSubagents '02-02-agent.md'
+    foreach ($akDef in @($akDefA, $akDefB)) {
+        [System.IO.File]::WriteAllText($akDef, "---`nname: fixture`nid: 01`ngroup: 01`n---`n`n# Fixture def`n", $Utf8NoBom)
+    }
+    function Set-AkManifest { param([string]$AgentsJson)
+        $body = if ($AgentsJson) { ", `"agents`": $AgentsJson" } else { '' }
+        [System.IO.File]::WriteAllText($akManifest,
+            "{ `"name`": `"dkj-subagents-alpha`", `"version`": `"0.0.1`"$body }`n", $Utf8NoBom)
+    }
+
+    # 1. THE #1764 STATE: a directory as a bare string. The installer answers 'agents: Invalid input'
+    #    and installs nothing; this gate said 0 error(s).
+    Set-AkManifest -AgentsJson '"./subagents/"'
+    $ak1 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True ($ak1.Out -match '\[agents-key\].*does not name a \.md file') `
+        'check 38: a directory as the agents string is reported -- the exact manifest v4.33.0 shipped'
+    Assert-True ($ak1.Out -match '\[agents-key\].*#1764') `
+        'check 38: and the finding cites the issue, so a reader gets the measurement without the source'
+    Assert-True ($ak1.Code -ne 0) 'check 38: the run fails, so the gate would have refused the release'
+
+    # 2. THE ARRAY FORM OF THE SAME MISTAKE. The validator distinguishes them ('agents.0' rather than
+    #    'agents'), so a check that only knew the string form would pass the obvious next attempt --
+    #    which is the one #1764 measured second.
+    Set-AkManifest -AgentsJson '["./subagents/"]'
+    $ak2 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True ($ak2.Out -match '\[agents-key\].*does not name a \.md file') `
+        'check 38: a directory INSIDE the array is reported too -- the array is legal, the element is not'
+
+    # 3. A GLOB, which reads as the obvious way out of a hand-maintained list and is not expanded.
+    Set-AkManifest -AgentsJson '["./subagents/*.md"]'
+    $ak3 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True ($ak3.Out -match '\[agents-key\].*subagents/\*\.md') `
+        'check 38: a glob is reported -- nothing expands it, so it names no file'
+
+    # 4. A PATH THAT ENDS IN .md AND NAMES NOTHING. Distinct from 1-3: the shape is right and the file is
+    #    absent, which is what a renamed def leaves behind -- and it takes the whole install down.
+    Set-AkManifest -AgentsJson '["./subagents/01-01-agent.md", "./subagents/99-99-agent.md"]'
+    $ak4 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True ($ak4.Out -match '\[agents-key\].*99-99-agent\.md.*names no file that exists') `
+        'check 38: an entry naming a missing file is reported, naming the entry'
+
+    # 5. CONTAINMENT: a path leaving the plugin cannot travel with it, the same rule check 1 holds a
+    #    marketplace source to.
+    Set-AkManifest -AgentsJson '["../dkj-subagents-shopify/subagents/01-01-agent.md"]'
+    $ak5 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True ($ak5.Out -match '\[agents-key\].*resolves outside the plugin root') `
+        'check 38: an entry escaping the plugin root is reported -- what is registered here gets published'
+
+    # 6. THE COMPLETENESS DIRECTION, and the one 'claude plugin validate' cannot reach: a correct,
+    #    installable list that omits a def the plugin ships. This is the drift Dave's chosen repair
+    #    (keep subagents/, list the files) is exposed to, and the reason the check exists as a gate.
+    Set-AkManifest -AgentsJson '["./subagents/01-01-agent.md"]'
+    $ak6 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True ($ak6.Out -match '\[agents-key\].*02-02-agent\.md.*no .agents. entry names it') `
+        'check 38: a def the list omits is reported -- it installs fine and loads for nobody'
+    Assert-True (-not ($ak6.Out -match 'does not name a \.md file|names no file that exists')) `
+        'check 38: and only that finding -- the shape of the entry it DOES carry is sound'
+
+    # 7. THE COMPLETE LIST IS CLEAN. The absence assert is anchored on the '.' that opens every finding's
+    #    relative manifest path, NOT on '[agents-key]' and not on any word: that bracket also opens the
+    #    coverage line this check prints on every run, so '[agents-key] <lowercase>' matches
+    #    '[agents-key] checked 6 -- ...' and passes only while the check says nothing at all, itself
+    #    included. Written that way first and it failed here on scenarios 7 and 9 -- the trap check 6b's
+    #    scenario 3 documents, met head-on.
+    Set-AkManifest -AgentsJson '["./subagents/01-01-agent.md", "./subagents/02-02-agent.md"]'
+    $ak7 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True (-not ($ak7.Out -match '\[agents-key\] \.')) `
+        'check 38: a list naming every def, each an existing file, is clean'
+    Assert-True ($ak7.Out -match "\[agents-key\] checked") `
+        'check 38: and the check reports its coverage, so a silent pass cannot hide an empty scan'
+    Assert-True ($ak7.Out -match "\[agents-key\] checked \d+ -- published plugin\(s\) read, [1-9]") `
+        'check 38: with a non-zero entry count -- proof -SkipCheck agent-def did not narrow this check'
+
+    # 8. NO KEY AT ALL, with defs outside agents/: #1698's defect stated as a rule. Convention discovery
+    #    reads agents/ and nothing else, so these are declared by nothing -- and it reads as a clean gate.
+    Set-AkManifest -AgentsJson $null
+    $ak8 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True ($ak8.Out -match "\[agents-key\].*declares no .agents. key") `
+        'check 38: no key plus defs outside agents/ is reported -- nothing discovers them'
+    Assert-True ($ak8.Out -match '\[agents-key\].*2 def\(s\) outside it') `
+        'check 38: and the finding counts them, so the reader knows the size of what is not loading'
+
+    # 9. NO KEY AND THE DEFS IN agents/: the convention, and silent. This is the state the repo was in
+    #    before #1698 and the one the check must never accuse -- five of six real plugins rely on the
+    #    silence half of this rule.
+    $akConvention = Join-Path $Fixture 'plugins\dkj-subagents\dkj-subagents-alpha\agents'
+    New-Item -ItemType Directory -Path $akConvention -Force | Out-Null
+    Move-Item -LiteralPath $akDefA -Destination (Join-Path $akConvention '01-01-agent.md') -Force
+    Move-Item -LiteralPath $akDefB -Destination (Join-Path $akConvention '02-02-agent.md') -Force
+    $ak9 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True (-not ($ak9.Out -match '\[agents-key\] \.')) `
+        'check 38: no key with every def under agents/ is the convention and is silent'
+
+    # 10. A NESTED PLUGIN ROOT IS NOT ITS PARENT'S CONTENT. plugins/dkj-policy/dkj-policy-bwj really sits
+    #     inside plugins/dkj-policy in this repo, and neither ships a def today -- so nothing would fire
+    #     if this were wrong, which is precisely why it is exercised here rather than left to the tree.
+    #     The marketplace is rewritten for this scenario and restored immediately after: every later
+    #     assert in this suite reads it.
+    $akMpPath = Join-Path $Fixture '.claude-plugin\marketplace.json'
+    $akMpOrig = [System.IO.File]::ReadAllText($akMpPath, [System.Text.Encoding]::UTF8)
+    $akChildRoot = Join-Path $Fixture 'plugins\dkj-policy\dkj-policy-bwj'
+    try {
+        New-Item -ItemType Directory -Path (Join-Path $akChildRoot '.claude-plugin') -Force | Out-Null
+        New-Item -ItemType Directory -Path (Join-Path $akChildRoot 'agents') -Force | Out-Null
+        [System.IO.File]::WriteAllText((Join-Path $akChildRoot '.claude-plugin\plugin.json'),
+            "{ `"name`": `"dkj-policy-bwj`", `"version`": `"0.0.1`" }`n", $Utf8NoBom)
+        # The child's def sits OUTSIDE its own agents/ dir on purpose: the child must be accused and the
+        # parent must not. One file separates the two readings.
+        New-Item -ItemType Directory -Path (Join-Path $akChildRoot 'subagents-stray') -Force | Out-Null
+        [System.IO.File]::WriteAllText((Join-Path $akChildRoot 'subagents-stray\03-03-agent.md'),
+            "---`nname: fixture`nid: 03`ngroup: 03`n---`n`n# Child def`n", $Utf8NoBom)
+        [System.IO.File]::WriteAllText($akMpPath, (@'
+{
+  "name": "fixture-marketplace",
+  "plugins": [
+    { "name": "dkj-subagents-alpha",         "source": "./plugins/dkj-subagents/dkj-subagents-alpha" },
+    { "name": "dkj-subagents-shopify",       "source": "./plugins/dkj-subagents/dkj-subagents-shopify" },
+    { "name": "dkj-policy", "source": "./plugins/dkj-policy" },
+    { "name": "dkj-policy-bwj", "source": "./plugins/dkj-policy/dkj-policy-bwj" }
+  ]
+}
+'@), $Utf8NoBom)
+        $ak10 = Invoke-Integrity -FixtureRoot $Fixture
+        Assert-True ($ak10.Out -match "\[agents-key\] \./plugins/dkj-policy/dkj-policy-bwj.*declares no .agents. key|\[agents-key\] \.\\plugins\\dkj-policy\\dkj-policy-bwj.*declares no .agents. key") `
+            'check 38: the nested plugin is accused of its own stray def'
+        Assert-True (-not ($ak10.Out -match "\[agents-key\] \.[\\/]plugins[\\/]dkj-policy[\\/]\.claude-plugin")) `
+            'check 38: and its PARENT is not -- a nested root is not its parent content'
+    } finally {
+        [System.IO.File]::WriteAllText($akMpPath, $akMpOrig, $Utf8NoBom)
+        Remove-Item -LiteralPath $akChildRoot -Recurse -Force -ErrorAction SilentlyContinue
+    }
+
+    # Back to the canonical fixture: the manifest exactly as New-IntegrityFixture wrote it, and no defs.
+    [System.IO.File]::WriteAllText($akManifest, $akManifestOrig, $Utf8NoBom)
+    Remove-Item -LiteralPath $akConvention -Recurse -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $akSubagents -Recurse -Force -ErrorAction SilentlyContinue
+
     # --- -SkipCheck: the guard rails around the one parameter that can make this gate check less ------
     #     The parameter exists for THIS suite and nothing else. Its failure mode is silence -- a gate
     #     that ran fewer checks and still said "0 errors" -- so the three things that make it safe are

@@ -293,12 +293,20 @@ uninstall/install is a second wrong answer rather than a head start.
 
 ### What you will see change inside the plugin, and can ignore
 
-Each team's payload directory `agents/` is now `subagents/`, declared by an
-`"agents": "./subagents/"` key in the plugin manifest. This is internal to the package: nothing you write
+Each team's payload directory `agents/` is now `subagents/`, declared by an `"agents"` key in the plugin
+manifest that **lists every subagent file by path**. This is internal to the package: nothing you write
 names that directory, and every reader this family ships reads **both** leaf names, new first, so a
 machine holding a pre-rename version in its plugin cache keeps resolving. `skills/` is deliberately
 **not** renamed alongside it — the plugin format always scans the default `skills/` directory in addition
 to any custom one, so a custom skills directory can only ever add, never move.
+
+> **If you tried to install a team plugin on `v4.33.0` and it refused, that is why.** That release
+> declared the key as `"agents": "./subagents/"` — a directory — and the installer accepts only paths to
+> `.md` **files**, so all four team plugins answered
+> `Validation errors: agents: Invalid input` and installed for nobody
+> ([#1764](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1764)). Run
+> `claude plugin marketplace update` to pick up the repaired manifests, then install as usual. Nothing on
+> your side caused it and nothing on your side needs changing.
 
 ---
 
