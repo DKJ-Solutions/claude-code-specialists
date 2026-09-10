@@ -43,7 +43,46 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**1 / 4 minor entries** <!-- pending-tally -->
+**1 / 5 minor entries** <!-- pending-tally -->
+
+### DEPLOY: feat/tidy-machine-skill · 20260910-084037
+
+A new `tidy-machine` skill and script clear the clutter this workflow leaves on a machine, in one
+command and ten lanes: stale worktree lanes, branches whose pull request was CLOSED without merging,
+expired `backup/*` branches, old stashes, an unfolded changelog entry, the `~/.claude` plugin
+administration, install records pointing at a checkout that has moved, plugin staleness, and fixture
+trees under the scratch root.
+
+It is a conductor rather than a second implementation: six of the ten lanes call a script that
+already exists and already has its own suite, and the new logic is pure and testable in
+`tidy-lib.ps1`. The one thing it adds to the workflow's vocabulary is a **second proof** -- a pull
+request CLOSED without merging, which is the only evidence that separates abandoned work from
+unfinished work without guessing from a date. That proof is held to the same name-AND-tip pair test
+as the merged one, through the same shared functions, because a name-only match is what inbound
+#1190 and #1191 both cost.
+
+It deletes only what `prune-merged` can already prove, on Dave's answer of September 10, 2026;
+everything else is classified and handed over with the command. Lane 1 runs first because git
+refuses to delete a branch held by a worktree, and that refusal outranks the merge question (#1760).
+
+**Score:** 4
+
+#### What makes this deploy extra special
+
+N/A -- this repo publishes a plugin rather than a subscribed service, so no subscriber notices a
+maintenance command. The reader who does is a consumer developer, and that is the tier-0 answer above.
+
+**Score:** N/A
+
+#### Pull Request
+
+A machine-wide tidy: one command for the clutter this workflow leaves behind
+
+Plugins: dkj-policy
+
+[PR #1767](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1767)
+
+---
 
 ### DEPLOY: fix/1762-pasteable-path-absolute · 20260910-082956
 
