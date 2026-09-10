@@ -160,8 +160,12 @@ merge, and do not treat a green run from an earlier day as proof.
       consumer's own migration
 - [ ] Re-run the `@`-sweep on the LAST catch-up merge, immediately before the fase 3 merge -- `main`
       keeps writing new `@claude-code-specialists` literals while this branch waits (see PLAN)
-- [ ] Victor (scripts) + Edith (docs/links) review -- branch stays open until fase 2 is built
-- [ ] LAST (session-breaking on this branch until flag day): `.claude/settings.json` self-consume
+- [ ] FLAG DAY: rewrite the two staging paragraphs, which go false at the moment of the merge --
+      `CLAUDE.md`'s "A second rename is pending on this same citation" (the slug rename is no longer
+      pending) and `scripts/repo-config.ps1`'s "FASE 1 IS BUILT, NOT MERGED" (it merged). Both say
+      "does not merge until fase 3" in as many words, so neither degrades quietly; found by Edith on
+      review, September 10, 2026
+- [ ] Victor (scripts) + Edith (docs/links) review -- branch stays open until fase 2 is built- [ ] LAST (session-breaking on this branch until flag day): `.claude/settings.json` self-consume
       keys + `github` source + `repo`
 - [ ] LAST (session-breaking): live `@`-import paths + clone-dir path segments
       `marketplaces/claude-code-specialists/` -> `marketplaces/dkj-claude-plugins/`,
