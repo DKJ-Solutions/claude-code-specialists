@@ -43,7 +43,53 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**5 / 21 minor entries** <!-- pending-tally -->
+**6 / 22 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1796-fold-push-race-stand-down · 20260910-125423
+
+`fold-on-merge.yml` no longer goes red when it loses the fold race at the **push**. That race has two
+halves: the other fold landing before the job's pre-pass reads the trunk (exit `2`, stood down since
+#1586), and it landing in the ~1s between that read and the job's own push -- which no check at the top
+of a run can close, because the window opens after it. The second half folded, committed, and came back
+a non-fast-forward, and the job went red on a trunk that was already correct.
+
+`fold-changelog-entry.ps1` signals that case with exit code `3` -- introduced by #1792 hours earlier for
+the session's side of the same race, and earned by a measurement rather than by the push having failed:
+every entry the run folded is already upstream, present with an identical body. The runner stands down
+on it, and the redundant commit it leaves behind dies with the ephemeral workspace. A push refused for
+any other reason -- a ruleset `GH013`, a credential, or a non-fast-forward where one entry is upstream
+and another is genuinely new -- is still exit `1` and still red, which is what keeps this from becoming
+a blanket "ignore a failed push".
+
+So one code now has two readers that answer it differently, on purpose: `ship-pr.ps1` stands down and
+then reports the redundant commit, because it sits on a trunk somebody has to live with; this runner
+stands down and says nothing more, because its workspace is discarded. The suite that owns the code
+pins both readers -- the workflow's half was asserted nowhere until now, only the template it ships.
+
+The header's three-cause triage could not tell a ruleset rejection from a non-fast-forward -- the
+report's own point -- so cause 3 now names the difference in the reader's terms: `GH013` names a rule
+and a ruleset, a non-fast-forward names a ref and tells you to fetch first.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+A consumer running the placed fold runner gets the same stand-down through `adopt-merge-queue.ps1`'s
+template, and the `adopt-dkj-policy` skill now documents two stood-down refusals as the two halves of
+one race rather than one. Nothing for them to do: an adopted runner picks it up with the plugin update,
+and a red run they would otherwise have read as a ruleset problem stops happening.
+
+**Score:** 2
+
+#### Pull Request
+
+The fold-on-merge runner stands down when it loses the fold race at the push
+
+Plugins: dkj-policy
+
+[PR #1798](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1798)
+
+---
 
 ### DEPLOY: fix/1781-agents-key-one-normaliser · 20260910-124041
 
