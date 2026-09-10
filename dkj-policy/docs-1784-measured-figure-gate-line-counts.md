@@ -67,8 +67,15 @@ wrong.
       it for line counts, and why the measurement is the cleanest confirmation of the rule it has.
 - [x] Repaired the one real defect the measurement found -- `06-25-extension.md:264`, a present-tense
       `CLAUDE.md` "is 875 lines in 9 sections" against 526 in 3 -- by tense plus the method to re-derive it.
-- [~] No check built and no test suite added. That IS the finding: 16 findings, 1 real. A suite would pin
-      a rule this branch declines.
+- [x] Red-teamed the decline before recording it, which changed it twice. The reason now leads with the
+      digit argument (#1779's sites spelled the number out, so no candidate in this family could have
+      caught it), and the "no resolver fixes this" overclaim is replaced by the measured adjacency
+      variant -- green at 1 of 1, left unbuilt with a revisit condition rather than declined.
+- [x] Filed #1790 for the enforcement gap the measurement exposed: no figure gate reaches a `.ps1`
+      comment, which is where #1779's seven sites and #1775's propagation both happened. A separate
+      subject -- a file set, not a unit -- so it is filed rather than answered here.
+- [~] No check built and no test suite added. That IS the finding: 16 findings and 1 real for the wide
+      form; 1 subject tree-wide for the green narrow one. A suite would pin a rule this branch declines.
 
 ### TEST
 
@@ -77,18 +84,20 @@ wrong.
 ### DEPLOY: docs/1784-measured-figure-gate-line-counts
 
 The proposed line-count gate from #1784 is **declined on measurement**, and the measurement is recorded
-where the gate's other declined rules live. Extending check 16 (`[measured-figure]`) to line counts
-produces 16 findings across the trunk of which exactly **1** is a real defect: six sites are deliberate
-historical records where the figure is the point, four are deltas rather than lengths, one is a section
-rather than a file, two describe another repo's files, one is history that already carries the binding
-check 16 asks for, and one is a pairing failure whose victim is the best-behaved figure in the tree -- a
-comment that states its own `wc -l`. That figure went stale by a line during this branch's own
-eight-commit fast-forward, which is why a tolerance band is mandatory and why a line count is something a
-reader re-runs rather than something a gate pins. And writing this decline up, with each instance cited
-verbatim as a measurement here must be, took the same rule from 16 findings to 26 -- so it penalises
-measuring and recording the result, which is what the gate's other rules exist to encourage. Check 16's
-unit list stays byte-shaped, deliberately, and the writing rule that does hold this class already exists
-in Tessa's portable manual. The one real defect the measurement found is repaired.
+where the gate's other declined rules live. **The reason that settles it is not the one the proposal
+argues about: the defect it was filed over carries no digit** -- #1779's seven sites read "three thousand
+lines" in words -- so no digit-anchored pattern can see it, check 16's own included, however precisely
+tuned. For the figures such a pattern *can* see, extending check 16 (`[measured-figure]`) to line counts
+produces 16 findings across the trunk of which exactly **1** is a real defect, in six classes no regex
+separates from it; and writing the decline up with each instance cited verbatim, as a measurement here
+must be, took the same rule from 16 findings to 26 -- so it penalises measuring and recording the result,
+which is what the gate's other rules exist to encourage. One narrow variant **is** green -- a backticked
+filename immediately before a present-tense copula, 1 of 1 on the trunk -- and it is recorded as measured
+and left **unbuilt**, with its revisit condition, rather than declined: one subject tree-wide, blind to
+the motivating defect, and still firing on the prose that cites it. Check 16's unit list stays
+byte-shaped, deliberately. Its *file set* is a separate and real gap -- no figure gate reaches a `.ps1`
+comment, which is where both recorded instances of this class happened -- filed as #1790. The one real
+defect the measurement found is repaired.
 
 **Score:** 2
 
