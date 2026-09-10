@@ -211,7 +211,7 @@ try {
     # so they answer "does it still emit this string", never "is there a script at the other end". The
     # path DID move here (plugins/workflows/contributing-davekjohn/ -> plugins/dkj-policy/), all three
     # stayed green, and two consumers scaffolded before the move were red on every pull request for
-    # five weeks. They are kept, because what they pin is real -- a runner naming the SOURCE's own
+    # five days. They are kept, because what they pin is real -- a runner naming the SOURCE's own
     # scripts/ path would be correct here and absent in every consumer -- and the derived asserts below
     # answer the other question rather than replacing them.
     . (Join-Path $RepoRoot 'scripts\lib\consumer-runner-lib.ps1')

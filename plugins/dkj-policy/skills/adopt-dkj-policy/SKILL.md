@@ -134,14 +134,14 @@ pin does not fail loudly, it fails the *wrong way*: refusing branches that do ca
 current path. Tracking the tip means the gate follows the convention it enforces. Pin a tag instead if you
 would rather own the bump.
 
-**That argument was only ever half of the trade, and the missing half cost two repos five weeks**
+**That argument was only ever half of the trade**
 ([#1805](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1805)). It weighs the **entry's**
 path moving, correctly. What it never weighed is the **script's** own path moving -- and that is what
-actually happened: `plugins/workflows/contributing-davekjohn/` became `plugins/dkj-policy/`, and every
-repo scaffolded before the move went on naming the old one. Tracking the tip protects you from a stale
-convention and exposes you to a moved script, and only the first half was on this page. Measured
-September 10, 2026: `thumbnail-generator` and `life-hub` had been red on **every** pull request since
-August 3, and neither had been noticed, because neither had opened one since the break.
+actually happened: `plugins/workflows/contributing-davekjohn/` became `plugins/dkj-policy/` on
+September 5, 2026, and every repo scaffolded before that went on naming the old one. Tracking the tip
+protects you from a stale convention and exposes you to a moved script, and only the first half was on
+this page. Measured September 10, 2026: two consumer repos were red on **every** pull request, and
+neither had been noticed, because neither had opened one since the break.
 
 **The pin still stands, because the exposure is now covered at the other end.** The source repo's
 `check-connectors.ps1` reads the runners its registered consumers actually have and reports a path that

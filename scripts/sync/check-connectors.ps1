@@ -50,14 +50,20 @@
          session is in (#1775). An id naming a marketplace other than this one is silently out of scope:
          this register has no way to judge a catalogue it does not own.
       6. Per connector: does every path its CI runners reach into a checkout of THIS repo for still
-         exist here? One missing -> [ERROR] naming the workflow file, the line, the path, and where
-         that script is now. Three runners this workflow scaffolds (branch-entry.yml, fold-on-merge.yml,
-         verify-resolved.yml) check this repository out beside the consumer's tree and run a path into
-         it, so a move here silently breaks a file this repo cannot reach -- measured #1805, two
-         consumers red on every pull request for five weeks. This is the only check here whose subject
-         is a path INTO this tree rather than the consumer's own state, and the only repair that can
-         reach a repo which adopted before the move: fixing the scaffolder cannot, because it writes
-         once. Switched off entirely, rather than guessing, when Get-RepoName cannot be read.
+         exist here? Three outcomes, not two. Missing -> [ERROR] naming the workflow file, the line,
+         the path, and where that script is NOW (the published mirror offered before this repo's own
+         scripts/ copy, since only the first is a path a consumer may run). Present -> silence.
+         And a reference that does not stay under the checkout at all -> [ERROR] of its own, saying
+         so and saying it was NOT looked up: the path comes out of a consumer's file, so resolving
+         '../..' against this disk would answer whether an arbitrary file exists on the maintainer's
+         machine, unattended, at every session start. Three runners this workflow scaffolds
+         (branch-entry.yml, fold-on-merge.yml, verify-resolved.yml) check this repository out beside
+         the consumer's tree and run a path into it, so a move here silently breaks a file this repo
+         cannot reach -- measured #1805, two consumers red on every pull request. This is the only
+         check here whose subject is a path INTO this tree rather than the consumer's own state, and
+         the only repair that can reach a repo which adopted before the move: fixing the scaffolder
+         cannot, because it writes once. Switched off entirely, rather than guessing, when
+         Get-RepoName cannot be read.
     The register no longer keeps a syncedVersion bookkeeping: the check reads the actual installed
     version from the machine record, and register administration that only duplicates numbers
     produced nothing but maintenance PRs (Dave's decision, July 20, 2026).
@@ -145,8 +151,10 @@ $PluginRoots = @(Get-RepoPluginRoots -RepoRoot $RepoRoot)
 # UNREADABLE SWITCHES CHECK 6 OFF ENTIRELY rather than guessing at the name -- the same doctrine
 # $ThisMarketplaceName follows two blocks up, and for the stronger version of the same reason: a guessed
 # name that matches nothing makes every consumer read as clean, which is the exact silence #1805 was
-# filed about. Guessing from the checkout's directory name was the tempting shortcut and is refused: a
-# renamed or moved checkout is a case this family has already measured (#1449).
+# filed about. Guessing from the checkout's DIRECTORY NAME was the tempting shortcut and is refused on
+# its own terms: a directory can be renamed or moved without the repo changing name, so it answers a
+# different question. (This family keeps other state keyed on a folder path -- the plugin install
+# record, #1449 -- and that is a neighbouring hazard rather than evidence for this one.)
 $ThisRepoName = ''
 $repoConfigPath = Join-Path $RepoRoot 'scripts\repo-config.ps1'
 if (Test-Path -LiteralPath $repoConfigPath -PathType Leaf) {
@@ -794,7 +802,7 @@ foreach ($mf in $manifestFiles) {
     # written into a file this tree cannot reach, by a scaffolder that runs once at adoption and never
     # again. When plugins/workflows/contributing-davekjohn/ became plugins/dkj-policy/, every consumer
     # scaffolded before the move kept naming the old path, and two of them were red on every pull
-    # request for five weeks without anyone noticing -- because neither had opened one since.
+    # request without anyone noticing -- because neither had opened one since.
     #
     # THIS IS THE HALF THAT REACHES AN ALREADY-ADOPTED CONSUMER. Repairing the scaffolder cannot: it
     # writes once, and their file is already written. The register is the only thing here that looks at
@@ -824,18 +832,32 @@ foreach ($mf in $manifestFiles) {
                               Where-Object { $_.Extension -in @('.yml', '.yaml') } | Sort-Object Name)) {
                 $refs = @(Get-SharedScriptReference -WorkflowText ([System.IO.File]::ReadAllText($wf.FullName)) -RepositoryName $ThisRepoName)
                 if ($refs.Count -eq 0) { continue }
+                # EVERY VALUE LIFTED OUT OF THE CONSUMER'S FILE IS WRAPPED, THE FILENAME INCLUDED.
+                # Format-SafePathToken rather than Format-SafeToken, because all three subjects here are
+                # path-shaped and #414 is exactly that argument -- the id charset deletes what makes a
+                # path findable. What it strips is the class that matters on this route: control
+                # characters, which could forge a line in the session context the SessionStart hook
+                # forwards, and square brackets, which the hooks COUNT as verdict markers. A workflow
+                # file named 'x[ERROR] evil.yml' is a legal filename on NTFS and would otherwise change
+                # a hook's verdict from a consumer's own directory listing.
+                $wfName = Format-SafePathToken -Value $wf.Name
                 foreach ($judged in @(Test-SharedScriptReference -Reference $refs -SourceRoot $RepoRoot)) {
                     if ($judged.Exists) { continue }
-                    # Format-SafeToken, not Format-SuspectToken: the path is content out of a consumer's
-                    # own workflow file, so it is untrusted text -- but the path itself is not the
-                    # complaint (it was correct when it was written), only its absence here is. Same
-                    # distinction the [UNLISTED] finding above draws about an id.
+
+                    # AN ESCAPING REFERENCE IS ITS OWN FINDING, and deliberately not phrased as a
+                    # missing path: nothing was looked up, because looking it up is what the lib
+                    # refuses to do (it would answer whether an arbitrary file exists on this machine).
+                    if ($judged.Escapes) {
+                        Write-Failure "$wfName line $($judged.Line) runs '$(Format-SafePathToken -Value $judged.Path)', which does not stay inside the checkout of this repo it is resolved against -- so it was NOT looked up here. A runner reaching outside its own checkout cannot work on a CI machine whatever this tree holds; correct it in that consumer."
+                        continue
+                    }
+
                     $where = if ($judged.MovedTo.Count -gt 0) {
-                        "it is at $((@($judged.MovedTo) | ForEach-Object { Format-SafeToken -Value $_ }) -join ' / ') now"
+                        "it is at $((@($judged.MovedTo) | ForEach-Object { Format-SafePathToken -Value $_ }) -join ' / ') now"
                     } else {
                         'no file of that name exists anywhere here, so it was removed rather than moved'
                     }
-                    Write-Failure "$($wf.Name) line $($judged.Line) runs '$(Format-SafeToken -Value $judged.Path)' out of a checkout of this repo, and that path does not exist here -- $where. That runner is red on every pull request in this consumer until the path is corrected there; nothing in this repo can correct it from here."
+                    Write-Failure "$wfName line $($judged.Line) runs '$(Format-SafePathToken -Value $judged.Path)' out of a checkout of this repo, and that path does not exist here -- $where. That runner is red on every pull request in this consumer until the path is corrected there; nothing in this repo can correct it from here."
                 }
             }
         }

@@ -459,8 +459,10 @@ $releasesReadme = @(
 # SCRIPT's own path moving, which is what happened -- plugins/workflows/contributing-davekjohn/ became
 # plugins/dkj-policy/, and every consumer scaffolded before the move kept naming the old path. Tracking
 # the tip protects a consumer from a stale convention and exposes them to a moved script. Measured
-# September 10, 2026 (#1805): two consumers red on every pull request for five weeks, unnoticed because
-# neither had opened one since the break.
+# September 10, 2026 (#1805): two consumers red on every pull request, unnoticed because neither had
+# opened one since the September 5 move. (The report said August 3 and five weeks; the path they name
+# only existed from August 26, so the break is five DAYS old -- the whole timeline is in
+# consumer-runner-lib.ps1's header, with the git log it comes off.)
 #
 # THE PIN STAYS, AND THE EXPOSURE IS COVERED AT THE OTHER END -- because it cannot be covered here. This
 # command writes the path once, at adoption, and nothing rewrites it afterwards, so no change made in

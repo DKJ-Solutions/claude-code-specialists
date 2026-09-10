@@ -23,9 +23,24 @@
 
     So when `plugins/workflows/contributing-davekjohn/` became `plugins/dkj-policy/`, every consumer
     scaffolded before the move kept naming the old path. Measured September 10, 2026 (#1805):
-    `DaveKJohn/thumbnail-generator` and `DaveKJohn/life-hub` had been red on every pull request since
-    August 3 -- five weeks -- and neither had been noticed, because neither repo had opened a pull
-    request since the break.
+    `DaveKJohn/thumbnail-generator` and `DaveKJohn/life-hub` were red on every pull request, and
+    neither had been noticed, because neither repo had opened one since the break.
+
+    THE REPORT DATED THAT BREAK TO AUGUST 3 AND IT CANNOT BE, which is worth writing down because the
+    wrong figure is the more quotable one. `git log --diff-filter=ADR -- '*check-branch-entry.ps1'`
+    gives the whole life of the path those two consumers name:
+
+        2026-08-20  A   plugins/workflows/workflow-davekjohn/scripts/lint/check-branch-entry.ps1
+        2026-08-26  R   -> plugins/workflows/contributing-davekjohn/scripts/lint/check-branch-entry.ps1
+        2026-09-05  R   -> plugins/workflows/dkj-policy/... -> plugins/dkj-policy/...
+
+    So the gate did not exist at all until August 20, the path they name existed only from August 26,
+    and it stopped resolving on September 5 -- FIVE DAYS before the measurement, not five weeks.
+    August 3 is the date of a different move (the plugin tree flattening to `plugins/<plugin>/`), and
+    it reached the report because it is the date this repo's own CLAUDE.md gives for a reorganisation
+    of the same folder. Nothing about the defect changes; its duration does, by a factor of seven.
+    Recorded here rather than only in the issue because a citation is what makes a measurement
+    auditable, and this one would have shipped to every consumer on the strength of sounding worse.
 
     THE `ref: main` PIN IS NOT THE DEFECT, AND WAS NOT WHAT WENT UNARGUED. adopt-dkj-policy/SKILL.md
     argues the pin by name: a pinned tag keeps enforcing the shape it was pinned at, and the ENTRY's
@@ -42,7 +57,7 @@
 
       * the scaffolder suites read the emitted runners back through Get-SharedScriptReference and
         assert every referenced path EXISTS in this tree, so a move here goes red on the day it lands
-        rather than in somebody else's repository five weeks later;
+        rather than in somebody else's repository days later;
       * check-connectors.ps1 reads the runners a REGISTERED CONSUMER has already got, so a path
         written before a move is reported from the register instead of discovered by a red gate.
 
@@ -99,36 +114,62 @@ function Get-SharedScriptReference {
     $lines = $WorkflowText -split "`r?`n"
 
     # --- 1. Which local prefixes hold a checkout of this repository -----------------------------
-    # A `repository:` whose name half matches, then the `path:` of the SAME `with:` block -- same
-    # indentation, before the block ends (a line indented less than the key, ignoring blanks). A
-    # checkout step with no `path:` lands in the workspace root itself, which this deliberately does
-    # NOT treat as a prefix: every reference in the file would then look like one of ours, including
-    # the consumer's own scripts. The scaffolders always write a path, so that shape is somebody
-    # else's checkout step and not this lib's business.
+    # A `repository:` whose name half matches, then the `path:` of the SAME `with:` block. A checkout
+    # step with no `path:` lands in the workspace root itself, which this deliberately does NOT treat
+    # as a prefix: every reference in the file would then look like one of ours, including the
+    # consumer's own scripts. The scaffolders always write a path, so that shape is somebody else's
+    # checkout step and not this lib's business.
+    #
+    # THE BLOCK IS READ IN BOTH DIRECTIONS, AND A TRAILING COMMENT IS TOLERATED. Both were false
+    # NEGATIVES in the first cut of this lib, caught in review before it merged, and a false negative
+    # here is the whole failure this file exists to end -- arriving one layer down, inside the
+    # detector built to end it. A consumer whose runner is missed goes on reading as clean, which is
+    # indistinguishable from being clean.
+    #   * FORWARD-ONLY missed `path:` written ABOVE `repository:`. The scaffolders emit
+    #     repository/ref/path in that order, so a fresh runner was safe -- but YAML imposes no order
+    #     and this lib's own docstring anticipates hand edits, and swapping two keys is about the most
+    #     ordinary edit there is.
+    #   * ANCHORING THE VALUE AT `$` missed `repository: owner/name  # why we check it out`. An
+    #     end-of-line comment is everyday YAML, not one of the exotic shapes the header declines.
+    # Both are now covered by their own scenarios in connectors.tests.ps1.
+    $keyPattern = '^(?<ind>[ \t]*)(?<key>repository|path):[ \t]*(?<q>["''])?(?<val>[^"''\r\n#]*?)(?(q)\k<q>)[ \t]*(#.*)?$'
+
     $prefixes = @{}
     for ($i = 0; $i -lt $lines.Count; $i++) {
-        $m = [regex]::Match($lines[$i], '^(?<ind>[ \t]*)repository:[ \t]*["'']?(?<repo>[^"''\r\n#]+?)["'']?[ \t]*$')
-        if (-not $m.Success) { continue }
+        $m = [regex]::Match($lines[$i], $keyPattern)
+        if (-not $m.Success -or $m.Groups['key'].Value -ne 'repository') { continue }
 
-        $repo = $m.Groups['repo'].Value.Trim()
+        $repo = $m.Groups['val'].Value.Trim()
+        if (-not $repo) { continue }
         $name = $repo.Substring($repo.LastIndexOf('/') + 1)
         if (-not [string]::Equals($name, $RepositoryName, [System.StringComparison]::OrdinalIgnoreCase)) { continue }
 
-        $indent = $m.Groups['ind'].Value
-        for ($j = $i + 1; $j -lt $lines.Count; $j++) {
-            $line = $lines[$j]
-            if ([string]::IsNullOrWhiteSpace($line)) { continue }
+        $indent = $m.Groups['ind'].Value.Length
 
-            $lead = [regex]::Match($line, '^[ \t]*').Value
-            if ($lead.Length -lt $indent.Length) { break }
-            if ($lead.Length -gt $indent.Length) { continue }
+        # The block this key belongs to: outward from it in both directions until a line indented LESS
+        # than the key, which is the parent (`with:`) above and the next step below. A blank line does
+        # not end a block, so it is stepped over rather than treated as a boundary.
+        $first = $i
+        while ($first -gt 0) {
+            $prev = $lines[$first - 1]
+            if (-not [string]::IsNullOrWhiteSpace($prev) -and ([regex]::Match($prev, '^[ \t]*').Value.Length -lt $indent)) { break }
+            $first--
+        }
+        $last = $i
+        while ($last -lt $lines.Count - 1) {
+            $next = $lines[$last + 1]
+            if (-not [string]::IsNullOrWhiteSpace($next) -and ([regex]::Match($next, '^[ \t]*').Value.Length -lt $indent)) { break }
+            $last++
+        }
 
-            $p = [regex]::Match($line, '^[ \t]*path:[ \t]*["'']?(?<path>[^"''\r\n#]+?)["'']?[ \t]*$')
-            if ($p.Success) {
-                $prefix = $p.Groups['path'].Value.Trim().TrimEnd('/', '\')
-                if ($prefix) { $prefixes[$prefix] = $repo }
-                break
-            }
+        for ($j = $first; $j -le $last; $j++) {
+            $p = [regex]::Match($lines[$j], $keyPattern)
+            if (-not $p.Success -or $p.Groups['key'].Value -ne 'path') { continue }
+            if ($p.Groups['ind'].Value.Length -ne $indent) { continue }
+
+            $prefix = $p.Groups['val'].Value.Trim().TrimEnd('/', '\')
+            if ($prefix) { $prefixes[$prefix] = $repo }
+            break
         }
     }
     if ($prefixes.Count -eq 0) { return @() }
@@ -165,7 +206,31 @@ function Test-SharedScriptReference {
         that script go?
 
         Returns the input records with Exists added, plus MovedTo: the repo-relative paths in
-        $SourceRoot carrying the same file name. THE SUGGESTION IS THE POINT OF THE CHECK, not a
+        $SourceRoot carrying the same file name, and Escapes: the reference does not stay under
+        $SourceRoot at all.
+
+        ESCAPES IS TESTED FIRST, AND A REFERENCE THAT ESCAPES REACHES NO FILESYSTEM CALL. The path
+        comes out of a consumer's own workflow file, and the capture charset admits '.' and '/' --
+        which is what a path needs and is therefore not containment: `../../../../somewhere.ps1`
+        matches it exactly as a real reference does. Join-Path does not normalise '..', but Test-Path
+        resolves it against the real filesystem, so handing it one unchecked turns this check into an
+        existence oracle for the maintainer's own disk -- answered by the presence or absence of an
+        [ERROR] line, unattended, at every session start, for every registered connector. Bounded
+        (existence only, '.ps1'-suffixed, nothing read or run) and still wrong: it is not the question
+        this function is documented to answer.
+
+        NORMALISED WITHOUT TOUCHING THE DISK. [IO.Path]::GetFullPath is pure string work on a rooted
+        path, so the containment test itself performs no I/O -- which is what makes this a closure of
+        the oracle rather than a narrowing of it. The repo's own doctrine is the same shape one layer
+        up: Test-PluginNameSlug guards what may BECOME a path, Format-SafeToken only guards how one is
+        DISPLAYED, and a charset was never the containment.
+
+        AN ESCAPING REFERENCE IS REPORTED, NEVER DROPPED. Silence about a strange path is the exact
+        failure this lib exists to end, so it comes back as its own state for the caller to name --
+        not folded into Exists=$false, which would print 'that path does not exist here' about a path
+        whose problem is that it was never asked about.
+
+        THE SUGGESTION IS THE POINT OF THE CHECK, not a
         courtesy. "This path no longer exists here" leaves the reader to find out what replaced it in
         a tree they may not have; "it is at plugins/dkj-policy/scripts/lint/check-branch-entry.ps1
         now" is a repair they can paste. Where the name matches nothing, MovedTo is empty and the
@@ -190,15 +255,33 @@ function Test-SharedScriptReference {
         [Parameter(Mandatory)][string]$SourceRoot
     )
 
+    $rootFull = [System.IO.Path]::GetFullPath((Resolve-Path -LiteralPath $SourceRoot).Path).TrimEnd('\', '/')
+    $rootLen  = $rootFull.Length + 1
+
     $results = @()
     foreach ($ref in @($Reference)) {
-        $full = Join-Path $SourceRoot ($ref.Path -replace '/', [System.IO.Path]::DirectorySeparatorChar)
-        $exists = Test-Path -LiteralPath $full -PathType Leaf
+        $full = Join-Path $rootFull ($ref.Path -replace '/', [System.IO.Path]::DirectorySeparatorChar)
+
+        # Containment before contact -- see the docstring. GetFullPath normalises '..' as a string; the
+        # comparison is against the root plus its separator, so a sibling directory whose name merely
+        # starts with the root's ('...-old') cannot pass as a descendant.
+        $escapes = $true
+        try {
+            $normalised = [System.IO.Path]::GetFullPath($full)
+            $escapes = -not $normalised.StartsWith($rootFull + [System.IO.Path]::DirectorySeparatorChar, [System.StringComparison]::OrdinalIgnoreCase)
+        } catch {
+            # An unnormalisable path (a reserved device name, an illegal character the capture charset
+            # happens to admit) is treated as escaping rather than as absent: it is not a path under
+            # this root, which is the only claim this flag makes.
+            $escapes = $true
+        }
+
+        $exists = $false
+        if (-not $escapes) { $exists = Test-Path -LiteralPath $full -PathType Leaf }
 
         $movedTo = @()
-        if (-not $exists) {
+        if (-not $exists -and -not $escapes) {
             $leaf = Split-Path -Leaf $ref.Path
-            $rootLen = (Resolve-Path -LiteralPath $SourceRoot).Path.TrimEnd('\', '/').Length + 1
             $movedTo = @(
                 Get-ChildItem -LiteralPath $SourceRoot -Recurse -File -Filter $leaf -ErrorAction SilentlyContinue |
                     Where-Object { $_.FullName -notmatch '(^|\\|/)\.git(\\|/)' } |
@@ -213,6 +296,7 @@ function Test-SharedScriptReference {
             Repository = $ref.Repository
             Line       = $ref.Line
             Exists     = $exists
+            Escapes    = $escapes
             MovedTo    = $movedTo
         }
     }

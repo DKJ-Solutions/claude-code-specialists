@@ -162,7 +162,7 @@ try {
     # strings -- `$fold -like '*.workflow-scripts/plugins/dkj-policy/...*'` -- which compares the
     # scaffolder's output against itself and stays green when the script moves in this tree. It did move
     # (plugins/workflows/contributing-davekjohn/ -> plugins/dkj-policy/), every suite stayed green, and
-    # two consumers were red on every pull request for five weeks before anybody noticed.
+    # two consumers were red on every pull request for five days before anybody noticed.
     $gateRel = '.github\workflows\branch-entry.yml'
     Assert-True (Test-Path -LiteralPath (Join-Path $c2 $gateRel) -PathType Leaf) '-Apply: the branch-entry gate workflow is placed'
     . (Join-Path $RepoRoot 'scripts\lib\consumer-runner-lib.ps1')

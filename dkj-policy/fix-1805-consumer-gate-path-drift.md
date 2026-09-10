@@ -50,9 +50,15 @@ corrections:
 - **Option 1 cannot do what the issue claims for it.** "The only one that repairs the two repos that
   are red today without anyone visiting them" is not true of a scaffolder: it writes once, and their
   files are already written. The issue admits this two paragraphs later. Nothing in a scaffolder can
-  reach an August adoption, which is why the repair is split across both ends.
+  reach an existing adoption, which is why the repair is split across both ends.
+- **The size is mis-measured, and by a factor of seven.** "Red since August 3 -- five weeks" cannot
+  be: `git log --diff-filter=ADR -- '*check-branch-entry.ps1'` puts the gate script's creation at
+  August 20, the path those consumers name at August 26, and its retirement at September 5. So the
+  break is five days old, not five weeks, and on August 3 there was no gate at all. Caught in the
+  copy edit, after the wrong figure had already been written into eight places on this branch --
+  including the page that ships to every consumer.
 
-And the mechanism behind the five weeks is sharper than reported: `adopt-merge-queue.tests.ps1:202-206`
+And the mechanism behind the silence is sharper than reported: `adopt-merge-queue.tests.ps1:202-206`
 pins the emitted path as a **literal string**, so it compares the scaffolder's output against itself
 and stayed green through the move. `adopt-workflow-folder.tests.ps1` had no assertion about its runner
 at all -- not that it lands, not that its script exists.
@@ -60,20 +66,27 @@ at all -- not that it lands, not that its script exists.
 ### CREATE
 
 - [x] `scripts/lib/consumer-runner-lib.ps1` -- `Get-SharedScriptReference` (which scripts of this tree
-      a workflow reaches into, read from the file's own `repository:`/`path:` pair) and
-      `Test-SharedScriptReference` (does each still exist here, and where did it go).
+      a workflow reaches into, read from the file's own `repository:`/`path:` pair, matched on the
+      repository NAME so a pre-transfer `DaveKJohn/` citation is not skipped) and
+      `Test-SharedScriptReference` (does each still exist here, where did it go, and does it stay
+      under the checkout at all -- the `Escapes` verdict, normalised as a string so a traversing
+      reference reaches no filesystem call).
 - [x] `check-connectors.ps1` check 6 -- per registered consumer, every `.github/workflows/*.yml`
-      judged; a path this tree no longer holds is an `[ERROR]` naming the file, the line and the
-      current location. This is the half that reaches an already-adopted consumer.
+      judged, in three outcomes: silence, a missing path as an `[ERROR]` naming the file, the line
+      and the current location, and an escaping reference as an `[ERROR]` of its own. Every value
+      lifted out of the consumer's file, the workflow filename included, goes through
+      `Format-SafePathToken`. This is the half that reaches an already-adopted consumer.
 - [x] Both scaffolder comments and `adopt-dkj-policy/SKILL.md` -- the `ref: main` argument, which
       weighed the entry's path moving and never the script's. Plugin mirror regenerated via
       `build-shared-scripts.ps1`.
 
 ### TEST
 
-- [x] `connectors.tests.ps1` scenario 12 (a-e): current path silent, retired path an error naming the
+- [x] `connectors.tests.ps1` scenario 12 (a-i): current path silent, retired path an error naming the
       new location, an old-owner citation still caught, another repository ignored, an unknown script
-      name reported as removed rather than moved. 255 pass, 0 fail.
+      name reported as removed rather than moved, a traversing reference reported without being
+      looked up, a bracketed filename stripped before it can forge a hook marker, and the two hand-edit
+      shapes (`path:` above `repository:`, and trailing YAML comments) still detected. 268 pass, 0 fail.
 - [x] `adopt-workflow-folder.tests.ps1` and `adopt-merge-queue.tests.ps1`: the emitted paths are now
       **derived from the emitted file** and asserted to exist in this tree. 100 and 76 asserts, 0 fail.
 - [x] `check-plugin-integrity.ps1`: 0 errors.
@@ -102,14 +115,26 @@ Three CI runners this workflow scaffolds do not vendor the script they run: they
 out beside the consumer's tree and run a path into it. The dependency therefore points the wrong way --
 a path INTO this tree, written into a file this tree cannot reach, by a scaffolder that runs once at
 adoption -- and when `plugins/workflows/contributing-davekjohn/` became `plugins/dkj-policy/`, two
-consumers went red on every pull request for five weeks with nothing anywhere saying so.
+consumers went red on every pull request with nothing anywhere saying so.
 
 Both ends are now held. `check-connectors.ps1` reads the runners a registered consumer actually has and
 reports a path this tree no longer holds, naming where that script went; and the two scaffolder suites
 derive the emitted path from the emitted file instead of pinning it as a literal, so a move here goes
-red the day it lands rather than in somebody else's repository five weeks later. The `ref: main` pin
+red the day it lands rather than in somebody else's repository days later. The `ref: main` pin
 stays and its argument is completed: tracking the tip protects a consumer from a stale convention and
 exposes them to a moved script, and only the first half was ever written down.
+
+The detector reads a consumer's own file, so it is treated as untrusted throughout: a reference that
+does not stay under the checkout is reported as its own finding and never resolved against this disk,
+and every value printed -- the workflow filename included -- goes through `Format-SafePathToken`
+before it reaches a line the session hooks forward.
+
+**And the report's own figure was wrong, which is worth stating because the wrong one is the more
+quotable.** #1805 dates the break to August 3 and calls it five weeks; the gate script did not exist
+until August 20, the path those consumers name existed only from August 26, and it stopped resolving
+on September 5 -- five DAYS before the measurement. August 3 belongs to a different move of the same
+folder. The defect is unchanged; its duration is out by a factor of seven, and the corrected timeline
+sits with the `git log` it comes off in `consumer-runner-lib.ps1`'s header.
 
 **The detector reaches a consumer whose checkout is present on the machine running it, which is the
 register's standing limit rather than a new one** -- an absent checkout is `[SKIP]`, as it is for every
