@@ -84,12 +84,31 @@
     the paste class.
 
     SO THE TWO AXES STAY TWO, AND EACH GAINED ITS PATH SHAPE RATHER THAN A WIDER RULE. Get-PasteableRef
-    -Kind Path reuses the allowlist unchanged (a theme path passes it) and changes only the noun its
-    note speaks in and the strip that renders the value there. Get-DisplayPath is a second display
-    function rather than a parameter on the first, because it must NOT collapse or trim -- a path may
-    legitimately carry a space where a ref may not. And Get-DisplayRef is the wrong answer for a
-    command at either axis: a stripped path would hand the reader a `git diff` aimed at a different file
-    than the one on screen.
+    -Kind Path changes the noun its note speaks in, the strip that renders the value there, and -- since
+    #1762 -- the pattern it is judged against. Get-DisplayPath is a second display function rather than a
+    parameter on the first, because it must NOT collapse or trim -- a path may legitimately carry a space
+    where a ref may not. And Get-DisplayRef is the wrong answer for a command at either axis: a stripped
+    path would hand the reader a `git diff` aimed at a different file than the one on screen.
+
+    THE PATH PATTERN IS ITS OWN, BECAUSE A REPO-RELATIVE PATH WAS THE ONLY KIND THE REF ALLOWLIST COULD
+    EXPRESS (issue #1762, September 10, 2026). $RefPasteSafePattern admits neither `:` nor `\`, so
+    -Kind Path refused every ABSOLUTE path outright -- and an absolute path is exactly what a lane, a
+    worktree or a scratch tree always is. The one -Kind Path caller that carries such a path today,
+    check-plugin-integrity.ps1's nested-worktree remedy (`git worktree remove <the absolute path>`),
+    therefore always printed the placeholder for the very path it exists to hand the reader; tidy-machine
+    and worktree-lane want the same and could not have it. The measured path was an ordinary lane
+    directory this workflow's own `worktree-lane.ps1` had just created.
+      WIDENING THE SHARED ALLOWLIST WAS THE WRONG REPAIR. `:` and `\` in $RefPasteSafePattern would also
+    widen what a REF may carry, which is the axis #1594 and #1617 narrowed on purpose. The two nouns want
+    two allowlists. $PathPasteSafePattern adds exactly the two characters an absolute path needs -- a
+    drive/scheme colon and a leading `/` for a POSIX root -- and NOTHING else: a space, `$`, a backtick, a
+    quote, `;`, `&`, `|` are refused here identically to the ref axis and fall through to the same note.
+      AND `\` IS ADMITTED ONLY AFTER IT IS FOLDED TO `/` (ConvertTo-PastePath). `\` is bash's escape
+    character, so a token carrying it (`git diff --no-index -- C:\a\b`) loses its separators in Git Bash
+    -- one of the three shells this lib's header commits to -- while surviving in PowerShell and cmd. `/`
+    is literal in all three and git accepts it on Windows, so the folded form is the one printed value
+    that is correct everywhere. The fold touches only the .Token; the refusal note still shows the path
+    the reader actually has, backslashes and all, so they can recognise it.
 
     WHAT THIS LIB DOES NOT DO. It is not the creation-side
     guard -- Test-BranchName in the repo-owned scripts\lib\branch-info.ps1 holds the same allowlist so a
@@ -104,6 +123,12 @@
 # The one definition of "safe to paste". Anchored at both ends, first character pinned to alphanumeric.
 $script:RefPasteSafePattern = '^[A-Za-z0-9][A-Za-z0-9._/-]*$'
 
+# The path variant (issue #1762). The ref pattern plus exactly the two characters an ABSOLUTE path
+# needs and a ref never has: a drive/scheme `:`, and a leading `/` for a POSIX root. `\` is NOT in it --
+# it is folded to `/` before the match (ConvertTo-PastePath). Everything the ref pattern refuses, this
+# refuses too. The reasoning is in this file's header block, under THE PATH PATTERN IS ITS OWN.
+$script:PathPasteSafePattern = '^[A-Za-z0-9/][A-Za-z0-9._/:-]*$'
+
 function Test-RefPasteSafe {
     <#
         Ref -- the ref name to judge.
@@ -116,6 +141,36 @@ function Test-RefPasteSafe {
 
     if ([string]::IsNullOrEmpty($Ref)) { return $false }
     return [bool]($Ref -match $script:RefPasteSafePattern)
+}
+
+function ConvertTo-PastePath {
+    <#
+        Path -- a filesystem path about to be judged for, or carried into, a printed command.
+
+        Returns it with every `\` folded to `/`. That is the whole transform, and it exists so ONE
+        printed form is correct in all three shells this lib's header commits to: `\` is bash's escape
+        character and `C:\a\b` loses its separators in Git Bash, while `/` is literal in bash, PowerShell
+        and cmd alike and git accepts it on Windows. An empty or null path is returned unchanged.
+    #>
+    param([AllowEmptyString()][AllowNull()][string]$Path)
+
+    if ([string]::IsNullOrEmpty($Path)) { return $Path }
+    return ($Path -replace '\\', '/')
+}
+
+function Test-PathPasteSafe {
+    <#
+        Path -- the filesystem path to judge.
+
+        Returns $true when the path -- after its backslashes are folded to forward slashes -- may be
+        interpolated into a printed command line as-is. Same contract as Test-RefPasteSafe: an empty or
+        null path is NOT safe. Differs from it only in admitting `:` and a leading `/`, the two things an
+        absolute path carries and a ref cannot (issue #1762).
+    #>
+    param([AllowEmptyString()][AllowNull()][string]$Path)
+
+    if ([string]::IsNullOrEmpty($Path)) { return $false }
+    return [bool]((ConvertTo-PastePath -Path $Path) -match $script:PathPasteSafePattern)
 }
 
 function Get-DisplayRef {
@@ -188,10 +243,11 @@ function Get-PasteableRef {
         Ref         -- the ref name a printed command wants to carry. Or, with -Kind Path, the file
                        path one wants to carry: the judgement is a property of the string, not of what
                        the string names.
-        Kind        -- 'Ref' (the default) or 'Path'. It selects the noun the refusal note speaks in
-                       and the strip that renders the value in it, and nothing else -- see the
-                       implementation note. A caller passing a path also wants -Placeholder, since
-                       '<branch>' would be the wrong hole to fill in.
+        Kind        -- 'Ref' (the default) or 'Path'. It selects the pattern the value is judged
+                       against ($PathPasteSafePattern also admits `:` and folds `\` to `/`, so an
+                       absolute path can pass -- issue #1762), the noun the refusal note speaks in, and
+                       the strip that renders the value in it. A caller passing a path also wants
+                       -Placeholder, since '<branch>' would be the wrong hole to fill in.
         Placeholder -- what to print in the command's place when the name is refused. Defaults to
                        '<branch>', the angle-bracket convention every other printed remedy in this
                        workflow already uses for "fill this in yourself" (see ship-pr's own
@@ -219,8 +275,14 @@ function Get-PasteableRef {
         [ValidateSet('Ref', 'Path')][string]$Kind = 'Ref'
     )
 
-    if (Test-RefPasteSafe -Ref $Ref) {
-        return [pscustomobject]@{ Token = $Ref; IsSafe = $true; Note = '' }
+    # THE JUDGEMENT, AND THE SAFE TOKEN, ARE BOTH PER-KIND (issue #1762). A ref is carried verbatim; a
+    # path is carried in its slash-folded form, because that is the one spelling correct in all three
+    # shells (see ConvertTo-PastePath). A repo-relative path has no backslash, so the fold is a no-op for
+    # every caller that passed one before this change.
+    $isSafe = if ($Kind -eq 'Path') { Test-PathPasteSafe -Path $Ref } else { Test-RefPasteSafe -Ref $Ref }
+    if ($isSafe) {
+        $token = if ($Kind -eq 'Path') { ConvertTo-PastePath -Path $Ref } else { $Ref }
+        return [pscustomobject]@{ Token = $token; IsSafe = $true; Note = '' }
     }
 
     # THE NAME IS SHOWN IN THE NOTE, and the empty case is spelled out rather than printing '' into a
@@ -252,17 +314,18 @@ function Get-PasteableRef {
     # The two answers differ because the questions do: an unreadable BRANCH is a caller that has lost
     # track of where it is standing, which its own wording covers; an unreadable PATH is one row of a
     # list whose other rows are fine, and it has to stay a row.
-    # WHICH NOUN THE REFUSAL SPEAKS IN, AND WHICH STRIP RENDERS THE VALUE (issue #1637). Everything
-    # above -- the allowlist, the placeholder, the reasoning about quotes -- is already right for a FILE
-    # PATH: a printed command does not care which kind of name it was handed, and a theme path
-    # ('assets/foo.js', 'sections/main-product.liquid', 'locales/en.default.json') passes the very
-    # pattern a branch name passes. Exactly two things differ, and carrying them on one parameter is why
-    # there is no near-copy of this function sitting beside it. The NOUN, because a note reading "the
-    # branch name is" about a path sends the reader looking for the wrong kind of thing. And the STRIP:
-    # a path is rendered by Get-DisplayPath, which does not collapse or trim, because this note is the
-    # only place the real path appears and the reader is being told to put it in the command themselves
-    # -- so a path reported with its doubled or trailing spaces removed would aim them at a different
-    # file. #1638 carries the full reasoning for that difference.
+    # WHAT -Kind CHANGES (issues #1637, #1638, #1762). The placeholder and the quotes reasoning are
+    # already right for a file path -- a printed command does not care which kind of name it was handed.
+    # Three things differ, and carrying them on one parameter is why there is no near-copy of this
+    # function sitting beside it. The PATTERN (#1762), because $RefPasteSafePattern has neither `:` nor
+    # `\`, so it can express only a REPO-RELATIVE path ('assets/foo.js') and refuses every absolute one --
+    # the kind a lane, a worktree or a scratch tree always is; $PathPasteSafePattern adds exactly those
+    # two, folding `\` to `/` first. The NOUN, because a note reading "the branch name is" about a path
+    # sends the reader looking for the wrong kind of thing. And the STRIP: a path is rendered by
+    # Get-DisplayPath, which does not collapse or trim, because this note is the only place the real path
+    # appears and the reader is being told to put it in the command themselves -- so a path reported with
+    # its doubled or trailing spaces removed would aim them at a different file. #1638 carries the full
+    # reasoning for that difference.
     $noun  = if ($Kind -eq 'Path') { 'file path' } else { 'branch name' }
     $shown = if ($Kind -eq 'Path') { Get-DisplayPath -Path $Ref } else { Get-DisplayRef -Ref $Ref }
     if (-not $shown) { $shown = '(this run could not read it)' }

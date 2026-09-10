@@ -511,12 +511,14 @@ foreach ($ok in @('assets/theme.js', 'sections/main-product.liquid', 'locales/en
 
 # --- the PASTE axis for a path: Get-PasteableRef -Kind Path (issue #1637) --------------------------
 Write-Host ''
-Write-Host 'Get-PasteableRef -Kind Path -- the same allowlist, a path-shaped refusal' -ForegroundColor Cyan
+Write-Host 'Get-PasteableRef -Kind Path -- a path-shaped allowlist and a path-shaped refusal' -ForegroundColor Cyan
 
-# THE ALLOWLIST NEEDED NO WIDENING, which is the argument for a parameter rather than a second function.
+# A REPO-RELATIVE THEME PATH STILL NEEDS NO WIDENING -- it passed the ref pattern and passes the path one
+# unchanged, and the fold is a no-op on it (there is no backslash). This is the case every -Kind Path
+# caller took before #1762, asserted so a pattern change cannot regress it.
 foreach ($ok in @('assets/theme.js', 'sections/main-product.liquid', 'locales/en.default.json', 'config/settings_schema.json')) {
     $v = Get-PasteableRef -Ref $ok -Placeholder '<path>' -Kind Path
-    Assert-True $v.IsSafe "an ordinary theme path passes the ref allowlist unchanged: '$ok'"
+    Assert-True $v.IsSafe "an ordinary theme path passes: '$ok'"
     Assert-Equal $ok $v.Token '...and is carried into the command as itself'
     Assert-Equal '' $v.Note '...with no note, because there is nothing to explain'
 }
@@ -563,6 +565,50 @@ foreach ($esc in @("assets/a$([char]0x1B)[31mb.js", "assets/a$([char]0x202E)b.js
 $invisiblePath = Get-PasteableRef -Ref ([char]0x200B + [char]0x200D) -Placeholder '<path>' -Kind Path
 Assert-Equal '<path>' $invisiblePath.Token 'a path made entirely of format characters is not paste-safe either'
 Assert-True ($invisiblePath.Note -like '*(no printable path)*') 'and its note names that state rather than reading "could not read it"'
+
+# --- the absolute path: -Kind Path admits `:` and folds `\` (issue #1762) -------------------------
+Write-Host ''
+Write-Host 'Get-PasteableRef -Kind Path -- an absolute path can now pass (#1762)' -ForegroundColor Cyan
+
+# THE CASE THE FUNCTION WAS ADDED FOR AND COULD NOT DO: an absolute path. A lane, a worktree and a
+# scratch tree are always absolute; the ref pattern has neither `:` nor `\`, so every one of these was
+# refused before #1762.
+$lane = 'C:\Users\davek\GitHub\claude-code-specialists-lanes\fix--branch-doc-per-branch-path-v1'
+$v = Get-PasteableRef -Ref $lane -Placeholder '<path>' -Kind Path
+Assert-True $v.IsSafe 'an absolute Windows lane path is paste-safe'
+Assert-Equal 'C:/Users/davek/GitHub/claude-code-specialists-lanes/fix--branch-doc-per-branch-path-v1' $v.Token '...carried in its slash-folded form -- the one spelling correct in bash, PowerShell and cmd'
+Assert-Equal '' $v.Note '...with no note'
+
+# ALREADY-FORWARD-SLASH, POSIX ROOT, AND A UNC PATH: the three other absolute shapes, all safe.
+Assert-True (Get-PasteableRef -Ref 'C:/Users/davek/lanes/x' -Kind Path).IsSafe 'an absolute path that already uses forward slashes passes'
+Assert-Equal 'C:/Users/davek/lanes/x' (Get-PasteableRef -Ref 'C:/Users/davek/lanes/x' -Kind Path).Token '...unchanged, because the fold is a no-op on it'
+Assert-True (Get-PasteableRef -Ref '/home/dave/worktrees/fix-x' -Kind Path).IsSafe 'a POSIX absolute path passes on its leading /'
+Assert-Equal '//server/share/lanes/x' (Get-PasteableRef -Ref '\\server\share\lanes\x' -Kind Path).Token 'a UNC path folds to a doubled leading slash and passes'
+
+# THE FOLD DOES NOT RESCUE A DANGEROUS CHARACTER. Everything the ref pattern refuses, the path pattern
+# refuses too -- the two new characters are the only difference.
+foreach ($bad in @('C:\a\b$(id -un).js', 'C:\Program Files\a b\x', "C:\a\it's.js", 'C:\a\b;touch.js', 'C:\a\b`id`.js')) {
+    $r = Get-PasteableRef -Ref $bad -Placeholder '<path>' -Kind Path
+    Assert-True (-not $r.IsSafe) "an absolute path carrying a shell metacharacter or space is still refused: '$bad'"
+    Assert-Equal '<path>' $r.Token "...and the placeholder reaches the command: '$bad'"
+    Assert-True ($r.Note.Contains($bad)) "...while the note shows the path the reader actually has, backslashes and all: '$bad'"
+}
+
+# THE REF AXIS IS UNTOUCHED -- #1594 and #1617 narrowed it on purpose, and neither new character leaks
+# across. This is the whole reason the path pattern is its own and the shared one was not widened.
+Assert-True (-not (Get-PasteableRef -Ref 'fix/a:b').IsSafe)  'a ref carrying `:` is still refused on the default axis'
+Assert-True (-not (Get-PasteableRef -Ref 'fix/a\b').IsSafe)  'a ref carrying `\` is still refused on the default axis'
+Assert-Equal '<branch>' (Get-PasteableRef -Ref 'fix/a\b').Token '...and the branch placeholder is what reaches the command'
+
+# ConvertTo-PastePath and Test-PathPasteSafe on their own.
+Assert-Equal 'a/b/c'   (ConvertTo-PastePath -Path 'a\b\c')  'ConvertTo-PastePath folds every backslash'
+Assert-Equal 'a/b/c'   (ConvertTo-PastePath -Path 'a/b/c')  '...and leaves forward slashes alone'
+Assert-Equal ''        (ConvertTo-PastePath -Path '')       'an empty path folds to empty'
+Assert-Equal ''        (ConvertTo-PastePath -Path $null)    'a null path is the empty path'
+Assert-True  (Test-PathPasteSafe -Path 'C:\Users\davek\lanes\x') 'Test-PathPasteSafe accepts an absolute Windows path'
+Assert-True  (-not (Test-PathPasteSafe -Path 'C:\Users\Ada Lovelace\x')) '...and refuses one with a space in it'
+Assert-True  (-not (Test-PathPasteSafe -Path '')) 'an empty path is not paste-safe'
+Assert-True  (-not (Test-PathPasteSafe -Path $null)) 'a null path is not paste-safe'
 
 # --- the four sync-main sites the two issues measured ---------------------------------------------
 Write-Host ''
