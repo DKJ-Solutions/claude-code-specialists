@@ -78,14 +78,17 @@ wrong.
 
 The proposed line-count gate from #1784 is **declined on measurement**, and the measurement is recorded
 where the gate's other declined rules live. Extending check 16 (`[measured-figure]`) to line counts
-produces 16 findings tree-wide of which exactly **1** is a real defect: six sites are deliberate
+produces 16 findings across the trunk of which exactly **1** is a real defect: six sites are deliberate
 historical records where the figure is the point, four are deltas rather than lengths, one is a section
-rather than a file, two describe another repo's files, and one is a pairing failure whose victim is the
-best-behaved figure in the tree -- a comment that states its own `wc -l`. That figure also went stale by
-a line during this branch's own eight-commit fast-forward, which is why a tolerance band is mandatory and
-why a line count is something a reader re-runs rather than something a gate pins. Check 16's unit list
-stays byte-shaped, deliberately, and the writing rule that does hold this class already exists in Tessa's
-portable manual. The one real defect the measurement found is repaired.
+rather than a file, two describe another repo's files, one is history that already carries the binding
+check 16 asks for, and one is a pairing failure whose victim is the best-behaved figure in the tree -- a
+comment that states its own `wc -l`. That figure went stale by a line during this branch's own
+eight-commit fast-forward, which is why a tolerance band is mandatory and why a line count is something a
+reader re-runs rather than something a gate pins. And writing this decline up, with each instance cited
+verbatim as a measurement here must be, took the same rule from 16 findings to 26 -- so it penalises
+measuring and recording the result, which is what the gate's other rules exist to encourage. Check 16's
+unit list stays byte-shaped, deliberately, and the writing rule that does hold this class already exists
+in Tessa's portable manual. The one real defect the measurement found is repaired.
 
 **Score:** 2
 
