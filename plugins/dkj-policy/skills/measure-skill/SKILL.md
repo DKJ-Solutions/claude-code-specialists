@@ -76,6 +76,21 @@ printed `Always-on` total within tolerance, and every skill the component invent
 produced a row. Either failing is an `[ERROR]` and **no table is printed for that plugin** — a
 plausible wrong number is worse than a refusal.
 
+**Failing loudly is only a virtue where the failure is real**, and this refused two of six enabled
+plugins over output that was entirely intact ([#1771](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1771)).
+The CLI prints **no per-component table at all** for a plugin whose inventory declares no skills and no
+agents — there is nothing to tabulate, and `Always-on: ~0 tok` corroborates it. So an empty table is
+judged against that inventory rather than on its own: no rows **and** something owed is still the
+`[ERROR]`, no rows and nothing owed is an `[INFO]` naming why, and an inventory that could not be read at
+all stays the `[ERROR]` the check was written for.
+
+**And it says what the figures do NOT cover.** The inventory's `Agents (N)` counts only defs found by
+convention in a plugin's default `agents/` directory. A def named by the manifest's `agents` key **loads
+in a session** and is counted as **0** — measured with a two-plugin control against Claude Code 2.1.267 —
+so for such a plugin every always-on figure here, its printed total included, is **skills only**. The
+report states that rather than letting a 100% share imply the skills are the whole cost, and rather than
+letting `Agents (0)` read as *ships none*: that second misreading is what #1771 was filed on.
+
 Two notations share one table and both are handled: `~3.031` is **3031** (the dot is a thousands
 separator) while `~1.3k` is **1300**. A parser that read the first as 3.031 would under-report by a
 factor of a thousand and still look entirely plausible, which is why the sum check exists.

@@ -100,19 +100,27 @@ function Expand-ListArgument {
 
 function Read-PluginDetailsOutput {
     <#
-        Parses the output of `claude plugin details <id>` into the four things a measurement needs:
-        the version, the printed Always-on total, the skills the component inventory names, and one row
-        per component. Takes LINES rather than running the command, so it can be pinned by a suite
-        against captured output.
+        Parses the output of `claude plugin details <id>` into the five things a measurement needs:
+        the version, the printed Always-on total, the component inventory's own COUNTS, the skills that
+        inventory names, and one row per component. Takes LINES rather than running the command, so it
+        can be pinned by a suite against captured output.
 
-        Returns a pscustomobject: Version, AlwaysOnTotal, InventorySkills, Rows (Component, AlwaysOn,
-        OnInvoke). Anything it could not find is $null or an empty array -- judging that is
-        Get-PluginDetailsParseProblems' job, not this function's.
+        Returns a pscustomobject: Version, AlwaysOnTotal, InventoryCounts, RowProducingCount,
+        InventorySkills, Rows (Component, AlwaysOn, OnInvoke). Anything it could not find is $null or an
+        empty array -- judging that is Get-PluginDetailsParseProblems' job, not this function's.
+
+        THE COUNTS ARE READ BECAUSE AN EMPTY TABLE HAS TWO CAUSES, and they are opposite facts. The CLI
+        prints no per-component table at all for a plugin whose inventory is all zeroes -- there is
+        nothing to tabulate -- and it prints none if the format moves under this parser. Only the
+        inventory itself can tell those apart, so it is parsed rather than inferred. RowProducingCount is
+        skills plus agents: hooks are marked harness-only and MCP/LSP servers carry no model context, so
+        neither of those produces a row.
     #>
     param([string[]]$Lines)
 
     $version         = $null
     $alwaysOnTotal   = $null
+    $inventoryCounts = [ordered]@{}
     $inventorySkills = @()
     $rows            = @()
     $inTable         = $false
@@ -123,6 +131,16 @@ function Read-PluginDetailsOutput {
         # The header line ends in the version: '... (dkj-subagents-alpha) 4.17.0'. First match only, so a
         # version-looking string further down cannot overwrite it.
         if ($null -eq $version -and $line -match '\s(\d+\.\d+\.\d+)\s*$') { $version = $Matches[1] }
+
+        # Every inventory line, by name and count -- 'Skills (4)', 'Agents (0)', 'MCP servers (0)'. The
+        # count is what the CLI BELIEVES it has, which is the only thing that says whether a table was
+        # owed at all. Deliberately not matched against a fixed list of component kinds: a kind this
+        # parser has never heard of is still counted, so a new one cannot make an owed table look unowed.
+        # The name class excludes ':', which is what keeps the Description line (its own text may carry
+        # '(3)') from being read as a component.
+        if ($line -match '^\s{2,}([A-Za-z][A-Za-z ]*?)\s*\((\d+)\)\s*(?:\s\S.*)?$') {
+            $inventoryCounts[$Matches[1]] = [int]$Matches[2]
+        }
 
         if ($line -match '^\s*Skills\s*\(\d+\)\s+(.+)$') {
             $inventorySkills = @($Matches[1] -split ',' |
@@ -148,11 +166,24 @@ function Read-PluginDetailsOutput {
         }
     }
 
+    # $null, not 0, where no inventory line was read at all: 'no table was owed' and 'the format moved
+    # under the parser' must not collapse into one value -- the same three-state lesson claim-issue's
+    # read-back learned in #1628, where one boolean carried two opposite facts and printed the wrong one.
+    $rowProducing = $null
+    if ($inventoryCounts.Count -gt 0) {
+        $rowProducing = 0
+        foreach ($kind in @('Skills', 'Agents')) {
+            if ($inventoryCounts.Contains($kind)) { $rowProducing += [int]$inventoryCounts[$kind] }
+        }
+    }
+
     return [pscustomobject]@{
-        Version         = $version
-        AlwaysOnTotal   = $alwaysOnTotal
-        InventorySkills = $inventorySkills
-        Rows            = $rows
+        Version           = $version
+        AlwaysOnTotal     = $alwaysOnTotal
+        InventoryCounts   = $inventoryCounts
+        RowProducingCount = $rowProducing
+        InventorySkills   = $inventorySkills
+        Rows              = $rows
     }
 }
 
@@ -171,6 +202,15 @@ function Get-PluginDetailsParseProblems {
         Returns the problems as strings; an empty array means the parse can be trusted. Reporting and
         refusing belong to the caller.
 
+        AN EMPTY TABLE IS ONLY A PROBLEM WHERE THE INVENTORY SAYS ONE WAS OWED. The CLI prints no
+        per-component table for a plugin whose inventory declares no skills and no agents -- there is
+        nothing to tabulate, and 'Always-on: ~0 tok' corroborates it. Reading that as a format change was
+        a FALSE refusal on exactly the plugins that ship subagents and no skills (#1771): two of this
+        repo's six enabled plugins reported '[ERROR] ... did not parse as expected', with the CLI's
+        format entirely intact. So the emptiness is judged against RowProducingCount, and where the
+        inventory could not be read at all ($null) the old refusal stands -- an unreadable inventory is
+        the format change this check exists for.
+
         THE TOLERANCE IS NOT SLACK. Every printed figure is rounded to two significant figures, so the
         sum CANNOT equal the total: measured on this repo, 19 rows summing to 3,010 against a printed
         3,031. 5% of the total with a floor of 100 covers that rounding across a plugin of any size and
@@ -179,7 +219,16 @@ function Get-PluginDetailsParseProblems {
     param([Parameter(Mandatory = $true)]$Details)
 
     $problems = @()
-    if (@($Details.Rows).Count -eq 0) { $problems += 'the per-component table produced no rows' }
+    if (@($Details.Rows).Count -eq 0) {
+        $owed = $Details.RowProducingCount
+        if ($null -eq $owed) {
+            $problems += ('the per-component table produced no rows, and the component inventory could ' +
+                'not be read either, so nothing says whether a table was owed')
+        } elseif ($owed -gt 0) {
+            $problems += ("the per-component table produced no rows, while the component inventory " +
+                "declares $owed skill(s)/agent(s) that each owe one")
+        }
+    }
     if ($null -eq $Details.AlwaysOnTotal) { $problems += 'no Always-on total was found' }
 
     if (@($Details.Rows).Count -gt 0 -and $null -ne $Details.AlwaysOnTotal) {

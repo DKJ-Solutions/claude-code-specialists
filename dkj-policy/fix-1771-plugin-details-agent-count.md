@@ -36,19 +36,71 @@
 
 ### PLAN
 
+#1771 reported that the manifest's `agents` key registers nothing and asked for `subagents/` to be
+renamed back to `agents/` across 44 occurrences, the key dropped, and check 38 changed to refuse the key
+outright. Verifying the *reason* rather than the symptom overturned it: the key is honoured by the loader
+and honoured exclusively, so none of that was built. What #1771 actually found is a defect in the
+instrument it measured with, and that is this branch.
+
+#### The control that settled it
+
+A throwaway local marketplace, one plugin, two agent defs in one non-default directory with only
+**one** of them named in the `agents` key — installed into a scratch project and read back from a real
+session with `claude -p`:
+
+| def | in the key | `claude plugin details` | a real session |
+|---|---|---|---|
+| `zebrafish` | yes | not counted | **present** |
+| `quokka` | no, same directory | not counted | absent |
+
+The rig was removed and its marketplace entry unregistered in the same run.
+
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [x] `measure-skill-lib.ps1`: `Read-PluginDetailsOutput` reads the component inventory's own COUNTS
+      (`InventoryCounts`, `RowProducingCount`), and `Get-PluginDetailsParseProblems` judges an empty table
+      against them — three states, with `$null` for an inventory that could not be read at all
+- [x] `measure-skill.ps1`: an inventory declaring nothing tabulatable is an `[INFO]` naming why instead of
+      an `[ERROR]`; a plugin whose agents go uncounted gets the caveat, and its ≥100% share note no longer
+      claims the skills are the plugin's whole cost
+- [x] both mirrored into `plugins/dkj-policy/scripts/` for the drift lint
+- [x] check 38's header records the loading measurement and the DECLINED proposal to refuse the key
+- [x] the lesson written into Nolan #25's lens (the measurement) and Sylvester #15's lens (the declined
+      gate change), and the `measure-skill` skill page
 
 ### TEST
 
+- [x] `measure-skill.tests.ps1`: 15 asserts added — the inventory counts, the `$null` third state, the
+      `(3)`-in-a-description trap, the agents-only fixture that must NOT be a problem, and the
+      table-stripped mirror case that must stay one. 77 pass, 0 fail
+- [x] `measure-skill.ps1` over all six enabled plugins: 0 errors, where it reported 2 before
+- [x] the full lint + test gate via `open-pr`
+
 ### DEPLOY: fix/1771-plugin-details-agent-count
 
-**Score:**
+`measure-skill` no longer refuses a plugin that ships only subagents. `claude plugin details` prints no
+per-component table for a plugin whose inventory is all zeroes, and reading that as a CLI format change
+put an `[ERROR]` on two of this repo's six enabled plugins — `dkj-subagents-ecomm` and
+`dkj-subagents-lifehub` — over output that was entirely intact. The emptiness is now judged against the
+inventory's own counts, so nothing owed is an `[INFO]` naming why, something owed is still an `[ERROR]`,
+and an unreadable inventory stays the `[ERROR]` the check exists for.
+
+It also says what its figures do not cover. The inventory's `Agents (N)` counts only defs discovered by
+convention in a plugin's default `agents/` directory; a def named by the manifest's `agents` key loads in
+a session and is counted as 0. Every always-on figure for such a plugin is therefore skills only, which
+made the report read as *"the skill descriptions account for effectively ALL of this plugin's always-on
+cost"* over `dkj-subagents-alpha`, whose 15 uncounted agent descriptions are roughly three times the
+figure printed. Both readings are now stated in the output — including that `Agents (0)` means *not
+counted here*, never *ships none*, which is the misreading #1771 was filed on.
+
+**Score:** 3
 
 #### What makes this deploy extra special
 
-**Score:**
+N/A — the tool measures what a plugin costs a session; it ships to no subscriber and changes nothing a
+consumer's own repo does.
+
+**Score:** N/A
 
 #### Pull Request
 

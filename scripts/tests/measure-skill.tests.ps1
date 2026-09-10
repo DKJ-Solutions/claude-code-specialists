@@ -209,6 +209,102 @@ Assert-True ((Get-PluginDetailsParseProblems -Details $emptyParsed).Count -ge 2)
     'no output at all yields both problems (no rows, no total) rather than a clean pass'
 
 Write-Host ''
+Write-Host '== The inventory COUNTS -- what says whether a table was owed ==' -ForegroundColor Cyan
+
+Assert-Equal 4  $parsed.InventoryCounts['Skills']      "the inventory's own count is read, not just the names"
+Assert-Equal 15 $parsed.InventoryCounts['Agents']      'and the agent count with it'
+Assert-Equal 1  $parsed.InventoryCounts['Hooks']       'hooks are counted too, though they produce no row'
+Assert-Equal 0  $parsed.InventoryCounts['MCP servers'] 'a two-word component name is read whole'
+Assert-Equal 19 $parsed.RowProducingCount `
+    'RowProducingCount is skills plus agents -- the 19 rows this table actually has'
+
+Assert-True (-not $parsed.InventoryCounts.Contains('Description')) `
+    'the Description line is not a component, even where its own text carries a (3)'
+$descParsed = Read-PluginDetailsOutput -Lines @(
+    '  Description: Add-on team for webshop repos (any platform): Sergio (3) and others.',
+    '  Skills (0)',
+    '  Agents (0)'
+)
+Assert-Equal 0 $descParsed.RowProducingCount 'a (3) inside the description does not become a component count'
+
+Assert-True ($null -eq $emptyParsed.RowProducingCount) `
+    'no inventory line read at all is $null, NOT 0 -- "nothing was owed" and "the format moved" are opposite facts'
+
+Write-Host ''
+Write-Host '== An empty table: owed vs. not owed (#1771) ==' -ForegroundColor Cyan
+
+# THE REGRESSION. Real v4.33.0 output for a plugin that ships THREE subagents by path and no skills: the
+# CLI prints no per-component table at all, and reported that as '[ERROR] ... did not parse as expected'
+# for two of six enabled plugins while its format was entirely intact.
+$script:AgentsOnlyFixture = @(
+    'Claude Specialists - team e-commerce (subagent scaffold) (dkj-subagents-ecomm) 4.33.0',
+    '  Description: Add-on team for commercial webshop repos (any platform): Sergio, Craig, Sean.',
+    '  Source: dkj-subagents-ecomm@claude-code-specialists',
+    '',
+    'Component inventory',
+    '  Skills (0)',
+    '  Agents (0)',
+    '  Hooks (0)',
+    '  MCP servers (0)',
+    '  LSP servers (0)',
+    '',
+    'Projected token cost',
+    '  Always-on:   ~0 tok   added to every session'
+)
+
+$agentsOnly = Read-PluginDetailsOutput -Lines $script:AgentsOnlyFixture
+Assert-Equal '4.33.0' $agentsOnly.Version 'the version still comes off the header'
+Assert-Equal 0 $agentsOnly.AlwaysOnTotal  "'~0 tok' is 0, and 0 is a real total rather than a missing one"
+Assert-Equal 0 @($agentsOnly.Rows).Count  'there is no per-component table to read'
+Assert-Equal 0 $agentsOnly.RowProducingCount 'and the inventory says none was owed'
+Assert-Equal 0 (Get-PluginDetailsParseProblems -Details $agentsOnly).Count `
+    'an inventory that declares nothing tabulatable is NOT a parse problem -- the refusal in #1771'
+
+# The mirror case, which must stay an error: the table is gone while the inventory still owes 19 rows.
+$tableStripped = @()
+foreach ($line in $script:Fixture) {
+    if ($line -match '^\s*component\s+always-on') { break }
+    $tableStripped += $line
+}
+$strippedParsed = Read-PluginDetailsOutput -Lines $tableStripped
+$strippedProblems = @(Get-PluginDetailsParseProblems -Details $strippedParsed)
+Assert-True ($strippedProblems.Count -ge 1) `
+    'a table that vanished while the inventory declares 19 row-owing components is still a problem'
+Assert-True ((($strippedProblems -join ' ') -match '19')) `
+    'and the problem names how many rows were owed, so the reader can tell it from an empty inventory'
+
+# Alpha at v4.33.0: skills counted, agents declared by path and counted as 0. The table is owed and
+# present, so nothing here is a problem -- the caveat about what the total omits is the script's half.
+$script:KeyedFixture = @(
+    'Claude Specialists - team alpha (the core team) (dkj-subagents-alpha) 4.33.0',
+    '  Source: dkj-subagents-alpha@claude-code-specialists',
+    '',
+    'Component inventory',
+    '  Skills (4)  orchestrator, specialists-init, specialists-teardown, sync-roster',
+    '  Agents (0)',
+    '  Hooks (1)  SessionStart  (harness-only - no model context cost)',
+    '',
+    'Projected token cost',
+    '  Always-on:   ~819 tok   added to every session',
+    '',
+    'Per-component (rounded)',
+    '  component             always-on  on-invoke',
+    '  specialists-init           ~220     ~17.1k',
+    '  orchestrator               ~220      ~2.6k',
+    '  specialists-teardown       ~210     ~12.6k',
+    '  sync-roster                ~170      ~2.6k',
+    '',
+    '  On-invoke cost is paid each time a skill or agent fires.'
+)
+$keyed = Read-PluginDetailsOutput -Lines $script:KeyedFixture
+Assert-Equal 4 $keyed.RowProducingCount 'four skills owe four rows; the 15 key-declared agents owe none here'
+Assert-Equal 4 @($keyed.Rows).Count     'and four rows came back'
+Assert-Equal 0 $keyed.InventoryCounts['Agents'] `
+    "'Agents (0)' is read as 0 -- what the CLI believes, which is what the table expectation must follow"
+Assert-Equal 0 (Get-PluginDetailsParseProblems -Details $keyed).Count `
+    'a plugin whose agents go uncounted parses cleanly'
+
+Write-Host ''
 Write-Host '== The registry safety invariants for pass 2 ==' -ForegroundColor Cyan
 
 $pairs = @(Get-SharedScriptPairs -RepoRoot $RepoRoot)

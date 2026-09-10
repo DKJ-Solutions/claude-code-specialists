@@ -2491,6 +2491,60 @@ fixture run invokes a copy of this script inside the fixture, and that copy carr
 valid span always exists there. Both are written into the check's own header, because an unstated gap
 reads as coverage.
 
+#### Check 38 was proposed for removal, and the proposal was DECLINED on a measurement (September 10, 2026, [#1771](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1771))
+
+**The report asked for the opposite of what the gate does, and was wrong on its central claim.** #1771
+concluded that the manifest's `agents` key *"registers nothing, in every form the validator passes"*, that
+the four team plugins therefore ship no specialists at all, that `subagents/` must be renamed back to
+`agents/` across 44 occurrences with the key dropped, and that check 38 should additionally **refuse the
+key existing at all**. Its evidence was `claude plugin details` reporting `Agents (0)` for each of the
+four, reproduced against a two-plugin control.
+
+**That measurement is real and it answers a different question.** `plugin details` reports what its own
+inventory counts, and the inventory counts only defs found by convention in a plugin's default `agents/`
+directory. What it cannot tell you is what a **session** loads — and the session filing the report had
+all 26 subagents in its own agent list, from these four plugins, out of `subagents/`, named by the key.
+Nothing in the report's evidence contradicted that, because none of it looked there.
+
+**The control that settles it, and the shape worth reusing.** A throwaway local marketplace, one plugin,
+two agent defs in a non-default directory, only **one** of them named in the `agents` key — installed into
+a scratch project and asked, through `claude -p`, which `subagent_type` values a real session has:
+
+| def | in the `agents` key | `plugin details` | a real session |
+|---|---|---|---|
+| `zebrafish` | yes | not counted | **present** |
+| `quokka` | no, same directory | not counted | absent |
+
+So the key **is** honoured by the loader, and honoured **exclusively** — which is the very sentence
+check 38's completeness rule already states (*"once the key is present it REPLACES convention discovery,
+so the list is the only way in"*), inferred from the validator in #1764 and now measured against the
+loader. Refusing the key would have forbidden the mechanism that works and un-guarded the one that
+does not. The rename was not built, and #1764's repair 1 stays declined.
+
+**What DID need repairing was the instrument, and it had gone red without anyone reading it.**
+`measure-skill.ps1` refused two of the six enabled plugins with *"the output of `claude plugin details`
+did not parse as expected"* — `-ecomm` and `-lifehub`, the two that ship only agents — because the CLI
+prints no per-component table at all for a plugin whose inventory is all zeroes, and an empty table was
+read as a format change. The emptiness is now judged against the inventory's own counts: nothing owed is
+an `[INFO]` naming why, something owed is still the `[ERROR]`, and an inventory that could not be read
+**stays** the `[ERROR]` this check exists for — the three-state lesson `claim-issue`'s read-back learned
+in [#1628](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1628), where one boolean
+carried two opposite facts and printed the wrong one. The report's own second half is why it matters that
+the tool was believed: `Agents (0)` was read as *ships none*, and a share computed over a skills-only
+total was reading as *the skills are effectively all of this plugin's cost* while ~2,260 tokens of agent
+descriptions sat outside it. Both are now stated in the output;
+[Nolan's lens](06-25-extension.md#how-to-measure-it--claude-plugin-details-july-28-2026) carries the
+measurement half.
+
+**The transferable lesson is the one this repo's constitution already states** — *a reported finding's
+reason is verified before it is repaired, not just its symptom.* #1771's symptom reproduced exactly, on
+the first command; the reason behind it did not survive the second one. Had the reason been taken at its
+word, the repair would have moved 44 occurrences, reversed a rename decided the day before, and turned a
+working guard into one that refuses the working configuration — a change that satisfies the report, is
+wrong, and now carries a citation. The report's own author named the hazard in its last section and did
+not apply it to itself: *"that choice was made on my measurement of what the validator accepts, and I did
+not measure whether an accepted form loads."* The measurement missing at the top was the same one.
+
 In short: the **how** (managing the harness, scripts, config, safety guards) is portable; the **what**
 (the plugin lint + drift lint, `branch-info.ps1`, `.claude/settings.json` with the github source, and
 the marketplace/plugin manifests) belongs to this repo.
