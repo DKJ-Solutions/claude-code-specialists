@@ -43,7 +43,52 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**6 / 22 minor entries** <!-- pending-tally -->
+**7 / 23 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1802-retired-id-hides-install-verdict · 20260910-145059
+
+A retired plugin name no longer hides the one thing the connector check can say that nothing else can:
+that a consumer's checkout is loading none of a plugin its own settings enable. Until now a retired id
+skipped that check along with the two that genuinely cannot run without a plugin source folder, so the
+consumers worst affected -- the ones enabling nothing but retired names -- were the ones the register
+reported as fine. The install-record question is now asked on that path too, and it hands over the
+migration rather than `claude plugin install`, which cannot repair an id the catalogue no longer
+declares. Alongside it, `plugin-versions.ps1` stops filing "enabled here, installed nowhere" under the
+same quiet marker as a stale cache: it is the only undetermined verdict that closes with a command, so
+in `-Brief` it is now an `[ERROR]`.
+
+Promoting that verdict exposed two things the review chain caught and this branch also repairs. An
+install administration that exists but does not parse yields no records, which is not the same fact as
+holding none -- so a corrupt file was being diagnosed as "not installed" and offered an install as the
+remedy, and this change would have made that wrong answer the loudest marker the tool has. It now stays
+undetermined, names the unreadable file, and points at the check that owns it. And the install command
+that verdict hands over is withheld for an id that is not a valid slug on both halves: an
+`enabledPlugins` key is arbitrary text from a settings file, `Format-SafeProseToken` deliberately keeps
+the punctuation a shell reads, and until now only the far rarer `behind` verdict put such a line in
+front of a reader. The remaining eighteen sites that interpolate that same value are #1803.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+A consumer whose plugin is enabled but not installed for that checkout loads none of it -- no skills,
+no subagents, no hooks -- and cannot report that itself, because the hook that would is inside the
+plugin that is not loading. That state now reaches the session start as an `[ERROR]` instead of an
+`[INFO]`, and a consumer still on retired plugin names is told that re-installing under the old id
+cannot work and that the migration is the way out. Consumers already in good standing see no new
+noise: the finding requires a missing record, and a present one keeps it silent.
+
+**Score:** 3
+
+#### Pull Request
+
+A retired plugin id no longer hides that a consumer loads nothing
+
+Plugins: dkj-policy
+
+[PR #1804](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1804)
+
+---
 
 ### DEPLOY: fix/1796-fold-push-race-stand-down · 20260910-125423
 
