@@ -253,13 +253,21 @@ constant belongs in the namespace — which `dkj-` and `@dkj-claude-plugins` alr
 # 1. Refresh -- do this first, every time
 claude plugin marketplace update claude-code-specialists
 
-# 2. Uninstall the retired ids -- skip whichever you never enabled
+# 2. Uninstall the retired ids -- skip whichever you never enabled.
+#    Keep the OLD @claude-code-specialists spelling: uninstall resolves against your
+#    install record, which still holds it, not against the catalogue.
 claude plugin uninstall dkj-team-alpha@claude-code-specialists --scope project
 claude plugin uninstall dkj-team-ecomm@claude-code-specialists --scope project
 claude plugin uninstall dkj-team-lifehub@claude-code-specialists --scope project
 claude plugin uninstall dkj-team-shopify@claude-code-specialists --scope project
 
-# 3. Refresh again, then install the new ids -- only the ones you had
+# 3. Re-register the marketplace under its new name -- the marketplace itself was
+#    renamed on the flag day, so your machine must drop the old registration and add
+#    the new one. A plain refresh cannot do this: the name is part of the id.
+claude plugin marketplace remove claude-code-specialists
+claude plugin marketplace add DKJ-Solutions/dkj-claude-plugins --scope project
+
+# 4. Refresh the new marketplace, then install the new ids -- only the ones you had
 claude plugin marketplace update dkj-claude-plugins
 claude plugin install dkj-subagents-alpha@dkj-claude-plugins --scope project
 claude plugin install dkj-subagents-ecomm@dkj-claude-plugins --scope project
@@ -267,13 +275,14 @@ claude plugin install dkj-subagents-lifehub@dkj-claude-plugins --scope project
 claude plugin install dkj-subagents-shopify@dkj-claude-plugins --scope project
 ```
 
-**4. Restart your Claude Code session.**
+**5. Restart your Claude Code session.**
 
 `--scope project` is not optional here any more than it is anywhere else on this page. Expect the
-uninstalls and the installs to rewrite `.claude/settings.json` on the way, the same rewriting behaviour
-[documented above](#connecting--the-install-step): the four `dkj-team-*` `enabledPlugins` entries come
-out, the four `dkj-subagents-*` ones go in, and any diff beyond that is formatting. **That file is the
-CLI's to edit, so it is not on the list below** — the list is what the CLI leaves for you.
+uninstalls, the `marketplace add`, and the installs to rewrite `.claude/settings.json` on the way, the
+same rewriting behaviour [documented above](#connecting--the-install-step): the four `dkj-team-*`
+`enabledPlugins` entries come out, the four `dkj-subagents-*` ones go in, the marketplace source key is
+repointed at `dkj-claude-plugins`, and any diff beyond that is formatting. **That file is the CLI's to
+edit, so it is not on the list below** — the list is what the CLI leaves for you.
 
 ### The two things inside your repo that the id swap does not fix
 
@@ -331,18 +340,26 @@ two repos it binds. Nothing about the precedence rule changed; the names now say
 # 1. Refresh -- do this first, every time
 claude plugin marketplace update claude-code-specialists
 
-# 2. Uninstall the retired ids -- skip whichever you never enabled
+# 2. Uninstall the retired ids -- skip whichever you never enabled.
+#    Keep the OLD @claude-code-specialists spelling: uninstall resolves against your
+#    install record, which still holds it, not against the catalogue.
 claude plugin uninstall contributing-davekjohn@claude-code-specialists --scope project
 claude plugin uninstall bwj-codex@claude-code-specialists --scope project
 
-# 3. Refresh again, then install the new ids
+# 3. Re-register the marketplace under its new name -- the marketplace itself was
+#    renamed on the flag day, so your machine must drop the old registration and add
+#    the new one. A plain refresh cannot do this: the name is part of the id.
+claude plugin marketplace remove claude-code-specialists
+claude plugin marketplace add DKJ-Solutions/dkj-claude-plugins --scope project
+
+# 4. Refresh the new marketplace, then install the new ids
 claude plugin marketplace update dkj-claude-plugins
 claude plugin install dkj-policy@dkj-claude-plugins --scope project
 # Only BWJ's two store repos need the second one:
 claude plugin install dkj-policy-bwj@dkj-claude-plugins --scope project
 ```
 
-**4. Restart your Claude Code session.**
+**5. Restart your Claude Code session.**
 
 ### Your folder, and what happens if you do not rename it
 
@@ -463,7 +480,9 @@ replacement plus the one workflow you decided on above, then restart.
 # 1. Refresh -- do this first, every time
 claude plugin marketplace update claude-code-specialists
 
-# 2. Uninstall every old id you had enabled -- skip whichever you never enabled
+# 2. Uninstall every old id you had enabled -- skip whichever you never enabled.
+#    Keep the OLD @claude-code-specialists spelling: uninstall resolves against your
+#    install record, which still holds it, not against the catalogue.
 claude plugin uninstall specialists@claude-code-specialists --scope project
 claude plugin uninstall specialists-lifehub@claude-code-specialists --scope project
 claude plugin uninstall specialists-shopify@claude-code-specialists --scope project
@@ -472,28 +491,35 @@ claude plugin uninstall specialists-workflow-davekjohn@claude-code-specialists -
 ```
 
 ```powershell
-# 3. Refresh again, then install the new ids
+# 3. Re-register the marketplace under its new name -- the marketplace itself was
+#    renamed on the flag day, so your machine must drop the old registration and add
+#    the new one. A plain refresh cannot do this: the name is part of the id.
+claude plugin marketplace remove claude-code-specialists
+claude plugin marketplace add DKJ-Solutions/dkj-claude-plugins --scope project
+
+# 4. Refresh the new marketplace, then install the new ids
 claude plugin marketplace update dkj-claude-plugins
 
-# 3a. The core team -- everyone runs this one
+# 4a. The core team -- everyone runs this one
 claude plugin install dkj-subagents-alpha@dkj-claude-plugins --scope project
 
-# 3b. The add-on teams -- ONLY the ones you uninstalled in step 2. Delete the other lines.
+# 4b. The add-on teams -- ONLY the ones you uninstalled in step 2. Delete the other lines.
 claude plugin install dkj-subagents-lifehub@dkj-claude-plugins --scope project
 claude plugin install dkj-subagents-shopify@dkj-claude-plugins --scope project
 claude plugin install dkj-subagents-ecomm@dkj-claude-plugins --scope project
 
-# 3c. The workflow -- opt-in. Uncomment it only if you deliberately want this method.
+# 4c. The workflow -- opt-in. Uncomment it only if you deliberately want this method.
 # claude plugin install dkj-policy@dkj-claude-plugins --scope project
 ```
 
-**4. Restart your Claude Code session.**
+**5. Restart your Claude Code session.**
 
 `--scope project` is not optional here any more than it is anywhere else on this page — see
-[Step 1](#step-1--enable-and-install) for what it costs to leave off. Expect the uninstalls and the
-installs to rewrite `.claude/settings.json` on the way, the same rewriting behaviour
-[documented above](#connecting--the-install-step): the old `enabledPlugins` entries come out, the new ones
-go in, and any diff beyond that is formatting.
+[Step 1](#step-1--enable-and-install) for what it costs to leave off. Expect the uninstalls, the
+`marketplace add`, and the installs to rewrite `.claude/settings.json` on the way, the same rewriting
+behaviour [documented above](#connecting--the-install-step): the old `enabledPlugins` entries come out,
+the new ones go in, the marketplace source key is repointed at `dkj-claude-plugins`, and any diff beyond
+that is formatting.
 
 ### After the reinstall
 

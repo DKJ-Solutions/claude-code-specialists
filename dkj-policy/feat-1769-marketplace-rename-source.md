@@ -170,10 +170,20 @@ merge, and do not treat a green run from an earlier day as proof.
       missed), one test gap closed by Tycho, and the sweep's own over-reach corrected by Tessa across
       15 places in 5 files: dated transcripts and migration tables' OLD columns keep the retired name.
       The branch stays open until fase 2 is built
-- [ ] FLAG DAY: the three migration procedures in `INSTALL.md` need a marketplace remove+add step
-      between their uninstall and install halves, or they cannot run at all after the rename --
-      filed as [#1801](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1801) because the
-      repair defines part of the procedure and interacts with fase 5's release notes
+- [x] The three migration procedures in `INSTALL.md` now carry a `marketplace remove claude-code-specialists`
+      + `marketplace add DKJ-Solutions/dkj-claude-plugins --scope project` step between their uninstall
+      and install halves, plus a kept `marketplace update dkj-claude-plugins` before the installs (the
+      lint's refresh-next-to-install rule wants it and it is idempotent) -- without it step 3's install
+      resolves against a marketplace the reader's machine does not know
+      ([#1801](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1801)). Dave's word,
+      September 10, 2026: fold into this branch rather than defer to flag day -- it is the same
+      post-rename doc content as the `@`-id swap already done here, not session-breaking and not stale
+      at merge. The four decision points in #1801 resolved conservatively: three procedures keep their
+      shape; re-add sits between uninstall and install; slug is the post-#1769 `DKJ-Solutions/dkj-claude-plugins`
+      (per `CLAUDE.md`'s own updated "Repo citation" note); `INSTALL.md` is canonical and fase 5's notes
+      link to it. `UNINSTALL.md` checked -- no equivalent gap: it is a one-directional teardown that
+      never reinstalls, so there is no re-add to be missing, and its `marketplace remove` name was
+      already swept. Issue stays open until this branch merges on flag day
 - [ ] LAST (session-breaking on this branch until flag day): `.claude/settings.json` self-consume
       keys + `github` source + `repo`
 - [ ] LAST (session-breaking): live `@`-import paths + clone-dir path segments
