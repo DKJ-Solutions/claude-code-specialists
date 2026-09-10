@@ -454,6 +454,21 @@ $releasesReadme = @(
 # does not fail loudly, it fails the wrong way: refusing branches that do carry an entry at the current
 # path. Tracking the tip means the gate follows the convention it enforces. A consumer who needs
 # reproducibility over currency pins a tag and accepts owning the bump.
+#
+# AND THAT IS HALF THE TRADE. The paragraph above weighs the ENTRY's path moving; it never weighed the
+# SCRIPT's own path moving, which is what happened -- plugins/workflows/contributing-davekjohn/ became
+# plugins/dkj-policy/, and every consumer scaffolded before the move kept naming the old path. Tracking
+# the tip protects a consumer from a stale convention and exposes them to a moved script. Measured
+# September 10, 2026 (#1805): two consumers red on every pull request for five weeks, unnoticed because
+# neither had opened one since the break.
+#
+# THE PIN STAYS, AND THE EXPOSURE IS COVERED AT THE OTHER END -- because it cannot be covered here. This
+# command writes the path once, at adoption, and nothing rewrites it afterwards, so no change made in
+# this file can reach a repo that adopted in August. What can: check-connectors.ps1's check 6, which
+# reads the runners a registered consumer actually has and reports a path this tree no longer holds; and
+# this command's own suite, which now DERIVES the emitted path from the emitted file and asserts it
+# exists here, where the three literal asserts in adopt-merge-queue.tests.ps1 compared the output
+# against itself and stayed green through the move.
 $entryGateWorkflow = @(
     '# Every PR into the trunk carries a WRITTEN changelog entry.',
     '#',

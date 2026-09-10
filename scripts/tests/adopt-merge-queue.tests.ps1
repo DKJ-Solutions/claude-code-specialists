@@ -206,6 +206,26 @@ try {
     Assert-True ($verify -like '*.workflow-scripts/plugins/dkj-policy/scripts/release/verify-pushed-merges.ps1*') `
         'the resolves runner calls the plugin mirror of verify-pushed-merges'
 
+    # AND THE THREE ASSERTS ABOVE CANNOT CATCH A MOVE, which is why the four below exist (#1805). Each
+    # of them compares the scaffolder's output against a literal copied out of that same scaffolder --
+    # so they answer "does it still emit this string", never "is there a script at the other end". The
+    # path DID move here (plugins/workflows/contributing-davekjohn/ -> plugins/dkj-policy/), all three
+    # stayed green, and two consumers scaffolded before the move were red on every pull request for
+    # five weeks. They are kept, because what they pin is real -- a runner naming the SOURCE's own
+    # scripts/ path would be correct here and absent in every consumer -- and the derived asserts below
+    # answer the other question rather than replacing them.
+    . (Join-Path $RepoRoot 'scripts\lib\consumer-runner-lib.ps1')
+    foreach ($runner in @(
+        @{ Name = 'fold-on-merge.yml';   Text = $fold;   Expect = 2 },
+        @{ Name = 'verify-resolved.yml'; Text = $verify; Expect = 1 }
+    )) {
+        $refs = @(Get-SharedScriptReference -WorkflowText $runner.Text -RepositoryName 'claude-code-specialists')
+        Assert-Equal $runner.Expect $refs.Count "$($runner.Name): reaches $($runner.Expect) script(s) out of a checkout of this repo"
+        foreach ($judged in @(Test-SharedScriptReference -Reference $refs -SourceRoot $RepoRoot)) {
+            Assert-True $judged.Exists "$($runner.Name): runs '$($judged.Path)', and that path EXISTS in this tree"
+        }
+    }
+
     # CLAUDE_PROJECT_DIR IS NOT OPTIONAL IN EITHER. A mirrored script resolves the tree it judges from
     # that variable first; without it the fold would read whatever `git rev-parse` answered in a
     # workspace holding two checkouts, which is a coin toss rather than a bug that shows up.
