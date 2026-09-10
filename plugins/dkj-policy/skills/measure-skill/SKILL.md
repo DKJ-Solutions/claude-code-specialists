@@ -63,9 +63,12 @@ always-on total. Ranked by always-on, because that is the figure paid unconditio
 
 Two rules are enforced by the script rather than left to whoever reads the output:
 
-- **It names the copy it measured.** `claude plugin details` prices the **marketplace clone**, not the
-  tree. Where those differ the report says so, because the difference is *queued cost arriving at the
-  next plugin update* — not error to smooth away.
+- **It names the copy it measured.** `claude plugin details` prices the **installed payload** — the
+  extracted copy under `~/.claude/plugins/cache/` that a session loads — not the tree, and not the
+  marketplace clone, which is what this said until
+  [#1812](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1812). Where payload and tree
+  differ the report says so, because the difference is *queued cost arriving at the next release* — not
+  error to smooth away.
 - **The "fires how often" column is left empty.** An on-invoke figure without a firing frequency is not
   a cost, and a guessed frequency is worse than a blank one. Fill it in yourself; the script will not
   invent it.
@@ -209,8 +212,11 @@ things it can find that really are defects are printed loudly and adjudicated by
 sections that fail to sum to their file mean this script's arithmetic is wrong rather than the repo.
 
 **It reports the copy that LOADS.** Where a document is imported from the marketplace clone rather
-than from the tree, the report names both and prints the difference — that gap is queued cost
-arriving at the next plugin update, not noise to smooth away.
+than from the tree, the report names both and prints the difference — that gap is queued cost arriving
+at the next `claude plugin marketplace update`, not noise to smooth away. **An `@`-imported document is
+the one thing that does load from the clone**; everything a plugin ships loads from the installed
+payload instead, and that copy moves only on a release
+([#1812](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1812)).
 
 ### Parameters
 

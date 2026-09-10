@@ -1,18 +1,19 @@
 ---
 name: tidy-machine
 description: >-
-  Clear the clutter this workflow leaves behind on a machine, in one command and eleven lanes: finished
+  Clear the clutter this workflow leaves behind on a machine, in one command and twelve lanes: finished
   branches, stale worktree lanes, branches whose pull request was CLOSED without merging, expired
   backup branches, old stashes, an unfolded changelog entry, the ~/.claude plugin administration,
   install records pointing at a checkout that is gone or naming a plugin the marketplace has retired,
-  plugin/marketplace staleness, and fixture trees under the scratch root. It DELETES only what
+  plugin/marketplace staleness, extracted plugin payload no install record points at any more, and
+  fixture trees under the scratch root. It DELETES only what
   prune-merged can already prove -- an ancestor of the trunk, or a tip that is the head commit of a
   merged PR -- and everything else it classifies and hands over with the command, paste-ready. Use it when branches have piled up, as the closing tidy-up
   of a working session, when a lane worktree has outlived its branch, or when you want to know which
   of the trees under your temp directory belong to runs that have ended.
 ---
 
-# tidy-machine -- the whole-machine tidy, in eleven lanes
+# tidy-machine -- the whole-machine tidy, in twelve lanes
 
 `prune-merged` answers one question extremely well: **was this branch merged?** This command answers
 the ones next to it, and calls `prune-merged` for that one rather than re-deciding it.
@@ -78,12 +79,12 @@ powershell -NoProfile -File "${CLAUDE_PLUGIN_ROOT}/scripts/maintenance/tidy-mach
 |---|---|
 | `-DryRun` | change nothing anywhere, including in the one lane that would otherwise act -- it is passed through to `prune-merged` |
 | `-CheckoutOnly` | lanes 1-6 only |
-| `-MachineOnly` | lanes 7-11 only. Useful mid-flight, when you want the `~/.claude` and scratch answers without anything reading the branch list |
+| `-MachineOnly` | lanes 7-12 only. Useful mid-flight, when you want the `~/.claude` and scratch answers without anything reading the branch list |
 | `-MaxAgeDays <n>` | how old a `backup/*` branch or a stash must be to be reported. Default 14 |
 | `-MinFixtureAgeHours <n>` | how old a scratch tree must be before its dead pid counts. Default 24 |
 | `-Remote <name>` | the remote `prune-merged` fetches and prunes. Default `origin` |
 
-## The eleven lanes
+## The twelve lanes
 
 **Per checkout:**
 
@@ -105,8 +106,9 @@ powershell -NoProfile -File "${CLAUDE_PLUGIN_ROOT}/scripts/maintenance/tidy-mach
 | 9 | plugin and marketplace staleness | → `plugin-versions.ps1` |
 | 10 | **fixture trees under the scratch root** | attributes -- **never deletes** |
 | 11 | **install records under a plugin name the marketplace has retired** | reports, with the uninstall |
+| 12 | **extracted plugin payload no install record points at** | reports -- **no command, nothing removed** |
 
-Six of the eleven are a call into a script that already exists and already has its own suite. Only five
+Six of the twelve are a call into a script that already exists and already has its own suite. Only six
 carry new logic, and that logic is pure and lives in `tidy-lib.ps1`, which is what lets its suite drive
 the classifier over states no machine here has ever been in.
 
@@ -209,6 +211,36 @@ retained-on-purpose artefacts (`sync-pr-body-*`, written for you to paste into `
 [#1636](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1636)) and 162 belonged to an
 unrelated tool. **Attribution is the scarce thing, not deletion.** The lane skips both retained labels
 by name and reports only trees whose pid is no longer a running process.
+
+### Lane 12 judges the other end of the pointer lanes 8 and 11 read
+
+A record's `installPath` names an **extracted copy of the plugin** under
+`~/.claude/plugins/cache/<marketplace>/<plugin>/<version-or-sha>/`, and that copy — not the marketplace
+clone — is what a session loads. Measured September 10, 2026 on Claude Code 2.1.267
+([#1812](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1812)): the running process
+writes a lease at `<installPath>/.in_use/<pid>` and holds it for the life of the session, and the clone
+holds none. Lanes 8 and 11 ask whether a pointer is still good; this one asks what is on the other end
+of it, and it is the only lane whose subject the install register does not itself enumerate.
+
+**It is worth a lane because nothing reaps those copies.** The harness marks a tree no record points at
+with `.orphaned_at` and stamps `~/.claude/plugins/.last_inuse_sweep` — but on the machine measured, 30
+of 41 trees carried that mark, 22.2 MB of 32.6 MB, the oldest six days old and every one still on disk.
+An uninstall was measured to remove the **record** and leave the payload standing, so lane 11's handover
+grows this pile rather than clearing it.
+
+**Three things about what it prints:**
+
+- **Grouped by plugin id, not one line per tree.** A machine that has taken a dozen releases holds a
+  dozen trees per plugin, and a per-tree list buries the one number a reader acts on under its own
+  length.
+- **A tree nothing points at but a LIVE process is still reading is never counted as reclaimable.** That
+  is a session which started before the record moved; it goes when the session does, and deleting it
+  would pull the files out from under a running session.
+- **No command is handed over, and that omission is the point — the same decision as lane 10.** There
+  is no plugin-cache verb to hand over, so the only line to print would be a recursive `Remove-Item`
+  under your home, which is the delete primitive `New-ScratchPath` exists to remove
+  ([#1659](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1659)). Clear by hand what
+  you recognise.
 
 ## What it never touches
 

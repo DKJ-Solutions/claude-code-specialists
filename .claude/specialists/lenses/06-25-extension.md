@@ -979,8 +979,16 @@ code rather than remembered:
   estimate from file sizes` is about the subject the count_tokens API prices; **it does not price
   documents**, so here an estimate is the only answer available and the honest move is to label it every
   time. The plugin listings stay `measure-skill`'s, and the report says so rather than absorbing them.
-- **It resolves the load path.** The persona that loads is the marketplace clone: 16,585 B against 21,860
-  in the tree, so **5,275 B is queued cost arriving at the next plugin update** — named, not smoothed.
+- **It resolves the load path.** The persona that loads is the marketplace clone's copy: 16,585 B against
+  21,860 in the tree, so **5,275 B is queued cost** — named, not smoothed. **It arrives on a
+  `claude plugin marketplace update` and not on a plugin update**, which this bullet had the wrong way
+  round until [#1812](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1812). The clone is
+  the right answer here for a reason that does not generalise: this document is reached by an absolute
+  `@`-import naming a path inside the clone, and an `@`-import is a filesystem path rather than a plugin
+  lookup. Everything a plugin *ships* — a skill, a hook, an agent def — loads from the extracted payload
+  under `~/.claude/plugins/cache/` instead, and that copy moves only on a release. Two artefacts, two
+  load paths; the measurement is in
+  [the system-administration lens](05-15-extension.md).
 - **The sections must sum to the file, or no table is printed.** A plausible wrong share is worse than a
   refusal, which is `measure-skill`'s own parse-check reasoning applied to arithmetic.
 

@@ -1385,7 +1385,8 @@ authorship for him in consumers that never granted it.
   family's [INSTALL.md](../../../INSTALL.md#staying-up-to-date);
   don't restate them here.
 - **The marketplace clone follows a REFRESH, not a push — and no version check can tell you it is
-  behind.** A session here reads the plugins from the local marketplace clone, which advances only on
+  behind.** The clone is what a document named by an absolute `@`-import reads — the orchestrator's
+  body, in every repo here — and it advances only on
   `claude plugin marketplace update claude-code-specialists`. Measured August 23, 2026
   ([#845](https://github.com/DaveKJohn/claude-code-specialists/issues/845)): after four PRs merged and
   pushed, the clone still stood on the previous day's `3e46b3de` while `main` was at `86f1a6c8` — the
@@ -1409,11 +1410,67 @@ authorship for him in consumers that never granted it.
   the ordinary state. What was wrong was the **expectation** — [`CLAUDE.md`](../../../CLAUDE.md) promised
   the "last pushed" version — and that sentence is what the repair changed.
 
-  **The measurement check 11's comment relies on has never reached this boundary, so don't lean on it
-  again without re-measuring.** It records, correctly and with a date, that a bare project-scoped
-  `update` advanced the clone during the run (July 31, 2026, CLI 2.1.220, 3.0.3 → 3.0.4) — taken while
-  the **version number was changing**. Identical version, new content, nothing moved is the untested
-  case, and it is the one that bit.
+  **The measurement check 11's comment relies on had never reached this boundary. It has now, and the
+  answer is worse than the guess** (September 10, 2026, Claude Code 2.1.267, on a second machine of Dave's,
+  [#1812](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1812)). What check 11 records,
+  correctly and with a date, is that a bare project-scoped `update` advanced the clone during the run
+  (July 31, 2026, CLI 2.1.220, 3.0.3 → 3.0.4) — taken while the **version number was changing**.
+  Identical version, new content, nothing moved was the untested case. Measured, in this order:
+
+  - `claude plugin marketplace update claude-code-specialists` advanced the clone **104 commits**,
+    `0711d417` → `37f72f76`. Every extracted payload was left byte-identical — no new tree, no
+    changed mtime — and `installed_plugins.json` came back byte-identical too.
+  - `claude plugin update dkj-policy --scope project` then answered *"already at the latest version
+    (4.33.0)"* and extracted nothing, with the clone's payload for 4.33.0 by then carrying a skill
+    (`tidy-machine`) the installed payload does not.
+  - `claude plugin install dkj-policy@claude-code-specialists --scope project` answered *"already
+    installed"* and extracted nothing either.
+
+  **So both documented commands decide on the version STRING, and a payload that changed without a
+  bump is unreachable by either.** Not "a few hours older than `main`", as the August 24 reading had
+  it — arbitrarily old, until the next cut. That reading was taken on the clone, which is the copy the
+  refresh does move, and nobody looked at the copy underneath it.
+
+  **The copy underneath it is the one a session loads, and this is the measurement that settles it.** A
+  record in `installed_plugins.json` carries an `installPath`, always into
+  `~/.claude/plugins/cache/<marketplace>/<plugin>/<version-or-sha>/`, and the running process writes a
+  lease at `<installPath>/.in_use/<pid>` holding `{"pid":…,"procStartFt":…}` for the life of the
+  session. Measured live: pid 51988 (`claude`, started 19:51:42) held one in `dkj-policy/4.33.0` and
+  `dkj-policy-bwj/4.33.0` and in no other tree, and the clone held none. Two corroborations, both from
+  the same run: `claude plugin details dkj-policy` reported `Skills (17)` while the clone's copy of the
+  same 4.33.0 carried 18 — so that command prices the payload, not the clone — and a checkout enabling
+  `dkj-subagents-alpha/-ecomm/-shopify` with no install record for its own path loaded none of them,
+  which is [#1802](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1802) seen from the
+  other end.
+
+  **Neither account in the tree was complete, and that is why #1810 could not be designed.** This lens
+  said the clone is what a session reads; #1802 said a dead consumer survives because its *cache*
+  survives. Both are half of one mechanism: **plugin components — skills, hooks, agent defs, the
+  plugin's own scripts — load from the payload, and a document named by an absolute `@`-import loads
+  from wherever that path points**, which in this family is the clone. That is the whole of it, and it
+  is why a refresh visibly repaired #845's `@`-imported document while leaving every hook and skill on
+  the same bytes as before.
+
+  **What follows for a fleet, since that was the question underneath.** One `marketplace update` per
+  machine moves nothing that a plugin ships; the unit that moves a payload is a **release**, and it has
+  to be pulled per checkout, on every machine, with the version bump as its only trigger. Between two
+  cuts there is no command in the CLI that will hand a session new plugin content — measured above,
+  three times.
+
+  **And the payload is never reaped, only marked.** The harness writes `.orphaned_at` (Unix
+  milliseconds) into a tree no record points at and stamps `~/.claude/plugins/.last_inuse_sweep`, but
+  on this machine 30 of 41 trees carried that mark — 22.2 MB of 32.6 MB — the oldest six days old, and
+  every one was still on disk. `claude plugin uninstall` was measured on
+  `dkj-team-lifehub@claude-code-specialists`: the record went, the payload stayed. **That last one
+  refines rather than discovers, and the report that asked for it had it as untested** — the reason a
+  report gives is checked before it is repaired, and here
+  [UNINSTALL.md](../../../UNINSTALL.md#what-is-left-behind-honestly) had already established that the
+  cache directory follows the marketplace and not the install
+  ([#339](https://github.com/DaveKJohn/claude-code-specialists/issues/339)). What was genuinely open
+  was the per-plugin case, and that is what was run. That is the gap
+  [lane 12 of `tidy-machine.ps1`](../../../scripts/maintenance/tidy-machine.ps1) reports — and reports
+  only, because there is no plugin-cache verb to hand over and a recursive delete under a user's home
+  is the primitive #1659 exists to prevent.
 - **Always read `$LASTEXITCODE` before you pipe a native command through a cmdlet.** A construct like
   `& git … | Select-Object -First 1` cuts the upstream (git) short as soon as the first item is in;
   if the process has not yet exited cleanly at that point, it ends with a non-zero exit code —
