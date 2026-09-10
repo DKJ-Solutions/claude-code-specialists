@@ -36,19 +36,60 @@
 
 ### PLAN
 
+Inbound #1762: `Get-PasteableRef -Kind Path` (`scripts/lib/ref-print-lib.ps1`) judges the path against
+`$RefPasteSafePattern`, which admits neither `:` nor `\`, so no absolute path can pass -- and a lane, a
+worktree or a scratch tree is always absolute. The one `-Kind Path` caller carrying such a path today,
+`check-plugin-integrity.ps1`'s nested-worktree remedy, therefore always prints the placeholder for the
+very path it exists to hand the reader; `tidy-machine` and `worktree-lane` want the same.
+
+Verified on pickup against the six inbound checks -- symptom, reasoning, repair, subject, size, repo --
+all stand. The one correction: the title slightly overstates the size. The two current `-Kind Path`
+callers (`check-plugin-integrity.ps1:497`, `sync-main.ps1:1167`) both pass repo-relative paths and keep
+working; the block is for callers passing an absolute path.
+
+Chosen repair: a per-kind pattern (issue option B), not the single-quote rewrite (option C). Option C
+rests on "every command this workflow prints a path into runs in PowerShell", which contradicts the
+lib's own header -- its remedies are "pasted into PowerShell, Git Bash and cmd alike". The per-kind
+pattern keeps the allowlist discipline and leaves the deliberately-narrowed `-Kind Ref` axis untouched.
+
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [x] `ref-print-lib.ps1`: add `$script:PathPasteSafePattern` (the ref pattern plus `:` and a leading
+  `/`), `ConvertTo-PastePath` (fold `\` to `/` -- `\` is bash's escape character, `/` is literal in all
+  three shells and git accepts it on Windows), and `Test-PathPasteSafe`.
+- [x] `Get-PasteableRef`: judge and carry the token per-`$Kind` -- a path passes as its slash-folded
+  form, a ref unchanged. Header block and the two implementation comments updated to say three things
+  differ now (pattern, noun, strip), not two.
+- [x] `scripts/sync/build-shared-scripts.ps1`: mirrors regenerated (`dkj-policy`, `dkj-subagents-shopify`).
 
 ### TEST
 
+- [x] `ref-print-lib.tests.ps1`: absolute Windows / already-forward-slash / POSIX-root / UNC paths pass
+  and carry the folded token; an absolute path with a space or a shell metacharacter is still refused
+  with the note showing the real backslash path; the ref axis still refuses `:` and `\`;
+  `ConvertTo-PastePath` and `Test-PathPasteSafe` covered directly. 444 pass, 0 fail.
+- [x] `check-plugin-integrity.ps1` green -- `[script-ascii]` 0 findings (the `\` escapes are ASCII),
+  `[shared-script]` mirrors in sync.
+- [x] Full lint + test gate via `open-pr.ps1`.
+
 ### DEPLOY: fix/1762-pasteable-path-absolute
 
-**Score:**
+`Get-PasteableRef -Kind Path` now judges a filesystem path against its own allowlist
+(`$PathPasteSafePattern`) instead of the ref one, so an **absolute** path can pass: the pattern adds the
+drive/scheme `:` and a leading `/` for a POSIX root, and `ConvertTo-PastePath` folds `\` to `/` first so
+the one printed token is correct in Git Bash as well as PowerShell and cmd. Everything the ref allowlist
+refuses -- a space, `$`, a backtick, a quote, `;`, `&`, `|` -- is still refused, and the deliberately
+narrow `-Kind Ref` axis (#1594, #1617) is unchanged. Fixes inbound #1762: the `-Kind Path` callers that
+carry an absolute path -- `check-plugin-integrity.ps1`'s nested-worktree remedy today, `tidy-machine` and
+`worktree-lane` next -- were getting the `<path>` placeholder for every real path.
+
+**Score:** 3
 
 #### What makes this deploy extra special
 
-**Score:**
+N/A -- an internal formatter for the workflow's own printed remedies; no subscriber of a service reaches it.
+
+**Score:** N/A
 
 #### Pull Request
 
