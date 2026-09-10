@@ -1604,7 +1604,7 @@ $liveReadme = Join-Path $PSScriptRoot ('..\..\' + ((& {
     if (Test-FunctionDefined 'Get-ReleaseHistoryPath') { Get-ReleaseHistoryPath } else { 'releases/README.md' }
 }) -replace '/', '\'))
 if (Test-Path -LiteralPath $liveReadme) {
-    Assert-Equal '4' (Get-OverviewTargetMajor -ReadmeContent (Get-Content -LiteralPath $liveReadme -Raw -Encoding UTF8)) "this repo's own overview now targets 4.x -- a 4.0.0 cut lands under its own major, and a 3.x cut would be refused"
+    Assert-Equal '5' (Get-OverviewTargetMajor -ReadmeContent (Get-Content -LiteralPath $liveReadme -Raw -Encoding UTF8)) "this repo's own overview now targets 5.x -- a 5.0.0 cut lands under its own major, and a 4.x cut would be refused"
 }
 
 Write-Host "Get-OverviewLatestVersion -- the release the overview RECORDS as newest (inbound #802)" -ForegroundColor Cyan
