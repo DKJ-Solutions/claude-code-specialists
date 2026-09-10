@@ -36,19 +36,68 @@
 
 ### PLAN
 
+#### What #1786 reported, and what verifying it added
+
+The report says `scripts/tests/connector-sessioncheck.tests.ps1`'s header claims branches 1 and 2
+drive the hook against **this repo's own root copy** of `plugin-versions.ps1`. Verified in the code
+and it stands: `$Hook` is the plugin mirror's hook file, the hook has exactly one engine candidate
+(`$PSScriptRoot/../scripts/task/plugin-versions.ps1`), so the engine actually measured is
+`plugins/dkj-policy/scripts/task/plugin-versions.ps1`. The `$cwd` candidate the header describes was
+removed on review, and the hook's own comment argues at length for having dropped it.
+
+Two things the verification added to the report:
+
+1. **The report named one passage; there are three.** `Invoke-Hook`'s own docstring repeats the
+   abandoned resolution word for word ("the hook's engine search reads (Get-Location)"), and
+   `Invoke-IsolatedHookNoEngine`'s says "BOTH of the hook's candidates" where there is now one.
+   `Invoke-HookWithFakeEngine`'s docstring is already correct and records the change itself, which
+   is why the header reading the other way went unnoticed.
+2. **The push to `$RepoRoot` is inert, not merely misdescribed.** Every scenario passes
+   `-WorkshopPathOverride`, which replaces the `$cwd` candidate list outright, and the version
+   branch returns before the consumer scoping reads `(Get-Location)` at all. Saying it "is kept
+   because the hook still reads (Get-Location)" would have been a second unverified reason in place
+   of the first, so the docstring says it is inert belt-and-braces and says so explicitly.
+
+#### Size: a docstring, and the mechanism left alone
+
+The report's gate claim was checked rather than taken: check 8 of `check-plugin-integrity.ps1`
+raises `[shared-script] ... deviates from ...` on a stale mirror, and `open-pr.ps1` runs the lint
+before the suites. So the gate cannot be fooled by an unbuilt mirror and the window is the
+standalone run only -- which is exactly the run a session makes while editing the engine, so the
+ordering is worth naming in the docstring rather than building against.
+
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [x] Header docstring: name the mirror as the engine branches 1 and 2 measure, and state the
+      rebuild-before-standalone ordering with #1786's own measurement (47/0 then 41/6)
+- [x] `Invoke-Hook`: replace the abandoned `(Get-Location)` resolution with the mirror, and say the
+      push is inert rather than inventing a reason for it
+- [x] `Invoke-IsolatedHookNoEngine`: one candidate, not both
+- [x] Swept the file for the remaining stale spellings ("root copy", "first candidate", "BOTH")
 
 ### TEST
 
+- [x] `connector-sessioncheck.tests.ps1` standalone: **47 pass, 0 fail** -- unchanged, as a
+      docstring-only repair must be
+- [x] Pure ASCII confirmed (repo convention for `.ps1`, check 27)
+- [x] Full lint + suites via `open-pr.ps1`
+
 ### DEPLOY: fix/1786-stale-test-docstring
 
-**Score:**
+`connector-sessioncheck.tests.ps1`'s header said its first two branches drive the hook against this
+repo's own root `scripts/task/plugin-versions.ps1`. They drive the plugin mirror beside the hook --
+the `$cwd` candidate that once made the header true was removed on review. The docstrings now name
+the mirror, and state the consequence the wrong name hid: after editing the source engine, rebuild
+the mirror before running this suite standalone, or it reports on the previous version and says
+nothing about having done so.
+
+**Score:** 2 -- a test suite's own account of what it measures was wrong, which cost one session a
+false all-clear (47/0 against an unrebuilt mirror, 41/6 after). Small because the gate was never
+exposed to it: the drift check errors on a stale mirror before the suites run.
 
 #### What makes this deploy extra special
 
-**Score:**
+**Score:** N/A -- a docstring inside this repo's own test suite. Nothing reaches a consumer.
 
 #### Pull Request
 
