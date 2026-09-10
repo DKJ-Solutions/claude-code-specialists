@@ -1073,6 +1073,153 @@ try {
     Assert-Equal 0 $r.Code 'id with empty plugin name: exit code 0'
     Assert-NotMatch '\[UNLISTED\]' $r.Out 'id with empty plugin name: no [UNLISTED] marker'
     Assert-NotMatch 'does not name it' $r.Out 'id with empty plugin name: no unlisted-plugin INFO either'
+
+    # --- 12. Check 6: a consumer's CI runner names a path this tree no longer has (#1805) ----------
+    # THE FIXTURES NAME REAL PATHS OF THIS REPO, not invented ones, and one of them deliberately names
+    # a path that USED to exist here (plugins/workflows/contributing-davekjohn/...). That is the exact
+    # string two consumers were still running after the September 5 move, and a fixture that invented a
+    # path would prove the regex works without proving the check answers the case it was built for.
+    Write-Host "`n-- 12. check 6: a runner reaching into a path this tree no longer has --" -ForegroundColor Cyan
+
+    function New-FixtureWorkflow {
+        # -PathFirst and -Commented are the two shapes the first cut of the parser silently missed.
+        # They are switches on the shared helper rather than bespoke fixtures so that every OTHER
+        # assertion in this scenario keeps holding over them unchanged.
+        param(
+            [Parameter(Mandatory)][string]$Name,
+            [Parameter(Mandatory)][string]$Repository,
+            [Parameter(Mandatory)][string]$ScriptPath,
+            [switch]$PathFirst,
+            [switch]$Commented
+        )
+        $dir = Join-Path $Fixture '.github\workflows'
+        New-Item -ItemType Directory -Path $dir -Force | Out-Null
+        $withKeys = if ($PathFirst) {
+            @('          path: .workflow-scripts', ("          repository: $Repository"), '          ref: main')
+        } elseif ($Commented) {
+            @(("          repository: $Repository  # the shared workflow scripts"), '          ref: main', '          path: .workflow-scripts   # where they land')
+        } else {
+            @(("          repository: $Repository"), '          ref: main', '          path: .workflow-scripts')
+        }
+        $yml = @(
+            'name: Fixture'
+            'on:'
+            '  pull_request:'
+            '    branches: [main]'
+            'jobs:'
+            '  fixture:'
+            '    runs-on: windows-latest'
+            '    steps:'
+            '      - uses: actions/checkout@v5'
+            ''
+            '      - uses: actions/checkout@v5'
+            '        with:'
+        ) + $withKeys + @(
+            ''
+            '      - shell: powershell'
+            '        run: |'
+            ("          powershell -NoProfile -ExecutionPolicy Bypass -File .workflow-scripts/$ScriptPath -Branch " + '"x"')
+        ) -join "`n"
+        [System.IO.File]::WriteAllText((Join-Path $dir $Name), $yml)
+    }
+
+    # 12a. The current path -- silence, and nothing about it in the output. This is the case every
+    #      healthy consumer is in, so a check that cannot stay quiet here is one nobody will keep.
+    New-FixtureConsumer -ExtensionIds @('06-16')
+    New-FixtureWorkflow -Name 'branch-entry.yml' -Repository 'DKJ-Solutions/claude-code-specialists' -ScriptPath 'plugins/dkj-policy/scripts/lint/check-branch-entry.ps1'
+    $mf = New-FixtureManifest -Extensions @('06-16')
+    $r = Invoke-Ps $Script ($base + @('-Manifest', $mf, '-ConsumerPathOverride', $Fixture))
+    Assert-Equal 0 $r.Code 'current runner path: exit code 0'
+    Assert-NotMatch 'does not exist here' $r.Out 'current runner path: no finding'
+
+    # 12b. The retired path -- an ERROR that names the file, the line, and where the script is NOW.
+    #      The suggestion is asserted because it is the whole difference between a report and a repair:
+    #      the reader is in a repo that does not contain this tree and cannot go looking.
+    New-FixtureConsumer -ExtensionIds @('06-16')
+    New-FixtureWorkflow -Name 'branch-entry.yml' -Repository 'DKJ-Solutions/claude-code-specialists' -ScriptPath 'plugins/workflows/contributing-davekjohn/scripts/lint/check-branch-entry.ps1'
+    $mf = New-FixtureManifest -Extensions @('06-16')
+    $r = Invoke-Ps $Script ($base + @('-Manifest', $mf, '-ConsumerPathOverride', $Fixture))
+    Assert-Equal 1 $r.Code 'retired runner path: exit code 1 -- it counts as an error'
+    Assert-Match 'branch-entry\.yml line \d+' $r.Out 'retired runner path: names the workflow file and the line'
+    Assert-Match 'plugins/workflows/contributing-davekjohn/scripts/lint/check-branch-entry\.ps1' $r.Out 'retired runner path: quotes the path it found'
+    Assert-Match 'it is at plugins/dkj-policy/scripts/lint/check-branch-entry\.ps1' $r.Out 'retired runner path: offers the PUBLISHED copy first, not this repo own scripts/ path'
+
+    # 12c. The OLD OWNER still counts. This repo moved from DaveKJohn to DKJ-Solutions on September 2,
+    #      2026 and a consumer scaffolded before that names the old owner, which still resolves through
+    #      the transfer redirect. Matching owner/name would skip the file and report nothing -- the same
+    #      silence this check exists to end, arriving through the guard itself.
+    New-FixtureConsumer -ExtensionIds @('06-16')
+    New-FixtureWorkflow -Name 'branch-entry.yml' -Repository 'DaveKJohn/claude-code-specialists' -ScriptPath 'plugins/workflows/contributing-davekjohn/scripts/lint/check-branch-entry.ps1'
+    $mf = New-FixtureManifest -Extensions @('06-16')
+    $r = Invoke-Ps $Script ($base + @('-Manifest', $mf, '-ConsumerPathOverride', $Fixture))
+    Assert-Equal 1 $r.Code 'old owner, retired path: still exit code 1'
+    Assert-Match 'does not exist here' $r.Out 'old owner, retired path: still reported'
+
+    # 12d. A checkout of somebody ELSE's repository is not this check's business, whatever path it runs.
+    New-FixtureConsumer -ExtensionIds @('06-16')
+    New-FixtureWorkflow -Name 'other.yml' -Repository 'someone/unrelated-repo' -ScriptPath 'plugins/workflows/contributing-davekjohn/scripts/lint/check-branch-entry.ps1'
+    $mf = New-FixtureManifest -Extensions @('06-16')
+    $r = Invoke-Ps $Script ($base + @('-Manifest', $mf, '-ConsumerPathOverride', $Fixture))
+    Assert-Equal 0 $r.Code 'another repository checked out: exit code 0'
+    Assert-NotMatch 'does not exist here' $r.Out 'another repository checked out: no finding'
+
+    # 12e. A script name that exists NOWHERE here reads as removed, not moved -- a different
+    #      conversation, and the message has to be able to say so rather than trailing off.
+    New-FixtureConsumer -ExtensionIds @('06-16')
+    New-FixtureWorkflow -Name 'branch-entry.yml' -Repository 'DKJ-Solutions/claude-code-specialists' -ScriptPath 'plugins/dkj-policy/scripts/lint/check-nothing-of-this-name.ps1'
+    $mf = New-FixtureManifest -Extensions @('06-16')
+    $r = Invoke-Ps $Script ($base + @('-Manifest', $mf, '-ConsumerPathOverride', $Fixture))
+    Assert-Equal 1 $r.Code 'unknown script name: exit code 1'
+    Assert-Match 'removed rather than moved' $r.Out 'unknown script name: says removed rather than moved'
+
+    # 12f. A TRAVERSING REFERENCE IS NOT LOOKED UP (Sebastian's finding 1). The capture charset admits
+    #      '.' and '/' because a path needs them, so '../../..' matches exactly as a real reference
+    #      does -- and Test-Path resolves it against the real filesystem. Handing it one unchecked
+    #      turns this check into an existence oracle for the maintainer's own disk, answered by whether
+    #      an [ERROR] line appears, unattended, at every session start. It is reported as its own state
+    #      rather than as a missing path, because nothing was looked up.
+    New-FixtureConsumer -ExtensionIds @('06-16')
+    New-FixtureWorkflow -Name 'branch-entry.yml' -Repository 'DKJ-Solutions/claude-code-specialists' -ScriptPath '../../../../check-branch-entry.ps1'
+    $mf = New-FixtureManifest -Extensions @('06-16')
+    $r = Invoke-Ps $Script ($base + @('-Manifest', $mf, '-ConsumerPathOverride', $Fixture))
+    Assert-Equal 1 $r.Code 'traversing path: exit code 1 -- reported, never dropped'
+    Assert-Match 'does not stay inside the checkout' $r.Out 'traversing path: named as escaping the checkout'
+    Assert-Match 'was NOT looked up here' $r.Out 'traversing path: says outright that no lookup happened'
+    Assert-NotMatch 'does not exist here' $r.Out 'traversing path: NOT phrased as a missing path -- that would be an answer it refused to compute'
+    Assert-NotMatch 'removed rather than moved' $r.Out 'traversing path: and no recursive search was run for it either'
+
+    # 12g. THE WORKFLOW FILENAME IS A CONSUMER-OWNED VALUE TOO (Sebastian's finding 2). It was the one
+    #      value in this message printed raw while its two neighbours were wrapped. Square brackets are
+    #      legal in an NTFS filename and the SessionStart hooks decide how loudly to surface a run by
+    #      matching '[ERROR]' over its whole output -- so a file named like this would not merely look
+    #      odd, it would be COUNTED. The finding itself must still fire.
+    New-FixtureConsumer -ExtensionIds @('06-16')
+    New-FixtureWorkflow -Name 'x[ERROR] forged.yml' -Repository 'DKJ-Solutions/claude-code-specialists' -ScriptPath 'plugins/workflows/contributing-davekjohn/scripts/lint/check-branch-entry.ps1'
+    $mf = New-FixtureManifest -Extensions @('06-16')
+    $r = Invoke-Ps $Script ($base + @('-Manifest', $mf, '-ConsumerPathOverride', $Fixture))
+    Assert-Equal 1 $r.Code 'bracketed filename: the real finding still fires'
+    Assert-Match 'does not exist here' $r.Out 'bracketed filename: and it is the stale-path finding, not something else'
+    Assert-Match 'xERROR forged\.yml' $r.Out 'bracketed filename: the name is printed with its brackets stripped'
+    Assert-NotMatch 'x\[ERROR\] forged' $r.Out 'bracketed filename: the forged marker never reaches the output verbatim'
+
+    # 12h/12i. THE TWO SHAPES THE PARSER FIRST MISSED (Victor's findings 1 and 2). Both are ordinary
+    #      hand edits of a scaffolded runner -- swapping two keys, and adding an end-of-line comment --
+    #      and both made the whole file read as carrying no reference at all. A false negative here is
+    #      #1805 recurring one layer down, inside the detector built to close it, so each gets a
+    #      scenario proving the finding still fires rather than a note saying it should.
+    New-FixtureConsumer -ExtensionIds @('06-16')
+    New-FixtureWorkflow -Name 'branch-entry.yml' -Repository 'DKJ-Solutions/claude-code-specialists' -ScriptPath 'plugins/workflows/contributing-davekjohn/scripts/lint/check-branch-entry.ps1' -PathFirst
+    $mf = New-FixtureManifest -Extensions @('06-16')
+    $r = Invoke-Ps $Script ($base + @('-Manifest', $mf, '-ConsumerPathOverride', $Fixture))
+    Assert-Equal 1 $r.Code 'path: written above repository:: still exit code 1'
+    Assert-Match 'does not exist here' $r.Out 'path: written above repository:: the stale path is still found'
+
+    New-FixtureConsumer -ExtensionIds @('06-16')
+    New-FixtureWorkflow -Name 'branch-entry.yml' -Repository 'DKJ-Solutions/claude-code-specialists' -ScriptPath 'plugins/workflows/contributing-davekjohn/scripts/lint/check-branch-entry.ps1' -Commented
+    $mf = New-FixtureManifest -Extensions @('06-16')
+    $r = Invoke-Ps $Script ($base + @('-Manifest', $mf, '-ConsumerPathOverride', $Fixture))
+    Assert-Equal 1 $r.Code 'trailing YAML comments: still exit code 1'
+    Assert-Match 'does not exist here' $r.Out 'trailing YAML comments: the stale path is still found'
 } finally {
     if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture }
     if (Test-Path -LiteralPath $HookHome) { Remove-Item -Recurse -Force -LiteralPath $HookHome -ErrorAction SilentlyContinue }

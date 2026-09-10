@@ -134,6 +134,25 @@ pin does not fail loudly, it fails the *wrong way*: refusing branches that do ca
 current path. Tracking the tip means the gate follows the convention it enforces. Pin a tag instead if you
 would rather own the bump.
 
+**That argument was only ever half of the trade**
+([#1805](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1805)). It weighs the **entry's**
+path moving, correctly. What it never weighed is the **script's** own path moving -- and that is what
+actually happened: `plugins/workflows/contributing-davekjohn/` became `plugins/dkj-policy/` on
+September 5, 2026, and every repo scaffolded before that went on naming the old one. Tracking the tip
+protects you from a stale convention and exposes you to a moved script, and only the first half was on
+this page. Measured September 10, 2026: two consumer repos were red on **every** pull request, and
+neither had been noticed, because neither had opened one since the break.
+
+**The pin still stands, because the exposure is now covered at the other end.** The source repo's
+`check-connectors.ps1` reads the runners its registered consumers actually have and reports a path that
+tree no longer holds, naming where the script went; and its scaffolder suites derive the emitted path
+from the emitted file and assert it exists, so a move goes red on the day it lands. Neither could be
+built into this scaffolder: it writes your workflow once, at adoption, and nothing rewrites it
+afterwards -- **a repair that must reach an already-adopted repo cannot live in the thing that is
+written once.** What that leaves you is one thing worth knowing rather than an action: if this repo is
+not in that register, nobody upstream can see your runner, and a tag you own the bump on is the
+trade-off that puts the timing back in your hands.
+
 **Making the check *required* is yours.** The file makes it run and report; whether a red gate blocks a
 merge is a branch-protection setting, which is a repo decision rather than something a scaffolder should
 reach into.

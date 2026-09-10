@@ -150,6 +150,27 @@ try {
     foreach ($rel in $ExpectedFiles) {
         Assert-True (Test-Path -LiteralPath (Join-Path $c2 $rel) -PathType Leaf) "-Apply: $rel exists"
     }
+
+    # --- THE ENTRY GATE, AND THE PATH IT REACHES INTO THIS TREE FOR (#1805) -----------------------
+    # This runner was the ONE file this command places outside the folder and the only one nothing here
+    # asserted at all -- not that it lands, and not that the script it names exists. It does not vendor
+    # the gate: it checks THIS repository out beside the consumer's tree and runs a path into it, so the
+    # dependency points the wrong way and this suite is the only end of it this repo can hold.
+    #
+    # THE PATH IS DERIVED FROM THE EMITTED FILE, NEVER RESTATED HERE, and that is the whole point of the
+    # assert rather than a style preference. adopt-merge-queue.tests.ps1 pins its three paths as literal
+    # strings -- `$fold -like '*.workflow-scripts/plugins/dkj-policy/...*'` -- which compares the
+    # scaffolder's output against itself and stays green when the script moves in this tree. It did move
+    # (plugins/workflows/contributing-davekjohn/ -> plugins/dkj-policy/), every suite stayed green, and
+    # two consumers were red on every pull request for five days before anybody noticed.
+    $gateRel = '.github\workflows\branch-entry.yml'
+    Assert-True (Test-Path -LiteralPath (Join-Path $c2 $gateRel) -PathType Leaf) '-Apply: the branch-entry gate workflow is placed'
+    . (Join-Path $RepoRoot 'scripts\lib\consumer-runner-lib.ps1')
+    $gateRefs = @(Get-SharedScriptReference -WorkflowText ([System.IO.File]::ReadAllText((Join-Path $c2 $gateRel), [System.Text.Encoding]::UTF8)) -RepositoryName 'claude-code-specialists')
+    Assert-Equal 1 $gateRefs.Count '-Apply: the gate reaches exactly one script out of a checkout of this repo'
+    foreach ($judged in @(Test-SharedScriptReference -Reference $gateRefs -SourceRoot $RepoRoot)) {
+        Assert-True $judged.Exists "-Apply: the gate runs '$($judged.Path)', and that path EXISTS in this tree"
+    }
     # THE BRANCH DOCUMENT IS NOT PLACED, and that is this adopter's half of the lifetime rule (Dave,
     # August 23, 2026). It used to be written here in its reset state, so a consumer's first look at the
     # folder was also their reference. The document exists only while a branch is open now, so placing one
