@@ -43,7 +43,51 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**2 / 9 minor entries** <!-- pending-tally -->
+**2 / 10 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1773-retired-plugin-name-records · 20260910-095038
+
+`tidy-machine` gained an eleventh lane, and it closes the half of a defect lane 8 could never see: an
+install record naming a **plugin the marketplace no longer lists**, for a checkout that is still there.
+Lane 8 probes the record's `projectPath`, so a rename -- a deliberate act this workflow performs, twice
+in two days in #1697 and #1698 -- silently turned every existing record into dead weight that no lane
+reported. Measured on the machine this landed from: seven such records, under two retired naming
+generations. The lane names each one, hands over the uninstall, and says which checkout it has to be run
+from, because an uninstall is keyed on the directory it runs in.
+
+Three decisions inside it are worth naming. The authority is **each marketplace's own clone** under
+`~/.claude`, per marketplace, which is the caveat #1773 raised: a name alive in one marketplace says
+nothing about a record naming another, and a clone this run could not parse produces silence rather than
+a verdict. The printed `--scope` is the **record's own** and never a fixed `project`, because an
+uninstall at `project` refuses a record sitting at `local` (inbound #315) and a session start alone is
+enough to create one. And the lane is numbered 11 rather than slotted in beside its sibling: lane
+numbers are cited in the changelog, the skill page and a sibling suite, so adjacency would have cost
+more than it bought.
+
+Lane 8 also stopped printing findings with the plugin name missing. It read a `Plugin` field on the
+install record, which nothing writes -- the projection carries `Id` -- so every finding it has ever made
+named a path and no plugin. Its own fixture hand-wrote that field and no assert read the value back,
+which is exactly why the suite was green; the id is asserted now.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A -- this repo publishes a plugin rather than a subscribed service, so no subscriber sees a
+maintenance lane. The reader who does is a consumer developer running `dkj-policy`, and that is the
+score above.
+
+**Score:** N/A
+
+#### Pull Request
+
+tidy-machine reports install records under a retired plugin name
+
+Plugins: dkj-policy
+
+[PR #1783](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1783)
+
+---
 
 ### DEPLOY: docs/1769-marketplace-rename-prep · 20260910-093800
 
