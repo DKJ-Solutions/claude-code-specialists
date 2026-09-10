@@ -226,7 +226,7 @@ carry skills, hooks and scripts — so the roster check skips them by design rat
 
 Each specialist has a repo lens at `.claude/specialists/lenses/<g>-<id>-extension.md`. For a
 
-full description, run `claude plugin details <plugin>@claude-code-specialists` or read their manual.
+full description, run `claude plugin details <plugin>@dkj-claude-plugins` or read their manual.
 
 
 

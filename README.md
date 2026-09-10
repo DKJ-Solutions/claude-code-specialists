@@ -18,7 +18,7 @@ keeping its own copies, and enables or disables **per plugin** which teams and w
 | **connect my own repo — just the commands** | **[INSTALL.md, the quickstart half](INSTALL.md#quickstart--the-commands-and-nothing-else)** — five steps, the commands and nothing else, linking down for every caveat. |
 | **connect my own repo — and know why** | **[INSTALL.md, the adoption half](INSTALL.md#adoption--how-to-connect-your-repo)** — the full, measurement-backed adoption manual for someone who did not build this, ~47 min (August 6, 2026). Read its *Before you start* section first if the machine is new or has adopted this family before. |
 | **disconnect it again** | [UNINSTALL.md](UNINSTALL.md) — the install page's mirror: the repo teardown and the machine-side removal, in the order they have to happen. |
-| **I already adopted this, under the old plugin names** | [INSTALL.md, migrating from the old plugin names](INSTALL.md#migrating-from-the-old-plugin-names) — a third procedure, neither the quickstart nor first-time adoption: the old ids (`specialists@claude-code-specialists` and its siblings) mapped onto the new teams and workflow. |
+| **I already adopted this, under the old plugin names** | [INSTALL.md, migrating from the old plugin names](INSTALL.md#migrating-from-the-old-plugin-names) — a third procedure, neither the quickstart nor first-time adoption: the old ids (`specialists@dkj-claude-plugins` and its siblings) mapped onto the new teams and workflow. |
 | know **what this promises my repo** | [The plugin serves the consumer's repo](#the-plugin-serves-the-consumers-repo) — the specialist teams adapt to your way of working, and nothing arrives unasked; `dkj-policy` is the exception, and installing it is choosing to be governed by it. |
 | know **what the words mean** (agent, subagent, scaffold, harness) | [The vocabulary](#the-vocabulary--where-these-plugins-sit-inside-an-agent) — where these plugins sit inside an agent, and why none of them is named after an agent. |
 | know **which plugin does what** | [Teams and workflows](#teams-and-workflows--whats-the-difference) |
@@ -235,7 +235,7 @@ were declined and the reasoning is recorded here, because it is the kind of prop
   was meant to cure.
 - **`scaffold` cannot distinguish one plugin from another**, because on the definition above every
   plugin here is scaffold. A prefix every member carries is a constant, and a constant belongs in the
-  namespace — which `dkj-` and `@claude-code-specialists` already are. It would also collide with the two
+  namespace — which `dkj-` and `@dkj-claude-plugins` already are. It would also collide with the two
   established senses listed above, in a tree that has spent real effort keeping them sharp.
 - **`dkj-scaffold-core` cannot reach its own content.** `${CLAUDE_PLUGIN_ROOT}` resolves per installed
   plugin and does not cross plugin boundaries. `dkj-policy-bwj` already demonstrates the consequence:
@@ -894,7 +894,7 @@ invented: the manifest format has none, and one would need Claude to honour it, 
 not travel cannot be offered by anything.
 
 **The marketplace keeps its name.** `claude-code-specialists` is the key in every consumer's
-`enabledPlugins` (`dkj-subagents-alpha@claude-code-specialists`), so the filtered marketplace is the *same*
+`enabledPlugins` (`dkj-subagents-alpha@dkj-claude-plugins`), so the filtered marketplace is the *same*
 marketplace with fewer entries, not a second one under a new key.
 
 **The unit is the plugin, and the degraded items travel.** `dkj-subagents-alpha`'s three PowerShell skills and

@@ -79,7 +79,7 @@ New-Item -ItemType Directory -Path (Join-Path $FixtureRoot '.claude') -Force | O
       "source": { "source": "github", "repo": "DKJ-Solutions/claude-code-specialists" }
     }
   },
-  "enabledPlugins": { "dkj-subagents-alpha@claude-code-specialists": true }
+  "enabledPlugins": { "dkj-subagents-alpha@dkj-claude-plugins": true }
 }
 '@ | Set-Content -LiteralPath (Join-Path $FixtureRoot '.claude\settings.json') -Encoding utf8
 

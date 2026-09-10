@@ -234,7 +234,7 @@ commands, run from the root of the repo that consumes it:
 
 ```powershell
 claude plugin marketplace update claude-code-specialists                   # 1. refresh the cache first
-claude plugin update dkj-policy@claude-code-specialists --scope project    # 2. then update, per plugin
+claude plugin update dkj-policy@dkj-claude-plugins --scope project    # 2. then update, per plugin
 ```
 
 Then **restart the session** — a skill or a hook that arrived with the update is not in a session that

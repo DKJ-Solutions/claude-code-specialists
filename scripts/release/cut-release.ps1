@@ -1275,7 +1275,7 @@ function Write-SelfConsumptionReminder {
         declarative way has no record -- and this function used to read only the settings key, which made
         the very source it consulted the one that guaranteed the command it printed could not succeed:
 
-            claude plugin update dkj-subagents-alpha@claude-code-specialists --scope project
+            claude plugin update dkj-subagents-alpha@dkj-claude-plugins --scope project
             -> Failed to update plugin "...": Plugin "dkj-subagents-alpha" is not installed
 
         Both halves were measured rather than reasoned about, because the report that found this flagged

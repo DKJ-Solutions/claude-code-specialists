@@ -103,8 +103,8 @@ line) and `script-contract-sessioncheck.ps1` (through `check-script-contract.ps1
   "claude-code-specialists": { "source": { "source": "github", "repo": "DKJ-Solutions/claude-code-specialists" } }
 },
 "enabledPlugins": {
-  "dkj-subagents-alpha@claude-code-specialists": true
-  // plus a domain plugin of choice, e.g. "dkj-subagents-shopify@claude-code-specialists": true
+  "dkj-subagents-alpha@dkj-claude-plugins": true
+  // plus a domain plugin of choice, e.g. "dkj-subagents-shopify@dkj-claude-plugins": true
 }
 ```
 
@@ -127,9 +127,9 @@ So run, from the root of the consuming repo, one command per plugin listed in `e
 
 ```powershell
 claude plugin marketplace update claude-code-specialists   # first: refresh the cached marketplace
-claude plugin install dkj-subagents-alpha@claude-code-specialists --scope project
+claude plugin install dkj-subagents-alpha@dkj-claude-plugins --scope project
 # plus each domain plugin, e.g.:
-claude plugin install dkj-subagents-shopify@claude-code-specialists --scope project
+claude plugin install dkj-subagents-shopify@dkj-claude-plugins --scope project
 ```
 
 **That first line matters if the marketplace is already cached on this machine, and skipping it
@@ -213,7 +213,7 @@ directly. **Nothing in this plugin depends on that being fixed**: the checks now
 plugin update` also defaults to user scope, so on a project-scoped install the plain command fails:
 
 ```
-✘ Failed to update plugin "dkj-subagents-alpha@claude-code-specialists": Plugin "specialists" is not installed at scope user
+✘ Failed to update plugin "dkj-subagents-alpha@dkj-claude-plugins": Plugin "specialists" is not installed at scope user
 ```
 
 That message is literally true and reads as *"this plugin is not installed"* on a machine where it
@@ -223,7 +223,7 @@ flag instead, from the consuming repo's root, one command per plugin:
 
 ```powershell
 claude plugin marketplace update claude-code-specialists
-claude plugin update dkj-subagents-alpha@claude-code-specialists --scope project
+claude plugin update dkj-subagents-alpha@dkj-claude-plugins --scope project
 ```
 
 Both lines — but the reason is stated per command now, because the shared version of it was tested and
@@ -257,7 +257,7 @@ record had **moved**, not never existed — worth knowing, because the two call 
 list nevertheless reported:
 
 ```
-❯ dkj-subagents-alpha@claude-code-specialists   Version: 3.0.1   Scope: project   Status: ✔ enabled
+❯ dkj-subagents-alpha@dkj-claude-plugins   Version: 3.0.1   Scope: project   Status: ✔ enabled
 ```
 
 The command enumerates install records beyond the current repo, so a green line is no evidence that

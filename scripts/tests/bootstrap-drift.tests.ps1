@@ -288,7 +288,7 @@ try {
     if (Test-Path -LiteralPath $FixtureWf) { Remove-Item -Recurse -Force -LiteralPath $FixtureWf }
     New-Item -ItemType Directory -Path (Join-Path $FixtureWf '.claude') -Force | Out-Null
     [System.IO.File]::WriteAllText((Join-Path $FixtureWf '.claude\settings.json'),
-        '{ "enabledPlugins": { "dkj-subagents-alpha@claude-code-specialists": true, "dkj-policy@claude-code-specialists": true } }', $Utf8NoBom)
+        '{ "enabledPlugins": { "dkj-subagents-alpha@dkj-claude-plugins": true, "dkj-policy@dkj-claude-plugins": true } }', $Utf8NoBom)
     $rWf = Invoke-Script -Path $Bootstrap -ScriptArgs @('-ConsumerRoot', $FixtureWf)
     Assert-Equal 0 $rWf.Code 'workflow plugin: bootstrap exit 0'
     $rcScaffold = Join-Path $FixtureWf 'scripts\repo-config.ps1'
@@ -340,7 +340,7 @@ try {
         # THE DEFECT ITSELF. Without this the paste produces a valid settings file with no plugin
         # surface at all -- 3 -> 0 SessionStart hooks, 6 -> 0 skills, 15 -> 0 subagents, and no message
         # (the state #1076 measured). Both plugins, because losing one is the same failure for that one.
-        foreach ($id in @('dkj-subagents-alpha@claude-code-specialists', 'dkj-policy@claude-code-specialists')) {
+        foreach ($id in @('dkj-subagents-alpha@dkj-claude-plugins', 'dkj-policy@dkj-claude-plugins')) {
             Assert-True (@($wfObj.enabledPlugins.PSObject.Properties | Where-Object { $_.Name -eq $id }).Count -eq 1) `
                 "workflow plugin: the merged file KEEPS enabledPlugins['$id'] -- the key a whole-file paste deleted (#1124)"
         }
@@ -385,9 +385,9 @@ try {
     # exists to catch a stale consumer cannot fire for a plugin nobody listed. This fixture is the
     # exact shape that produced it, which is why the assertion lives here rather than in a fixture
     # written for it.
-    Assert-True ($rWf.Out -match '(?s)"id":\s*"dkj-policy@claude-code-specialists",\s*\r?\n\s*"extensions":\s*\[\s*\]') `
+    Assert-True ($rWf.Out -match '(?s)"id":\s*"dkj-policy@dkj-claude-plugins",\s*\r?\n\s*"extensions":\s*\[\s*\]') `
         'workflow plugin: the agent-less plugin IS in the register proposal, with an empty extensions array (#1084)'
-    Assert-True ($rWf.Out -match '(?s)"id":\s*"dkj-subagents-alpha@claude-code-specialists",\s*\r?\n\s*"extensions":\s*\["01-01"') `
+    Assert-True ($rWf.Out -match '(?s)"id":\s*"dkj-subagents-alpha@dkj-claude-plugins",\s*\r?\n\s*"extensions":\s*\["01-01"') `
         'workflow plugin: and the agent-bearing plugin still carries its ids -- the widening did not flatten the inventory'
     # The notice is the other half of the repair: it was worded as a missing DIRECTORY, so the reader
     # had to infer several hundred lines later what it meant for the manifest they were about to paste.
@@ -436,11 +436,11 @@ try {
     if (Test-Path -LiteralPath $FixtureMp) { Remove-Item -Recurse -Force -LiteralPath $FixtureMp }
     New-Item -ItemType Directory -Path (Join-Path $FixtureMp '.claude') -Force | Out-Null
     [System.IO.File]::WriteAllText((Join-Path $FixtureMp '.claude\settings.json'),
-        '{ "enabledPlugins": { "dkj-subagents-alpha@claude-code-specialists": true, "dkj-policy@claude-code-specialists": true, "somewidget@some-other-marketplace": true } }', $Utf8NoBom)
+        '{ "enabledPlugins": { "dkj-subagents-alpha@dkj-claude-plugins": true, "dkj-policy@dkj-claude-plugins": true, "somewidget@some-other-marketplace": true } }', $Utf8NoBom)
     $rMp = Invoke-Script -Path $Bootstrap -ScriptArgs @('-ConsumerRoot', $FixtureMp)
     Assert-Equal 0 $rMp.Code 'marketplace scope: bootstrap exit 0 with a foreign plugin enabled'
-    Assert-True ($rMp.Out -match 'dkj-subagents-alpha@claude-code-specialists') 'marketplace scope: our own plugins are in the proposal'
-    Assert-True ($rMp.Out -match 'dkj-policy@claude-code-specialists') 'marketplace scope: including the agent-less one (#1084)'
+    Assert-True ($rMp.Out -match 'dkj-subagents-alpha@dkj-claude-plugins') 'marketplace scope: our own plugins are in the proposal'
+    Assert-True ($rMp.Out -match 'dkj-policy@dkj-claude-plugins') 'marketplace scope: including the agent-less one (#1084)'
     Assert-True (-not ($rMp.Out -match 'somewidget@some-other-marketplace')) 'marketplace scope: a plugin of ANOTHER marketplace is NOT in the proposal'
     # And it says so where the reader is, rather than dropping it in silence -- the same rule the skip
     # notice above follows: name the consequence for the manifest, not just the missing directory.
@@ -468,7 +468,7 @@ try {
     $hookCmd = 'powershell -File C:\uadded\check.ps1 && echo <done>'
     [System.IO.File]::WriteAllText((Join-Path $FixtureEsc '.claude\settings.json'), (@'
 {
-  "enabledPlugins": { "dkj-subagents-alpha@claude-code-specialists": true },
+  "enabledPlugins": { "dkj-subagents-alpha@dkj-claude-plugins": true },
   "permissions": { "allow": null },
   "hooks": { "Stop": [ { "hooks": [ { "type": "command", "command": "HOOKCMD" } ] } ] }
 }
@@ -501,7 +501,7 @@ try {
     Invoke-FixtureGitIn $FixtureIgn init --quiet
     [System.IO.File]::WriteAllText((Join-Path $FixtureIgn '.gitignore'), ".claude/settings.json`n", $Utf8NoBom)
     [System.IO.File]::WriteAllText((Join-Path $FixtureIgn '.claude\settings.json'),
-        '{ "enabledPlugins": { "dkj-subagents-alpha@claude-code-specialists": true }, "env": { "SOME_TOKEN": "x" } }', $Utf8NoBom)
+        '{ "enabledPlugins": { "dkj-subagents-alpha@dkj-claude-plugins": true }, "env": { "SOME_TOKEN": "x" } }', $Utf8NoBom)
     $rIgn = Invoke-Script -Path $Bootstrap -ScriptArgs @('-ConsumerRoot', $FixtureIgn)
     Assert-Equal 0 $rIgn.Code 'ignore-gap: bootstrap exit 0'
     Assert-True ($rIgn.Out -match 'gitignored here and the merged copy beside it is NOT') `
@@ -624,7 +624,7 @@ try {
             # below would pass or fail for the wrong reason.
             New-Item -ItemType Directory -Path (Join-Path $gitFix '.claude') -Force | Out-Null
             [System.IO.File]::WriteAllText((Join-Path $gitFix '.claude\settings.json'),
-                '{ "enabledPlugins": { "dkj-subagents-alpha@claude-code-specialists": true, "dkj-policy@claude-code-specialists": true } }', $Utf8NoBom)
+                '{ "enabledPlugins": { "dkj-subagents-alpha@dkj-claude-plugins": true, "dkj-policy@dkj-claude-plugins": true } }', $Utf8NoBom)
             $rg = Invoke-Script -Path $Bootstrap -ScriptArgs @('-ConsumerRoot', $gitFix)
             Assert-Equal 0 $rg.Code "git derivation ($Label): bootstrap exit 0"
             $txt = [System.IO.File]::ReadAllText((Join-Path $gitFix 'scripts\repo-config.ps1'), [System.Text.Encoding]::UTF8)
@@ -711,7 +711,7 @@ try {
     [System.IO.File]::WriteAllText((Join-Path $cacheRoot 'dkj-subagents-lifehub\1.10.0\agents\04-99-agent.md'), "---`nname: newest`nid: 99`ngroup: 04`n---`nfixture")
     $cacheConsumer = Join-Path $Fixture 'cache-consumer'
     New-Item -ItemType Directory -Path (Join-Path $cacheConsumer '.claude') -Force | Out-Null
-    [System.IO.File]::WriteAllText((Join-Path $cacheConsumer '.claude\settings.json'), '{ "enabledPlugins": { "dkj-subagents-alpha@claude-code-specialists": true, "dkj-subagents-lifehub@claude-code-specialists": true } }')
+    [System.IO.File]::WriteAllText((Join-Path $cacheConsumer '.claude\settings.json'), '{ "enabledPlugins": { "dkj-subagents-alpha@dkj-claude-plugins": true, "dkj-subagents-lifehub@dkj-claude-plugins": true } }')
     $cachedBootstrap = Join-Path $ownCache 'skills\specialists-init\bootstrap.ps1'
     $rc = Invoke-Script -Path $cachedBootstrap -ScriptArgs @('-ConsumerRoot', $cacheConsumer)
     Assert-Equal 0 $rc.Code 'version cache: bootstrap exit 0'

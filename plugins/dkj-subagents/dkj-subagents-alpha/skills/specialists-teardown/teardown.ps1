@@ -544,7 +544,10 @@ function Get-InstallRecordState {
 $settings = Join-Path $root '.claude\settings.json'
 if (Test-Path -LiteralPath $settings -PathType Leaf) {
     $text = [System.IO.File]::ReadAllText($settings, [System.Text.Encoding]::UTF8)
-    if ($text -match 'specialists') {
+    # The marketplace name appears in every 'enabledPlugins' key ('<plugin>@<marketplace>') and in the
+    # marketplace-source key. Match both the current name and the retired one, so a consumer that has
+    # not yet migrated off 'claude-code-specialists' still gets the note (#1769).
+    if ($text -match 'dkj-claude-plugins|claude-code-specialists') {
         $notes += ".claude/settings.json still enables the plugin. That file is yours -- THIS SCRIPT never edits it. The uninstall command in the next note removes the 'enabledPlugins' entry for you (it leaves 'enabledPlugins': {} behind), so edit this file by hand only if you are NOT running that command, or to drop the marketplace source when nothing else uses it. Either way the subagents and the session hooks stay active until the entry is gone and the session has been restarted."
     }
 }

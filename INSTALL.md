@@ -36,7 +36,7 @@ which this half is the summary of.
 > **Read neither half, and go straight to
 > [Migrating from the old plugin names](#migrating-from-the-old-plugin-names) instead, if you already
 > have this family installed under the ids it used before it split into teams and a workflow** —
-> `specialists@claude-code-specialists` and its siblings. That is a third procedure, not a shorter or
+> `specialists@dkj-claude-plugins` and its siblings. That is a third procedure, not a shorter or
 > longer version of either half below.
 
 ### Step 1 — enable and install
@@ -56,7 +56,7 @@ line per add-on team you want, and add `dkj-policy` only if you deliberately wan
     }
   },
   "enabledPlugins": {
-    "dkj-subagents-alpha@claude-code-specialists": true
+    "dkj-subagents-alpha@dkj-claude-plugins": true
   }
 }
 ```
@@ -69,7 +69,7 @@ it, the next command fails with `Marketplace … not found`.
 ```powershell
 claude plugin marketplace update claude-code-specialists                     # never skip: install does not refresh
 claude plugin marketplace list                                               # came the entry from YOUR repo's settings?
-claude plugin install dkj-subagents-alpha@claude-code-specialists --scope project    # once per plugin
+claude plugin install dkj-subagents-alpha@dkj-claude-plugins --scope project    # once per plugin
 ```
 
 `--scope project` is not optional — without it the install goes machine-wide and writes no
@@ -189,7 +189,7 @@ Two commands, from your repo's root, one pair per plugin:
 
 ```powershell
 claude plugin marketplace update claude-code-specialists
-claude plugin update dkj-subagents-alpha@claude-code-specialists --scope project
+claude plugin update dkj-subagents-alpha@dkj-claude-plugins --scope project
 ```
 
 **Before running them, check whether you are behind at all.** Once `dkj-policy` is installed, the
@@ -227,17 +227,17 @@ your own lenses, which do not travel with the plugin.
 ## Migrating off the `dkj-team-*` ids (#1698, September 9, 2026)
 
 > **This section is for a repo that has this family's teams installed under the ids they used up to
-> September 9, 2026** — `dkj-team-alpha@claude-code-specialists` and the three add-on teams. Like the
+> September 9, 2026** — `dkj-team-alpha@dkj-claude-plugins` and the three add-on teams. Like the
 > section below it, this is a rename and nothing else: no team gained or lost a specialist, a manual, a
 > skill or a hook on the day it happened. The workflow ids (`dkj-policy`, `dkj-policy-bwj`) are
 > **unchanged** — do not touch them.
 
 | old plugin id | new plugin id |
 |---|---|
-| `dkj-team-alpha@claude-code-specialists` | `dkj-subagents-alpha@claude-code-specialists` |
-| `dkj-team-ecomm@claude-code-specialists` | `dkj-subagents-ecomm@claude-code-specialists` |
-| `dkj-team-lifehub@claude-code-specialists` | `dkj-subagents-lifehub@claude-code-specialists` |
-| `dkj-team-shopify@claude-code-specialists` | `dkj-subagents-shopify@claude-code-specialists` |
+| `dkj-team-alpha@dkj-claude-plugins` | `dkj-subagents-alpha@dkj-claude-plugins` |
+| `dkj-team-ecomm@dkj-claude-plugins` | `dkj-subagents-ecomm@dkj-claude-plugins` |
+| `dkj-team-lifehub@dkj-claude-plugins` | `dkj-subagents-lifehub@dkj-claude-plugins` |
+| `dkj-team-shopify@dkj-claude-plugins` | `dkj-subagents-shopify@dkj-claude-plugins` |
 
 **Why the names moved.** *Team* is this family's own word for a group of specialists; *subagent* is Claude
 Code's word for what those plugins actually ship, and it is the word your own harness uses when it loads
@@ -247,24 +247,24 @@ it rather than replacing it.
 
 **What did NOT get a prefix, deliberately.** `dkj-scaffold-subagents` was considered on the same day and
 declined: on the agent anatomy *every* plugin here is scaffold, so the prefix would be a constant, and a
-constant belongs in the namespace — which `dkj-` and `@claude-code-specialists` already are.
+constant belongs in the namespace — which `dkj-` and `@dkj-claude-plugins` already are.
 
 ```powershell
 # 1. Refresh -- do this first, every time
 claude plugin marketplace update claude-code-specialists
 
 # 2. Uninstall the retired ids -- skip whichever you never enabled
-claude plugin uninstall dkj-team-alpha@claude-code-specialists --scope project
-claude plugin uninstall dkj-team-ecomm@claude-code-specialists --scope project
-claude plugin uninstall dkj-team-lifehub@claude-code-specialists --scope project
-claude plugin uninstall dkj-team-shopify@claude-code-specialists --scope project
+claude plugin uninstall dkj-team-alpha@dkj-claude-plugins --scope project
+claude plugin uninstall dkj-team-ecomm@dkj-claude-plugins --scope project
+claude plugin uninstall dkj-team-lifehub@dkj-claude-plugins --scope project
+claude plugin uninstall dkj-team-shopify@dkj-claude-plugins --scope project
 
 # 3. Refresh again, then install the new ids -- only the ones you had
 claude plugin marketplace update claude-code-specialists
-claude plugin install dkj-subagents-alpha@claude-code-specialists --scope project
-claude plugin install dkj-subagents-ecomm@claude-code-specialists --scope project
-claude plugin install dkj-subagents-lifehub@claude-code-specialists --scope project
-claude plugin install dkj-subagents-shopify@claude-code-specialists --scope project
+claude plugin install dkj-subagents-alpha@dkj-claude-plugins --scope project
+claude plugin install dkj-subagents-ecomm@dkj-claude-plugins --scope project
+claude plugin install dkj-subagents-lifehub@dkj-claude-plugins --scope project
+claude plugin install dkj-subagents-shopify@dkj-claude-plugins --scope project
 ```
 
 **4. Restart your Claude Code session.**
@@ -313,14 +313,14 @@ to any custom one, so a custom skills directory can only ever add, never move.
 ## Migrating off `contributing-davekjohn` and `bwj-codex` (#1437, September 5, 2026)
 
 > **This section is for a repo that has this family installed under the ids it used up to
-> September 5, 2026** — `contributing-davekjohn@claude-code-specialists` and, in BWJ's two store repos,
-> `bwj-codex@claude-code-specialists`. It is shorter than the section below because it is a rename and
+> September 5, 2026** — `contributing-davekjohn@dkj-claude-plugins` and, in BWJ's two store repos,
+> `bwj-codex@dkj-claude-plugins`. It is shorter than the section below because it is a rename and
 > nothing else: no plugin gained or lost a skill, a script, a gate or a seam on the day it happened.
 
 | old plugin id | new plugin id |
 |---|---|
-| `contributing-davekjohn@claude-code-specialists` | `dkj-policy@claude-code-specialists` |
-| `bwj-codex@claude-code-specialists` | `dkj-policy-bwj@claude-code-specialists` |
+| `contributing-davekjohn@dkj-claude-plugins` | `dkj-policy@dkj-claude-plugins` |
+| `bwj-codex@dkj-claude-plugins` | `dkj-policy-bwj@dkj-claude-plugins` |
 
 **Why the names moved.** `dkj-policy` is the top rung of the order this family legislates — the page that
 outranks a consumer's root `CLAUDE.md` on every subject it addresses — and `contributing-davekjohn` named
@@ -332,14 +332,14 @@ two repos it binds. Nothing about the precedence rule changed; the names now say
 claude plugin marketplace update claude-code-specialists
 
 # 2. Uninstall the retired ids -- skip whichever you never enabled
-claude plugin uninstall contributing-davekjohn@claude-code-specialists --scope project
-claude plugin uninstall bwj-codex@claude-code-specialists --scope project
+claude plugin uninstall contributing-davekjohn@dkj-claude-plugins --scope project
+claude plugin uninstall bwj-codex@dkj-claude-plugins --scope project
 
 # 3. Refresh again, then install the new ids
 claude plugin marketplace update claude-code-specialists
-claude plugin install dkj-policy@claude-code-specialists --scope project
+claude plugin install dkj-policy@dkj-claude-plugins --scope project
 # Only BWJ's two store repos need the second one:
-claude plugin install dkj-policy-bwj@claude-code-specialists --scope project
+claude plugin install dkj-policy-bwj@dkj-claude-plugins --scope project
 ```
 
 **4. Restart your Claude Code session.**
@@ -380,9 +380,9 @@ the folder to match the plugin, and move the seam answer in the same commit.
 ## Migrating from the old plugin names
 
 > **This section is for a repo that already has this family installed under the plugin ids it used
-> before it split into teams and a workflow** — `specialists@claude-code-specialists`,
-> `specialists-lifehub@claude-code-specialists`, `specialists-shopify@claude-code-specialists`,
-> `specialists-ecomm@claude-code-specialists`, or `specialists-workflow-davekjohn@claude-code-specialists`.
+> before it split into teams and a workflow** — `specialists@dkj-claude-plugins`,
+> `specialists-lifehub@dkj-claude-plugins`, `specialists-shopify@dkj-claude-plugins`,
+> `specialists-ecomm@dkj-claude-plugins`, or `specialists-workflow-davekjohn@dkj-claude-plugins`.
 > It is neither the quickstart above (you are not adopting for the first time) nor the adoption manual
 > below (you are not connecting a repo that has never seen this family) — it is a third procedure, and
 > it earns its own section because a mechanical id swap alone silently loses something neither of the
@@ -391,11 +391,11 @@ the folder to match the plugin, and move the seam answer in the same commit.
 
 | old plugin id | new plugin id |
 |---|---|
-| `specialists@claude-code-specialists` | `dkj-subagents-alpha@claude-code-specialists` |
-| `specialists-lifehub@claude-code-specialists` | `dkj-subagents-lifehub@claude-code-specialists` |
-| `specialists-shopify@claude-code-specialists` | `dkj-subagents-shopify@claude-code-specialists` |
-| `specialists-ecomm@claude-code-specialists` | `dkj-subagents-ecomm@claude-code-specialists` |
-| `specialists-workflow-davekjohn@claude-code-specialists` | `dkj-policy@claude-code-specialists` |
+| `specialists@dkj-claude-plugins` | `dkj-subagents-alpha@dkj-claude-plugins` |
+| `specialists-lifehub@dkj-claude-plugins` | `dkj-subagents-lifehub@dkj-claude-plugins` |
+| `specialists-shopify@dkj-claude-plugins` | `dkj-subagents-shopify@dkj-claude-plugins` |
+| `specialists-ecomm@dkj-claude-plugins` | `dkj-subagents-ecomm@dkj-claude-plugins` |
+| `specialists-workflow-davekjohn@dkj-claude-plugins` | `dkj-policy@dkj-claude-plugins` |
 
 Every plugin is now either a **team** (who the specialists are) or a **workflow** (how work moves
 through the repo) — see
@@ -453,7 +453,7 @@ replacement plus the one workflow you decided on above, then restart.
 > to remove a plugin its catalogue no longer advertises. **Measured on 2026-08-09**, on the source repo
 > itself, in exactly this order: after
 > `claude plugin marketplace update claude-code-specialists` the uninstalls of
-> `specialists@claude-code-specialists` and `specialists-workflow-davekjohn@claude-code-specialists`
+> `specialists@dkj-claude-plugins` and `specialists-workflow-davekjohn@dkj-claude-plugins`
 > both returned `✔ Successfully uninstalled plugin`. `uninstall` resolves against your install record,
 > not against the catalogue. What is *not* claimed here is anything about whether `uninstall` refreshes
 > the cache — nobody has tested that, and this page has been caught generalising an untested claim from
@@ -464,11 +464,11 @@ replacement plus the one workflow you decided on above, then restart.
 claude plugin marketplace update claude-code-specialists
 
 # 2. Uninstall every old id you had enabled -- skip whichever you never enabled
-claude plugin uninstall specialists@claude-code-specialists --scope project
-claude plugin uninstall specialists-lifehub@claude-code-specialists --scope project
-claude plugin uninstall specialists-shopify@claude-code-specialists --scope project
-claude plugin uninstall specialists-ecomm@claude-code-specialists --scope project
-claude plugin uninstall specialists-workflow-davekjohn@claude-code-specialists --scope project
+claude plugin uninstall specialists@dkj-claude-plugins --scope project
+claude plugin uninstall specialists-lifehub@dkj-claude-plugins --scope project
+claude plugin uninstall specialists-shopify@dkj-claude-plugins --scope project
+claude plugin uninstall specialists-ecomm@dkj-claude-plugins --scope project
+claude plugin uninstall specialists-workflow-davekjohn@dkj-claude-plugins --scope project
 ```
 
 ```powershell
@@ -476,15 +476,15 @@ claude plugin uninstall specialists-workflow-davekjohn@claude-code-specialists -
 claude plugin marketplace update claude-code-specialists
 
 # 3a. The core team -- everyone runs this one
-claude plugin install dkj-subagents-alpha@claude-code-specialists --scope project
+claude plugin install dkj-subagents-alpha@dkj-claude-plugins --scope project
 
 # 3b. The add-on teams -- ONLY the ones you uninstalled in step 2. Delete the other lines.
-claude plugin install dkj-subagents-lifehub@claude-code-specialists --scope project
-claude plugin install dkj-subagents-shopify@claude-code-specialists --scope project
-claude plugin install dkj-subagents-ecomm@claude-code-specialists --scope project
+claude plugin install dkj-subagents-lifehub@dkj-claude-plugins --scope project
+claude plugin install dkj-subagents-shopify@dkj-claude-plugins --scope project
+claude plugin install dkj-subagents-ecomm@dkj-claude-plugins --scope project
 
 # 3c. The workflow -- opt-in. Uncomment it only if you deliberately want this method.
-# claude plugin install dkj-policy@claude-code-specialists --scope project
+# claude plugin install dkj-policy@dkj-claude-plugins --scope project
 ```
 
 **4. Restart your Claude Code session.**
@@ -916,7 +916,7 @@ that domain). What follows is a **complete, pasteable file** — if you already 
     }
   },
   "enabledPlugins": {
-    "dkj-subagents-alpha@claude-code-specialists": true
+    "dkj-subagents-alpha@dkj-claude-plugins": true
   }
 }
 ```
@@ -969,7 +969,7 @@ of your repo, preceded once by a refresh of that cached clone:
 
 ```powershell
 claude plugin marketplace update claude-code-specialists                     # 1. refresh the cache first
-claude plugin install dkj-subagents-alpha@claude-code-specialists --scope project    # 2. then install, per plugin
+claude plugin install dkj-subagents-alpha@dkj-claude-plugins --scope project    # 2. then install, per plugin
 # and line 2 again for each add-on team you enabled, and for dkj-policy if you enabled it
 ```
 
@@ -1147,7 +1147,7 @@ clone these commands read tracks `main`, not the tag.
 
 ```powershell
 claude plugin marketplace update claude-code-specialists          # 1. refresh the marketplace cache
-claude plugin update dkj-subagents-alpha@claude-code-specialists --scope project   # 2. then update, per plugin
+claude plugin update dkj-subagents-alpha@dkj-claude-plugins --scope project   # 2. then update, per plugin
 ```
 
 The `plugin-versions` skill (shipped by `dkj-policy`) packages the installed-vs-clone comparison this
@@ -1166,7 +1166,7 @@ the two differ and an earlier version of this page generalised them.**
   and with the refresh a second fresh folder produced **3.0.5**. So the refresh is what makes the
   difference for this verb — nothing else.
   **And the output cannot warn you, even in principle:** `✔ Successfully installed plugin:
-  specialists@claude-code-specialists (scope: project)` names the scope and **no version at all**. The
+  specialists@dkj-claude-plugins (scope: project)` names the scope and **no version at all**. The
   install record is the only place the version appears, which is exactly why the verification step in
   Step 1 queries `installed_plugins.json` instead of reading a success line.
 - **`update` refreshed the cache by itself when measured.** On July 31, 2026 (CLI `2.1.220`), with the

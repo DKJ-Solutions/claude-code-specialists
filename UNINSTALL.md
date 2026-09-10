@@ -186,7 +186,7 @@ nothing and needs no `-Apply`.
 From your repo root:
 
 ```powershell
-claude plugin uninstall dkj-subagents-alpha@claude-code-specialists --scope project
+claude plugin uninstall dkj-subagents-alpha@dkj-claude-plugins --scope project
 # and once more for each add-on team you enabled -- and for
 # dkj-policy if you enabled the workflow
 ```
@@ -206,9 +206,9 @@ command does not act on a project-scoped install. What it says instead depends o
 `2.1.220` (measured, round v11) it is:
 
 ```text
-✘ Failed to uninstall plugin "dkj-subagents-alpha@claude-code-specialists": Plugin "dkj-subagents-alpha@claude-code-specialists"
+✘ Failed to uninstall plugin "dkj-subagents-alpha@dkj-claude-plugins": Plugin "dkj-subagents-alpha@dkj-claude-plugins"
   is enabled at project scope (.claude/settings.json, shared with your team). To disable just for you:
-  claude plugin disable dkj-subagents-alpha@claude-code-specialists --scope local
+  claude plugin disable dkj-subagents-alpha@dkj-claude-plugins --scope local
 ```
 
 **Do not follow the remedy the CLI suggests there.** `plugin disable --scope local` is a different
@@ -225,7 +225,7 @@ removed one. The command you want is the one above, with `--scope project`.
 **If that refuses with *"installed in local scope, not project"*, you are in the third scope and it is not
 your doing.** A session start can write a record by itself and flip an existing `project` record to
 `local` — no command run, no file in your repo changed, nothing reporting it. Remove that one with
-`claude plugin uninstall dkj-subagents-alpha@claude-code-specialists --scope local`. Which scope you are actually in
+`claude plugin uninstall dkj-subagents-alpha@dkj-claude-plugins --scope local`. Which scope you are actually in
 is the last thing this query prints:
 
 ```powershell
@@ -256,7 +256,7 @@ Two more things this command does that are worth expecting rather than discoveri
 The uninstall clears the *entry*; the keys you added in adoption Step 1 are yours to take back out. In
 `.claude/settings.json` (and `.claude/settings.local.json` if you used it), remove:
 
-- `enabledPlugins` — the `dkj-subagents-alpha@claude-code-specialists` entries, or the whole key if it is now `{}`;
+- `enabledPlugins` — the `dkj-subagents-alpha@dkj-claude-plugins` entries, or the whole key if it is now `{}`;
 - `extraKnownMarketplaces` — the `claude-code-specialists` block. **Of the two, this is the one to be sure
   about**: left behind, it can put the marketplace back and the machine rebuilds its own install without a
   command being run (the measured detail is a few paragraphs below);

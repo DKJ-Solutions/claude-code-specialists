@@ -1357,12 +1357,12 @@ authorship for him in consumers that never granted it.
   move.** Because this repo consumes itself, it is a consumer like any other, and the install record is
   keyed on `projectPath`. Measured August 3, 2026: after the directory was renamed from
   `davekjohns-workshop` to `claude-code-specialists`, `.claude/settings.json` still enabled
-  `specialists@claude-code-specialists` correctly while the machine's only record named the old folder,
+  `specialists@dkj-claude-plugins` correctly while the machine's only record named the old folder,
   so the session loaded no subagent, skill or hook at all. Recognize it by a **deliberate** run of
   [`check-roster-sync.ps1`](../../../scripts/sync/check-roster-sync.ps1) reporting
   `[NOT-INSTALLED-HERE]` — the session-start hook cannot report it, because that hook ships in the
   plugin that did not load. The repair is `claude plugin marketplace update claude-code-specialists`
-  followed by `claude plugin install dkj-subagents-alpha@claude-code-specialists --scope project` from the new
+  followed by `claude plugin install dkj-subagents-alpha@dkj-claude-plugins --scope project` from the new
   root, after which a leftover record naming the old folder is expected and inert. The mechanism, the
   other two ways a record goes missing, and why that leftover is not a stray duplicate are in the
   family's [INSTALL.md](../../../INSTALL.md#staying-up-to-date);
