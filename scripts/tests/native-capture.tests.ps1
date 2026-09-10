@@ -777,12 +777,20 @@ Write-Host 'Every temp path the SHIPPING scripts compose carries a guid (#1659)'
 # literals included, and it flagged an earlier draft of this very comment as a predictable fixture path.
 # A guard's own prose is inside the tree its sibling guard measures.
 #
-# THE EXEMPTION IS A MARKER AT THE SITE, not a match on the line's source text. Two lines cannot carry a
-# guid honestly: New-ScratchPath's own composition (it USES the guid built one line above) and
-# check-claude-home's enumeration of the temp roots (it composes nothing). Pinning the first by its
+# THE EXEMPTION IS A MARKER AT THE SITE, not a match on the line's source text. Three lines cannot carry
+# a guid honestly: New-ScratchPath's own composition (it USES the guid built one line above),
+# check-claude-home's enumeration of the temp roots, and tidy-machine's walk of the same root -- the last
+# two compose nothing at all. Pinning the first by its
 # exact text was the first shape, and a rename of $leaf or a reflow of that one line would have turned
 # the scan against its own composer. '# temp-path-exempt:' says so where a reader and a diff both see
-# it, and the count below is what stops a third appearing quietly.
+# it, and the count below is what stops a fourth appearing quietly.
+#
+# THE COUNT WENT FROM TWO TO THREE ON SEPTEMBER 10, 2026, and the shape of the third is why that is not
+# a weakening: tidy-machine.ps1's lane 10 ENUMERATES the temp root to attribute what is already standing
+# there, and deletes nothing -- scripts/README.md having already settled that those trees stay standing
+# (#1668) and named a pattern sweep as the very delete primitive New-ScratchPath exists to remove
+# (#1659). A reader is exactly what this scan is not about. What the count still catches is a fourth
+# line that WRITES.
 #
 # scripts/tests/ is out of scope because it is enforced NEXT DOOR, not because it is unenforced:
 # test-suite-gate.tests.ps1 requires a fresh guid in every fixture path, which is the same bar this scan
@@ -813,7 +821,7 @@ foreach ($f in @(Get-ChildItem -LiteralPath $scriptsRoot -Recurse -Filter '*.ps1
     }
 }
 Assert-True ($tempOffenders.Count -eq 0) ('no shipping script composes a temp path without a guid' + $(if ($tempOffenders.Count) { ' -- ' + ($tempOffenders -join ', ') } else { '' }))
-Assert-True ($tempExempt.Count -eq 2) ("exactly two lines are declared exempt -- the composer and check-claude-home's reader (found $($tempExempt.Count): " + ($tempExempt -join ', ') + ')')
+Assert-True ($tempExempt.Count -eq 3) ("exactly three lines are declared exempt -- the composer, and the two readers in check-claude-home and tidy-machine (found $($tempExempt.Count): " + ($tempExempt -join ', ') + ')')
 
 # AND THE CONVERSION IS PINNED AT ITS CALL SITES, so a revert to a hand-composed path fails here rather
 # than only in the scan above -- which a reverter could satisfy by adding a guid and leaving the class

@@ -41,8 +41,9 @@
     WHAT THIS LIB WILL NOT DO: decide, or compose a command. Every function here returns a
     classification with a reason and, at most, the VERB that would act on it -- never a finished
     command line with a branch name or a path interpolated into it. That is deliberate rather than
-    fussy: a ref name is not safe to paste on trust (git enforces only the \p{Cc} half of the class, so
-    a name can carry a \p{Cf} run or a shell metacharacter -- #1594, #1617), and a lib that handed back
+    fussy: a ref name is not safe to paste on trust (git rejects only the control half of the display
+    class, so a name can carry a format character or a shell metacharacter -- #1594, #1617), and a lib
+    that handed back
     a ready-made string would be handing every future caller a line that skipped the paste guard. The
     caller renders the name through Get-PasteableRef and joins the two. Running the result is the
     reader's, for everything but prune-merged's own two proofs -- see tidy-machine.ps1's header for the
@@ -487,15 +488,29 @@ function Format-PasteablePathToken {
         being none.
 
         WHAT IS STILL REFUSED, AND IT IS A DIFFERENT AXIS ENTIRELY. Quoting makes a path inert when it
-        RUNS; it does nothing about what the path does when it is DISPLAYED. A \p{Cc} or \p{Cf} run --
-        U+202E, a zero-width joiner -- repaints or reverses the line the reader is judging, so a
-        command containing one is a command whose text is not what it appears to be. Those are refused
-        with a placeholder, and the caller prints the path as prose instead, where the same characters
-        are stripped and inert. Stripping them for the COMMAND is not an option: it would produce a
-        line aimed at a different file than the one on screen, which is exactly the trap
-        ref-print-lib.ps1 records for Get-DisplayRef.
+        RUNS; it does nothing about what the path does when it is DISPLAYED. A control or format
+        character -- U+202E, a zero-width joiner -- repaints or reverses the line the reader is
+        judging, so a command containing one is a command whose text is not what it appears to be.
+        Those are refused with a placeholder, and the caller prints the path as prose instead, where
+        the same characters are stripped and inert. Stripping them for the COMMAND is not an option: it
+        would produce a line aimed at a different file than the one on screen, which is exactly the
+        trap ref-print-lib.ps1 records for Get-DisplayRef.
 
         SO THE VERDICT IS: literal-quote everything, refuse only what cannot be safely READ.
+
+        AND THE CLASS IS NOT TYPED HERE -- IT IS ASKED OF Get-DisplayPath. This lib does not carry the
+        control-and-format character pattern anywhere, not even in this sentence: it renders the path
+        through ref-print-lib's own display function and refuses when the result DIFFERS from the
+        input, which is the same question answered by the same definition. That is deliberate and it
+        is enforced next door:
+        pr-issues.tests.ps1 asserts that exactly TWO libs type this class -- pr-issues-lib.ps1 and
+        ref-print-lib.ps1 -- because a third has to update Format-AuthoredText and a skill page with
+        it (#1612, #1623). An earlier draft here was that third copy and the suite caught it. Asking
+        rather than re-typing also means this cannot drift out of agreement with the sanitiser whose
+        output the caller actually prints beside the command.
+
+        REQUIRES ref-print-lib.ps1 to be dot-sourced by the caller, as this lib already requires
+        merged-pr-lib.ps1. tidy-machine.ps1 loads both above it.
 
     .PARAMETER Path
         The filesystem path to render.
@@ -512,7 +527,9 @@ function Format-PasteablePathToken {
         return [pscustomobject]@{ Token = "'$Placeholder'"; IsSafe = $false; Note = 'there is no path to put in this command.' }
     }
 
-    if ($Path -match '[\p{Cc}\p{Cf}]') {
+    # THE CLASS IS ref-print-lib's, ASKED RATHER THAN RE-TYPED -- see this function's header. A path
+    # whose display form differs from itself carries something that would repaint or reorder the line.
+    if ((Get-DisplayPath $Path) -ne $Path) {
         return [pscustomobject]@{
             Token  = "'$Placeholder'"
             IsSafe = $false

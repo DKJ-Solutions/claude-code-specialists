@@ -152,7 +152,7 @@ if (Test-Path -LiteralPath $guardLib -PathType Leaf) { . $guardLib; Assert-OwnCo
 # Repo root -- dual context: if a consumer runs the shared plugin mirror, CLAUDE_PROJECT_DIR supplies
 # its repo root; in the source root (or outside a session) it falls back to the git root. This way the
 # SAME file works in both locations, and the root copy and the plugin mirror stay byte-identical.
-$repoRoot = if ($env:CLAUDE_PROJECT_DIR) { $env:CLAUDE_PROJECT_DIR } else { (git rev-parse --show-toplevel 2>$null | Out-String).Trim() }
+$repoRoot = if ($env:CLAUDE_PROJECT_DIR) { $env:CLAUDE_PROJECT_DIR } else { (git rev-parse --show-toplevel).Trim() }
 if (-not $repoRoot) { $repoRoot = (Get-Location).Path }
 
 if ($CheckoutOnly -and $MachineOnly) {
@@ -538,7 +538,7 @@ if ($runMachine) {
 
 if ($runMachine) {
     Write-Lane '10' 'Fixture trees under the scratch root -- attributed, never deleted'
-    $scratch = if ($ScratchRoot) { $ScratchRoot } else { [System.IO.Path]::GetTempPath() }
+    $scratch = if ($ScratchRoot) { $ScratchRoot } else { [System.IO.Path]::GetTempPath() } # temp-path-exempt: reader, not composer
     if (-not (Test-Path -LiteralPath $scratch -PathType Container)) {
         Write-Item "scratch root $(Get-DisplayPath $scratch) does not exist -- lane skipped." 'DarkGray'
     } else {

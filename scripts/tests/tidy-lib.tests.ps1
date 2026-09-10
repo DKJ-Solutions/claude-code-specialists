@@ -35,7 +35,12 @@ $ErrorActionPreference = 'Stop'
 $RepoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
 $Script   = Join-Path $RepoRoot 'scripts\maintenance\tidy-machine.ps1'
 
+# tidy-lib depends on both of the first two: the pair test comes from merged-pr-lib, and the display
+# class Format-PasteablePathToken refuses on is ASKED of ref-print-lib's Get-DisplayPath rather than
+# re-typed here -- pr-issues.tests.ps1 pins that exactly two libs may type it, and an earlier draft of
+# this lib was the third.
 . (Join-Path $RepoRoot 'scripts\lib\merged-pr-lib.ps1')
+. (Join-Path $RepoRoot 'scripts\lib\ref-print-lib.ps1')
 . (Join-Path $RepoRoot 'scripts\lib\worktree-lib.ps1')
 . (Join-Path $RepoRoot 'scripts\lib\tidy-lib.ps1')
 
@@ -199,13 +204,17 @@ Assert-True (-not $t.IsSafe) 'an empty path is refused rather than printing a ho
 # --- 8. Scratch attribution -----------------------------------------------------------------------
 Write-Host '-- 8. scratch attribution --' -ForegroundColor Cyan
 
-$guid = '0' * 32
+# A CONSTANT, NOT A FRESH GUID, AND NOT NAMED ONE EITHER. This is the hex tail of a NAME being
+# classified -- a string this suite reads, never a path it writes -- so the fixture rule's reason
+# (an unpredictable directory nobody can pre-plant at) does not apply. Named $leafHex rather than
+# $guid so the neighbouring scan is not asked to tell those two apart by intent.
+$leafHex = '0' * 32
 Assert-Equal 'not-ours'  (Get-ScratchLeftoverVerdict -Name 'some-unrelated-folder' -LivePids @(1)) 'a name that is not New-ScratchPath''s shape is not ours'
-Assert-Equal 'retained'  (Get-ScratchLeftoverVerdict -Name "sync-pr-body-4242-$guid" -LivePids @() -AgeHours 999) 'sync-pr-body is retained on purpose (#1668), never a leftover'
-Assert-Equal 'retained'  (Get-ScratchLeftoverVerdict -Name "test-suite-gate-4242-$guid" -LivePids @() -AgeHours 999) 'the gate''s capture directories are retained on purpose (#1636)'
-Assert-Equal 'live'      (Get-ScratchLeftoverVerdict -Name "native-capture-777-$guid" -LivePids @(777) -AgeHours 999) 'a tree whose pid is running belongs to a live suite'
-Assert-Equal 'live'      (Get-ScratchLeftoverVerdict -Name "native-capture-778-$guid" -LivePids @() -AgeHours 1) 'a young tree is live even with no matching pid -- the pid-reuse belt'
-Assert-Equal 'leftover'  (Get-ScratchLeftoverVerdict -Name "native-capture-779-$guid" -LivePids @() -AgeHours 999) 'an old tree whose pid is gone is attributable to a run that ended'
+Assert-Equal 'retained'  (Get-ScratchLeftoverVerdict -Name "sync-pr-body-4242-$leafHex" -LivePids @() -AgeHours 999) 'sync-pr-body is retained on purpose (#1668), never a leftover'
+Assert-Equal 'retained'  (Get-ScratchLeftoverVerdict -Name "test-suite-gate-4242-$leafHex" -LivePids @() -AgeHours 999) 'the gate''s capture directories are retained on purpose (#1636)'
+Assert-Equal 'live'      (Get-ScratchLeftoverVerdict -Name "native-capture-777-$leafHex" -LivePids @(777) -AgeHours 999) 'a tree whose pid is running belongs to a live suite'
+Assert-Equal 'live'      (Get-ScratchLeftoverVerdict -Name "native-capture-778-$leafHex" -LivePids @() -AgeHours 1) 'a young tree is live even with no matching pid -- the pid-reuse belt'
+Assert-Equal 'leftover'  (Get-ScratchLeftoverVerdict -Name "native-capture-779-$leafHex" -LivePids @() -AgeHours 999) 'an old tree whose pid is gone is attributable to a run that ended'
 
 # --- 9. The summary line --------------------------------------------------------------------------
 Write-Host '-- 9. the summary line --' -ForegroundColor Cyan
