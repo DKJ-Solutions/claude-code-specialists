@@ -184,9 +184,9 @@ merge, and do not treat a green run from an earlier day as proof.
       link to it. `UNINSTALL.md` checked -- no equivalent gap: it is a one-directional teardown that
       never reinstalls, so there is no re-add to be missing, and its `marketplace remove` name was
       already swept. Issue stays open until this branch merges on flag day
-- [ ] LAST (session-breaking on this branch until flag day): `.claude/settings.json` self-consume
+- [x] LAST (session-breaking on this branch until flag day): `.claude/settings.json` self-consume
       keys + `github` source + `repo`
-- [ ] LAST (session-breaking): live `@`-import paths + clone-dir path segments
+- [x] LAST (session-breaking): live `@`-import paths + clone-dir path segments
       `marketplaces/claude-code-specialists/` -> `marketplaces/dkj-claude-plugins/`,
       `.claude/plugins/claude-code-specialists/`, `cache\claude-code-specialists`
 
