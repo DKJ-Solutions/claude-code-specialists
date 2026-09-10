@@ -83,6 +83,7 @@ list sits at the **end** of the page:
 
 | Version | Date | Type | Title |
 |---|---|---|---|
+| [5.0.0](audience/5.x/5.0.0.md) | 2026-09-11 | Major | The marketplace is dkj-claude-plugins -- every existing install must be re-installed under the new name |
 
 ### 4.x
 
