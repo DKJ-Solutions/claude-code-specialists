@@ -36,21 +36,108 @@
 
 ### PLAN
 
-Retire Format-PasteablePathToken and put tidy-machine on Get-PasteableRef -Kind Path
+Two branches answered #1762 eleven minutes apart and both landed on `main`, leaving the tree with two
+mechanisms for one question -- how a filesystem path is rendered into a command a reader is invited to
+paste. #1765 gave the shared paste guard its own `$PathPasteSafePattern`; #1767 shipped
+`Format-PasteablePathToken` in `tidy-lib.ps1`, which quotes the path as a PowerShell literal instead of
+judging it. Inbound #1768 asks which one survives.
+
+#### The verdict, and what decided it
+
+The allowlist survives; the literal-quote formatter is retired. Two measurements decided it, and neither
+is in the report.
+
+**Its premise had already expired when it landed.** The formatter argues that `Get-PasteableRef -Kind
+Path` judges against the ref allowlist and so "NO absolute Windows path can pass it, ever". That was true
+of the pattern it was written against and false eleven minutes later -- #1765 is exactly the change that
+fixed it. An ordinary lane path passes today, so the noise the second mechanism was built to remove was
+already gone when it was read.
+
+**Its guarantee belongs to one shell, and the commands it serves do not.** The single-quoted literal is
+exact in PowerShell and in neither of the other two this lib commits to. Measured September 10, 2026:
+the token for `C:\it's\here` is `'C:\it''s\here'`, and bash reads a doubled quote as close-then-open, so
+Git Bash resolves it to `C:\its\here` -- a different, entirely plausible path, silently and with no
+error to notice. In cmd, where single quotes do not quote, any spaced path splits into two arguments.
+That is decisive *here* because `tidy-machine.ps1` prints two commands per lane from the same call: a
+PowerShell-only `worktree-lane.ps1 -HandBack`, and a bare `git worktree remove` directly beneath it --
+which is precisely the kind a reader pastes into Git Bash.
+
+#### What the report proposed that is NOT done, and why
+
+#1768 offers "if the allowlist wins, it needs at least a space". It must not have one. The `.Token` is
+printed **unquoted**, on purpose -- ref-print-lib's header rejects quoting as the guard -- so
+`git worktree remove C:/Program Files/x` splits into two arguments in every shell rather than one. A
+space is the one character an allowlist over an unquoted token can never admit, whatever the destination
+turns out to be. `ref-print-lib.tests.ps1` has asserted that refusal for `C:\Program Files\a b\x` since
+#1762: it is the answer, not a gap in it, and the note carries the reader the rest of the way.
+
+#### And one claim in the report does not stand
+
+It states that `tidy-lib.ps1`'s header "cites #1762 as open" and quotes *"if that reasoning holds it
+belongs in this lib and not in a caller"*. Neither is in the tree: that file's only #1762 mention reads
+"(issue #1762, measured September 10, 2026)", and the quoted sentence matches nothing anywhere in the
+repo. The symptom the report is actually about -- two mechanisms, one question -- stands on its own, so
+the repair is unaffected; the wording is corrected here rather than inherited.
 
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [x] `scripts/lib/tidy-lib.ps1` -- `Format-PasteablePathToken` removed. It was that lib's only caller
+      into `ref-print-lib.ps1`, so the dependency goes with it.
+- [x] `scripts/maintenance/tidy-machine.ps1` -- `Write-PathHandover` now calls
+      `Get-PasteableRef -Ref $Path -Kind Path`, and its doc comment carries the reasoning above. The old
+      comment claimed the path "is quoted here because a lane directory legally contains spaces", which
+      stopped being true of what the function does.
+- [x] `scripts/lib/ref-print-lib.ps1` -- the surviving mechanism records why it survived, why a space
+      stays out of the pattern, and the cross-shell measurement, beside the #1762 block it continues.
+- [x] `scripts/sync/build-shared-scripts.ps1` run -- four plugin mirrors updated.
 
 ### TEST
 
+- [x] `scripts/tests/tidy-lib.tests.ps1` -- section 7 (the retired formatter) removed and the remaining
+      sections renumbered; three structural assertions added so the second mechanism cannot come back by
+      halves: the formatter is not called, the handover goes through `-Kind Path`, and the function is
+      not defined at all.
+- [x] **A defect in that suite's own scan, found by the new assertion and repaired rather than worked
+      around.** Its structural section stripped line-comment tails but not `<# ... #>` blocks, so every
+      inner line of a function comment stood as apparent code. A doc paragraph *naming* the retired
+      formatter therefore failed the assertion that it is not *called*. Block comments are removed first
+      now. This was silent only while the forbidden words happened not to appear in one -- every other
+      assertion in that section inherited the same hole.
+- [x] `scripts/tests/ref-print-lib.tests.ps1` -- the space refusal is pinned with its reason, because it
+      reads as the pattern's weakest point and #1768 proposed removing it.
+- [x] `tidy-lib.tests.ps1` 46 passed / 0 failed; `ref-print-lib.tests.ps1` 444 pass / 0 fail.
+
 ### DEPLOY: fix/1768-path-paste-one-answer
 
-**Score:**
+A filesystem path printed into a paste-ready command now has **one** answer again, the shared allowlist
+`Get-PasteableRef -Kind Path`. Two branches answered #1762 eleven minutes apart and both landed;
+`tidy-lib.ps1`'s `Format-PasteablePathToken` -- which quoted the path as a PowerShell literal rather than
+judging it -- is retired, and `tidy-machine.ps1` joins `sync-main.ps1` and `check-plugin-integrity.ps1`
+on the allowlist. Fixes inbound #1768.
+
+The literal lost on the destination, which is the one thing a printed remedy does not know. It is exact
+in PowerShell and silently wrong in Git Bash, which reads its doubled quote as close-then-open and turns
+`C:\it's\here` into `C:\its\here` -- a different, plausible path, with no error to notice -- while cmd
+splits any spaced path in two. `tidy-machine.ps1` prints a PowerShell-only `worktree-lane.ps1 -HandBack`
+and a bare `git worktree remove` from the same call, one line apart, and the second is exactly what a
+reader pastes into Git Bash. Its own justification had also expired before it was read: it argued no
+absolute path could pass the allowlist, which #1765 had fixed eleven minutes earlier.
+
+**Score:** 2
 
 #### What makes this deploy extra special
 
-**Score:**
+The report's own proposed alternative is declined with a measurement rather than adopted: *"if the
+allowlist wins, it needs at least a space"* would break the guard rather than widen it, because the token
+is printed **unquoted** by design and a spaced path splits in all three shells, not one. A space is the
+one character an allowlist over an unquoted token can never admit -- so the refusal plus the note is the
+answer, and the suite has asserted it since #1762.
+
+That is the second of #1768's two halves to fail on contact with the tree. The first is its claim that
+`tidy-lib.ps1` cites #1762 as open and carries a sentence about where the reasoning belongs; neither is
+in the repo. The symptom it reports -- two mechanisms for one question -- was real and is what got fixed.
+
+**Score:** 3
 
 #### Pull Request
 
