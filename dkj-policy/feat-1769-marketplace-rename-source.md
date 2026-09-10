@@ -173,7 +173,8 @@ merge, and do not treat a green run from an earlier day as proof.
 - [ ] FLAG DAY: the three migration procedures in `INSTALL.md` need a marketplace remove+add step
       between their uninstall and install halves, or they cannot run at all after the rename --
       filed as [#1801](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1801) because the
-      repair defines part of the procedure and interacts with fase 5's release notes- [ ] LAST (session-breaking on this branch until flag day): `.claude/settings.json` self-consume
+      repair defines part of the procedure and interacts with fase 5's release notes
+- [ ] LAST (session-breaking on this branch until flag day): `.claude/settings.json` self-consume
       keys + `github` source + `repo`
 - [ ] LAST (session-breaking): live `@`-import paths + clone-dir path segments
       `marketplaces/claude-code-specialists/` -> `marketplaces/dkj-claude-plugins/`,
