@@ -62,7 +62,7 @@ reader's pasteable block.
       per-repo procedure, and `INSTALL.md` had just moved upstream (442a250b) without touching them.
 - [x] Filed the sibling finding rather than widening this branch:
       [#1823](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1823) — `UNINSTALL.md`'s
-      Step 5 carries the same machine-wide reach, and there nothing reinstalls afterwards. Its repair
+      Step 5 carries the same machine-wide reach, and there nothing reinstalls it afterwards. Its repair
       is a procedural decision of its own, not a sentence.
 - [x] Sharpened the instruction after Sebastian's review, which asked whether a checkout skipping
       step 3 is left with a stale marketplace source key. It would have been: `marketplace remove` and
@@ -72,6 +72,19 @@ reader's pasteable block.
       owed to every checkout. The section and all three fence notes now say skip the `remove`, run the
       `add`. This is a better repair than the one #1820 proposed, and it came from the review rather
       than from the report.
+- [x] Acted on Edith's copy edit: dropped the "flag day" label from the measurement date (that label
+      names September 10 everywhere else in this file and in `CLAUDE.md`, so pairing it with the 11th
+      read as a second date for one event), fixed two grammar slips and the table's arbitrary
+      emphasis, and said where the quoted pair of CLI errors came from — one checkout holding both a
+      team plugin and the workflow, so the pair spans two of the sequences and cannot be matched to
+      the step 2 the reader is standing in.
+- [x] Filed her sixth finding rather than repairing it here:
+      [#1824](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1824) — the `dkj-team-*`
+      section tells the reader the workflow ids are unchanged and not to touch them, then drops their
+      install record at step 3 and never reinstalls it, leaving a consumer's workflow plugin
+      uninstalled with nothing printed. Verified against `main` before filing; pre-existing, and
+      #1820's own verbatim quote is evidence of it. Its repair changes what that section tells every
+      reader about the workflow ids, which is a decision rather than a sentence.
 
 ### TEST
 

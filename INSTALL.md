@@ -227,7 +227,7 @@ your own lenses, which do not travel with the plugin.
 ## If this machine has more than one checkout
 
 > **Read this before step 3 of any of the three migration sequences below.** It changes nothing about
-> the commands. It changes how many times you run them, and where the second and third checkout start.
+> the commands. It changes how many times you run them, and where the second and third checkouts start.
 
 An install record is keyed on the folder it was written for, so each of the migrations below is per
 machine **and** per checkout: three checkouts on this family means running the sequence three times.
@@ -236,14 +236,14 @@ marketplace registration machine-wide, and it takes every install record keyed o
 it — including the records of checkouts that have not migrated yet, and that no command in your run has
 named.
 
-Measured on the flag day, September 11, 2026, on one machine with three checkouts, read before and after
+Measured on September 11, 2026, on one machine with three checkouts, read before and after
 from `~/.claude/plugins/installed_plugins.json`:
 
 | records on the machine | count |
 |---|---|
-| before starting | **16**, over three checkouts |
+| before starting | 16, over three checkouts |
 | after step 2 in the first checkout only (six uninstalled) | 10 |
-| after that checkout's step 3 and step 4 | **6** — its own six under the new name, and nothing else |
+| after that checkout's step 3 and step 4 | 6 — its own six under the new name, and nothing else |
 
 The ten records belonging to the other two checkouts were gone, silently, without either checkout being
 named by any command in the run and without either having been touched.
@@ -267,9 +267,14 @@ Failed to uninstall plugin "dkj-team-alpha@claude-code-specialists": Plugin "dkj
 Failed to uninstall plugin "dkj-policy@claude-code-specialists": Plugin "dkj-policy@claude-code-specialists" is not installed in project scope. Use --scope to specify the correct scope.
 ```
 
+**The two lines came off one checkout that held both a team plugin and the workflow under the old
+marketplace name**, so between them they span what two of the sequences below cover separately. Do not
+try to match the pair to the step 2 you are standing in: what carries over is the two **shapes** of
+failure, not this particular pair of ids.
+
 **The second one is the actively misleading one:** it reads as a scope mistake of yours, and
 `--scope project` was correct. Nothing is wrong with your machine and there is nothing to repair — the
-record it is looking for was taken by a command you ran in a different folder. Carry on at step 4.
+record it is looking for was taken by a command you ran in a different folder. Carry on at step 3's `add`.
 
 **It is bookkeeping, not data loss.** An install record is what tells a session which plugins this folder
 has; installing writes it again, which is what step 4 does anyway. What the machine-wide removal costs is
