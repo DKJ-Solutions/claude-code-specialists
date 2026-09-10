@@ -402,8 +402,8 @@ function Get-PluginManifestPaths {
 # top, exactly as with Get-FencedLineFlags above.
 #
 # WHY THEY MOVED DOWN A LAYER. The fold needs the entry-boundary rule too, and it deliberately does not
-# load this file: its header rejects pulling three thousand lines of release machinery into a script that
-# runs immediately after a merge and directly on the trunk. The dependency can only run one way -- the
+# load this file: its header rejects pulling this lib -- and the thousands of lines of entry-scaffold-lib
+# behind it -- into a script that runs immediately after a merge and directly on the trunk. The dependency can only run one way -- the
 # fold and entry-scaffold-lib's own suite load that lib standalone, while nothing loads this one without
 # it -- so a rule both the cut and the fold read has to sit down there. Inbound #561 is the defect that
 # forced the question: the two scripts shared an assumption about what an H2 means and only one of them
@@ -698,10 +698,19 @@ function Set-ReleaseInternalNoteLink {
 #
 # WHY IT MOVED. It went from matching a path shape to reading the plugin roots, which made it a function
 # about the plugin tree rather than about a release. Keeping it here would have forced the fold script to
-# dot-source THIS file to reach it -- and this file pulls in entry-scaffold-lib, three thousand lines,
+# dot-source THIS file to reach it -- and this file pulls in entry-scaffold-lib, thousands of lines,
 # for a function that walks a list of strings. The fold runs immediately after a merge, directly on the
 # trunk, so what it loads is worth being deliberate about. Moving one pure function down a layer costs
 # nothing and lets the fold depend on a dependency-free lib instead.
+#
+# NO LINE COUNT IN THAT SENTENCE, DELIBERATELY (issue #1779). It read "three thousand lines" from the day
+# this function moved, and entry-scaffold-lib measured 8,289 when anybody first checked -- 2.7x under, in
+# the one sentence that carries the whole argument for the layer this function now sits in. A size written
+# into prose drifts with every commit to the file it describes, and here it drifts in the direction that
+# WEAKENS the argument: the stale figure invites a reader to reconsider a decision the real number settles
+# harder. It also gets copied rather than re-measured -- check-connectors.ps1 declined to call into this
+# lib and cited THIS docstring as its evidence (#1775), so one stale number became two. "thousands" cannot
+# go stale upward, which is the only direction that file has ever moved.
 
 function Get-EntryPlugins {
     <#
