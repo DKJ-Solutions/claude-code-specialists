@@ -43,7 +43,51 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**3 / 11 minor entries** <!-- pending-tally -->
+**3 / 12 minor entries** <!-- pending-tally -->
+
+### DEPLOY: docs/1774-settings-reflow · 20260910-100232
+
+Every `claude plugin install`/`uninstall --scope project` rewrites the tracked `.claude/settings.json`
+and strips the blank lines that group its 60-entry `permissions.allow` into git / gh / scripts /
+release blocks -- measured over nine such commands with `enabledPlugins` byte-identical before and
+after. It is the CLI's own settings writer doing a JSON round trip, so there is nothing in this repo to
+repair; what there was, was a session meeting an unexplained diff with no warning and having to work out
+from it that the tool and not the work had caused it.
+
+So it is written down twice, split the way this repo's own rule splits a lesson. The **portable** half
+is in Sylvester's manual, because the mechanism belongs to any repo whose settings file is tracked and
+that does plugin administration at all: what the round trip loses, that `git checkout -- <file>` is the
+remedy and re-serialising the captured content is not, and that a `git add -A` in the same sitting
+commits the reflow silently -- valid JSON, functionally identical, past every check there is. The
+**local** half is in his lens, beside the `claude plugin marketplace remove` bullet it is the sibling
+of: the measurement, why this repo meets it routinely rather than once (it consumes its own marketplace
+with all six plugins enabled), and what the never-commit-on-`main` rule adds to the cost of a stray
+diff.
+
+Both halves say why the two mechanical repairs were declined. Dropping the grouping would pay for
+round-trip stability with the readability the blocks exist for; a gate refusing a whitespace-only diff
+on one file is the shape this lens already records as measured and declined for the control-character
+rule. Neither would change the CLI, which is the only thing that could actually stop it.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+N/A -- this repo publishes a plugin rather than a subscribed service. The reader who gains something is
+a consumer developer, who now receives the portable half with the next release instead of nothing at
+all, and that is the score above.
+
+**Score:** N/A
+
+#### Pull Request
+
+plugin administration reflows the tracked settings.json -- recorded where it is met
+
+Plugins: dkj-subagents-alpha
+
+[PR #1785](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1785)
+
+---
 
 ### DEPLOY: fix/1773-retired-plugin-name-records · 20260910-095038
 
