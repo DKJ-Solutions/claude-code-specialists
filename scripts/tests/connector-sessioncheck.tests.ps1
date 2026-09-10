@@ -52,22 +52,32 @@
     touch.
 
     HOW EACH BRANCH IS REACHED, since none of them is the hook's normal candidate-search path:
-      - Branches 1 and 2 drive the REAL hook against a REAL plugin-versions.ps1 (this repo's own
-        root copy), isolated via CLAUDE_PROJECT_DIR + USERPROFILE exactly as plugin-versions.tests.ps1
-        isolates that script directly -- Invoke-Hook additionally pushes the process location to
-        $RepoRoot so the hook's engine search (which reads (Get-Location), NOT
-        $env:CLAUDE_PROJECT_DIR) finds this repo's own scripts/task/plugin-versions.ps1 regardless
-        of wherever this suite itself was launched from.
-      - Branch 3 substitutes a FAKE engine by the same mechanism the hook itself uses to prefer
-        "the repo's own copy": the hook's first candidate is (cwd)/scripts/task/plugin-versions.ps1,
-        so pushing the location to a scratch dir that HAS its own such file (one that prints
-        neither [ERROR] nor [INFO] nor [SUMMARY]) makes the hook run that instead of the real one.
-      - Branch 4 needs BOTH hook-relative candidates to miss: the fixed second candidate is
-        ($PSScriptRoot/../scripts/task/plugin-versions.ps1) relative to the HOOK FILE'S OWN
-        location, which in this repo always resolves (root and plugin mirror are kept identical --
-        see plugin-versions.tests.ps1's own note on dual-context). So this branch copies the hook
-        itself into an isolated fixture tree with no such sibling, the same "stub" technique
-        connectors.tests.ps1 already uses for check-connectors.ps1.
+      - Branches 1 and 2 drive the REAL hook against a REAL plugin-versions.ps1, isolated via
+        CLAUDE_PROJECT_DIR + USERPROFILE exactly as plugin-versions.tests.ps1 isolates that script
+        directly. WHICH real copy is not a free choice, and naming it precisely is the point: the
+        hook has exactly ONE engine candidate -- ($PSScriptRoot/../scripts/task/plugin-versions.ps1)
+        relative to the HOOK FILE'S OWN location -- and $Hook below is the plugin mirror's copy
+        (plugins/dkj-policy/hooks/), so the engine these two branches measure is
+        plugins/dkj-policy/scripts/task/plugin-versions.ps1. THE MIRROR, never this repo's root
+        scripts/task/ copy. The drift lint holds the two byte-identical, so the assertions below
+        read the same either way; the ORDER of two commands does not.
+        AFTER EDITING scripts/task/plugin-versions.ps1, RUN scripts/sync/build-shared-scripts.ps1
+        BEFORE RUNNING THIS SUITE STANDALONE. Until the mirror is rebuilt this suite reports on the
+        PREVIOUS engine and says nothing about having done so. Measured September 10, 2026 on the
+        #1772 branch: 47 pass / 0 fail against the unrebuilt mirror, then 41 pass / 6 fail from the
+        same unchanged suite once it was rebuilt, with a fixture that genuinely needed repointing
+        (#1786). The test gate is not exposed to this -- it runs the shared-script drift check,
+        which ERRORS on a stale mirror, before it runs the suites -- so the window is the standalone
+        run only, which is exactly the run a session makes while editing the engine.
+      - Branch 3 substitutes a FAKE engine the only way that single candidate allows: an isolated
+        COPY of the hook with the fake planted at its own ..\scripts\task\plugin-versions.ps1 (one
+        that prints neither [ERROR] nor [INFO] nor [SUMMARY]). It used to plant the fake under
+        (Get-Location) instead, back when $cwd was the hook's FIRST candidate; that candidate was
+        removed on review as arbitrary execution out of whatever directory a session happened to be
+        opened in, and Invoke-HookWithFakeEngine's own docstring records what its removal cost.
+      - Branch 4 needs that one candidate to miss, so it copies the hook itself into an isolated
+        fixture tree with no such sibling -- the same "stub" technique connectors.tests.ps1 already
+        uses for check-connectors.ps1.
 
     THE FIFTH GROUP IS NOT A FIFTH BRANCH -- IT IS HOW OFTEN THE FOUR ARE REACHED (#1605). The
     matcher is 'startup|resume|clear|compact', so every scenario above used to be paid again at every
@@ -215,11 +225,22 @@ function Write-Admin {
 
 function Invoke-Hook {
     <#
-        Runs the REAL hook (this repo's own copy) with CLAUDE_PROJECT_DIR and USERPROFILE pinned to
-        a fixture, and the process location pushed to $RepoRoot -- the hook's engine search reads
-        (Get-Location), not $env:CLAUDE_PROJECT_DIR, and pinning it to $RepoRoot rather than relying
-        on wherever this suite happens to be invoked from is what makes "the real root copy is
-        found" independent of the caller's own working directory.
+        Runs the REAL hook (the plugin mirror's copy -- see $Hook) with CLAUDE_PROJECT_DIR and
+        USERPROFILE pinned to a fixture, and the process location pushed to $RepoRoot.
+
+        THE ENGINE IT REACHES IS THE MIRROR BESIDE THAT HOOK FILE, and the pushed location has
+        nothing to do with it: the hook's one engine candidate is $PSScriptRoot-relative, so what
+        these callers measure is plugins/dkj-policy/scripts/task/plugin-versions.ps1 whatever the
+        working directory is. This helper pushed to $RepoRoot back when $cwd WAS the hook's first
+        engine candidate and that push was what found the root copy. THE PUSH IS NOW INERT for
+        these scenarios and is kept only as belt-and-braces isolation: the hook's remaining reads of
+        (Get-Location) are its workshop search -- which every scenario here bypasses with
+        -WorkshopPathOverride -- and its consumer scoping, which sits past the version branch's own
+        return. Pinning it still costs nothing and keeps the caller's directory out of any path a
+        later change might reopen; do not read it as a mechanism these branches depend on.
+        The header's ordering note applies to every caller of this helper: rebuild the mirror before
+        running this suite standalone against a freshly edited scripts/task/plugin-versions.ps1
+        (#1786).
 
         No native-capture-lib redirect-file capture here (unlike plugin-versions.tests.ps1):
         Invoke-Ps in connectors.tests.ps1 already established this hook is safe to call with a plain
@@ -315,10 +336,12 @@ function Invoke-HookWithFakeEngine {
 function Invoke-IsolatedHookNoEngine {
     <#
         Branch 4: copies the REAL hook file into a fixture tree with no sibling
-        ..\scripts\task\plugin-versions.ps1 at all, and pushes the location to a bare dir that also
-        has none of its own -- so BOTH of the hook's candidates miss and $engine stays $null. This is
-        the same "isolated copy" technique New-StubWorkshop already uses for check-connectors.ps1,
-        applied to this hook's own file rather than reimplementing its logic.
+        ..\scripts\task\plugin-versions.ps1 at all -- so the hook's one candidate misses and $engine
+        stays $null. This is the same "isolated copy" technique New-StubWorkshop already uses for
+        check-connectors.ps1, applied to this hook's own file rather than reimplementing its logic.
+        It also pushes the location to a bare dir with no such file of its own: that was load-bearing
+        when $cwd was an engine candidate too, and is now the same inert belt-and-braces isolation
+        Invoke-Hook's docstring describes.
     #>
     param([string]$IsolatedRoot, [string]$CwdDir)
     $hookCopy = Join-Path $IsolatedRoot 'hooks\connector-sessioncheck.ps1'
