@@ -833,7 +833,7 @@ function in Claude Code and in Cowork, but not in a plain Claude.ai Chat session
 `specialists-init`, `specialists-teardown`, `sync-roster`, `start-task`, `adopt-shopify-floor`,
 `cut-release`, `adopt-dkj-policy`,
 `release-notes-page`, `sync-main`, `push-preview`, `check-branch-entry`, `check-policy-drift`,
-`prune-merged`, `plugin-versions`, `check-fanout`,
+`prune-merged`, `tidy-machine`, `plugin-versions`, `check-fanout`,
 `measure-skill`, `worktree-lane`, `report-issue`, `adopt-dkj-policy-bwj`, `orchestrator`)<!-- /skills:all -->
 remain available there.
 
@@ -918,7 +918,7 @@ typo there would quietly exclude the plugin it meant to keep and report success.
 `new-branch`, `claim-issue`, `park`, `fix-mojibake`, `specialists-init`, `specialists-teardown`,
 `sync-roster`, `start-task`, `adopt-dkj-policy`, `adopt-shopify-floor`,
 `release-notes-page`, `sync-main`, `push-preview`, `check-branch-entry`, `check-policy-drift`,
-`prune-merged`, `plugin-versions`, `measure-skill`, `worktree-lane`, `check-fanout`) are a thin wrapper around a script — procedural
+`prune-merged`, `tidy-machine`, `plugin-versions`, `measure-skill`, `worktree-lane`, `check-fanout`) are a thin wrapper around a script — procedural
 **mechanism** (branch, claiming an issue on the tracker before the work on it starts, PR, ship, fold,
 bootstrap, teardown, roster-sync, encoding repair, reading a
 repo's own conventions, placing an add-on team's operational floor, pushing a branch to its own preview

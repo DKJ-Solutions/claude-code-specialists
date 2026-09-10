@@ -290,6 +290,27 @@ function Get-SharedScriptPairs {
             # a plain run shells out to `claude plugin details` once per enabled plugin, so timing it
             # would measure the CLI and the network rather than this script. It is also the only
             # registered script that could time itself, which is a good enough reason on its own.
+            # ---------------------------------------------------------------------------------------
+            # The whole-machine tidy (September 10, 2026). A CONDUCTOR: six of its ten lanes call a
+            # script that is already registered here and already has its own suite, so mirroring it
+            # adds one entry point rather than ten mechanisms. It is registered for the ordinary
+            # reason every consumer accumulates the same residue -- finished branches, lanes that
+            # outlived their branch, install records pointing at a checkout that has moved -- and the
+            # source repo is where the classification is maintained.
+            #
+            # -DryRun IS THE MeasureArgs, and it is the honest timing rather than a cheap one: every
+            # lane still runs and still reads, including both gh lookups and the delegations. What it
+            # skips is the deletions, which are prune-merged's and are timed in prune-merged's own row.
+            Name   = 'tidy-machine'
+            Source = 'scripts\maintenance\tidy-machine.ps1'
+            Plugin = 'dkj-policy'
+            Skill  = 'tidy-machine'
+            MeasureArgs = @('-DryRun')
+            # Fixture seams, so the suite can drive the machine-wide lanes against a scratch tree. A
+            # consumer never types either, and documenting them would invite someone to.
+            SkillParamsExempt = @('UserHomeOverride', 'ScratchRoot')
+        },
+        @{
             Name   = 'measure-skill'
             Source = 'scripts\maintenance\measure-skill.ps1'
             Plugin = 'dkj-policy'
@@ -737,6 +758,24 @@ function Get-SharedScriptPairs {
             Name    = 'worktree-lib'
             Source  = 'scripts\lib\worktree-lib.ps1'
             Plugin = 'dkj-policy'
+            LibOnly = $true
+        },
+        @{
+            # The pure classification behind tidy-machine.ps1 (September 10, 2026): which local clutter
+            # is provably finished, which is merely finished-LOOKING, and which is live work. Mirrored
+            # because its only caller is, and dot-sourced rather than inlined for the ordinary reason --
+            # a consumer's tidy-machine loading a file the mirror does not carry would fail on its first
+            # lane.
+            #
+            # ITS OWN FILE rather than a widening of merged-pr-lib, whose two functions it REUSES. That
+            # lib answers one question (is this name+tip pair in a PR listing) and this one asks it of a
+            # second listing; folding the classifier in would make a lib that is currently about one
+            # comparison into a lib about a taxonomy. Nothing in it is repo-owned -- every input is a
+            # parameter, which is also what lets its suite drive states no machine here has been in --
+            # so no contract row follows.
+            Name    = 'tidy-lib'
+            Source  = 'scripts\lib\tidy-lib.ps1'
+            Plugin  = 'dkj-policy'
             LibOnly = $true
         },
         @{
