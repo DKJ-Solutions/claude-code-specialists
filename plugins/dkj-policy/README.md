@@ -233,7 +233,7 @@ migration, and there is no second one to switch between: the two directions are 
 commands, run from the root of the repo that consumes it:
 
 ```powershell
-claude plugin marketplace update claude-code-specialists                   # 1. refresh the cache first
+claude plugin marketplace update dkj-claude-plugins                   # 1. refresh the cache first
 claude plugin update dkj-policy@dkj-claude-plugins --scope project    # 2. then update, per plugin
 ```
 

@@ -63,13 +63,13 @@ partial or split install state is visible):
 
 ```text
 6 plugin(s): 4 up to date, 2 on the released version, with unreleased commits in the clone -- nothing to update (see below).
-  clone 'claude-code-specialists': <path>  [HEAD 0711d4175d75, committed 2026-09-10T08:52:24Z, last fetch 2026-09-10T10:57:51]
+  clone 'dkj-claude-plugins': <path>  [HEAD 0711d4175d75, committed 2026-09-10T08:52:24Z, last fetch 2026-09-10T10:57:51]
 
 dkj-subagents-alpha@dkj-claude-plugins
   installed here     4.33.0  0711d4175d75  project
   marketplace clone  4.33.0  HEAD 0711d4175d75
   verdict            up to date -- your install is at the clone's HEAD
-                     -> the clone advances only on: claude plugin marketplace update claude-code-specialists
+                     -> the clone advances only on: claude plugin marketplace update dkj-claude-plugins
 
 dkj-policy@dkj-claude-plugins
   installed here     4.33.0  810a0af28930  project

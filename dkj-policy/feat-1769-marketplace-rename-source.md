@@ -123,6 +123,15 @@ The ~830 `DKJ-Solutions/claude-code-specialists` / `DaveKJohn/claude-code-specia
 citations: **let drift, correct-on-edit**, per #1526 (the slug redirect holds as long as nothing is
 created at the old path). Not swept in fase 1 unless Dave says otherwise.
 
+#### The sweep is not once-and-for-all -- every catch-up merge re-imports literals
+
+Measured on the September 10 catch-up merge from `main` (it brought 39 files): two fresh
+`@claude-code-specialists` literals arrived in `scripts/tests/measure-skill.tests.ps1`, written on the
+trunk after this branch's own sweep. `main` keeps producing them and will go on doing so for as long
+as this branch stays a staging area -- which is by design, until fase 3. So the sweep is a step of the
+FLAG DAY as well as of fase 1: re-run it on the final catch-up merge, immediately before the fase 3
+merge, and do not treat a green run from an earlier day as proof.
+
 ### CREATE
 
 - [x] Dave's word on the connector-rename timing -- **A**: connectors deferred to fase 3
@@ -139,16 +148,18 @@ created at the old path). Not swept in fase 1 unless Dave says otherwise.
       marketplace-name vars (`connectors.tests.ps1`, `roster-sync.tests.ps1` x2, `sync-roster.tests.ps1`)
 - [x] `check-plugin-integrity.ps1` green (0 errors) + all 91 suites green + `shared-scripts` +
       `script-contract` green
-- [ ] Remaining bare-name **marketplace-name** literals (fase 1, not gate failures): the
+- [x] Remaining bare-name **marketplace-name** literals (fase 1, not gate failures): the
       `marketplace update claude-code-specialists` command strings in `INSTALL.md` / `UNINSTALL.md` /
       the two READMEs / `specialists-init/SKILL.md`, `check-plugin-integrity.ps1:3` docstring, and the
       stale test literals listed in the PLAN note
-- [ ] `.claude/rules/language-layers.md` + `CLAUDE.md` "Repo citation" + `scripts/repo-config.ps1`
+- [x] `.claude/rules/language-layers.md` + `CLAUDE.md` "Repo citation" + `scripts/repo-config.ps1`
       carve-out comment (r. 49-62) -- rewrite so it states the rename is in progress on this branch,
       not merely decided
 - [~] connectors: deferred to fase 3 per Dave's decision A -- `connectors/*.json` (6x) +
       `connectors/claude-code-specialists.json` rename + `connectors/README.md` move with each
       consumer's own migration
+- [ ] Re-run the `@`-sweep on the LAST catch-up merge, immediately before the fase 3 merge -- `main`
+      keeps writing new `@claude-code-specialists` literals while this branch waits (see PLAN)
 - [ ] Victor (scripts) + Edith (docs/links) review -- branch stays open until fase 2 is built
 - [ ] LAST (session-breaking on this branch until flag day): `.claude/settings.json` self-consume
       keys + `github` source + `repo`

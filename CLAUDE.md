@@ -261,6 +261,15 @@ https://github.com/DKJ-Solutions/claude-code-specialists.git` — and the redire
 load-bearing there. It is the same fragility as the prose citation: the redirect holds only while
 nothing is created at the old path.
 
+**A second rename is pending on this same citation**
+([#1769](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1769)). The slug itself
+becomes `dkj-claude-plugins`, in one coordinated flag day with the marketplace name — after which
+`DKJ-Solutions/claude-code-specialists` resolves only through a transfer redirect, under exactly the
+rule above: nothing may ever be created at the old path. **Until that day the instruction above is
+unchanged**, and the ~830 existing slug citations are deliberately left to drift rather than swept — a
+sweep now would have to be redone at the flag day. The marketplace-name half is already built on
+`feat/1769-marketplace-rename-source`, which does not merge until fase 3.
+
 ### Structure — where everything lives
 
 The full repo layout (`.claude-plugin/`, `plugins/` incl. `dkj-subagents/subagent-shared/`, `connectors/` at the root,

@@ -112,7 +112,7 @@ line) and `script-contract-sessioncheck.ps1` (through `check-script-contract.ps1
 marketplace; a **session start** does. Measured on a virgin profile in three states (inbound
 [#329](https://github.com/DaveKJohn/claude-code-specialists/issues/329)): without the settings file the
 refresh below fails, with the settings file in the same session it still fails, and after one session
-start it succeeds — reporting `Marketplace 'claude-code-specialists' not found` until then, which reads as a
+start it succeeds — reporting `Marketplace 'dkj-claude-plugins' not found` until then, which reads as a
 misspelled name rather than a missing act. `claude plugin marketplace add <owner>/<repo> --scope project`
 registers it without a restart if that is preferable; keep the scope flag, because `add` defaults to
 `user`.
@@ -126,7 +126,7 @@ registered, a single session start was measured to write a full project-scoped r
 So run, from the root of the consuming repo, one command per plugin listed in `enabledPlugins`:
 
 ```powershell
-claude plugin marketplace update claude-code-specialists   # first: refresh the cached marketplace
+claude plugin marketplace update dkj-claude-plugins   # first: refresh the cached marketplace
 claude plugin install dkj-subagents-alpha@dkj-claude-plugins --scope project
 # plus each domain plugin, e.g.:
 claude plugin install dkj-subagents-shopify@dkj-claude-plugins --scope project
@@ -140,7 +140,7 @@ on July 31 right after `v3.0.5`, same machine and same minute: **without** the r
 `3.0.4` and the clone did not move; **with** it, a second fresh folder got `3.0.5`. Unlike `plugin
 update`, `install` does **not** refresh for itself — so for this command the line is load-bearing rather
 than insurance. And the output cannot tell you: the success line names the **scope and no version at
-all**, which is why step 0c below verifies against the install record. `claude plugin marketplace update claude-code-specialists` followed by a `plugin
+all**, which is why step 0c below verifies against the install record. `claude plugin marketplace update dkj-claude-plugins` followed by a `plugin
 update` then moved it `3.0.1 -> 3.0.2` in one step. A refresh mechanism exists (the command reports
 `Refreshing marketplace cache (timeout: 120s)`), so a cache does not stay stale indefinitely; on what
 schedule it refreshes by itself was not established, which is why the explicit line is in the
@@ -222,7 +222,7 @@ user-scope record** beside the project one and makes the plugin appear machine-w
 flag instead, from the consuming repo's root, one command per plugin:
 
 ```powershell
-claude plugin marketplace update claude-code-specialists
+claude plugin marketplace update dkj-claude-plugins
 claude plugin update dkj-subagents-alpha@dkj-claude-plugins --scope project
 ```
 

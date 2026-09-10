@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Integrity check for the claude-code-specialists marketplace: validates the manifests, the
+    Integrity check for the dkj-claude-plugins marketplace: validates the manifests, the
     agent-def frontmatter and the internal links before a change lands via a PR on main.
 .DESCRIPTION
     This repo's lint gate (invoked by scripts/release/open-pr.ps1). Read-only -- changes nothing.

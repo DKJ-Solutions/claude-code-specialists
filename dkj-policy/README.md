@@ -91,7 +91,7 @@ Two commands, from the root of the checkout you want to move — the refresh onc
 enabled plugin:
 
 ```powershell
-claude plugin marketplace update claude-code-specialists                            # 1. refresh the clone
+claude plugin marketplace update dkj-claude-plugins                            # 1. refresh the clone
 claude plugin update dkj-subagents-alpha@dkj-claude-plugins --scope project         # 2. then update, per plugin
 claude plugin update dkj-subagents-ecomm@dkj-claude-plugins --scope project
 claude plugin update dkj-subagents-lifehub@dkj-claude-plugins --scope project

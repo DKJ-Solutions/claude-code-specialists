@@ -179,7 +179,7 @@ function New-CutFixture {
 
     Write-Utf8 (Join-Path $root '.claude-plugin\marketplace.json') @"
 {
-  "name": "claude-code-specialists",
+  "name": "dkj-claude-plugins",
   "owner": { "name": "fixture" },
   "plugins": [
     { "name": "team-fixture",     "source": "./plugins/dkj-subagents/team-fixture" },

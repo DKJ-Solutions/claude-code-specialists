@@ -55,10 +55,15 @@ function Get-RepoBlobUrl {
 # Dave has decided to rename this marketplace from 'claude-code-specialists' to 'dkj-claude-plugins',
 # accepting the exact cost the August 14 reasoning identified (every consumer's enabledPlugins key
 # breaks; no redirect for a marketplace name). It runs as a phased migration -- decision and plan on
-# #1769, fase 0 is this prep branch. WHAT IS NOT DECIDED YET: whether this business MIRROR follows the
+# #1769, fase 0 was the prep branch. WHAT IS NOT DECIDED YET: whether this business MIRROR follows the
 # source's new name or keeps 'claude-code-specialists' for its own consumers -- that is fase 4, and the
-# August 14 reasoning still applies to the mirror in isolation. No name is changed anywhere in fase 0;
-# this comment is the only edit.
+# August 14 reasoning still applies to the mirror in isolation.
+#
+# FASE 1 IS BUILT, NOT MERGED. The source-side rename lives on feat/1769-marketplace-rename-source,
+# where .claude-plugin/marketplace.json and every '<plugin>@<marketplace>' literal in the tree already
+# read 'dkj-claude-plugins'. That branch is a staging area: it merges at the fase 3 flag day and not
+# before, in one movement with the slug rename, the major cut and the per-machine re-installs. So the
+# fase 0 sentence 'no name is changed anywhere' has expired -- it described fase 0 and nothing since.
 $script:BusinessMarketplaceRepo = 'BWJ-ecommerce/claude-plugins-bwj'
 
 function Get-BusinessMarketplaceRepo {

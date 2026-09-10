@@ -51,7 +51,7 @@ line per add-on team you want, and add `dkj-policy` only if you deliberately wan
 ```json
 {
   "extraKnownMarketplaces": {
-    "claude-code-specialists": {
+    "dkj-claude-plugins": {
       "source": { "source": "github", "repo": "DKJ-Solutions/claude-code-specialists" }
     }
   },
@@ -67,7 +67,7 @@ it, the next command fails with `Marketplace … not found`.
 **3–4. Refresh, then install — from your repo's root, one install per plugin you enabled.**
 
 ```powershell
-claude plugin marketplace update claude-code-specialists                     # never skip: install does not refresh
+claude plugin marketplace update dkj-claude-plugins                     # never skip: install does not refresh
 claude plugin marketplace list                                               # came the entry from YOUR repo's settings?
 claude plugin install dkj-subagents-alpha@dkj-claude-plugins --scope project    # once per plugin
 ```
@@ -188,7 +188,7 @@ session start will tell you both are on.
 Two commands, from your repo's root, one pair per plugin:
 
 ```powershell
-claude plugin marketplace update claude-code-specialists
+claude plugin marketplace update dkj-claude-plugins
 claude plugin update dkj-subagents-alpha@dkj-claude-plugins --scope project
 ```
 
@@ -251,7 +251,7 @@ constant belongs in the namespace — which `dkj-` and `@dkj-claude-plugins` alr
 
 ```powershell
 # 1. Refresh -- do this first, every time
-claude plugin marketplace update claude-code-specialists
+claude plugin marketplace update dkj-claude-plugins
 
 # 2. Uninstall the retired ids -- skip whichever you never enabled
 claude plugin uninstall dkj-team-alpha@dkj-claude-plugins --scope project
@@ -260,7 +260,7 @@ claude plugin uninstall dkj-team-lifehub@dkj-claude-plugins --scope project
 claude plugin uninstall dkj-team-shopify@dkj-claude-plugins --scope project
 
 # 3. Refresh again, then install the new ids -- only the ones you had
-claude plugin marketplace update claude-code-specialists
+claude plugin marketplace update dkj-claude-plugins
 claude plugin install dkj-subagents-alpha@dkj-claude-plugins --scope project
 claude plugin install dkj-subagents-ecomm@dkj-claude-plugins --scope project
 claude plugin install dkj-subagents-lifehub@dkj-claude-plugins --scope project
@@ -329,14 +329,14 @@ two repos it binds. Nothing about the precedence rule changed; the names now say
 
 ```powershell
 # 1. Refresh -- do this first, every time
-claude plugin marketplace update claude-code-specialists
+claude plugin marketplace update dkj-claude-plugins
 
 # 2. Uninstall the retired ids -- skip whichever you never enabled
 claude plugin uninstall contributing-davekjohn@dkj-claude-plugins --scope project
 claude plugin uninstall bwj-codex@dkj-claude-plugins --scope project
 
 # 3. Refresh again, then install the new ids
-claude plugin marketplace update claude-code-specialists
+claude plugin marketplace update dkj-claude-plugins
 claude plugin install dkj-policy@dkj-claude-plugins --scope project
 # Only BWJ's two store repos need the second one:
 claude plugin install dkj-policy-bwj@dkj-claude-plugins --scope project
@@ -452,7 +452,7 @@ replacement plus the one workflow you decided on above, then restart.
 > ids, and the uninstalls that follow name the OLD ones — so the obvious worry is that the CLI refuses
 > to remove a plugin its catalogue no longer advertises. **Measured on 2026-08-09**, on the source repo
 > itself, in exactly this order: after
-> `claude plugin marketplace update claude-code-specialists` the uninstalls of
+> `claude plugin marketplace update dkj-claude-plugins` the uninstalls of
 > `specialists@dkj-claude-plugins` and `specialists-workflow-davekjohn@dkj-claude-plugins`
 > both returned `✔ Successfully uninstalled plugin`. `uninstall` resolves against your install record,
 > not against the catalogue. What is *not* claimed here is anything about whether `uninstall` refreshes
@@ -461,7 +461,7 @@ replacement plus the one workflow you decided on above, then restart.
 
 ```powershell
 # 1. Refresh -- do this first, every time
-claude plugin marketplace update claude-code-specialists
+claude plugin marketplace update dkj-claude-plugins
 
 # 2. Uninstall every old id you had enabled -- skip whichever you never enabled
 claude plugin uninstall specialists@dkj-claude-plugins --scope project
@@ -473,7 +473,7 @@ claude plugin uninstall specialists-workflow-davekjohn@dkj-claude-plugins --scop
 
 ```powershell
 # 3. Refresh again, then install the new ids
-claude plugin marketplace update claude-code-specialists
+claude plugin marketplace update dkj-claude-plugins
 
 # 3a. The core team -- everyone runs this one
 claude plugin install dkj-subagents-alpha@dkj-claude-plugins --scope project
@@ -556,7 +556,7 @@ for the workflow — with one exception worth knowing before you go looking for 
 
 So the line in your `.claude/specialists/SPECIALISTS.md` changes as follows — **bound to this repo's
 layout as of `v4.5.0`, which the table above is read off, and to the marketplace name
-`claude-code-specialists`; substitute yours if you registered it under another name**:
+`dkj-claude-plugins`; substitute yours if you registered it under another name**:
 
 ```text
 # before -- EITHER of these, depending on how long ago you last updated
@@ -690,7 +690,7 @@ rename touches it, and nothing about the content of any lens you have written ch
 
 - **Skill names.** Only the plugin prefix in front of them moved; the names themselves — `new-branch`,
   `open-pr`, `specialists-init`, and the rest — did not.
-- **The marketplace name**, `claude-code-specialists`, and the source you registered it under in
+- **The marketplace name**, `dkj-claude-plugins`, and the source you registered it under in
   `extraKnownMarketplaces`.
 - **The lens-family path segment**, `claude-specialists`, used by a pre-seam lens directory (see above)
   — it names the family, not any one plugin, so this rename does not touch it.
@@ -911,7 +911,7 @@ that domain). What follows is a **complete, pasteable file** — if you already 
 ```json
 {
   "extraKnownMarketplaces": {
-    "claude-code-specialists": {
+    "dkj-claude-plugins": {
       "source": { "source": "github", "repo": "DKJ-Solutions/claude-code-specialists" }
     }
   },
@@ -936,7 +936,7 @@ refresh command below fails; **with** the settings file, in the same session, it
 session start in the repo it succeeds. The failure is easy to misread — on CLI `2.1.220` it reads:
 
 ```
-✘ Failed to update marketplace(s): Marketplace 'claude-code-specialists' not found.
+✘ Failed to update marketplace(s): Marketplace 'dkj-claude-plugins' not found.
   Available marketplaces: claude-plugins-official
 ```
 
@@ -968,7 +968,7 @@ the running session. It makes the marketplace findable and installs nothing.
 of your repo, preceded once by a refresh of that cached clone:
 
 ```powershell
-claude plugin marketplace update claude-code-specialists                     # 1. refresh the cache first
+claude plugin marketplace update dkj-claude-plugins                     # 1. refresh the cache first
 claude plugin install dkj-subagents-alpha@dkj-claude-plugins --scope project    # 2. then install, per plugin
 # and line 2 again for each add-on team you enabled, and for dkj-policy if you enabled it
 ```
@@ -1146,7 +1146,7 @@ different question, answered under [the version is not the code](#staying-up-to-
 clone these commands read tracks `main`, not the tag.
 
 ```powershell
-claude plugin marketplace update claude-code-specialists          # 1. refresh the marketplace cache
+claude plugin marketplace update dkj-claude-plugins          # 1. refresh the marketplace cache
 claude plugin update dkj-subagents-alpha@dkj-claude-plugins --scope project   # 2. then update, per plugin
 ```
 

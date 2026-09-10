@@ -46,7 +46,7 @@ try {
         'From the root of your repo:'
         ''
         '```powershell'
-        'claude plugin marketplace update claude-code-specialists'
+        'claude plugin marketplace update dkj-claude-plugins'
         'claude plugin install dkj-subagents-alpha@dkj-claude-plugins --scope project'
         '```'
     )
@@ -64,7 +64,7 @@ try {
         ''
         'Run `claude plugin install dkj-subagents-alpha@dkj-claude-plugins` from the repo root.'
         ''
-        'Refresh first with `claude plugin marketplace update claude-code-specialists`.'
+        'Refresh first with `claude plugin marketplace update dkj-claude-plugins`.'
     )
     [System.IO.File]::WriteAllText((Join-Path $Fixture 'CONTRIBUTING.md'), (($s18Lines -join "`n") + "`n"), $Utf8NoBom)
     $rL18 = Invoke-Integrity -FixtureRoot $Fixture
@@ -176,7 +176,7 @@ try {
     $s25Lines = @(
         '# Contributing'
         ''
-        'Refresh with `claude plugin marketplace update claude-code-specialists` first.'
+        'Refresh with `claude plugin marketplace update dkj-claude-plugins` first.'
         ''
         'Then `claude plugin install dkj-subagents-alpha@dkj-claude-plugins --scope project ; claude plugin install dkj-subagents-ecomm@dkj-claude-plugins` for both.'
     )
@@ -210,7 +210,7 @@ try {
     $s27Lines = @(
         '# Contributing'
         ''
-        'Refresh with `claude plugin marketplace update claude-code-specialists` first.'
+        'Refresh with `claude plugin marketplace update dkj-claude-plugins` first.'
         ''
         'Then run `claude plugin install dkj-subagents-alpha@dkj-claude-plugins --scope local` from the root.'
     )
