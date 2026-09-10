@@ -4542,8 +4542,10 @@ foreach ($akPlugin in $akRoots) {
         continue
     }
 
-    # string|string[]: a bare string is one element, which is what the validator accepts.
-    $akEntries = if ($akManifest.agents -is [string]) { @([string]$akManifest.agents) } else { @($akManifest.agents) }
+    # string|string[]: a bare string is one element, which is what the validator accepts. Read through
+    # plugin-tree-lib's Get-ManifestAgentEntries, the ONE reading of this field -- measure-skill-lib's
+    # Get-DeclaredAgentCount carried a second one until #1781, and the two could not disagree loudly.
+    $akEntries = @(Get-ManifestAgentEntries -Manifest $akManifest)
     $akNamed = @{}
     foreach ($akEntry in $akEntries) {
         $akDeclared++

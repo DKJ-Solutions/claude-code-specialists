@@ -26,6 +26,12 @@
     Pure ASCII (repo convention for .ps1).
 #>
 
+# THE ONE DEPENDENCY, for the one field this lib does not own. Get-ManifestAgentEntries is the shared
+# reading of a manifest's 'agents' key; Get-DeclaredAgentCount below carried its own until #1781. Safe to
+# pull in here for the reason plugin-tree-lib's own header states: it has no dependencies of its own, so
+# this costs one small file rather than a chain of them.
+. (Join-Path $PSScriptRoot 'plugin-tree-lib.ps1')
+
 # EVERY FIGURE IS FORMATTED INVARIANTLY, and that is not a style choice. Formatted on a Dutch machine,
 # '{0:N0}' renders 13700 as '13.700' -- which an English reader of this repo reads as 13.7, off by a
 # factor of a thousand and still plausible. That is the same trap ConvertTo-TokenCount guards against in
@@ -295,13 +301,13 @@ function Get-DeclaredAgentCount {
         return [pscustomobject]@{ Found = $false; Version = $null; AgentCount = 0 }
     }
 
-    # string|string[], the two forms the installer accepts -- a bare string is one entry. Both properties
-    # are PROBED rather than read: Set-StrictMode throws on an absent one, and a manifest with no 'agents'
-    # key at all is the ordinary case for every plugin that ships none.
-    $agents = 0
-    if ($json.PSObject.Properties['agents'] -and $null -ne $json.agents) {
-        $agents = if ($json.agents -is [string]) { 1 } else { @($json.agents).Count }
-    }
+    # string|string[], the two forms the installer accepts -- a bare string is one entry, and the absent
+    # key is the ordinary case for every plugin that ships none. Both of those answers come from
+    # plugin-tree-lib's Get-ManifestAgentEntries, the ONE reading of this field: check 38 of
+    # check-plugin-integrity.ps1 validates the same key through the same function, so the gate and this
+    # count cannot silently drift apart (#1781). 'version' is still PROBED here, because Set-StrictMode
+    # throws on an absent property and that one has no shared reader.
+    $agents = @(Get-ManifestAgentEntries -Manifest $json).Count
     $version = if ($json.PSObject.Properties['version']) { $json.version } else { $null }
     return [pscustomobject]@{ Found = $true; Version = $version; AgentCount = $agents }
 }
