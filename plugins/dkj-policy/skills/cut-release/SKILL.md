@@ -674,10 +674,12 @@ Claude Enterprise syncs, so colleagues without GitHub access receive the plugins
 ## A milestone release — `-SummaryFile`
 
 An ordinary release's notes are the diff since the last one: `-Title` gives it one sentence and the
-entries carry the detail. A **milestone** is a different claim — the arc across many releases, which fits
-in neither. `-SummaryFile <path>` puts an authored markdown block between the title line and the
-generated entries, closed off with a horizontal rule so a reader can see where the authored part stops
-and the per-PR record begins. Three things to know:
+entries carry the detail — and where a release rolls up too many unrelated changes for one sentence to
+fit, a stable `Release version X.Y.Z` is a legitimate title rather than forced filler, since the
+entries and the attached notes carry everything regardless. A **milestone** is a different claim — the
+arc across many releases, which fits in neither. `-SummaryFile <path>` puts an authored markdown block
+between the title line and the generated entries, closed off with a horizontal rule so a reader can see
+where the authored part stops and the per-PR record begins. Three things to know:
 
 - **The file may live outside the repo, and normally should.** Its canonical home becomes the generated
   notes file; a second copy kept under `releases/` purely to feed the parameter is duplication.

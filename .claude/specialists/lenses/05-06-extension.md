@@ -204,6 +204,13 @@ through afterward, per the `cut-release` skill's checklist — not automated by 
   instruction and Rendall had to say so in prose. The generated body's pointer line does that
   structurally, and the acting instructions live in the attachment where they always did.
 
+**Pass `-Title "Release version X.Y.Z"` on every cut here** (Dave, September 10, 2026, at the `v4.33.0`
+cut). A release rolls up everything merged since the last one, and one sentence cannot describe a large
+multi-theme one — so this repo does not try. That string lands in `history.md`'s title column and in the
+generated Release body verbatim; `releases/README.md`'s *Local decisions* section carries the reasoning.
+It is the repo's choice, not the skill's rule: `-Title` still accepts a descriptive sentence, and a
+`-SummaryFile` milestone is unaffected.
+
 Never inline the development notes regardless: `gh release create`'s body has a hard
 125,000-character limit and this repo's development notes have exceeded that.
 

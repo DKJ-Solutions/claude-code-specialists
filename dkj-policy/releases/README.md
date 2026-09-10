@@ -124,6 +124,15 @@ attachment list is the development notes alone.
 > here. `v3.2.0`'s `.html` was removed from `main`; the `v3.2.0` **tag** still contains it, because a tag is
 > a record of a moment and is not rewritten.
 
+**Every release is titled `Release version X.Y.Z`, and nothing more** (Dave, September 10, 2026, at the
+`v4.33.0` cut). A `cut-release.ps1` release rolls up every entry merged since the last one, and a large one
+rolls up dozens with nothing in common — so a forced one-sentence `-Title` describes none of them and reads
+as filler in `history.md`'s title column. This repo therefore passes `-Title "Release version X.Y.Z"` on
+every cut, and `history.md` and the generated GitHub Release body carry that same string. The `-Title`
+mechanism is unchanged and a descriptive sentence is still valid — a repo whose releases each carry a
+single theme should use one — and `-SummaryFile` still turns a genuine milestone into its own authored
+block regardless of the title.
+
 **The notes are also readable as one hosted page** (Dave, August 15, 2026). `build-release-notes-page.ps1`
 builds every document under `audience/` into one page with a picker per release; the portable half — what
 the page is, why it is generated rather than edited, and what hosting it decides — is in
