@@ -172,10 +172,18 @@ September 8, 2026). Via [`.claude/settings.json`](.claude/settings.json) all six
 `dkj-subagents-alpha`, `dkj-subagents-ecomm`, `dkj-subagents-lifehub`, `dkj-subagents-shopify`, `dkj-policy` and
 `dkj-policy-bwj` — with the `github` marketplace source `DKJ-Solutions/claude-code-specialists`, so the
 repo points at itself. That way work here runs against
-exactly the product it maintains. One consequence to be aware of: a session reads the plugins from the
-**local marketplace clone**, and that clone advances on a `claude plugin marketplace update` — **not on
-a push**. So an agent def you modify on a branch takes effect after merge, push *and* that refresh, and
-between two releases **no version check can tell you the clone is behind**. A second: being a consumer,
+exactly the product it maintains. One consequence to be aware of: **a session loads neither this tree
+nor the marketplace clone.** It loads an extracted copy under `~/.claude/plugins/cache/`, named by the
+`installPath` of this checkout's install record and frozen at the moment that record was last written —
+the clone is the catalogue, and the source that copy was extracted from. Measured September 10, 2026
+([#1812](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1812)): a
+`claude plugin marketplace update` advanced the clone by 104 commits and left every payload
+byte-identical, and both `plugin update` and `plugin install` then declined on the **version string**
+alone. So a change that lands without a version bump reaches no session at all, and an agent def you
+modify on a branch takes effect after merge, push *and a release* — not after a refresh. **The one
+thing that does load from the clone is a document named by an absolute `@`-import**, which is why the
+orchestrator's body below advances on that refresh alone and everything else waits for the cut. Between
+two releases **no version check can tell you either copy is behind**. A second: being a consumer,
 whichever machine has actually run `claude plugin install ... --scope project` for this checkout
 carries an install record keyed on its **folder path** there, and renaming or moving the checkout on
 that machine unlinks the plugin without any error. A machine that has never run that install carries no
@@ -205,8 +213,8 @@ since #1570** ([#1579](https://github.com/DKJ-Solutions/claude-code-specialists/
 still **do not silence it by seeding a theme id**, which would arm a guard over a revenue-serving theme
 on a number nobody verified. The two are not the same act and the seam exists to keep them apart: the
 declaration says there is no store, an id says there is one and names it. **The session start here stays
-noisy until that plugin change reaches the marketplace clone through a release** — the lag named above,
-where an agent def or a hook takes effect on a `claude plugin marketplace update` and not on a push. The
+noisy until that plugin change reaches this checkout's installed payload through a release** — the lag
+named above, where an agent def or a hook takes effect on a release and not on a push or a refresh. The
 seam itself is verified against #1570's own hook rather than against the cached copy: with it the check
 is silent, without it the `[ERROR]` returns.
 

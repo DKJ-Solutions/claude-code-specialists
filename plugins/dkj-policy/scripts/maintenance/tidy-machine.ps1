@@ -17,8 +17,8 @@
     proof it does not have is the defect inbound #1191 measured. What was missing was a command that
     NAMES the rest, plus the four kinds of clutter that are not branches at all.
 
-    SO THIS IS A CONDUCTOR, NOT A SECOND IMPLEMENTATION. Six of its eleven lanes are a call into a
-    script that already exists and is already tested; only five carry new logic, and that logic is pure
+    SO THIS IS A CONDUCTOR, NOT A SECOND IMPLEMENTATION. Six of its twelve lanes are a call into a
+    script that already exists and is already tested; only six carry new logic, and that logic is pure
     and lives in tidy-lib.ps1. Nothing here re-derives a merge proof, re-reads a worktree list by hand, or
     re-answers a question another script in this repo already answers -- which is the whole of Ravi's
     rule and the reason issue #81 exists.
@@ -77,6 +77,13 @@
     one defect. It is deliberately
     not connectors/, which exists only in the source repo: this script has to work in a consumer.
 
+    AND ONE LANE READS WHAT THAT REGISTER POINTS AT, WHICH IS NOT THE SAME ARTEFACT (issue #1812). A
+    record's installPath names an extracted copy of the plugin under ~/.claude/plugins/cache/, and that
+    copy -- not the marketplace clone -- is what a session loads: measured September 10, 2026, the
+    running process holds a lease at <installPath>/.in_use/<pid> for the life of the session and the
+    clone holds none. Lanes 8 and 11 judge the pointer; lane 12 judges what is on the other end of it,
+    and it is the only lane whose subject the register does not itself enumerate.
+
     IT VISITS NO OTHER CHECKOUT. Dave's second answer on September 10, 2026 was "this checkout plus the
     machine-wide lanes" rather than "every checkout the machine knows about". A run that walked into
     other repositories would be reaching past the tree the session is standing in, and the blast radius
@@ -93,10 +100,10 @@
     it is passed straight through to prune-merged.ps1. Use it the first time on any machine.
 
 .PARAMETER CheckoutOnly
-    Run only the six per-checkout lanes and skip the five machine-wide ones.
+    Run only the six per-checkout lanes and skip the six machine-wide ones.
 
 .PARAMETER MachineOnly
-    Run only the five machine-wide lanes. Useful when a checkout is mid-flight and you want the
+    Run only the six machine-wide lanes. Useful when a checkout is mid-flight and you want the
     ~/.claude and scratch answers without anything reading the branch list.
 
 .PARAMETER MaxAgeDays
@@ -741,6 +748,110 @@ if ($runMachine) {
             Write-Item "  Not examined: $($unreadable.Count) marketplace(s) whose plugin list could not be read -- $($unreadable -join '; ')." 'DarkGray'
         }
         Write-Item (Get-TidySummaryLine -Lane 'Retired-name records' -Reported $dead.Count) 'White'
+    }
+}
+
+# ===================================================================================================
+# LANE 12 -- the extracted payload trees under ~/.claude/plugins/cache/ (#1812).
+#
+# THE OTHER END OF THE POINTER LANES 8 AND 11 JUDGE. Those two ask whether a RECORD is still good; this
+# one asks what the record's installPath POINTS AT, which is the extracted copy of the plugin a session
+# actually loads. Measured September 10, 2026 on Claude Code 2.1.267: 41 trees over 32.6 MB, of which 30
+# -- 22.2 MB -- carried the harness's own .orphaned_at mark and every one of those was still on disk, the
+# oldest mark six days old. An uninstall removes the record and leaves the payload.
+#
+# IT REPORTS AND HANDS OVER NOTHING TO RUN, and that omission is the point, exactly as in lane 10. No
+# plugin-cache verb exists to hand over, so the only line to print would be a recursive Remove-Item
+# under the user's home -- the delete primitive #1659 exists to remove.
+# ===================================================================================================
+
+if ($runMachine) {
+    Write-Lane '12' 'Extracted plugin payload -- the copy a session loads, and the copies nothing points at'
+    $userHome12 = Get-UserClaudeHome -UserHomeOverride $UserHomeOverride
+    $cacheRoot = if ($userHome12) { Join-Path $userHome12 (Join-Path '.claude' (Join-Path 'plugins' 'cache')) } else { '' }
+    if (-not $cacheRoot -or -not (Test-Path -LiteralPath $cacheRoot -PathType Container)) {
+        Write-Item 'no extracted plugin payload on this machine -- nothing to check.' 'DarkGray'
+    } else {
+        $install12 = Get-InstallRecord -RepoRoot $repoRoot -UserHomeOverride $UserHomeOverride
+        if ($install12.Exists -and -not $install12.Readable) {
+            # WITHOUT THE REGISTER THERE IS NO VERDICT, only a directory listing. Saying so beats
+            # reporting every tree as ownerless, which is what an empty install-path set would do.
+            Write-Item "the install administration could not be read, so no tree can be judged: $($install12.Error)" 'Red'
+        } else {
+            $installPaths = @(@($install12.AllRecords) | ForEach-Object { [string]$_.InstallPath } | Where-Object { $_ })
+            $livePids12 = @()
+            try { $livePids12 = @(Get-Process -ErrorAction SilentlyContinue | ForEach-Object { $_.Id }) } catch { }
+
+            # THE WALK IS EXACTLY THREE LEVELS: <marketplace>/<plugin>/<key>. That shape is the cache
+            # key itself -- a version string, or a commit sha where an extraction happened between two
+            # releases -- and a deeper walk would start reporting a plugin's own subdirectories as if
+            # they were payload trees.
+            $loaded = 0; $leased = 0; $ownerless = 0; $ownerlessBytes = [int64]0; $staleLeaseTrees = 0
+            $ownerlessRows = @()
+            foreach ($mp in @(Get-ChildItem -LiteralPath $cacheRoot -Directory -ErrorAction SilentlyContinue)) {
+                foreach ($plugin in @(Get-ChildItem -LiteralPath $mp.FullName -Directory -ErrorAction SilentlyContinue)) {
+                    foreach ($tree in @(Get-ChildItem -LiteralPath $plugin.FullName -Directory -ErrorAction SilentlyContinue)) {
+                        $marked = Test-Path -LiteralPath (Join-Path $tree.FullName '.orphaned_at') -PathType Leaf
+                        $leasePids = @()
+                        $leaseDir = Join-Path $tree.FullName '.in_use'
+                        if (Test-Path -LiteralPath $leaseDir -PathType Container) {
+                            foreach ($lease in @(Get-ChildItem -LiteralPath $leaseDir -File -ErrorAction SilentlyContinue)) {
+                                $leasePid = 0
+                                if ([int]::TryParse($lease.BaseName, [ref]$leasePid)) { $leasePids += $leasePid }
+                            }
+                        }
+                        $verdict = Get-PayloadTreeVerdict -Path $tree.FullName -InstallPaths $installPaths -OrphanMarked $marked -LeasePids $leasePids -LivePids $livePids12
+                        if (@($verdict.StaleLeases).Count -gt 0) { $staleLeaseTrees++ }
+                        switch ($verdict.Class) {
+                            'loaded' {
+                                $loaded++
+                                # A disagreement between the register and the harness's own mark is the
+                                # one thing in this lane worth interrupting an otherwise clean run for.
+                                if ($marked) {
+                                    $reportedTotal++
+                                    Write-Item (Get-DisplayPath $tree.FullName) 'Yellow'
+                                    Write-Item "    $($verdict.Reason)" 'DarkGray'
+                                }
+                            }
+                            'leased' { $leased++ }
+                            'ownerless' {
+                                $ownerless++
+                                $bytes = [int64]0
+                                try { $bytes = [int64](@(Get-ChildItem -LiteralPath $tree.FullName -Recurse -File -ErrorAction SilentlyContinue) | Measure-Object -Property Length -Sum).Sum } catch { }
+                                $ownerlessBytes += $bytes
+                                $ownerlessRows += [pscustomobject]@{
+                                    Path = $tree.FullName; Bytes = $bytes; Id = "$($plugin.Name)@$($mp.Name)"; Key = $tree.Name
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if ($ownerless -eq 0) {
+                Write-Item 'Every extracted payload on this machine is one an install record still points at.' 'DarkGray'
+            } else {
+                # GROUPED BY PLUGIN ID, not one line per tree. A machine that has taken a dozen releases
+                # holds a dozen trees per plugin, and a per-tree list buries the one number a reader
+                # acts on -- how much of the disk this is -- under its own length.
+                $groups = @($ownerlessRows | Group-Object -Property Id | Sort-Object -Property @{ Expression = { (@($_.Group) | Measure-Object -Property Bytes -Sum).Sum } } -Descending)
+                foreach ($group in $groups) {
+                    $sum = [int64]((@($group.Group) | Measure-Object -Property Bytes -Sum).Sum)
+                    $keys = (@(@($group.Group) | Sort-Object -Property Key | ForEach-Object { $_.Key }) -join ', ')
+                    $reportedTotal++
+                    Write-Item "$(Format-SuspectToken -Value ([string]$group.Name)) -- $($group.Count) tree(s), $([math]::Round($sum / 1MB, 1)) MB: $keys" 'Yellow'
+                }
+                Write-Item "  $([math]::Round($ownerlessBytes / 1MB, 1)) MB in $ownerless tree(s) no install record points at." 'DarkGray'
+                Write-Item '  NO COMMAND IS OFFERED HERE. No plugin-cache verb exists, an uninstall removes the record and leaves the payload (measured, #1812), and a recursive delete under your home is the primitive #1659 exists to prevent. Clear by hand what you recognise.' 'DarkGray'
+            }
+            if ($leased -gt 0) {
+                Write-Item "  $leased tree(s) no record points at are still being READ by a live process -- a session that started before the record moved. Untouched, and they go when it does." 'DarkGray'
+            }
+            if ($staleLeaseTrees -gt 0) {
+                Write-Item "  $staleLeaseTrees tree(s) carry a lease whose process has ended. Harmless to a session; the harness's own sweep is what reads them." 'DarkGray'
+            }
+            Write-Item (Get-TidySummaryLine -Lane 'Payload trees' -Reported $ownerless -Untouched ($loaded + $leased)) 'White'
+        }
     }
 }
 
