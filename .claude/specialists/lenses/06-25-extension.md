@@ -68,6 +68,40 @@ out all 15 subagents with their descriptions. Those descriptions are **already**
 ~2.260 above — so the table was paying twice for the same information. Removing them shrank `CLAUDE.md`
 by 2.799 characters, **~750 tokens per session**.
 
+**Since September 10, 2026 that table has a hole in it, and the instrument does not say so.** The
+inventory's `Agents (N)` counts only defs found by convention in a plugin's default `agents/` directory.
+The four team plugins name their defs by path in the manifest's `agents` key — `subagents/` is not the
+default directory, so the key is what the validator requires — and against Claude Code 2.1.267 those
+defs **load in a session** while the inventory counts **zero** of them. So for every one of the four,
+`claude plugin details` now prints `Agents (0)` and an Always-on total that is **skills only**: alpha
+reads ~819, and the ~2.260 of agent descriptions the row above measures is simply absent from it. The
+figure is not wrong about what it covers; it is silent about what it omits.
+
+**Two ways that misleads, both measured
+([#1771](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1771)).** A share computed
+against that total reads as *"the skill descriptions account for effectively ALL of this plugin's
+always-on cost"* — false by roughly a factor of four for alpha. And `Agents (0)` reads as *"this plugin
+ships none"*, which is what produced #1771: a report concluding the four team plugins register no
+specialists at all, filed against a session that had all 26 of them in its own agent list.
+`measure-skill.ps1` now says both things out loud rather than leaving the reader to notice, and its
+suite pins them.
+
+**How to settle a claim like that, since `plugin details` cannot.** Build a throwaway local marketplace
+with one plugin, put two agent defs in a non-default directory, name only **one** of them in the `agents`
+key, install it **fresh** into a scratch project, and then **dispatch each one** from a real session
+(`claude -p`). Measured that way: the named def returns its word, and the unnamed one in the same
+directory comes back `Agent type '<name>' not found`. That is what makes the key's behaviour a
+**reporting** defect rather than a loading defect.
+
+**Two ways that method goes wrong, both met on the first attempt.** Asking a session to *list* its
+`subagent_type` values is not a measurement — a model can answer it from belief, so the run has to
+**invoke**. And installing one def, then adding the second by updating the plugin in place, measures the
+resolved snapshot rather than the key: the CLI says `Restart to apply changes`, and the absent def is
+then absent for the wrong reason. Ship both defs in the first version, list the resolved cache before
+dispatching, and the reading is unambiguous. The general lever, which is this lens's own subject applied
+to itself: **an instrument that reports a component is not evidence that the component loads, and the
+only thing that is, is loading it.**
+
 Be precise about that second number's provenance: `claude plugin details` uses the `count_tokens` API,
 but it only measures *plugins*. A `CLAUDE.md` delta has no such command, so ~750 is a character-based
 estimate — good enough to decide by, not a measured figure like the ~2.260. The first attempt landed at
