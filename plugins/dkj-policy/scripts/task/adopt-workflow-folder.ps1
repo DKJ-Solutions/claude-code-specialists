@@ -243,10 +243,55 @@ $updateCommandLines = if ($updateIds.Count -gt 0) {
 # "right owner, wrong reach" shape recorded for PR #734, and stated for CLAUDE.md further down. A marker
 # plus a section-level append is the narrowest answer that closes it: nothing existing is read back,
 # rewritten or merged, which is exactly the rule the note-root seam answer below appends under.
-$updateSectionMarker = '<!-- dkj-policy:update-section -->'
+#
+# AND SINCE #1766 IT IS A FENCED REGION RATHER THAN A ONE-SHOT APPEND, which is the second bounded
+# exception to "never rewrites" and the only one. The append closed "a section added later never
+# arrives"; it did not close "a section that arrived is never CORRECTED", and the second half is what a
+# consumer actually reported. Their folder README still named the branch document `development.md` and
+# still carried two pre-rename plugin ids -- because everything in this block is generated from the
+# arrays below. It is the plugin's own writing, sitting in a file the plugin had promised never to touch
+# again, with no way to correct it and no way for the reader to tell whose sentence had gone stale.
+#
+# WHAT THE FENCE BUYS, AND WHAT IT DELIBERATELY DOES NOT. Content BETWEEN the two markers is the
+# plugin's and is replaced on every -Apply; everything outside them is the repo's and is never read. So
+# the surface #1766 asks for -- a block identical in every consumer, kept current -- costs one closing
+# marker rather than a vendored copy of the portable pages in every repo. It is NOT a licence to rewrite
+# a page this scaffold did not fence: an opening marker with NO closing one is a section from before
+# #1766, possibly edited since, and it is left exactly as it is and REPORTED. The write block further
+# down answers all four states.
+#
+# THE TWO SHAPES #1766 PROPOSED ARE BOTH DECLINED, with reasons rather than by preference. A vendored
+# `HELP/` subtree (its shape 1) duplicates ~203 KB of portable prose into every consumer and reverses
+# this file's governing rule outright -- and it repeats the defect #664 closed, publishing plumbing to an
+# audience that cannot act on it. A separate pointer page (its shape 2) duplicates what the intro above
+# already says, which creates a second drift surface inside one folder: the exact complaint. Neither
+# repairs the staleness that was measured, because both leave the stale README standing.
+$updateSectionMarker    = '<!-- dkj-policy:update-section -->'
+$updateSectionEndMarker = '<!-- /dkj-policy:update-section -->'
 $folderReadmeUpdate = @(
     '',
     $updateSectionMarker,
+    '## The `dkj-policy` workflow',
+    '',
+    '**Everything between the two markers around this block is the plugin''s writing, and a re-run of the',
+    '`adopt-dkj-policy` skill (Part 1) replaces it.** Write outside it -- above the block or below it --',
+    'and your words are never read or touched. To own these paragraphs yourself instead, delete the two',
+    'marker comments: the block becomes ordinary text in your file and no run will write it again.',
+    '',
+    'The conventions this workflow runs on do not live in this repo. They travel with the plugin as three',
+    'portable pages -- `CONTRIBUTING-portable.md`, `DEVELOPMENT-portable.md` and `RELEASES-portable.md` --',
+    'and every page in this folder beside them is *your* answers to one of them. They are named here in',
+    'code rather than linked because the path to your plugin install differs per machine; ask your Claude',
+    'for the `adopt-dkj-policy` skill, or read them in the source repo.',
+    '',
+    '### Which version am I running?',
+    '',
+    'Run `/dkj-policy:plugin-versions`. **The answer is a command rather than a number written here,',
+    'because a plugin version is a property of the (plugin, checkout) pair** -- recorded per machine and',
+    'keyed on this checkout''s folder path, so one repo can sit on two different versions on two machines',
+    'at once. A number committed into this file would be correct for at most one clone and stale',
+    'everywhere else, while reading as authoritative.',
+    '',
     '## Updating the plugins',
     '',
     'A release ANNOUNCES a new version; nothing delivers it. From this repo''s root:',
@@ -283,8 +328,11 @@ $folderReadmeUpdate = @(
     'function this repo has never had; `script-contract-sessioncheck` names it at the next session start,',
     'and the `adopt-dkj-policy` skill''s Part 2 fills it in.',
     '',
-    'Placed by that skill''s Part 1, which tops this section up when it is missing and never rewrites it',
-    'once it is here -- the marker above is how it recognises it. This is your file: edit it freely.'
+    'Placed and kept current by that skill''s Part 1: it writes this block when the markers are missing',
+    'and replaces what sits between them when they are present, so a correction to any sentence above',
+    'reaches this repo on the next run. **The rest of the page is yours and is never read** -- and if you',
+    'want these paragraphs too, delete the two markers and they stop being the plugin''s.',
+    $updateSectionEndMarker
 )
 
 $folderReadme = @(
@@ -586,29 +634,78 @@ foreach ($t in $targets) {
 # answer -- so a repo still holding a folder under one of this workflow's earlier names reads THAT page,
 # and topping up the name it does not use would put the section where nobody looks.
 #
-# NO READ-BACK BEYOND THE MARKER TEST, and AppendAllText rather than a rewrite, for the same encoding
-# reason the seam answer below states: reading a file and writing it back re-encodes it, and this command
-# was only ever asked to add a section.
+# FOUR STATES SINCE #1766, WHERE THERE WERE THREE, and the new one is the pre-fence page. Read in the
+# order below, because two of them are told apart only by the CLOSING marker:
+#   1. no page              -- the loop above already reported it; this block says nothing
+#   2. BOTH markers         -- the block between them is the plugin's; -Apply replaces it
+#   3. opening marker only  -- a section from before #1766, possibly edited since. LEFT ALONE, reported
+#                              with the one thing the reader can do about it
+#   4. neither marker       -- appended, exactly as before
+#
+# STATE 3 IS THE WHOLE REASON THE FENCE IS SAFE, so it is not a fallback. A page carrying the old
+# unfenced section has no machine-readable end: replacing "from the marker to the end of the file" would
+# take everything the repo wrote below it, and this command has never had permission to do that. There is
+# no heuristic worth guessing with here -- the honest answer is to say the page predates the fence and
+# name the two-character edit that opts in. That keeps "nothing is ever rewritten" true of every page
+# this scaffold did not itself fence.
+#
+# THE REPLACE IS STILL NOT A MERGE, and reads back only what it must. State 2 reads the file once, cuts
+# on the two markers, and writes head + fresh block + tail with the same UTF-8-no-BOM encoder the append
+# uses -- so a re-encode reaches only a file this command already owns a region of. States 3 and 4 keep
+# AppendAllText and the marker test, for the encoding reason the seam answer below states.
 #
 # EVERY BRANCH PRINTS. "Your page already has it" has to be distinguishable from "nobody looked" -- the
-# whole failure this block exists for was silent by construction.
+# whole failure this block exists for was silent by construction. Since #1766 that has a third value:
+# "it is here and it was brought up to date" is a different fact again, and a run that quietly refreshed
+# a page would be the same silence wearing the opposite face.
 $folderReadmeRel = "$workflowFolder/README.md"
 $folderReadmeAbs = Join-Path $repoRoot ($folderReadmeRel -replace '/', '\')
 if (-not (Test-Path -LiteralPath $folderReadmeAbs -PathType Leaf)) {
     # Either it was just created with the section in it, or this repo has no such page at all. Both are
     # already reported by the loop above, so this block says nothing.
+} elseif ((Get-Content -LiteralPath $folderReadmeAbs -Raw) -match [regex]::Escape($updateSectionEndMarker)) {
+    # STATE 2 -- fenced. The end marker is what is tested, because a fenced page carries BOTH and a
+    # pre-fence page carries only the opening one: testing the opening marker cannot tell them apart.
+    $existingReadme = [System.IO.File]::ReadAllText($folderReadmeAbs)
+    $startIdx = $existingReadme.IndexOf($updateSectionMarker)
+    $endIdx   = $existingReadme.IndexOf($updateSectionEndMarker)
+    if ($startIdx -lt 0 -or $endIdx -lt $startIdx) {
+        # A closing marker with no opening one before it. Nothing here knows where the block begins, so
+        # nothing here may cut -- the same reasoning as state 3, reached from the other side.
+        Write-Host "  [section] $folderReadmeRel carries a closing marker with no opening one -- left as it is" -ForegroundColor Yellow
+        Write-Host "            repair the pair by hand, or delete both markers to own the block yourself." -ForegroundColor DarkGray
+    } else {
+        $head = $existingReadme.Substring(0, $startIdx)
+        $tail = $existingReadme.Substring($endIdx + $updateSectionEndMarker.Length)
+        # The block is composed with its own leading blank line, so the head is trimmed of trailing
+        # newlines to keep a re-run from growing the gap above it by one line every time.
+        $fresh = (($folderReadmeUpdate -join $nl).TrimStart("`r", "`n"))
+        $rebuilt = $head.TrimEnd("`r", "`n") + $nl + $nl + $fresh + $tail
+        if ($rebuilt -eq $existingReadme) {
+            Write-Host "  [section] $folderReadmeRel already carries the current block -- nothing to do" -ForegroundColor DarkGray
+        } elseif ($Apply) {
+            [System.IO.File]::WriteAllText($folderReadmeAbs, $rebuilt, $Utf8NoBom)
+            $toppedUp++
+            Write-Host "  [topped]  $folderReadmeRel -- the plugin's block was brought up to date" -ForegroundColor Green
+        } else {
+            $toppedUp++
+            Write-Host "  [top up]  $folderReadmeRel -- the plugin's block has drifted; it would be replaced" -ForegroundColor Green
+        }
+    }
 } elseif ((Get-Content -LiteralPath $folderReadmeAbs -Raw) -match [regex]::Escape($updateSectionMarker)) {
-    Write-Host "  [section] $folderReadmeRel already carries the UPDATE section -- left as it is" -ForegroundColor DarkGray
+    # STATE 3 -- the pre-fence section. It has no end, so it is not ours to cut.
+    Write-Host "  [section] $folderReadmeRel carries the UPDATE section from before it was fenced -- left as it is" -ForegroundColor DarkGray
+    Write-Host "            to take the current block, delete the '$updateSectionMarker' line and its section, then re-run." -ForegroundColor DarkGray
 } elseif ($Apply) {
     $existingReadme = [System.IO.File]::ReadAllText($folderReadmeAbs)
     $readmeAppendix = (($folderReadmeUpdate -join $nl) + $nl)
     if ($existingReadme.Length -gt 0 -and -not $existingReadme.EndsWith("`n")) { $readmeAppendix = $nl + $readmeAppendix }
     [System.IO.File]::AppendAllText($folderReadmeAbs, $readmeAppendix, $Utf8NoBom)
     $toppedUp++
-    Write-Host "  [topped]  $folderReadmeRel -- UPDATE section appended" -ForegroundColor Green
+    Write-Host "  [topped]  $folderReadmeRel -- the plugin's block was appended" -ForegroundColor Green
 } else {
     $toppedUp++
-    Write-Host "  [top up]  $folderReadmeRel -- has no UPDATE section; it would be appended" -ForegroundColor Green
+    Write-Host "  [top up]  $folderReadmeRel -- has no plugin block; it would be appended" -ForegroundColor Green
 }
 
 # --- The one seam this run may answer (issue #1150) ------------------------------------------------

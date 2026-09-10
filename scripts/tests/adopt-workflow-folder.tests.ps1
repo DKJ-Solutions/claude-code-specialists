@@ -380,7 +380,7 @@ Assert-Match 'releases/history\.md' $relText '-Apply: it names where the list ac
     $readme11b = [System.IO.File]::ReadAllText((Join-Path $c11 'dkj-policy\README.md'), [System.Text.Encoding]::UTF8)
     Assert-Equal 1 ([regex]::Matches($readme11b, [regex]::Escape($Marker)).Count) 'update re-run: still exactly one section'
     Assert-Equal $readme11 $readme11b 'update re-run: the page was not touched at all'
-    Assert-Match 'already carries the UPDATE section' $r11b.Flat 'update re-run: and it says so rather than staying silent'
+    Assert-Match 'already carries the current block' $r11b.Flat 'update re-run: and it says so rather than staying silent'
 
     # THE CASE THIS BLOCK EXISTS FOR: a repo that adopted BEFORE the section existed. Its README is its
     # own writing with no marker anywhere -- the state every already-adopted consumer is in.
@@ -393,13 +393,13 @@ Assert-Match 'releases/history\.md' $relText '-Apply: it names where the list ac
     # Dry run first: it reports the top-up and changes nothing.
     $r12dry = Invoke-Adopt -Dir $c12
     Assert-Equal 0 $r12dry.Code 'update topup dry: exit 0'
-    Assert-Match 'has no UPDATE section' $r12dry.Flat 'update topup dry: the run names what it would append'
+    Assert-Match 'has no plugin block' $r12dry.Flat 'update topup dry: the run names what it would append'
     Assert-Equal $ownReadme ([System.IO.File]::ReadAllText((Join-Path $c12 'dkj-policy\README.md'), [System.Text.Encoding]::UTF8)) `
         'update topup dry: and wrote nothing'
 
     $r12 = Invoke-Adopt -Dir $c12 -ScriptArgs @('-Apply')
     Assert-Equal 0 $r12.Code 'update topup: exit 0'
-    Assert-Match 'UPDATE section appended' $r12.Flat 'update topup: the run reports the append'
+    Assert-Match "the plugin's block was appended" $r12.Flat 'update topup: the run reports the append'
     $readme12 = [System.IO.File]::ReadAllText((Join-Path $c12 'dkj-policy\README.md'), [System.Text.Encoding]::UTF8)
     Assert-Match ([regex]::Escape($Marker)) $readme12 'update topup: the section is there now'
     # THEIR OWN WRITING SURVIVES BYTE FOR BYTE, and it still leads: this is an append, not a merge.
@@ -408,6 +408,69 @@ Assert-Match 'releases/history\.md' $relText '-Apply: it names where the list ac
     # BOTH HALVES OF THE EXCEPTION AT ONCE: the loop still leaves the FILE alone while this block appends
     # to it, which is what keeps the append bounded rather than a rewrite in disguise.
     Assert-Match '\[exists\]\s+dkj-policy/README\.md' $r12.Out 'update topup: the file itself was still left as it is'
+
+    # --- 12. The fence: the plugin's block is REPLACED, and only between its own markers (#1766) -----
+    # THE SECOND BOUNDED EXCEPTION TO "NEVER REWRITES", so every edge of it is pinned. The append closed
+    # "a section added later never arrives"; it never closed "a section that arrived is never
+    # CORRECTED", which is the half a consumer reported -- their page still named the branch document
+    # `development.md` and still carried two pre-rename plugin ids, all of it this scaffold's own
+    # generated writing sitting in a file it had promised not to touch again.
+    Write-Host "adopt-workflow-folder -- the plugin's block is refreshed between its markers" -ForegroundColor Cyan
+    $EndMarker = '<!-- /dkj-policy:update-section -->'
+
+    Assert-Match ([regex]::Escape($EndMarker)) $readme11 'fence: the scaffolded README carries the closing marker too'
+    Assert-Match 'plugin-versions' $readme11 'fence: and answers the version question with a command, not a number'
+    Assert-True ($readme11.IndexOf($Marker) -lt $readme11.IndexOf($EndMarker)) 'fence: opening marker comes first'
+
+    # THE REPLACE ITSELF. The repo's own writing is put BELOW the block and the block is then corrupted
+    # by hand; a re-run must restore the block and leave both sides byte for byte.
+    $c13 = New-FixtureConsumer -Label 'fence-replace'
+    $r13 = Invoke-Adopt -Dir $c13 -ScriptArgs @('-Apply')
+    Assert-Equal 0 $r13.Code 'fence replace: scaffold exit 0'
+    $p13 = Join-Path $c13 'dkj-policy\README.md'
+    $fresh13 = [System.IO.File]::ReadAllText($p13, [System.Text.Encoding]::UTF8)
+
+    $s13 = $fresh13.IndexOf($Marker)
+    $e13 = $fresh13.IndexOf($EndMarker) + $EndMarker.Length
+    $head13 = $fresh13.Substring(0, $s13)
+    $ourTail = "`n`n## Our own notes`n`nWritten by this repo, below the block.`n"
+    $stale = $head13 + $Marker + "`n## Updating the plugins`n`nstale: development.md, dkj-team-alpha`n" + $EndMarker + $ourTail
+    [System.IO.File]::WriteAllText($p13, $stale, (New-Object System.Text.UTF8Encoding($false)))
+
+    # Dry run reports the drift and writes nothing -- the contract every other branch here has.
+    $r13dry = Invoke-Adopt -Dir $c13
+    Assert-Match 'would be replaced' $r13dry.Flat 'fence replace dry: the run names what it would do'
+    Assert-Equal $stale ([System.IO.File]::ReadAllText($p13, [System.Text.Encoding]::UTF8)) 'fence replace dry: and wrote nothing'
+
+    $r13b = Invoke-Adopt -Dir $c13 -ScriptArgs @('-Apply')
+    Assert-Equal 0 $r13b.Code 'fence replace: exit 0'
+    Assert-Match 'brought up to date' $r13b.Flat 'fence replace: the run says the block was refreshed'
+    $after13 = [System.IO.File]::ReadAllText($p13, [System.Text.Encoding]::UTF8)
+    Assert-True ($after13 -notmatch 'dkj-team-alpha') 'fence replace: the stale content is gone'
+    Assert-True $after13.EndsWith($ourTail) 'fence replace: the repo''s own writing below the block survives byte for byte'
+    Assert-True $after13.StartsWith($head13.TrimEnd("`r", "`n")) 'fence replace: and everything above it survives too'
+    Assert-Equal 1 ([regex]::Matches($after13, [regex]::Escape($Marker)).Count) 'fence replace: still exactly one block'
+
+    # IDEMPOTENT: a second run over a block already current writes nothing and says so. A refresh that
+    # rewrote on every run would re-encode a file it has no other reason to touch, on every adoption.
+    $r13c = Invoke-Adopt -Dir $c13 -ScriptArgs @('-Apply')
+    Assert-Match 'already carries the current block' $r13c.Flat 'fence idempotent: a current block is left alone'
+    Assert-Equal $after13 ([System.IO.File]::ReadAllText($p13, [System.Text.Encoding]::UTF8)) 'fence idempotent: and the file is untouched'
+
+    # STATE 3 -- THE PRE-FENCE PAGE, which is what makes the fence safe rather than a licence. An opening
+    # marker with no closing one has no machine-readable end, so cutting "to the end of the file" would
+    # take the repo's own writing with it. Left alone and reported.
+    Write-Host "adopt-workflow-folder -- a pre-fence section is left alone, not guessed at" -ForegroundColor Cyan
+    $c14 = New-FixtureConsumer -Label 'fence-legacy'
+    New-Item -ItemType Directory -Path (Join-Path $c14 'dkj-policy') -Force | Out-Null
+    $legacy = "# dkj-policy`n`nOurs.`n`n$Marker`n## Updating the plugins`n`nthe old one-shot section`n`n## Our own section`n`nwritten after it, and it must survive`n"
+    [System.IO.File]::WriteAllText((Join-Path $c14 'dkj-policy\README.md'), $legacy, (New-Object System.Text.UTF8Encoding($false)))
+    $r14 = Invoke-Adopt -Dir $c14 -ScriptArgs @('-Apply')
+    Assert-Equal 0 $r14.Code 'fence legacy: exit 0'
+    Assert-Match 'from before it was fenced' $r14.Flat 'fence legacy: the run names the state'
+    Assert-Match 'delete the' $r14.Flat 'fence legacy: and the one thing the reader can do about it'
+    Assert-Equal $legacy ([System.IO.File]::ReadAllText((Join-Path $c14 'dkj-policy\README.md'), [System.Text.Encoding]::UTF8)) `
+        'fence legacy: the page is untouched, including the section written after the marker'
 } finally {
     if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture -ErrorAction SilentlyContinue }
 }
