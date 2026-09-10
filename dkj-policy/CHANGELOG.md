@@ -43,7 +43,63 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**10 / 30 minor entries** <!-- pending-tally -->
+**11 / 31 minor entries** <!-- pending-tally -->
+
+### DEPLOY: feat/1769-marketplace-rename-source · 20260910-215042
+
+This marketplace is called `dkj-claude-plugins`. The name is the key half of every
+`<plugin>@<marketplace>` id, so it is stated once in `.claude-plugin/marketplace.json` and read from
+there by `Get-MarketplaceName` -- and everything that had spelled it out instead now follows: the
+`@`-ids across `scripts/**`, the byte-identical `plugins/**/scripts/` mirrors, `bootstrap.ps1` and
+`teardown.ps1`, the manuals, agent defs, personas and skills, the printed
+`claude plugin marketplace update` command strings, `INSTALL.md` and `UNINSTALL.md`, and the live
+`@`-import paths into the marketplace clone. This repo consumes itself, so its own
+`.claude/settings.json` enables all six plugins under the new name and its entry in `connectors/`
+moved with it, in the same commit rather than a later one -- the register and the consumer being one
+tree here is the whole reason that is honest.
+
+The repository itself was renamed the same day, ahead of this merge, and the two halves are not the
+same job. **What resolves the name follows it; what merely prints it may lag.** So `Get-RepoName`, the
+`repository:` line the two consumer scaffolders write, the matcher that finds it again, the regenerated
+config blueprint and the session check's candidate paths are all current, while the ~830 prose citations
+stay correct-on-edit per #1526 -- both spellings resolve, and a sweep would buy prose consistency at the
+price of an unreviewable diff.
+
+**And the rename broke one guard silently, which is the part worth reading twice.**
+`consumer-runner-lib.ps1` finds a scaffolded CI runner by matching the name half of its `repository:`
+line. Every consumer scaffolded before the rename names the old one; those runners keep working, because
+GitHub answers the redirect -- so nothing fails, and the check simply stops finding them. A consumer
+nothing is reported about reads exactly like a consumer with nothing wrong, which is the silence #1805
+was filed to end, arriving through the detector built to end it. `Get-RetiredRepoNames` now states the
+names this repo has been renamed away from, the matcher takes one or many, and a new scenario holds both
+directions. The list only grows.
+
+**Score:** 5
+
+#### What makes this deploy extra special
+
+**Every existing install stops resolving, and no consumer can be fixed by an update.** An
+`enabledPlugins` key is `<plugin>@<marketplace-name>`, and there is no redirect for a marketplace name
+the way there is for a git slug -- so the old key matches nothing and the plugin silently does not load.
+The route out is per machine **and** per checkout, because an install record is keyed on the folder path:
+uninstall the old ids, remove the old marketplace, add the new one, refresh, install again.
+`INSTALL.md` carries that sequence for each migration shape and is the canonical copy of it.
+
+Read the flag day as one movement rather than a release: the five consumer repositories were prepared on
+their own branches first and merge alongside this one, and the re-installs follow immediately -- because
+between this merge and the last re-install, every consumer that has not been brought over is dark.
+
+**Score:** 5
+
+#### Pull Request
+
+Rename the marketplace -- and the functional half of the repo name -- to dkj-claude-plugins
+
+Plugins: dkj-policy, dkj-policy-bwj, dkj-subagents-alpha, dkj-subagents-shopify
+
+[PR #1819](https://github.com/DKJ-Solutions/dkj-claude-plugins/pull/1819)
+
+---
 
 ### DEPLOY: fix/1816-retired-doc-name-citations · 20260910-194223
 
