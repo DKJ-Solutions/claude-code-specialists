@@ -43,7 +43,52 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**4 / 16 minor entries** <!-- pending-tally -->
+**5 / 17 minor entries** <!-- pending-tally -->
+
+### DEPLOY: feat/1766-plugin-owned-region · 20260910-111206
+
+`dkj-policy/README.md` now carries a **fenced block that belongs to the plugin and is kept current**.
+Everything between `<!-- dkj-policy:update-section -->` and `<!-- /dkj-policy:update-section -->` is
+replaced by a re-run of the `adopt-dkj-policy` skill's Part 1; everything outside those two markers is
+yours and is never read. The block says what this workflow is, names the three portable pages in code,
+and answers *"which version am I on?"* with `/dkj-policy:plugin-versions` rather than a number -- a
+version is per (plugin, checkout), so a number committed into a repo is right for at most one clone.
+Fixes inbound #1766.
+
+**This is the one place the scaffold rewrites anything**, and it exists because everything in that block
+was always the plugin's writing sitting in a file the plugin had promised not to touch. A consumer's page
+went on naming the branch document `development.md` and listing two pre-rename plugin ids, with no way to
+correct it and no way for a reader to tell whose sentence had gone stale. Three ways out, all the
+consumer's: write outside the block, delete both markers to own the paragraphs, or edit inside and know
+they are replaced. **A page from before the fence is left exactly as it is** -- an opening marker with no
+closing one has no machine-readable end, so the run reports it and names the edit that opts in.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+Neither shape the issue proposed was built, and the reasons are measurements rather than preferences. A
+vendored `HELP/` subtree duplicates ~203 KB into every consumer and repeats the defect #664 closed; a
+separate pointer page duplicates what the folder README's intro already says, creating a second drift
+surface inside one folder -- which is the complaint itself. Neither would have fixed the staleness that
+was actually measured, because both leave the stale README standing.
+
+One of the report's supporting claims also failed on contact with the tree: it treats pre-marker repos as
+unreachable, and that case has been built and tested since the marker existed
+(`adopt-workflow-folder.tests.ps1`, `$c12`). Their page carries no marker because Part 1 has not been
+re-run there.
+
+**Score:** 2
+
+#### Pull Request
+
+A refreshable plugin-owned region in the consumer's dkj-policy/README.md
+
+Plugins: dkj-policy
+
+[PR #1794](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1794)
+
+---
 
 ### DEPLOY: fix/1786-stale-test-docstring · 20260910-110446
 
