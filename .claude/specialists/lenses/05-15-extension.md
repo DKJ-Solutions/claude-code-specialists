@@ -2506,20 +2506,44 @@ directory. What it cannot tell you is what a **session** loads — and the sessi
 all 26 subagents in its own agent list, from these four plugins, out of `subagents/`, named by the key.
 Nothing in the report's evidence contradicted that, because none of it looked there.
 
-**The control that settles it, and the shape worth reusing.** A throwaway local marketplace, one plugin,
-two agent defs in a non-default directory, only **one** of them named in the `agents` key — installed into
-a scratch project and asked, through `claude -p`, which `subagent_type` values a real session has:
+**The evidence that needs no rig at all, and it was in the room.** The specialist who red-teamed this
+conclusion is `06-29-agent.md`, and in the resolved plugin cache that def is reachable **only** through
+`dkj-subagents-alpha`'s `agents` key: the cache holds `subagents/` and **no** `agents/` directory, so no
+convention scan could have found him. A subagent arguing about whether subagents load is a primary
+measurement, and it costs nothing to take.
 
-| def | in the `agents` key | `plugin details` | a real session |
-|---|---|---|---|
-| `zebrafish` | yes | not counted | **present** |
-| `quokka` | no, same directory | not counted | absent |
+**The control that settles the exclusivity half, and the shape worth reusing.** A throwaway local
+marketplace, one plugin, two agent defs in one non-default directory with only **one** of them named in
+the `agents` key — installed **fresh** into a scratch project, then each one **actually dispatched**
+through `claude -p`:
+
+| def | in the `agents` key | in the resolved cache | `plugin details` | dispatched |
+|---|---|---|---|---|
+| `zebrafish` | yes | yes | not counted | **`ok ZEBRAFISH`** |
+| `quokka` | no, same directory | yes | not counted | **`Agent type 'keyed:quokka' not found`** |
+
+**Both columns on the right are the point, and the first version of this control had neither.** It asked
+a session to *list* the `subagent_type` values it had, which a model can answer from belief rather than
+from the harness — so the run above **invokes** instead, and a returned `ZEBRAFISH` is a dispatch that
+happened. And it installed at 1.0.0 and then *updated in place* to add the second def, against a CLI that
+had just printed `Restart to apply changes` — which makes `quokka` absent for a reason that has nothing
+to do with the key. Both defs are present from the first version now, and the cache is listed before the
+dispatch, so *"named loads, unnamed does not"* is the only reading left. Marlowe caught both holes in
+review; the conclusion survived, its proof did not, and a conclusion resting on a control this repo
+would not accept is one bad rerun away from being wrong.
 
 So the key **is** honoured by the loader, and honoured **exclusively** — which is the very sentence
 check 38's completeness rule already states (*"once the key is present it REPLACES convention discovery,
 so the list is the only way in"*), inferred from the validator in #1764 and now measured against the
 loader. Refusing the key would have forbidden the mechanism that works and un-guarded the one that
 does not. The rename was not built, and #1764's repair 1 stays declined.
+
+**And that leaves a standing cost, which is a trade rather than a repair.** Check 38's own header names
+it: this repo carries a hand-maintained list of 26 paths across four manifests, *"which is the shape this
+file exists to refuse"*. A specialist whose def ships without its manifest entry loads for nobody, and
+check 38 is the only thing in the tree that looks. That tax was accepted in exchange for not renaming a
+directory a fifth time; it is worth re-reading whenever the list grows, because the alternative did not
+become wrong, only unnecessary.
 
 **What DID need repairing was the instrument, and it had gone red without anyone reading it.**
 `measure-skill.ps1` refused two of the six enabled plugins with *"the output of `claude plugin details`

@@ -87,11 +87,20 @@ specialists at all, filed against a session that had all 26 of them in its own a
 suite pins them.
 
 **How to settle a claim like that, since `plugin details` cannot.** Build a throwaway local marketplace
-with one plugin, put two agent defs in a non-default directory, name only **one** of them in the
-`agents` key, install it into a scratch project, and ask a real session which `subagent_type` values it
-has (`claude -p`). Measured that way: the named def is present, the unnamed one in the same directory is
-not. That is what makes the key's behaviour a **reporting** defect rather than a loading defect — and it
-is the only method here that reads the thing that actually matters, which is what a session loads.
+with one plugin, put two agent defs in a non-default directory, name only **one** of them in the `agents`
+key, install it **fresh** into a scratch project, and then **dispatch each one** from a real session
+(`claude -p`). Measured that way: the named def returns its word, and the unnamed one in the same
+directory comes back `Agent type '<name>' not found`. That is what makes the key's behaviour a
+**reporting** defect rather than a loading defect.
+
+**Two ways that method goes wrong, both met on the first attempt.** Asking a session to *list* its
+`subagent_type` values is not a measurement — a model can answer it from belief, so the run has to
+**invoke**. And installing one def, then adding the second by updating the plugin in place, measures the
+resolved snapshot rather than the key: the CLI says `Restart to apply changes`, and the absent def is
+then absent for the wrong reason. Ship both defs in the first version, list the resolved cache before
+dispatching, and the reading is unambiguous. The general lever, which is this lens's own subject applied
+to itself: **an instrument that reports a component is not evidence that the component loads, and the
+only thing that is, is loading it.**
 
 Be precise about that second number's provenance: `claude plugin details` uses the `count_tokens` API,
 but it only measures *plugins*. A `CLAUDE.md` delta has no such command, so ~750 is a character-based

@@ -123,6 +123,7 @@ function Read-PluginDetailsOutput {
     $inventoryCounts = [ordered]@{}
     $inventorySkills = @()
     $rows            = @()
+    $inInventory     = $false
     $inTable         = $false
 
     foreach ($line in @($Lines)) {
@@ -136,9 +137,17 @@ function Read-PluginDetailsOutput {
         # count is what the CLI BELIEVES it has, which is the only thing that says whether a table was
         # owed at all. Deliberately not matched against a fixed list of component kinds: a kind this
         # parser has never heard of is still counted, so a new one cannot make an owed table look unowed.
-        # The name class excludes ':', which is what keeps the Description line (its own text may carry
-        # '(3)') from being read as a component.
-        if ($line -match '^\s{2,}([A-Za-z][A-Za-z ]*?)\s*\((\d+)\)\s*(?:\s\S.*)?$') {
+        #
+        # READ ONLY INSIDE THE 'Component inventory' BLOCK, the same way the table below is read only
+        # inside its own. The pattern is '<words> (<digits>)', which is ordinary prose: measured, an
+        # indented line reading 'See also (2) related notes.' parses as a component called 'See also'
+        # with a count of 2, inflating what the check below thinks was owed. Excluding ':' from the name
+        # keeps today's Description and Source lines out, but that is a property of today's wording
+        # rather than a rule -- the block boundary is structural, so a note the CLI adds tomorrow cannot
+        # become a component wherever it is worded.
+        if ($line -match '^\S') { $inInventory = $false }
+        if ($line -match '^Component inventory\s*$') { $inInventory = $true; continue }
+        if ($inInventory -and $line -match '^\s{2,}([A-Za-z][A-Za-z ]*?)\s*\((\d+)\)\s*(?:\s\S.*)?$') {
             $inventoryCounts[$Matches[1]] = [int]$Matches[2]
         }
 
@@ -166,15 +175,21 @@ function Read-PluginDetailsOutput {
         }
     }
 
-    # $null, not 0, where no inventory line was read at all: 'no table was owed' and 'the format moved
+    # $null, not 0, where the inventory could not be read: 'no table was owed' and 'the format moved
     # under the parser' must not collapse into one value -- the same three-state lesson claim-issue's
     # read-back learned in #1628, where one boolean carried two opposite facts and printed the wrong one.
+    #
+    # BOTH KINDS MUST BE PRESENT, or the answer is $null. Summing whichever of the two happened to parse
+    # was the weaker rule: rename 'Skills (N)' alone and the block still yields lines, so the count stays
+    # non-$null and silently loses that kind's contribution -- undercounting TOWARDS 0, which is the
+    # direction that turns a refusal into a pass. Requiring both means a per-kind drift lands on the
+    # [ERROR] this check exists for rather than on the quiet branch. It also means a future CLI dropping
+    # either line outright is refused, which is the correct failure direction: loud, and one line to fix.
     $rowProducing = $null
-    if ($inventoryCounts.Count -gt 0) {
+    $kinds = @('Skills', 'Agents')
+    if (@($kinds | Where-Object { $inventoryCounts.Contains($_) }).Count -eq $kinds.Count) {
         $rowProducing = 0
-        foreach ($kind in @('Skills', 'Agents')) {
-            if ($inventoryCounts.Contains($kind)) { $rowProducing += [int]$inventoryCounts[$kind] }
-        }
+        foreach ($kind in $kinds) { $rowProducing += [int]$inventoryCounts[$kind] }
     }
 
     return [pscustomobject]@{
@@ -249,4 +264,44 @@ function Get-PluginDetailsParseProblems {
     }
 
     return @($problems)
+}
+
+function Get-DeclaredAgentCount {
+    <#
+        WHAT THE MANIFEST DECLARES, WHERE THE INVENTORY CANNOT SAY. `claude plugin details` reports
+        'Agents (N)' by counting only defs found by convention in a plugin's default agents\ directory:
+        measured against Claude Code 2.1.267, a def named by the manifest's 'agents' key LOADS in a
+        session and is counted as 0 there. So that count is not evidence about a plugin's agents, and
+        this reads the manifest for the one thing that is -- how many the plugin declares.
+
+        Read from the TREE, which is also where the version comparison gets its answer: that is the copy
+        this repo can act on, and the caller names it whenever it differs from the measured one.
+
+        Returns Found / Version / AgentCount. A manifest that is missing or unparseable is Found=$false
+        with a count of 0, so a caller cannot mistake 'could not look' for 'declares none' -- the same
+        three-state care Read-PluginDetailsOutput takes over the inventory.
+    #>
+    param(
+        [Parameter(Mandatory = $true)][string]$RepoRoot,
+        [Parameter(Mandatory = $true)][string]$ShortName
+    )
+
+    $manifest = @(Get-ChildItem -Path (Join-Path $RepoRoot "plugins\*\$ShortName\.claude-plugin\plugin.json") -ErrorAction SilentlyContinue |
+        Select-Object -First 1)
+    if ($manifest.Count -ne 1) { return [pscustomobject]@{ Found = $false; Version = $null; AgentCount = 0 } }
+    try {
+        $json = Get-Content -LiteralPath $manifest[0].FullName -Raw | ConvertFrom-Json
+    } catch {
+        return [pscustomobject]@{ Found = $false; Version = $null; AgentCount = 0 }
+    }
+
+    # string|string[], the two forms the installer accepts -- a bare string is one entry. Both properties
+    # are PROBED rather than read: Set-StrictMode throws on an absent one, and a manifest with no 'agents'
+    # key at all is the ordinary case for every plugin that ships none.
+    $agents = 0
+    if ($json.PSObject.Properties['agents'] -and $null -ne $json.agents) {
+        $agents = if ($json.agents -is [string]) { 1 } else { @($json.agents).Count }
+    }
+    $version = if ($json.PSObject.Properties['version']) { $json.version } else { $null }
+    return [pscustomobject]@{ Found = $true; Version = $version; AgentCount = $agents }
 }

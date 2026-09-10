@@ -45,15 +45,22 @@ instrument it measured with, and that is this branch.
 #### The control that settled it
 
 A throwaway local marketplace, one plugin, two agent defs in one non-default directory with only
-**one** of them named in the `agents` key — installed into a scratch project and read back from a real
-session with `claude -p`:
+**one** of them named in the `agents` key — installed **fresh** into a scratch project, the resolved
+cache listed, then each def **actually dispatched** from a real session via `claude -p`:
 
-| def | in the key | `claude plugin details` | a real session |
-|---|---|---|---|
-| `zebrafish` | yes | not counted | **present** |
-| `quokka` | no, same directory | not counted | absent |
+| def | in the key | in the resolved cache | `claude plugin details` | dispatched |
+|---|---|---|---|---|
+| `zebrafish` | yes | yes | not counted | `ok ZEBRAFISH` |
+| `quokka` | no, same directory | yes | not counted | `Agent type 'keyed:quokka' not found` |
 
-The rig was removed and its marketplace entry unregistered in the same run.
+The first version of this control was weaker in two ways Marlowe caught in review — it asked the session
+to *list* its agent types rather than invoke one, and it added the second def by updating the plugin in
+place against a `Restart to apply changes`. Both are corrected above. The rig, its marketplace entry and
+its cache tree were all removed in the same run.
+
+Independent of the rig: the reviewing specialist's own def, `06-29-agent.md`, is reachable in the
+resolved cache **only** through the `agents` key — that cache holds `subagents/` and no `agents/`
+directory at all.
 
 ### CREATE
 
@@ -74,6 +81,17 @@ The rig was removed and its marketplace entry unregistered in the same run.
       `(3)`-in-a-description trap, the agents-only fixture that must NOT be a problem, and the
       table-stripped mirror case that must stay one. 77 pass, 0 fail
 - [x] `measure-skill.ps1` over all six enabled plugins: 0 errors, where it reported 2 before
+- [x] the parallel review round — Victor, Edith, Sebastian, Marlowe — and everything it produced:
+      the inventory parse gated to inside the `Component inventory` block (an indented
+      `See also (2) related notes.` parsed as a component before), `RowProducingCount` requiring **both**
+      known kinds or answering `$null` (summing whichever parsed undercounted towards 0, the direction
+      that turns a refusal into a pass), `Get-DeclaredAgentCount` moved into the lib with 11 asserts
+      because the suite never dot-sourced the script, and the uncounted-agent count no longer asserted
+      against a differently-versioned marketplace copy. Suite: 92 pass, 0 fail
+- [x] the control re-run after Marlowe found two holes in it — fresh install with both defs present, and
+      an actual dispatch instead of a self-report
+- [x] two stale check counts dropped rather than restated (#1780), and the duplicated `agents`-key
+      normalisation filed as #1781 rather than folded in here
 - [x] the full lint + test gate via `open-pr`
 
 ### DEPLOY: fix/1771-plugin-details-agent-count

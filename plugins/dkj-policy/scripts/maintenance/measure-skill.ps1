@@ -16,8 +16,10 @@
     against a stored baseline, and states its own provenance. It computes no token count.
 
     WHAT IT IS NOT. It does not check a skill's correctness -- frontmatter, dead links, parameter
-    coverage and the printed install commands all belong to check-plugin-integrity.ps1, which has 26
-    checks for it. Duplicating one here would produce two verdicts on one subject.
+    coverage and the printed install commands all belong to check-plugin-integrity.ps1, which has its own
+    numbered checks for each. Duplicating one here would produce two verdicts on one subject.
+    (The count is deliberately not stated: it said 26 while that gate ran 35, and a wrong number reads as
+    authority -- the same reason CLAUDE.md stopped stating its gate counts. Read it off the gate.)
 
     IT IS NOT A GATE AND MUST NOT BECOME ONE. open-pr already spends ~10s of lint plus ~170s of
     suites, and CI's lint-en-tests has a median of 7m 23s and blocks every merge. A skill's cost
@@ -200,36 +202,10 @@ function Get-PluginDetails {
     }
 }
 
-# --- what the manifest declares, where the inventory cannot say -----------------------------------
-# The inventory's 'Agents (N)' counts only defs found by convention in the plugin's default agents\
-# directory: measured against Claude Code 2.1.267, a def named by the manifest's 'agents' key LOADS in a
-# session and is counted as 0 here. So the count is not evidence about a plugin's agents, and this
-# function reads the manifest for the one thing that is -- how many the plugin declares. Read from the
-# TREE, the same copy and the same lookup the version comparison below already uses; that is the copy
-# this repo can act on, and the report already names it whenever it differs from the measured one.
-function Get-DeclaredAgentCount {
-    param(
-        [Parameter(Mandatory = $true)][string]$RepoRoot,
-        [Parameter(Mandatory = $true)][string]$ShortName
-    )
-    $manifest = @(Get-ChildItem -Path (Join-Path $RepoRoot "plugins\*\$ShortName\.claude-plugin\plugin.json") -ErrorAction SilentlyContinue |
-        Select-Object -First 1)
-    if ($manifest.Count -ne 1) { return [pscustomobject]@{ Found = $false; Version = $null; AgentCount = 0 } }
-    try {
-        $json = Get-Content -LiteralPath $manifest[0].FullName -Raw | ConvertFrom-Json
-    } catch {
-        return [pscustomobject]@{ Found = $false; Version = $null; AgentCount = 0 }
-    }
-    # string|string[], the two forms the installer accepts -- a bare string is one entry. The property is
-    # probed rather than read: Set-StrictMode throws on an absent one, and 'no agents key at all' is the
-    # ordinary case for every plugin that ships none.
-    $agents = 0
-    if ($json.PSObject.Properties['agents'] -and $null -ne $json.agents) {
-        $agents = if ($json.agents -is [string]) { 1 } else { @($json.agents).Count }
-    }
-    $version = if ($json.PSObject.Properties['version']) { $json.version } else { $null }
-    return [pscustomobject]@{ Found = $true; Version = $version; AgentCount = $agents }
-}
+# Get-DeclaredAgentCount lives in measure-skill-lib.ps1, dot-sourced above -- it reads a file and returns
+# an object, with no I/O of its own, which is that lib's whole remit. It sat here first and had no test at
+# all: the suite dot-sources the lib and never this script, so reverting the function and both its call
+# sites would have failed nothing.
 
 # The two cross-checks, reported. The judging itself is in the lib (Get-PluginDetailsParseProblems), so
 # the suite can pin it without a `claude` on the machine; refusing on it is this function's half.
@@ -334,20 +310,29 @@ foreach ($id in $pluginIds) {
     # the inventory counts it as 0, so its description is always-on cost that no figure below contains.
     # Left unsaid, the share reads as 'the skills are effectively ALL of this plugin's always-on cost'
     # over a plugin whose agents are unpriced, and 'Agents (0)' reads as 'this plugin ships none' (#1771).
-    $uncountedAgents = 0
+    #
+    # AND THE NUMBER IS THE TREE'S, so it is only stated where the tree is the copy that was measured.
+    # $declared.AgentCount comes from the manifest on disk while every figure here comes from the
+    # marketplace clone, and those are different versions often enough to have their own [INFO] one line
+    # up -- which says 'every figure below is what a session loads today'. Asserting a count off the other
+    # copy underneath that sentence contradicts it. So where the two versions differ, the caveat keeps the
+    # part that is version-independent (the inventory counts no key-declared agent) and drops the count.
     $inventoryAgents = $null
     if ($details.InventoryCounts -and $details.InventoryCounts.Contains('Agents')) {
         $inventoryAgents = [int]$details.InventoryCounts['Agents']
     }
-    if ($declared.AgentCount -gt 0 -and $inventoryAgents -eq 0) { $uncountedAgents = $declared.AgentCount }
+    $agentsUncounted = ($declared.AgentCount -gt 0 -and $inventoryAgents -eq 0)
+    $countIsMeasured = ($treeVersion -and $details.Version -and $treeVersion -eq $details.Version)
+    $uncountedAgents = if ($agentsUncounted -and $countIsMeasured) { $declared.AgentCount } else { 0 }
+    $agentPhrase = if ($uncountedAgents -gt 0) { "$uncountedAgents agent def(s)" } else { 'agent def(s)' }
 
     # A plugin the inventory declares nothing tabulatable for. Not a parse failure -- the cross-check
     # above has already cleared it -- and not something the skills report can say anything about, so it
     # is named and skipped rather than run through a table of zeroes. It carries the uncounted-agent
     # reason itself, rather than letting the caveat below print first and promise figures that never come.
     if (@($details.Rows).Count -eq 0) {
-        $why = if ($uncountedAgents -gt 0) {
-            "it ships no skills, and its $uncountedAgents agent def(s) are declared by path, which this inventory counts as 0 though they load in a session"
+        $why = if ($agentsUncounted) {
+            "it ships no skills, and its $agentPhrase are declared by path, which this inventory counts as 0 though they load in a session"
         } else {
             'it declares no skills and no agents'
         }
@@ -355,8 +340,8 @@ foreach ($id in $pluginIds) {
         continue
     }
 
-    if ($uncountedAgents -gt 0) {
-        Write-Info "$pluginId -- the inventory reports 'Agents (0)' while the manifest declares $uncountedAgents agent def(s) by path. Those load in a session and this inventory does not count them, so every always-on figure below -- the plugin's own printed total included -- is SKILLS ONLY and understates what the plugin costs. Read the 0 as 'not counted here', never as 'ships none'."
+    if ($agentsUncounted) {
+        Write-Info "$pluginId -- the inventory reports 'Agents (0)' while the manifest declares $agentPhrase by path. Those load in a session and this inventory does not count them, so every always-on figure below -- the plugin's own printed total included -- is SKILLS ONLY and understates what the plugin costs. Read the 0 as 'not counted here', never as 'ships none'."
     }
 
     $skillRows = @($details.Rows | Where-Object { $details.InventorySkills -contains $_.Component })
@@ -386,9 +371,10 @@ foreach ($id in $pluginIds) {
     $shareNote = ''
     if ($sharePct -ge 100) {
         $shareNote = ' -- rounding puts the rows at or just above the printed total, i.e. the skill descriptions account for effectively ALL of this plugin''s always-on cost'
-        if ($uncountedAgents -gt 0) {
+        if ($agentsUncounted) {
+            $descPhrase = if ($uncountedAgents -gt 0) { "$uncountedAgents agent description(s)" } else { 'agent description(s)' }
             $shareNote = ' -- rounding puts the rows at or just above the printed total, i.e. the skill descriptions account for effectively all of the total PRINTED here; the plugin also pays for ' +
-                "$uncountedAgents agent description(s) that this inventory does not count"
+                "$descPhrase that this inventory does not count"
         }
     }
 
