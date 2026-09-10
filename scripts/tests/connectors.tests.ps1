@@ -23,6 +23,12 @@ $Fixture  = Join-Path ([System.IO.Path]::GetTempPath()) "connectors-test-fixture
 # administration, so plugin-versions.ps1's fallback lands deterministically on "indeterminate"
 # regardless of what this machine's real install/clone actually look like.
 $HookHome = Join-Path ([System.IO.Path]::GetTempPath()) "connectors-hook-home-$PID-$([guid]::NewGuid().ToString('n'))"
+# The fake 'gh' scenario 13 drives -RemoteRunners against (#1808), plus the log of every call it
+# makes -- the log is what lets 13a assert the COST claim (nothing is called when the switch is off)
+# rather than merely stating it. Declared here so the closing finally can clear both and put PATH back.
+$FakeBin  = Join-Path ([System.IO.Path]::GetTempPath()) "connectors-fakegh-$PID-$([guid]::NewGuid().ToString('n'))"
+$GhCalls  = Join-Path ([System.IO.Path]::GetTempPath()) "connectors-ghcalls-$PID-$([guid]::NewGuid().ToString('n')).log"
+$PrevPath = $env:PATH
 
 $script:pass = 0
 $script:fail = 0
@@ -111,11 +117,15 @@ function New-FixtureManifest {
         # string form -- what every manifest but the two BWJ ones still carries -- would stop being
         # exercised at all.
         $LocalCheckout = 'nonexistent-fixture-path',
-        [string]$Plugin = 'dkj-subagents-alpha@claude-code-specialists'
+        [string]$Plugin = 'dkj-subagents-alpha@claude-code-specialists',
+        # The register's own name for the consumer. A parameter since #1808: it is what the network
+        # read turns into an API owner and name, so a scenario has to be able to hand it a slug the
+        # guard must refuse.
+        [string]$Repo = 'fixture/consumer'
     )
     $mfPath = Join-Path $Fixture 'manifest.json'
     $obj = [ordered]@{
-        repo          = 'fixture/consumer'
+        repo          = $Repo
         visibility    = 'private'
         localCheckout = $LocalCheckout
         plugins       = @(
@@ -1081,19 +1091,22 @@ try {
     # path would prove the regex works without proving the check answers the case it was built for.
     Write-Host "`n-- 12. check 6: a runner reaching into a path this tree no longer has --" -ForegroundColor Cyan
 
-    function New-FixtureWorkflow {
+    function New-FixtureWorkflowText {
+        # THE YAML SHAPE, WITHOUT A DISK. Split out from New-FixtureWorkflow when scenario 13 arrived
+        # (#1808): the remote read is handed workflow TEXT rather than a path, and the whole point of
+        # it going through the same judgement is lost if it is fed a different fixture shape than the
+        # local half. One builder, two transports -- the same split the script itself makes between
+        # Write-RunnerPathFinding and its two callers.
+        #
         # -PathFirst and -Commented are the two shapes the first cut of the parser silently missed.
         # They are switches on the shared helper rather than bespoke fixtures so that every OTHER
         # assertion in this scenario keeps holding over them unchanged.
         param(
-            [Parameter(Mandatory)][string]$Name,
             [Parameter(Mandatory)][string]$Repository,
             [Parameter(Mandatory)][string]$ScriptPath,
             [switch]$PathFirst,
             [switch]$Commented
         )
-        $dir = Join-Path $Fixture '.github\workflows'
-        New-Item -ItemType Directory -Path $dir -Force | Out-Null
         $withKeys = if ($PathFirst) {
             @('          path: .workflow-scripts', ("          repository: $Repository"), '          ref: main')
         } elseif ($Commented) {
@@ -1101,7 +1114,7 @@ try {
         } else {
             @(("          repository: $Repository"), '          ref: main', '          path: .workflow-scripts')
         }
-        $yml = @(
+        return (@(
             'name: Fixture'
             'on:'
             '  pull_request:'
@@ -1119,8 +1132,21 @@ try {
             '      - shell: powershell'
             '        run: |'
             ("          powershell -NoProfile -ExecutionPolicy Bypass -File .workflow-scripts/$ScriptPath -Branch " + '"x"')
-        ) -join "`n"
-        [System.IO.File]::WriteAllText((Join-Path $dir $Name), $yml)
+        ) -join "`n")
+    }
+
+    function New-FixtureWorkflow {
+        <# The same text, written where check 6's LOCAL half reads it. #>
+        param(
+            [Parameter(Mandatory)][string]$Name,
+            [Parameter(Mandatory)][string]$Repository,
+            [Parameter(Mandatory)][string]$ScriptPath,
+            [switch]$PathFirst,
+            [switch]$Commented
+        )
+        $dir = Join-Path $Fixture '.github\workflows'
+        New-Item -ItemType Directory -Path $dir -Force | Out-Null
+        [System.IO.File]::WriteAllText((Join-Path $dir $Name), (New-FixtureWorkflowText -Repository $Repository -ScriptPath $ScriptPath -PathFirst:$PathFirst -Commented:$Commented))
     }
 
     # 12a. The current path -- silence, and nothing about it in the output. This is the case every
@@ -1220,9 +1246,258 @@ try {
     $r = Invoke-Ps $Script ($base + @('-Manifest', $mf, '-ConsumerPathOverride', $Fixture))
     Assert-Equal 1 $r.Code 'trailing YAML comments: still exit code 1'
     Assert-Match 'does not exist here' $r.Out 'trailing YAML comments: the stale path is still found'
+
+    # --- 13. Check 6b: -RemoteRunners reads an ABSENT consumer's runners over the API (#1808) ------
+    # Check 6 reads the consumer's local checkout, so it inherited check 1: an absent consumer was
+    # [SKIP] and its runners were not read at all -- and the consumers most likely to carry a stale
+    # path are the ones nobody visits, which are the ones least likely to be checked out where you
+    # happen to be running. Measured on the branch that built check 6: of six registered connectors,
+    # three were [SKIP], including both of the two #1805 reported as red.
+    #
+    # DRIVEN AGAINST A FAKE gh ON PATH, not the real one. The subject is what this script does with
+    # each of the API's answers, and there is exactly one way to exercise the answer that matters most
+    # -- a repository the credential cannot see -- without owning such a repository.
+    Write-Host "`n-- 13. check 6b: the opt-in network read (-RemoteRunners) --" -ForegroundColor Cyan
+
+    New-Item -ItemType Directory -Path $FakeBin -Force | Out-Null
+    $Utf8NoBom = New-Object System.Text.UTF8Encoding $false
+    # 'auth status' answers the run-level probe; 'graphql' answers the per-connector read out of
+    # GH_GRAPHQL_BODY with GH_GRAPHQL_EXIT as its exit code -- gh really does exit 1 on a response
+    # carrying an errors[] block, which is why the script parses the body before it looks at the code.
+    # EVERY call is logged, including auth status, because 13a's claim is that NONE is made.
+    $ghImpl = @'
+if ($env:GH_CALL_LOG) { Add-Content -Path $env:GH_CALL_LOG -Value ($args -join ' ') }
+if ($args -contains 'auth' -and $args -contains 'status') {
+    if ($env:GH_AUTH_FAIL) { [Console]::Error.WriteLine('fake gh: you are not logged in'); exit 1 }
+    exit 0
+}
+if ($args -contains 'graphql') {
+    if ($env:GH_GRAPHQL_BODY) { Write-Output $env:GH_GRAPHQL_BODY }
+    if ($env:GH_GRAPHQL_EXIT) { exit ([int]$env:GH_GRAPHQL_EXIT) }
+    exit 0
+}
+exit 1
+'@
+    [System.IO.File]::WriteAllText((Join-Path $FakeBin 'gh-impl.ps1'), $ghImpl, $Utf8NoBom)
+    $ghCmd = "@echo off`r`npowershell -NoProfile -ExecutionPolicy Bypass -File `"%~dp0gh-impl.ps1`" %*`r`nexit /b %ERRORLEVEL%`r`n"
+    [System.IO.File]::WriteAllText((Join-Path $FakeBin 'gh.cmd'), $ghCmd, $Utf8NoBom)
+    $env:PATH = "$FakeBin;$env:PATH"
+    $env:GH_CALL_LOG = $GhCalls
+
+    function New-GraphQlAnswer {
+        <# The shape 'gh api graphql' returns for this query. -Files is a list of @{ Name; Text }; a
+           $null Text is the API declining to render a blob as text, which is its own outcome. Built
+           through ConvertTo-Json rather than hand-written so the workflow YAML inside it is escaped
+           by the same encoder that will have to decode it. #>
+        param([object[]]$Files = @(), [string]$Branch = 'main', [switch]$NoRepository, [switch]$NoWorkflowDir, [string]$ErrorMessage = '')
+        if ($NoRepository) {
+            $obj = [ordered]@{
+                data   = [ordered]@{ repository = $null }
+                errors = @(@{ type = 'NOT_FOUND'; message = $ErrorMessage })
+            }
+            return ($obj | ConvertTo-Json -Depth 10 -Compress)
+        }
+        $repo = [ordered]@{ defaultBranchRef = [ordered]@{ name = $Branch } }
+        if ($NoWorkflowDir) {
+            $repo['object'] = $null
+        } else {
+            $repo['object'] = [ordered]@{ entries = @($Files | ForEach-Object {
+                [ordered]@{ name = $_.Name; type = 'blob'; object = [ordered]@{ text = $_.Text } }
+            }) }
+        }
+        return (([ordered]@{ data = [ordered]@{ repository = $repo } }) | ConvertTo-Json -Depth 10 -Compress)
+    }
+
+    function Invoke-Absent {
+        <# The script against a manifest whose checkout does NOT resolve -- the [SKIP] branch, which is
+           where the network read lives. Deliberately no -ConsumerPathOverride: that parameter's whole
+           job is to make a checkout resolve. #>
+        param([string]$ManifestPath, [switch]$Remote)
+        Remove-Item -Path $GhCalls -Force -ErrorAction SilentlyContinue
+        $callArgs = $base + @('-Manifest', $ManifestPath)
+        if ($Remote) { $callArgs += '-RemoteRunners' }
+        $run = Invoke-Ps $Script $callArgs
+        $log = if (Test-Path -LiteralPath $GhCalls) { (Get-Content -LiteralPath $GhCalls -Raw) } else { '' }
+        return [pscustomobject]@{ Code = $run.Code; Out = $run.Out; Calls = $log }
+    }
+
+    $staleYml   = New-FixtureWorkflowText -Repository 'DKJ-Solutions/claude-code-specialists' -ScriptPath 'plugins/workflows/contributing-davekjohn/scripts/lint/check-branch-entry.ps1'
+    $currentYml = New-FixtureWorkflowText -Repository 'DKJ-Solutions/claude-code-specialists' -ScriptPath 'plugins/dkj-policy/scripts/lint/check-branch-entry.ps1'
+
+    # 13a. THE DEFAULT IS OFF, AND NOT ONE CALL IS MADE. This is the reason the feature is a switch at
+    #      all -- the script runs from connector-sessioncheck.ps1 at every session start -- so it is
+    #      asserted against the call log rather than trusted to the reading of an if. The [SKIP] also
+    #      has to keep its original wording, because that sentence is true again when nothing is read.
+    New-FixtureConsumer -ExtensionIds @('06-16')
+    $env:GH_GRAPHQL_BODY = New-GraphQlAnswer -Files @(@{ Name = 'branch-entry.yml'; Text = $staleYml })
+    Remove-Item Env:\GH_GRAPHQL_EXIT -ErrorAction SilentlyContinue
+    Remove-Item Env:\GH_AUTH_FAIL -ErrorAction SilentlyContinue
+    $mf = New-FixtureManifest -Extensions @('06-16')
+    $r = Invoke-Absent -ManifestPath $mf
+    Assert-Equal 0 $r.Code 'switch off: exit code 0'
+    Assert-Match 'not present on this machine -- not checked' $r.Out 'switch off: the plain [SKIP] wording, unchanged'
+    Assert-Equal '' $r.Calls 'switch off: gh is not called AT ALL -- the cost claim, asserted'
+    Assert-NotMatch 'does not exist here' $r.Out 'switch off: and the stale path the fake would have served is not reported'
+
+    # 13b. THE CASE THE SWITCH EXISTS FOR: an absent consumer whose runner names a path this tree no
+    #      longer holds is now an [ERROR], with the same wording and the same repair suggestion the
+    #      local half gives -- plus the branch it was read from, because the reader cannot open the
+    #      file to check which revision this is about.
+    New-FixtureConsumer -ExtensionIds @('06-16')
+    $mf = New-FixtureManifest -Extensions @('06-16')
+    $r = Invoke-Absent -ManifestPath $mf -Remote
+    Assert-Equal 1 $r.Code 'remote read, stale path: exit code 1 -- it counts as an error'
+    Assert-Match 'branch-entry\.yml line \d+' $r.Out 'remote read, stale path: names the workflow file and the line'
+    Assert-Match 'it is at plugins/dkj-policy/scripts/lint/check-branch-entry\.ps1' $r.Out 'remote read, stale path: same repair suggestion as the local half'
+    Assert-Match 'read from main over the API' $r.Out 'remote read, stale path: says which branch it judged'
+    Assert-Match 'no checkout of this consumer is on this machine' $r.Out 'remote read, stale path: and why it read the API rather than the disk'
+    Assert-Match 'graphql' $r.Calls 'remote read, stale path: the call was actually made'
+    Assert-NotMatch 'not present on this machine -- not checked\.' $r.Out 'remote read: the [SKIP] no longer claims nothing was checked'
+
+    # 13c. A CURRENT PATH IS SILENT OVER THE NETWORK TOO. The healthy consumer is the common one, and a
+    #      check that cannot stay quiet on a deliberate sweep of the whole register is one nobody runs
+    #      twice.
+    New-FixtureConsumer -ExtensionIds @('06-16')
+    $env:GH_GRAPHQL_BODY = New-GraphQlAnswer -Files @(@{ Name = 'branch-entry.yml'; Text = $currentYml })
+    $mf = New-FixtureManifest -Extensions @('06-16')
+    $r = Invoke-Absent -ManifestPath $mf -Remote
+    Assert-Equal 0 $r.Code 'remote read, current path: exit code 0'
+    Assert-NotMatch 'does not exist here' $r.Out 'remote read, current path: no finding'
+    Assert-Match 'graphql' $r.Calls 'remote read, current path: and it did look -- silence here is a verdict, not a skip'
+
+    # 13d. THE THIRD STATE, AND THE WHOLE REASON THIS IS WORTH A SWITCH. A repository the credential
+    #      cannot see comes back as HTTP 200 with a null repository, an errors[] block, and exit 1 from
+    #      gh. It must be a STATED not-checked: silence would be indistinguishable from 13c above, on a
+    #      check whose entire subject is a breach nobody has noticed. The API's own sentence is quoted
+    #      because 'gh exited 1' does not tell the reader whether to log in or to fix the register.
+    New-FixtureConsumer -ExtensionIds @('06-16')
+    $env:GH_GRAPHQL_BODY = New-GraphQlAnswer -NoRepository -ErrorMessage "Could not resolve to a Repository with the name 'fixture/consumer'."
+    $env:GH_GRAPHQL_EXIT = '1'
+    $mf = New-FixtureManifest -Extensions @('06-16')
+    $r = Invoke-Absent -ManifestPath $mf -Remote
+    Assert-Equal 0 $r.Code 'unreadable repo: exit code 0 -- our reach, not the consumer breaching anything'
+    Assert-Match '\[INFO\].*could not be read' $r.Out 'unreadable repo: stated, not silent'
+    Assert-Match 'Could not resolve to a Repository' $r.Out "unreadable repo: quotes the API's own message rather than the exit code"
+    Assert-Match 'Nothing about them was checked' $r.Out 'unreadable repo: says outright that no verdict was reached'
+    Assert-Match 'gh api repos/fixture/consumer' $r.Out 'unreadable repo: hands over the command that shows what gh says'
+    Remove-Item Env:\GH_GRAPHQL_EXIT -ErrorAction SilentlyContinue
+
+    # 13e. NO .github/workflows AT ALL is silence, and deliberately not the third state: it is the same
+    #      verdict the local half reaches when the directory is not there. The distinction is only
+    #      available because the query asks in GraphQL -- over REST both this and 13d are an HTTP 404.
+    New-FixtureConsumer -ExtensionIds @('06-16')
+    $env:GH_GRAPHQL_BODY = New-GraphQlAnswer -NoWorkflowDir
+    $mf = New-FixtureManifest -Extensions @('06-16')
+    $r = Invoke-Absent -ManifestPath $mf -Remote
+    Assert-Equal 0 $r.Code 'no workflows directory: exit code 0'
+    Assert-NotMatch 'could not be read' $r.Out 'no workflows directory: NOT reported as unreadable -- the repo answered'
+    Assert-NotMatch 'does not exist here' $r.Out 'no workflows directory: and nothing to find in it'
+
+    # 13f. A BLOB WITH NO TEXT IS ITS OWN NOTHING. The API declines to render a binary or over-sized
+    #      blob, and treating that null as an empty workflow would read as 'this file names no
+    #      reference' -- the exact false negative the lib's header warns about, arriving through the
+    #      transport instead of the parser. The OTHER file in the same repo must still be judged.
+    New-FixtureConsumer -ExtensionIds @('06-16')
+    $env:GH_GRAPHQL_BODY = New-GraphQlAnswer -Files @(
+        @{ Name = 'unreadable.yml'; Text = $null },
+        @{ Name = 'branch-entry.yml'; Text = $staleYml }
+    )
+    $mf = New-FixtureManifest -Extensions @('06-16')
+    $r = Invoke-Absent -ManifestPath $mf -Remote
+    Assert-Equal 1 $r.Code 'text-less blob: exit code 1 -- the second file is still judged'
+    Assert-Match 'unreadable\.yml came back without text' $r.Out 'text-less blob: named as not judged'
+    Assert-Match 'was NOT judged' $r.Out 'text-less blob: and said so in as many words'
+    Assert-Match 'branch-entry\.yml line \d+' $r.Out 'text-less blob: the sibling workflow is still reported'
+
+    # 13g. A REFUSED REQUEST IS SAID OUT LOUD. -RemoteRunners was typed on purpose, so falling back to
+    #      the ordinary [SKIP] would answer a deliberate question with the silence it was typed to end.
+    #      Asked ONCE per run rather than per connector, because gh holding no credential is a property
+    #      of the machine.
+    New-FixtureConsumer -ExtensionIds @('06-16')
+    $env:GH_AUTH_FAIL = '1'
+    $env:GH_GRAPHQL_BODY = New-GraphQlAnswer -Files @(@{ Name = 'branch-entry.yml'; Text = $staleYml })
+    $mf = New-FixtureManifest -Extensions @('06-16')
+    $r = Invoke-Absent -ManifestPath $mf -Remote
+    Assert-Equal 0 $r.Code 'gh not authenticated: exit code 0'
+    Assert-Match "gh auth status' exited 1" $r.Out 'gh not authenticated: named, with what gh answered'
+    Assert-Match 'no consumer.s runners were read over the network' $r.Out 'gh not authenticated: says what the switch did not do'
+    Assert-NotMatch 'graphql' $r.Calls 'gh not authenticated: and no repository read was attempted'
+    Assert-NotMatch 'does not exist here' $r.Out 'gh not authenticated: the stale path the fake would have served is NOT reported'
+    Remove-Item Env:\GH_AUTH_FAIL -ErrorAction SilentlyContinue
+
+    # 13h. NO gh AT ALL is the same refusal through a different door, and it is a different branch of
+    #      the code. PATH is cut down to an empty directory plus the two Windows directories a child
+    #      powershell needs to start at all -- gh lives in neither, and git goes with it, which the
+    #      script already degrades over (the source stamp is in a try/catch and simply does not print).
+    #      $PSHOME IS IN THERE BECAUSE Invoke-Ps CALLS 'powershell' BY BARE NAME: cutting PATH to the
+    #      empty directory alone made this scenario fail on 'The term powershell is not recognized',
+    #      which is the harness losing its own interpreter rather than the script meeting no gh.
+    New-FixtureConsumer -ExtensionIds @('06-16')
+    $noGhBin = Join-Path $Fixture 'no-gh-bin'
+    New-Item -ItemType Directory -Path $noGhBin -Force | Out-Null
+    $mf = New-FixtureManifest -Extensions @('06-16')
+    $savedPath = $env:PATH
+    $env:PATH = "$noGhBin;$PSHOME;$env:SystemRoot\System32"
+    try { $r = Invoke-Absent -ManifestPath $mf -Remote } finally { $env:PATH = $savedPath }
+    Assert-Equal 0 $r.Code 'no gh on PATH: exit code 0'
+    Assert-Match "'gh' is not on PATH" $r.Out 'no gh on PATH: named as the reason'
+    Assert-Match 'still judged off the disk by check 6' $r.Out 'no gh on PATH: and says what DOES still work'
+
+    # 13i. THE SLUG IS GUARDED BEFORE IT REACHES A URL. 'repo' is manifest content from a public
+    #      repository -- the same data the localCheckout guardrails already refuse to trust -- and here
+    #      it would become the owner and name of an API call. Held to GitHub's own shape, and refused
+    #      without a single call being made.
+    New-FixtureConsumer -ExtensionIds @('06-16')
+    $env:GH_GRAPHQL_BODY = New-GraphQlAnswer -Files @(@{ Name = 'branch-entry.yml'; Text = $staleYml })
+    $mf = New-FixtureManifest -Extensions @('06-16') -Repo 'fixture/consumer/../../etc'
+    $r = Invoke-Absent -ManifestPath $mf -Remote
+    Assert-Equal 0 $r.Code 'malformed repo slug: exit code 0'
+    Assert-Match 'not a valid GitHub owner/name slug' $r.Out 'malformed repo slug: named as rejected'
+    Assert-Match 'rejected before it became an API call' $r.Out 'malformed repo slug: and says the call was never made'
+    Assert-NotMatch 'graphql' $r.Calls 'malformed repo slug: which the call log confirms'
+
+    # 13j. WITH -OnlyConsumer THE NETWORK IS NOT REACHED FOR SOMEBODY ELSE. That switch means a session
+    #      is asking about its own repo, whose checkout is present by definition -- so an absent one
+    #      reached here is another consumer, and reading it would put a third party's findings into a
+    #      session that asked about neither. The same reasoning the [SKIP] itself is suppressed under.
+    New-FixtureConsumer -ExtensionIds @('06-16')
+    $mf = New-FixtureManifest -Extensions @('06-16')
+    Remove-Item -Path $GhCalls -Force -ErrorAction SilentlyContinue
+    $r = Invoke-Ps $Script ($base + @('-Manifest', $mf, '-RemoteRunners', '-OnlyConsumer', $Fixture))
+    $onlyCalls = if (Test-Path -LiteralPath $GhCalls) { (Get-Content -LiteralPath $GhCalls -Raw) } else { '' }
+    Assert-Equal 0 $r.Code '-OnlyConsumer over an absent third party: exit code 0'
+    Assert-NotMatch 'graphql' $onlyCalls '-OnlyConsumer: no repository read for a consumer this session did not ask about'
+    Assert-NotMatch 'does not exist here' $r.Out '-OnlyConsumer: and no finding about one either'
+    # (Victor's finding 2.) NOT ONE gh PROCESS, not merely no graphql call. The capability probe used to
+    # run before -OnlyConsumer was consulted, so a session-start run with both switches spawned
+    # `gh auth status` for an answer nothing downstream could reach. The assertion is on the WHOLE log
+    # for that reason: checking only for 'graphql' is what let the spawn through.
+    Assert-Equal '' $onlyCalls '-OnlyConsumer: and the capability probe is not spawned either -- the answer is unreachable there'
+
+    # 13k. A SHORT READ IS A FACT ABOUT THIS RUN, NOT ABOUT THE REPOSITORY (Victor's finding 1). Passing
+    #      -TimeoutSeconds routes the call through the Start-Process arm, which can answer exit 0 with a
+    #      capture still being written -- and truncated JSON does not parse. Folded into the generic
+    #      parse-failure line it would print 13d's sentence, sending the reader after the register or
+    #      their credential for something a re-run settles. The fake serves half a document at exit 0;
+    #      ShortRead itself cannot be provoked from here, so what this pins is the SEPARATION -- the two
+    #      causes must not share one sentence.
+    New-FixtureConsumer -ExtensionIds @('06-16')
+    $env:GH_GRAPHQL_BODY = '{"data":{"repository":{"defaultBranchRef":{"nam'
+    $mf = New-FixtureManifest -Extensions @('06-16')
+    $r = Invoke-Absent -ManifestPath $mf -Remote
+    Assert-Equal 0 $r.Code 'unparseable answer: exit code 0'
+    Assert-Match 'nothing this could parse as JSON' $r.Out 'unparseable answer: named as a parse failure'
+    Assert-NotMatch 'Could not resolve to a Repository' $r.Out 'unparseable answer: and NOT as a repository nobody can see'
+    Assert-NotMatch 'still being written' $r.Out 'unparseable answer: nor as a short read -- gh exited 0 with a whole (if broken) capture'
 } finally {
     if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture }
     if (Test-Path -LiteralPath $HookHome) { Remove-Item -Recurse -Force -LiteralPath $HookHome -ErrorAction SilentlyContinue }
+    if (Test-Path -LiteralPath $FakeBin) { Remove-Item -Recurse -Force -LiteralPath $FakeBin -ErrorAction SilentlyContinue }
+    Remove-Item -Path $GhCalls -Force -ErrorAction SilentlyContinue
+    $env:PATH = $PrevPath
+    foreach ($v in @('GH_CALL_LOG', 'GH_GRAPHQL_BODY', 'GH_GRAPHQL_EXIT', 'GH_AUTH_FAIL')) {
+        Remove-Item -Path "Env:\$v" -ErrorAction SilentlyContinue
+    }
 }
 
 Write-Host "`nResult: $($script:pass) pass, $($script:fail) fail." -ForegroundColor $(if ($script:fail -gt 0) { 'Red' } else { 'Green' })
