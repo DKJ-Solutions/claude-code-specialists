@@ -43,7 +43,45 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**8 / 26 minor entries** <!-- pending-tally -->
+**9 / 27 minor entries** <!-- pending-tally -->
+
+### DEPLOY: feat/1808-remote-runner-read · 20260910-182243
+
+Check 6 asks whether a consumer's CI runners still name paths that exist in this tree -- and it could
+only ask it about a consumer checked out on the machine running it. That is the register's standing
+behaviour and right for every other check there, but it lands badly on this one: those runners name a
+path *into this tree*, written once at adoption into a file this tree cannot reach, so the consumer most
+likely to carry a stale one is the one nobody visits -- which is the one least likely to be checked out
+where you happen to be. Measured here: of six registered connectors, three were `[SKIP]`, including both
+of the two whose runners were red.
+
+`-RemoteRunners` closes that from the other end. An absent consumer's workflow files are read from its
+default branch in one `gh api graphql` call and judged by the same function the local half calls, so the
+finding, the repair suggestion and the escaping-path refusal are identical -- with the branch named,
+because a reader who cannot open the file needs to know which revision was judged. It stays **off by
+default**: this script is what `connector-sessioncheck.ps1` runs at every session start, and the suite
+asserts that with the switch off not one `gh` call is made. And where the read cannot be made it says so
+and quotes what the API answered, per connector, rather than falling through to a silence that on this
+particular check would read as an all-clear.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+Nothing changes for anybody who does not type the switch, and that is asserted rather than claimed. What
+the switch buys is the one question about an absent consumer that can honestly be answered from
+anywhere, and the one this register most wants answered: a stale runner path is a required check red on
+every pull request in a repository nobody is visiting, which is precisely why nobody has noticed.
+
+**Score:** 2
+
+#### Pull Request
+
+check-connectors can judge the CI runners of a consumer that is not checked out here, on request
+
+[PR #1814](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1814)
+
+---
 
 ### DEPLOY: fix/1807-bwj-connectors-davekokbwj-checkout · 20260910-174934
 
