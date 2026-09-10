@@ -55,9 +55,24 @@ function Get-RepoBlobUrl {
 # Dave has decided to rename this marketplace from 'claude-code-specialists' to 'dkj-claude-plugins',
 # accepting the exact cost the August 14 reasoning identified (every consumer's enabledPlugins key
 # breaks; no redirect for a marketplace name). It runs as a phased migration -- decision and plan on
-# #1769, fase 0 was the prep branch. WHAT IS NOT DECIDED YET: whether this business MIRROR follows the
-# source's new name or keeps 'claude-code-specialists' for its own consumers -- that is fase 4, and the
-# August 14 reasoning still applies to the mirror in isolation.
+# #1769, fase 0 was the prep branch.
+#
+# THE MIRROR FOLLOWS THE SOURCE'S NEW NAME. Decision by Dave, September 10, 2026. It was carried as an
+# open fase 4 question until then, and that framing did not survive reading the script it would be
+# carried out by: publish-to-business.ps1 GENERATES the mirror's marketplace.json rather than copying
+# it, but only its 'plugins' array -- Remove-UnpublishedPlugins reads the source manifest, replaces
+# $manifest.plugins with the keep-set and writes it back. It never touches $manifest.name, there is no
+# name parameter (-TargetRepo, -Plugins, -RepoRoot, -Message, -Branch, -DryRun, -KeepClone is the whole
+# surface), and no assignment to .name exists in the file. So 'the mirror follows' was never a choice
+# to be made in fase 4 -- it is what the first publish after the fase 1 merge DOES, whoever runs it;
+# and 'the mirror keeps the old name' would have required building a name override first. Dave took
+# the default deliberately rather than by omission: one product, one name.
+#
+# WHAT THAT COSTS, so it is not discovered by a colleague instead: the mirror's own consumers are BWJ
+# colleagues on Claude Enterprise, who key on '<plugin>@claude-code-specialists' exactly as a CLI
+# consumer does and who are NOT in #1769's fase 2 list, because they have no checkout to prepare. They
+# need the same migration, delivered through Claude Enterprise rather than a CLI, and the release
+# notes of the flag-day cut are where it reaches them (fase 5).
 #
 # FASE 1 IS BUILT, NOT MERGED. The source-side rename lives on feat/1769-marketplace-rename-source,
 # where .claude-plugin/marketplace.json and every '<plugin>@<marketplace>' literal in the tree already

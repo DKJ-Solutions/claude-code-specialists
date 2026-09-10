@@ -125,6 +125,20 @@ be thorough about machines nobody uses.
   which is a state rather than a defect. Worth keeping as a shape, not just as a fix — a document
   written to describe a mechanism is not evidence about it, and this one was published a branch before
   anybody ran the thing it described.
+  **The one carve-out is this repo's OWN record, and it is narrow on purpose** (Dave, September 10,
+  2026, on [#1769](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1769)). The rule
+  above holds because the register and the consumer are two parties, so writing a new id here before
+  that consumer reinstalls is this side claiming something about the other. For
+  [`dkj-claude-plugins.json`](dkj-claude-plugins.json) they are one party: this repo consumes itself,
+  so its `.claude/settings.json` and its record live in the same tree and can land in the same commit.
+  When they do, nothing is claimed ahead of anything — and the alternative is worse in a measurable
+  way. During the marketplace rename the self-record was deliberately held back, and
+  `connectors.tests.ps1` case 6 then failed on precisely the disagreement the check exists to report,
+  which `open-pr.ps1` turns into a refusal; the only other way through was opening the rename's own
+  pull request with `-SkipTests`, i.e. the test gate off on the largest merge this repo has made.
+  **The carve-out is the self-record and nothing else.** Every other consumer migrates its record on
+  the day it reinstalls, exactly as the paragraph above says, and "we are doing a big rename" is not a
+  second carve-out.
 - `notes` is the human summary/explanation; updated when something changes substantively, not on
   every check.
 - **The manifest deliberately has no version bookkeeping (anymore)** (decision by Dave, July 20,

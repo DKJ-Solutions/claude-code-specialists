@@ -296,7 +296,7 @@ whatever it contains instead — and this rename is simply the newest thing it c
 against the marketplace, so a record still naming `dkj-team-alpha@` is reported as an `[INFO]` and **the
 whole block for that plugin is then skipped** — no enabled-in-settings check, no extensions check, no
 version check, silently, until somebody edits the record. That is the same cost the two renames before
-this one paid, recorded in `connectors/claude-code-specialists.json`'s own notes. Update the record when
+this one paid, recorded in `connectors/dkj-claude-plugins.json`'s own notes. Update the record when
 you migrate, not before: the register says what a consumer **has**, so an id changed ahead of the
 uninstall/install is a second wrong answer rather than a head start.
 

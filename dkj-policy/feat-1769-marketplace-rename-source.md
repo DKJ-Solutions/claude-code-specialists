@@ -95,6 +95,14 @@ same: this repo re-installs itself on flag day too.
 Recorded as an inconsistency between the plan (2026-09-10) and standing doctrine. **Dave chose A
 (2026-09-10):** connectors move to fase 3, per consumer.
 
+**AMENDED the same day, for the SELF-record only (Dave, 2026-09-10).** A stands for the five consumer
+records. It does not stand for `connectors/claude-code-specialists.json`, because the doctrine's
+objection needs two parties -- a register claiming a migration its consumer has not performed -- and
+here the register and the consumer are the same tree: this repo's `.claude/settings.json` and its own
+record land in the same commit. Leaving it behind had a measured price rather than a theoretical one
+(see TEST), and the carve-out is written into `connectors/README.md` beside the rule it bounds, so the
+next reader does not meet a doctrine the tree contradicts.
+
 #### Bare-name `claude-code-specialists` literals -- a second class the `@`-sweep does not reach
 
 Beyond `<plugin>@claude-code-specialists`, the bare string `claude-code-specialists` appears in three
@@ -155,9 +163,27 @@ merge, and do not treat a green run from an earlier day as proof.
 - [x] `.claude/rules/language-layers.md` + `CLAUDE.md` "Repo citation" + `scripts/repo-config.ps1`
       carve-out comment (r. 49-62) -- rewrite so it states the rename is in progress on this branch,
       not merely decided
-- [~] connectors: deferred to fase 3 per Dave's decision A -- `connectors/*.json` (6x) +
-      `connectors/claude-code-specialists.json` rename + `connectors/README.md` move with each
-      consumer's own migration
+- [~] connectors, the five CONSUMER records: still deferred to fase 3 per Dave's decision A --
+      `life-hub.json`, `thumbnail-generator.json`, `smartwatchbanden.json`, `xoxowildhearts.json`
+      and `djcylow-react.json` migrate alongside each consumer's own PR, on the day that consumer
+      actually reinstalls
+- [x] connectors, the SELF record: amendment to decision A, for this one file and no other (Dave,
+      September 10, 2026). `connectors/claude-code-specialists.json` ->
+      `connectors/dkj-claude-plugins.json`, its six ids and its `repo` field to `dkj-claude-plugins`,
+      a dated `MIGRATED 2026-09-10 (#1769)` note in the established style, the carve-out written into
+      `connectors/README.md`'s own doctrine so the next reader is not left with a rule the tree
+      contradicts, plus the two places that name the file: `connectors.tests.ps1` (the case 6 path and
+      four stub strings) and `INSTALL.md` r. 299. The doctrine's objection -- "a false alarm about a
+      migration nobody performed" -- needs two parties, and here the register and the consumer are one
+      tree: `.claude/settings.json` and this record land in the same commit. The alternative was
+      opening the flag-day PR with `-SkipTests`
+- [x] The business mirror follows the source's new name (Dave, September 10, 2026), recorded in
+      `scripts/repo-config.ps1` where the August 14 carve-out sits. It was carried as an open fase 4
+      question, and that framing did not survive reading `publish-to-business.ps1`: it never assigns
+      `$manifest.name` and has no name parameter, so "the mirror follows" is what the first publish
+      after this branch merges DOES, and "the mirror keeps the old name" would have been a build.
+      Recorded with what it costs -- the BWJ colleagues on Claude Enterprise key on the old name too
+      and are in no fase 2 list, so fase 5's release notes are where their migration reaches them
 - [ ] Re-run the `@`-sweep on the LAST catch-up merge, immediately before the fase 3 merge -- `main`
       keeps writing new `@claude-code-specialists` literals while this branch waits (see PLAN)
 - [ ] FLAG DAY: rewrite the two staging paragraphs, which go false at the moment of the merge --
@@ -192,28 +218,34 @@ merge, and do not treat a green run from an earlier day as proof.
 
 ### TEST
 
-**Na de catch-up merge en vóór de LAST-commits: lint 0 errors, alle 91 suites groen** (407s), inclusief
-de nieuwe cases die met #1804 meekwamen.
+**Before the catch-up merge and the LAST commits: lint 0 errors, all 91 suites green** (407s), including
+the cases that arrived with #1804.
 
-**Na de LAST-commits: lint 0 errors, 90 van 91 suites groen.** `connectors.tests.ps1` valt, op één
-assert -- case 6, *"self-manifest (workshop consumes itself): exit code 0"*. Die case draait
-`check-connectors.ps1` tegen de **echte** `connectors/claude-code-specialists.json`, en die noemt deze
-repo's plugins nog als `<plugin>@claude-code-specialists` terwijl `.claude/settings.json` sinds de
-LAST-commit `@dkj-claude-plugins` zegt. De check ziet dus een consumer die iets anders inschakelt dan
-zijn register beweert, en dat is precies wat hij hoort te melden.
+**After the LAST commits: lint 0 errors, 90 of 91 green.** `connectors.tests.ps1` failed on one assert --
+case 6, *"self-manifest (workshop consumes itself): exit code 0"*. That case runs `check-connectors.ps1`
+against the **real** self-connector, which still named this repo's plugins as
+`<plugin>@claude-code-specialists` while `.claude/settings.json` had said `@dkj-claude-plugins` since the
+LAST commit. The check saw a consumer enabling something other than what its own register claimed, which
+is exactly what it exists to report -- correct behaviour, not a defect, and the direct consequence of
+decision A deferring `connectors/**` to fase 3.
 
-**Dit is het gevolg van besluit A en niet van een fout.** Besluit A (Dave, 10 september 2026) stelt
-`connectors/**` uit tot fase 3, per consumer. Deze repo is zijn eigen consumer, dus zijn register
-verschuift pas op de vlagdag -- en tot dat moment staan zijn register en zijn settings uit elkaar. Het
-besluit is niet aangepast; het staat hier alleen met zijn prijs erbij.
+**Resolved September 10, 2026 by amending decision A for the self-record alone (Dave), and the suites are
+now 91 of 91 green** -- lint 0 errors, `open-pr.ps1 -GatesOnly` reporting *"all 91 suites passed in 371s
+(16 lanes)"*. The register, `connectors/README.md`'s doctrine and the two places naming the file moved in
+the same commit as the settings they describe. **The amendment is the self-record and nothing else**: the
+five consumer records still migrate on the flag day with their own PRs, and the reason it is safe here and
+nowhere else is that the register and the consumer are one tree, so nothing is claimed ahead of anything.
 
-**Wat dat kost op de vlagdag, en wat er dus besloten moet worden.** `open-pr.ps1` blokkeert op een
-vallende suite. De bron-PR van fase 3 kan dus niet openen zonder óf `-SkipTests`, óf het verplaatsen
-van de self-connector in diezelfde branch. Dat tweede is verdedigbaar -- voor de *self*-connector vallen
-de migratie en het vastleggen ervan in één commit samen, wat het doctrine-bezwaar ("een migratie claimen
-die niemand heeft uitgevoerd") niet raakt -- maar het is een wijziging van besluit A en dus niet van deze
-branch.
+**What it bought, stated because the alternative was cheap to take and expensive to have taken.**
+`open-pr.ps1` blocks on a failing suite, so the flag-day source PR would otherwise have opened with
+`-SkipTests` -- the test gate switched off on the largest merge this repo has made, where one red suite is
+indistinguishable from ten and nothing in the PR records that anything was skipped.
 
+**Not proven by this run, and deliberately so:** the machine side. `installed_plugins.json` on this machine
+still holds all six records under the old marketplace name until the flag-day re-install (#1802), so a
+version check from this checkout reads this register's ids as not installed here. That is the truth about
+the machine, not a fault in the file, and it goes green with the re-install rather than before it -- the
+same shape as the consumers' nine red suites and their CI gates.
 ### DEPLOY: feat/1769-marketplace-rename-source
 
 **Score:**
