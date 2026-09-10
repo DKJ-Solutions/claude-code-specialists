@@ -83,6 +83,7 @@ list sits at the **end** of the page:
 
 | Version | Date | Type | Title |
 |---|---|---|---|
+| [4.33.0](audience/4.x/4.33.0.md) | 2026-09-10 | Minor | Release version 4.33.0 |
 | [4.32.0](audience/4.x/4.32.0.md) | 2026-09-07 | Minor | Retire the merge queue as policy for detect-and-rebase, repair ship-pr's required-check handling, and fix the Asana mirror and BWJ connector registers after the org move |
 | [4.31.0](audience/4.x/4.31.0.md) | 2026-09-06 | Minor | Every plugin carries its owner in its name, and the fold survives a queue merge |
 | [4.30.0](audience/4.x/4.30.0.md) | 2026-09-05 | Minor | The workflow plugin is now dkj-policy, and consumers re-install under the new ids |
