@@ -36,19 +36,51 @@
 
 ### PLAN
 
+#### The finding (#1807)
+
+Both BWJ connector manifests record only `../../bwjecommerce/<repo>` and
+`../../GitHub/bwjecommerce/<repo>` as `localCheckout` candidates. Neither resolves on the
+maintenance machine, where the checkouts sit at `GitHub/davekokbwj/<repo>`, so
+`check-connectors.ps1` prints a false `[SKIP] checkout ... not present on this machine` that
+exits 0 and suppresses the whole connector block for both consumers -- the two with the most
+machinery in them. This is #1524 again one machine over: that repair turned `localCheckout`
+into a candidate list so no layout would have to be evicted, then evicted `davekokbwj/`.
+
+Repair: **append** `../../davekokbwj/<repo>` to each list rather than replace. The
+`bwjdevelopment/` path #1807 anticipated is not added -- that folder is not on this machine.
+
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [x] `connectors/smartwatchbanden.json`: append `../../davekokbwj/smartwatchbanden` to `localCheckout`
+- [x] `connectors/xoxowildhearts.json`: append `../../davekokbwj/xoxowildhearts` to `localCheckout`
+- [x] Record a `CORRECTED 2026-09-10 (#1807)` paragraph in each manifest's `notes`: append-not-replace, the measurement, what was deliberately not added, and the recorded-not-decided first-match-wins limitation
 
 ### TEST
 
+- [x] Both manifests parse as JSON (`ConvertFrom-Json`)
+- [x] `scripts/sync/check-connectors.ps1`: the false `[SKIP]` is gone for both BWJ connectors; each now resolves `../../davekokbwj/<repo>` and runs its plugin + drift checks
+- [x] `scripts/lint/check-plugin-integrity.ps1`: 0 errors
+- [x] `scripts/tests/connectors.tests.ps1` green
+- [x] Full test-suite gate green
+
 ### DEPLOY: fix/1807-bwj-connectors-davekokbwj-checkout
 
-**Score:**
+`connectors/`: both BWJ manifests (`smartwatchbanden`, `xoxowildhearts`) now list
+`../../davekokbwj/<repo>` as a third `localCheckout` candidate, appended rather than replacing
+the `bwjecommerce/` ones. On the maintenance machine the checkouts live under `davekokbwj/`, so
+`check-connectors.ps1` was emitting a false `[SKIP] checkout ... not present` that exits 0 and
+suppresses the whole connector block for both consumers. #1524 made this field a candidate list
+so no machine's layout would be evicted; its fix then evicted `davekokbwj/`. The list is
+first-match and additive, so this restores the evicted layout without losing the ones that are
+true on other machines.
+
+**Score:** 3
 
 #### What makes this deploy extra special
 
-**Score:**
+N/A -- register data internal to this repo; no subscriber of any service reaches it.
+
+**Score:** N/A
 
 #### Pull Request
 
