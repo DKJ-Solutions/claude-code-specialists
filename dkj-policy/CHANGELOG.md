@@ -43,4 +43,52 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**Nothing pending.** The last release took every entry. <!-- pending-tally -->
+**1 / 1 minor entry** <!-- pending-tally -->
+
+### DEPLOY: fix/1769-flag-day-register-and-install-page · 20260910-224248
+
+The connector register now records the five consumer repositories as they actually are after the
+`v5.0.0` flag day: `<plugin>@dkj-claude-plugins`, with the current plugin names. Every record was
+written from the consumer's own `.claude/settings.json` on `main` rather than from the migration plan,
+which matters because three of them were two renames behind and the plan's one-axis swap would have
+written ids that never existed.
+
+This is decision A coming due rather than a change of mind about it. The doctrine in
+`connectors/README.md` -- write a renamed id only after the consumer itself has migrated, so the
+register never raises a false alarm about a migration nobody performed -- held the whole way: all five
+consumers merged first, and their records followed within the hour.
+
+**And `INSTALL.md` stops handing a reader the retired slug in a command they are meant to paste.**
+Four sites resolved the repository name rather than merely printing it, and two contradicted
+themselves inside three lines by naming the marketplace `dkj-claude-plugins` while pointing its
+`repo` at `DKJ-Solutions/claude-code-specialists`. They worked, because GitHub answers the transfer
+redirect -- which is exactly the dependency `CLAUDE.md` says must never be load-bearing, since it
+holds only while nothing is created at the old path. The three old-slug hits still on the page are
+issue URLs and are correct as they stand.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+**A page that tells a new consumer to register the wrong source is the one doc defect that cannot be
+noticed by the person it hurts.** The registration succeeds, the plugins install, and nothing is
+visibly wrong -- until the day the redirect stops answering, at which point the failure lands on
+somebody who followed the instructions exactly. Three adoption rounds' worth of lint rules in this
+repo exist for that class, and this is the same class arriving through the rename that was supposed
+to close it.
+
+The register half has a quieter payoff: `check-connectors.ps1` is the thing that answers *"is this
+consumer behind?"*, and it SKIPS a plugin whose id it cannot resolve. With five records naming a
+marketplace that no longer exists, every one of those consumers would have been unreportable in
+exactly the way #1465, #1525 and #1698 each recorded before -- the fourth time by the same route.
+
+**Score:** 3
+
+#### Pull Request
+
+The connector register and the install page catch up with the flag day
+
+[PR #1822](https://github.com/DKJ-Solutions/dkj-claude-plugins/pull/1822)
+
+---
+
