@@ -43,7 +43,43 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**9 / 28 minor entries** <!-- pending-tally -->
+**9 / 29 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1813-safe-prose-docstring · 20260910-191402
+
+`Format-SafeProseToken`'s docstring told the next reader that a newline could not reach the function,
+because "the caller has already split the document into lines". Five scripts call it, two of them
+never split -- and one of those, `check-claude-home.ps1`, has a comment recording the measurement that
+`ConvertFrom-Json`'s parse error embeds the offending document whole, newlines and all. Two comments
+in one tree, one of them with a measurement behind it, saying opposite things.
+
+Nothing was broken and nothing is fixed in the code: the `'\s+'` collapse runs before the
+control-character strip and `\s` matches a newline, so multi-line input has always been handled
+correctly. What is repaired is the invariant the docstring hands over. A sentence saying *a newline
+cannot reach here* reads as licence to drop that collapse as cosmetic or move it behind a condition --
+and the caller that would then break is the one whose subject is an attacker-shaped string. The
+sentence now states what the code guarantees, for any caller, says why the collapse is load-bearing,
+and carries no census. The suite pins it, so the next reader who reorders that pass gets a red test
+instead of a comment they can talk themselves out of.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+Nothing reaches a subscriber: this is a comment and a test in a check library, with no behaviour
+change of any kind.
+
+**Score:** N/A
+
+#### Pull Request
+
+Format-SafeProseToken's docstring states what the function guarantees, for any caller
+
+Plugins: dkj-policy, dkj-subagents-alpha
+
+[PR #1817](https://github.com/DKJ-Solutions/dkj-claude-plugins/pull/1817)
+
+---
 
 ### DEPLOY: fix/1812-payload-cache-artefact · 20260910-190335
 
