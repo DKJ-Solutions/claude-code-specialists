@@ -43,7 +43,36 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**1 / 3 minor entries** <!-- pending-tally -->
+**1 / 4 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1762-pasteable-path-absolute · 20260910-082956
+
+`Get-PasteableRef -Kind Path` now judges a filesystem path against its own allowlist
+(`$PathPasteSafePattern`) instead of the ref one, so an **absolute** path can pass: the pattern adds the
+drive/scheme `:` and a leading `/` for a POSIX root, and `ConvertTo-PastePath` folds `\` to `/` first so
+the one printed token is correct in Git Bash as well as PowerShell and cmd. Everything the ref allowlist
+refuses -- a space, `$`, a backtick, a quote, `;`, `&`, `|` -- is still refused, and the deliberately
+narrow `-Kind Ref` axis (#1594, #1617) is unchanged. Fixes inbound #1762: the `-Kind Path` callers that
+carry an absolute path -- `check-plugin-integrity.ps1`'s nested-worktree remedy today, `tidy-machine` and
+`worktree-lane` next -- were getting the `<path>` placeholder for every real path.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A -- an internal formatter for the workflow's own printed remedies; no subscriber of a service reaches it.
+
+**Score:** N/A
+
+#### Pull Request
+
+Get-PasteableRef -Kind Path accepts an absolute filesystem path
+
+Plugins: dkj-policy, dkj-subagents-shopify
+
+[PR #1765](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1765)
+
+---
 
 ### DEPLOY: fix/1760-prune-merged-worktree-held-branch · 20260910-081941
 
