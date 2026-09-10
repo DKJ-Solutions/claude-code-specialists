@@ -4,7 +4,7 @@
 
 .DESCRIPTION
     WHY THIS SUITE EXISTS, AND WHY ALMOST ALL OF IT IS PURE. tidy-machine.ps1 is a conductor: six of
-    its eleven lanes are a call into a script that already has its own suite, so testing those again
+    its twelve lanes are a call into a script that already has its own suite, so testing those again
     here would be testing prune-merged, check-claude-home and plugin-versions a second time. What is NEW is
     the classification -- and that is exactly the part that is pure, takes every input as a parameter,
     and can therefore be driven over states this machine has never been in.
@@ -42,7 +42,7 @@ $Script   = Join-Path $RepoRoot 'scripts\maintenance\tidy-machine.ps1'
 # the cases this file used to.
 . (Join-Path $RepoRoot 'scripts\lib\merged-pr-lib.ps1')
 . (Join-Path $RepoRoot 'scripts\lib\ref-print-lib.ps1')
-# command-probe-lib is for ONE assertion in section 9: that tidy-lib no longer defines the retired
+# command-probe-lib is for ONE assertion in section 10: that tidy-lib no longer defines the retired
 # formatter. Test-FunctionDefined rather than the Get-Command idiom it replaced (#1729) -- this probe
 # is a MISS by design, which is the expensive case there: a bare Get-Command answers a miss by scanning
 # every PATH directory for an executable of that name, and command-probe-lib.tests.ps1 refuses the idiom
@@ -274,8 +274,55 @@ Write-Host '-- 8. the summary line --' -ForegroundColor Cyan
 Assert-Equal 'Lanes -- nothing found.' (Get-TidySummaryLine -Lane 'Lanes') 'an empty lane says so in words, not as three zeroes'
 Assert-Equal 'Lanes -- 1 acted on, 2 handed over, 3 left alone, of 6.' (Get-TidySummaryLine -Lane 'Lanes' -Acted 1 -Reported 2 -Untouched 3) 'and a populated one tallies'
 
-# --- 9. The structural promises ------------------------------------------------------------------
-Write-Host '-- 9. what the script may never contain --' -ForegroundColor Cyan
+# --- 9. The extracted payload trees (#1812) -------------------------------------------------------
+Write-Host '-- 9. which extracted payload a record still points at --' -ForegroundColor Cyan
+
+$Tree = 'C:\Users\x\.claude\plugins\cache\mp\dkj-policy\4.33.0'
+
+$r = Get-PayloadTreeVerdict -Path $Tree -InstallPaths @($Tree)
+Assert-Equal 'loaded' $r.Class 'a tree an install record points at is the copy a session loads'
+
+# The register is written by the CLI and read as text; two spellings of one path are not two answers,
+# which is the rule Get-InstallRecord already applies to projectPath.
+$r = Get-PayloadTreeVerdict -Path $Tree -InstallPaths @("$Tree\")
+Assert-Equal 'loaded' $r.Class 'a trailing separator on the record side does not orphan the tree'
+$r = Get-PayloadTreeVerdict -Path $Tree -InstallPaths @($Tree.ToUpperInvariant())
+Assert-Equal 'loaded' $r.Class 'and neither does a different casing'
+
+$r = Get-PayloadTreeVerdict -Path $Tree -InstallPaths @('C:\Users\x\.claude\plugins\cache\mp\dkj-policy\4.32.0')
+Assert-Equal 'ownerless' $r.Class 'a tree only a SIBLING version is pointed at is ownerless'
+Assert-True ($r.Reason -like '*has not marked it yet*') 'and an unmarked one says the sweep has not reached it'
+
+$r = Get-PayloadTreeVerdict -Path $Tree -InstallPaths @() -OrphanMarked $true
+Assert-Equal 'ownerless' $r.Class 'the harness having marked it changes nothing about the verdict'
+Assert-True ($r.Reason -like '*marking is not reaping*') 'it changes what the line SAYS -- marked and still on disk'
+
+# THE REGISTER IS THE AUTHORITY, NOT THE MARK. A mark on a tree a record still points at is the two
+# disagreeing, and the lane prints that rather than deferring to either -- it is the one finding in
+# lane 12 worth interrupting an otherwise clean run for.
+$r = Get-PayloadTreeVerdict -Path $Tree -InstallPaths @($Tree) -OrphanMarked $true
+Assert-Equal 'loaded' $r.Class 'a marked tree a record still points at is loaded, not ownerless'
+Assert-True ($r.Reason -like '*one of the two is out of date*') 'and the disagreement is stated'
+
+# A LEASE IS A RUNNING PROCESS READING THOSE FILES. Measured September 10, 2026: the session writes
+# <installPath>/.in_use/<pid> and holds it for its whole life. A tree nothing points at any more but
+# something is still reading is never reported as reclaimable -- deleting it would pull the files out
+# from under a live session.
+$r = Get-PayloadTreeVerdict -Path $Tree -InstallPaths @() -LeasePids @(4242) -LivePids @(4242, 7)
+Assert-Equal 'leased' $r.Class 'a recordless tree a LIVE process is reading is held, not ownerless'
+Assert-True ($r.Reason -like '*4242*') 'and the reason names the pid so the reader can find the session'
+
+$r = Get-PayloadTreeVerdict -Path $Tree -InstallPaths @() -LeasePids @(4242) -LivePids @(7)
+Assert-Equal 'ownerless' $r.Class 'a lease whose process has ENDED holds nothing'
+Assert-Equal 1 @($r.StaleLeases).Count 'and it is reported as stale rather than silently dropped'
+
+$r = Get-PayloadTreeVerdict -Path $Tree -InstallPaths @($Tree) -LeasePids @(4242, 7) -LivePids @(7)
+Assert-Equal 'loaded' $r.Class 'a live lease on a pointed-at tree does not change its class'
+Assert-Equal 1 @($r.StaleLeases).Count 'the stale one is still counted'
+Assert-Equal 1 @($r.HeldBy).Count 'and so is the live one'
+
+# --- 10. The structural promises ------------------------------------------------------------------
+Write-Host '-- 10. what the script may never contain --' -ForegroundColor Cyan
 
 $src = [System.IO.File]::ReadAllText($Script, [Text.Encoding]::UTF8)
 
@@ -297,6 +344,13 @@ Assert-True ($codeText -notmatch "'merge'")    'no gh pr merge'
 Assert-True ($codeText -notmatch "'close'")    'no gh pr close'
 Assert-True ($codeText -notmatch 'Remove-Item') 'nothing in this script removes anything from disk'
 Assert-True ($codeText -notmatch 'ReapScratch') 'and the scratch-sweep flag does not exist (#1659/#1668)'
+
+# LANE 12 CLASSIFIES THROUGH THE PURE FUNCTION RATHER THAN INLINE, which is what makes the cases in
+# section 9 worth anything: an inline copy of that judgement in the conductor would be untested. And
+# the Remove-Item assert above covers this lane too -- it is the one that walks a directory of files
+# nobody points at any more, so the promise not to delete matters there most (#1812).
+Assert-True ($codeText -match "Write-Lane '12'")       'the payload-cache lane is wired into the run'
+Assert-True ($codeText -match 'Get-PayloadTreeVerdict') 'and it judges through the pure verdict, not inline'
 
 # The two gh calls it DOES make are both reads, and the closed one must carry the server-side filter:
 # without it the limit is spent on merged PRs and the abandoned lane silently finds nothing, which is

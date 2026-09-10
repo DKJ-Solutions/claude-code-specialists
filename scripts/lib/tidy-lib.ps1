@@ -579,6 +579,106 @@ function Get-ScratchLeftoverVerdict {
     return 'leftover'
 }
 
+function Get-PayloadTreeVerdict {
+    <#
+    .SYNOPSIS
+        What one extracted payload tree under ~/.claude/plugins/cache/ IS: the copy a session loads
+        today, a copy no install record points at any more, or one of those still being read by a
+        process that is alive.
+
+    .DESCRIPTION
+        WHY A TREE AND NOT A RECORD, WHICH IS WHAT MAKES THIS DIFFERENT FROM LANES 8 AND 11. Both of
+        those read installed_plugins.json and judge a RECORD. A record is a pointer; its installPath is
+        where it points, and what it points AT is an extracted copy of the plugin -- skills, hooks,
+        agent defs, the plugin's own scripts. That copy is what a session loads. Measured on
+        September 10, 2026 (Claude Code 2.1.267, issue #1812): the running process writes a lease at
+        <installPath>/.in_use/<pid> holding {"pid":...,"procStartFt":...} and keeps it for the life of
+        the session, and the marketplace clone carries no lease at all. The clone is the catalogue, and
+        the source an extraction copies FROM; the payload is the copy that loads.
+
+        WHY THE MACHINE IS NOT ALREADY TIDY. The harness models this artefact itself -- it writes
+        .orphaned_at (Unix milliseconds) into a tree no record names, and stamps
+        ~/.claude/plugins/.last_inuse_sweep. What it was not observed to do is REMOVE one. On the
+        machine measured, 30 of 41 trees carried an orphan mark, the oldest of them six days old, and
+        every one of those trees was still on disk; `claude plugin uninstall` removed the record and
+        left the payload standing (measured on dkj-team-lifehub@claude-code-specialists the same day).
+        Marking is not reaping, and nothing in this workflow was reading the marks.
+
+        AND THIS LANE HANDS OVER NO COMMAND, WHICH IS THE SAME DECISION LANE 10 TOOK. There is no
+        `claude plugin cache` verb to hand over -- `claude plugin --help` lists none -- so the only
+        line this could print is a recursive Remove-Item at a path under the user's home, which is
+        precisely the delete primitive New-ScratchPath exists to remove (#1659, #1668). A tree still
+        leased by a live process makes it worse rather than better: the reader would be deleting the
+        files a running session is loading from.
+
+        PURE: every fact about the disk and about the process table arrives as a parameter.
+
+    .PARAMETER Path
+        The tree's full path -- <cache>/<marketplace>/<plugin>/<version-or-sha>.
+
+    .PARAMETER InstallPaths
+        Every installPath in the machine's install register. Compared the way Get-InstallRecord
+        compares a projectPath: trailing separator trimmed, case-insensitively, because two spellings
+        of one path are not two answers.
+
+    .PARAMETER OrphanMarked
+        Does the tree carry the harness's own .orphaned_at file? Reported, never trusted as the
+        verdict: the register is the authority on whether a tree is still pointed at, and a mark that
+        disagrees with it is worth saying out loud rather than deferring to.
+
+    .PARAMETER LeasePids
+        The pids named by files under the tree's .in_use directory.
+
+    .PARAMETER LivePids
+        The process ids alive on this machine right now.
+    #>
+    param(
+        [Parameter(Mandatory = $true)][AllowEmptyString()][string]$Path,
+        [string[]]$InstallPaths = @(),
+        [bool]$OrphanMarked = $false,
+        [int[]]$LeasePids = @(),
+        [int[]]$LivePids = @()
+    )
+
+    $key = ([string]$Path).TrimEnd('\', '/')
+    $owned = $false
+    foreach ($ip in @($InstallPaths)) {
+        if (-not $ip) { continue }
+        if (([string]$ip).TrimEnd('\', '/') -ieq $key) { $owned = $true; break }
+    }
+
+    $held  = @(@($LeasePids) | Where-Object { @($LivePids) -contains $_ })
+    $stale = @(@($LeasePids) | Where-Object { @($LivePids) -notcontains $_ })
+
+    if ($owned) {
+        $reason = if ($OrphanMarked) {
+            'an install record points here, yet the harness has marked it orphaned -- one of the two is out of date, and the register is the one to believe.'
+        } else {
+            'an install record points here: this is a copy a session loads.'
+        }
+        return [pscustomobject]@{
+            Class = 'loaded'; Reason = $reason; HeldBy = $held; StaleLeases = $stale
+        }
+    }
+
+    if ($held.Count -gt 0) {
+        return [pscustomobject]@{
+            Class  = 'leased'
+            Reason = "no install record points here, but pid $($held -join ', ') is reading it right now -- a session that started before the record moved. It goes when that session does."
+            HeldBy = $held; StaleLeases = $stale
+        }
+    }
+
+    $reason = if ($OrphanMarked) {
+        'no install record points here, and the harness has already marked it orphaned -- marking is not reaping, so it stays until something removes it.'
+    } else {
+        'no install record points here, and the harness has not marked it yet -- its sweep runs on its own schedule.'
+    }
+    return [pscustomobject]@{
+        Class = 'ownerless'; Reason = $reason; HeldBy = $held; StaleLeases = $stale
+    }
+}
+
 function Get-TidySummaryLine {
     <#
     .SYNOPSIS

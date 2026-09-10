@@ -1177,6 +1177,34 @@ the two differ and an earlier version of this page generalised them.**
   `plugin@marketplace` target it reads as an instruction to run, which is what check 11 in the lint
   gate enforces flags on — the repo's convention for quoting a command as the *subject* of a
   measurement is the ellipsis.)
+- **And within ONE version string, neither of them moves anything at all** (September 10, 2026, CLI
+  `2.1.267`, [#1812](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1812)). This is the
+  case the two measurements above do not cover: both were taken while the version number was changing.
+  Taken in order on one machine, with the clone's payload for `4.33.0` carrying a skill the installed
+  payload did not: the refresh advanced the clone **104 commits** and left every extracted payload
+  byte-identical, with `installed_plugins.json` unchanged to the byte; `update … --scope project` then
+  answered *"already at the latest version (4.33.0)"* and extracted nothing; a fresh `install …
+  --scope project` answered *"already installed"* and extracted nothing either. So **both verbs decide
+  on the version string**, and content that lands on `main` without a bump is unreachable by the pair —
+  not stale by hours, but until the next cut.
+- **What a session loads is the extracted payload, not the clone, and that is what makes the point
+  above bite.** A record in `installed_plugins.json` carries an `installPath` into
+  `~/.claude/plugins/cache/<marketplace>/<plugin>/<version-or-sha>/`, and the running process holds a
+  lease at `<installPath>/.in_use/<pid>` for the life of the session — measured live, with the clone
+  holding none, and corroborated by `claude plugin details` pricing the payload's component inventory
+  rather than the clone's. The clone is the catalogue and the source an extraction copies from. **The
+  one thing that does load from the clone is a document your repo names by an absolute `@`-import**
+  (the orchestrator's body), which is why a refresh visibly moves that one document and nothing else.
+- **`uninstall` removes the record and leaves the payload standing — per plugin, which is the half
+  [UNINSTALL.md](UNINSTALL.md#what-is-left-behind-honestly) had not measured.** That page already
+  establishes, correctly, that the cache directory follows the *marketplace* rather than the install
+  ([#339](https://github.com/DaveKJohn/claude-code-specialists/issues/339)); what was open is what an
+  uninstall of ONE plugin does to that plugin's own trees. Measured September 10, 2026 on
+  `dkj-team-lifehub@claude-code-specialists --scope project`: the record went, both of its extracted
+  trees stayed. The harness marks such a tree with `.orphaned_at` and sweeps on its own schedule, but
+  marking is not reaping — 30 of 41 trees on that machine were marked, 22.2 MB of 32.6 MB, the oldest
+  mark six days old and its tree still there. `tidy-machine`'s lane 12 reports this; nothing in this
+  family removes one.
 
 **Why line 1 stays in front of both:** for `install` it is load-bearing — skip it and you get the
 previous version, twice measured. For `update` it is idempotent insurance: the `update` behaviour is one
