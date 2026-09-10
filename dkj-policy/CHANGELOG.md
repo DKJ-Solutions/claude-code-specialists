@@ -43,7 +43,49 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**3 / 13 minor entries** <!-- pending-tally -->
+**4 / 14 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1768-path-paste-one-answer · 20260910-103648
+
+A filesystem path printed into a paste-ready command now has **one** answer again, the shared allowlist
+`Get-PasteableRef -Kind Path`. Two branches answered #1762 eleven minutes apart and both landed;
+`tidy-lib.ps1`'s `Format-PasteablePathToken` -- which quoted the path as a PowerShell literal rather than
+judging it -- is retired, and `tidy-machine.ps1` joins `sync-main.ps1` and `check-plugin-integrity.ps1`
+on the allowlist. Fixes inbound #1768.
+
+The literal lost on the destination, which is the one thing a printed remedy does not know. It is exact
+in PowerShell and silently wrong in Git Bash, which reads its doubled quote as close-then-open and turns
+`C:\it's\here` into `C:\its\here` -- a different, plausible path, with no error to notice -- while cmd
+splits any spaced path in two. `tidy-machine.ps1` prints a PowerShell-only `worktree-lane.ps1 -HandBack`
+and a bare `git worktree remove` from the same call, one line apart, and the second is exactly what a
+reader pastes into Git Bash. Its own justification had also expired before it was read: it argued no
+absolute path could pass the allowlist, which #1765 had fixed eleven minutes earlier.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+The report's own proposed alternative is declined with a measurement rather than adopted: *"if the
+allowlist wins, it needs at least a space"* would break the guard rather than widen it, because the token
+is printed **unquoted** by design and a spaced path splits in all three shells, not one. A space is the
+one character an allowlist over an unquoted token can never admit -- so the refusal plus the note is the
+answer, and the suite has asserted it since #1762.
+
+That is the second of #1768's two halves to fail on contact with the tree. The first is its claim that
+`tidy-lib.ps1` cites #1762 as open and carries a sentence about where the reasoning belongs; neither is
+in the repo. The symptom it reports -- two mechanisms for one question -- was real and is what got fixed.
+
+**Score:** 3
+
+#### Pull Request
+
+One answer for a path in a printed command: the allowlist, not the PowerShell literal
+
+Plugins: dkj-policy, dkj-subagents-shopify
+
+[PR #1789](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1789)
+
+---
 
 ### DEPLOY: fix/1779-stale-lib-line-count · 20260910-101138
 
