@@ -268,6 +268,18 @@ why the version number is not the code you are running — are in the family's
 [Staying up to date](https://github.com/DKJ-Solutions/claude-code-specialists/blob/main/INSTALL.md#staying-up-to-date),
 which is the page to read; they are not restated here.
 
+**And the pair moves nothing at all between two releases, which is the limit worth knowing before you
+run it** (measured September 10, 2026, Claude Code 2.1.267,
+[#1812](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1812)). What a session loads is
+not the clone: it is an extracted copy under `~/.claude/plugins/cache/`, named by the `installPath` of
+your checkout's install record and frozen when that record was last written. A
+`claude plugin marketplace update` advanced the clone 104 commits and left every one of those copies
+byte-identical, and `update` and `install` both then declined on the **version string** alone —
+*"already at the latest version"*, *"already installed"*. So the unit that reaches a session is a
+**release**, and a fix that lands on `main` without a version bump reaches nobody, however many times
+the pair is run. The exception is a document your own repo names by an absolute `@`-import into the
+clone — the orchestrator's body is one — which the refresh alone does move.
+
 **What can need catching up afterwards, and what tells you.** The shared scripts this plugin ships
 dot-source the two **repo-owned** libs named in [the seam](#what-it-expects-from-your-repo--the-seam),
 so a newer version can call a function your checkout has never had. That is the incident

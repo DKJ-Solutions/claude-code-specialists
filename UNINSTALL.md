@@ -508,7 +508,7 @@ Which step closes which — including the one entry that no step closes for you 
 |---|---|
 | `installed_plugins.json` | Step 2 removes the record; the file itself stays, holding `{"version": 2, "plugins": {}}` |
 | `marketplaces/<marketplace>/` | Step 5 — `marketplace remove` deletes the clone |
-| `cache/<marketplace>/` | **no step** — it follows the marketplace, not the install. Delete it by hand in Step 5 |
+| `cache/<marketplace>/` | **no step** — it follows the marketplace, not the install. Delete it by hand in Step 5. Per plugin the answer is the same: uninstalling one plugin leaves that plugin's own extracted trees where they are, measured September 10, 2026 ([#1812](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1812)) |
 | `data/<plugin>-<marketplace>/` | Step 2's uninstall, unless you passed `--keep-data` |
 | `known_marketplaces.json` | Step 5 removes the entry; the file stays |
 | `~/.claude/settings.json` | Step 3, by your own edit |

@@ -43,7 +43,122 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**9 / 27 minor entries** <!-- pending-tally -->
+**10 / 30 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1816-retired-doc-name-citations · 20260910-194223
+
+`check-policy-drift`'s report and its consumer-facing skill page no longer send a reader after two
+scripts and two hooks that #1421 folded away before either had ever shipped. The report's explanation
+of *why* it copies the hook's publishing-repo skip now cites the script that makes it, so the reasoning
+can be checked; its printed heading names `consumer-prose-sessioncheck` instead of claiming a hook each;
+and the skill page's table names the two detector functions that do exist, with the fold's own history
+under it in the shape `seam-lib.ps1` already uses. The four citations that narrate the fold in the past
+tense are untouched.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+A consumer holding the `check-policy-drift` skill page was told to look for `retired-doc-name-sessioncheck`
+and `supremacy-declaration-sessioncheck`, two hook names no release ever carried, and would find one
+hook called `consumer-prose-sessioncheck`. That page is the reference for a check whose whole subject is
+documents contradicting each other, so it was the worst place in the tree for this to sit.
+
+**Score:** 3
+
+#### Pull Request
+
+Name check-consumer-prose.ps1 where the retired detector scripts were still cited in the present tense
+
+Plugins: dkj-policy
+
+[PR #1818](https://github.com/DKJ-Solutions/dkj-claude-plugins/pull/1818)
+
+---
+
+### DEPLOY: fix/1813-safe-prose-docstring · 20260910-191402
+
+`Format-SafeProseToken`'s docstring told the next reader that a newline could not reach the function,
+because "the caller has already split the document into lines". Five scripts call it, two of them
+never split -- and one of those, `check-claude-home.ps1`, has a comment recording the measurement that
+`ConvertFrom-Json`'s parse error embeds the offending document whole, newlines and all. Two comments
+in one tree, one of them with a measurement behind it, saying opposite things.
+
+Nothing was broken and nothing is fixed in the code: the `'\s+'` collapse runs before the
+control-character strip and `\s` matches a newline, so multi-line input has always been handled
+correctly. What is repaired is the invariant the docstring hands over. A sentence saying *a newline
+cannot reach here* reads as licence to drop that collapse as cosmetic or move it behind a condition --
+and the caller that would then break is the one whose subject is an attacker-shaped string. The
+sentence now states what the code guarantees, for any caller, says why the collapse is load-bearing,
+and carries no census. The suite pins it, so the next reader who reorders that pass gets a red test
+instead of a comment they can talk themselves out of.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+Nothing reaches a subscriber: this is a comment and a test in a check library, with no behaviour
+change of any kind.
+
+**Score:** N/A
+
+#### Pull Request
+
+Format-SafeProseToken's docstring states what the function guarantees, for any caller
+
+Plugins: dkj-policy, dkj-subagents-alpha
+
+[PR #1817](https://github.com/DKJ-Solutions/dkj-claude-plugins/pull/1817)
+
+---
+
+### DEPLOY: fix/1812-payload-cache-artefact · 20260910-190335
+
+**A session loads neither this tree nor the marketplace clone.** It loads an extracted copy under
+`~/.claude/plugins/cache/<marketplace>/<plugin>/<version-or-sha>/`, named by the `installPath` of the
+install record for that checkout. Measured September 10, 2026 (Claude Code 2.1.267): the running process
+writes a lease at `<installPath>/.in_use/<pid>` and holds it for the life of the session, and the clone
+holds none. Two accounts of this stood in the tree, each half of one mechanism -- `CLAUDE.md` and two
+lenses said the clone is what a session reads, #1802 said a dead consumer survives because its cache
+survives. Both are now stated as what they are: **plugin components load from the payload, and a document
+named by an absolute `@`-import loads from the clone**, which is why a refresh visibly moved #845's
+`@`-imported persona while leaving every hook and skill on the same bytes.
+
+**And the conclusion that bullet rested on does not survive the measurement.** A
+`claude plugin marketplace update` advanced the clone 104 commits and left every payload byte-identical,
+with `installed_plugins.json` unchanged to the byte; `update --scope project` then answered *"already at
+the latest version"* and `install --scope project` *"already installed"*, neither extracting anything,
+with the clone's copy of that same version carrying a skill the installed payload did not. Both verbs
+decide on the **version string**, so content that lands without a bump is unreachable by the documented
+pair -- not stale by hours, but until the next cut. That is the arithmetic #1810 was missing, and it is
+the load-bearing half: the unit that reaches a session is a release, pulled per checkout, per machine.
+
+**Lane 12 of `tidy-machine.ps1` reports the artefact nothing was reading.** The harness marks a tree no
+record points at with `.orphaned_at` and stamps `.last_inuse_sweep`, but marking is not reaping: 30 of 41
+trees on the machine measured carried that mark, 22.2 MB of 32.6 MB, the oldest six days old and every one
+still on disk -- and `claude plugin uninstall` was measured to remove the record and leave the payload,
+so lane 11's handover grows that pile. The lane groups by plugin id, never counts a tree a live process
+still holds a lease on, and hands over **no command at all**: there is no plugin-cache verb, and a
+recursive delete under a user's home is the primitive #1659 exists to prevent.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A -- how a plugin reaches a session is machine administration for the people who run these repos; no
+subscriber of any service reaches it.
+
+**Score:** N/A
+
+#### Pull Request
+
+The extracted payload cache is what a session loads
+
+Plugins: dkj-policy
+
+[PR #1815](https://github.com/DKJ-Solutions/dkj-claude-plugins/pull/1815)
+
+---
 
 ### DEPLOY: feat/1808-remote-runner-read · 20260910-182243
 
