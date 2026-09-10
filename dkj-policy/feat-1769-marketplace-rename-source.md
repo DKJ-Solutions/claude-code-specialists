@@ -36,11 +36,91 @@
 
 ### PLAN
 
-Issue 1769 fase 1: build the source-side rename branch, do NOT merge (flag day = fase 3). Scope: marketplace.json name, the ~281 @claude-code-specialists key refs, the live @-import paths (archived release notes under dkj-policy/releases/**/3.x/ are the #1526 carve-out, leave them), scripts + byte-identical plugins/**/scripts/ mirrors, bootstrap/teardown, connectors/*.json x6 + rename claude-code-specialists.json -> dkj-claude-plugins.json, .claude/settings.json self-consume keys + github source + repo, docs (CLAUDE.md Repo citation, .claude/rules/language-layers.md), ~19 test suites green. Open question to settle on-branch: sweep the ~830 slug prose refs or let them drift per #1526 (default: drift). Do @-import path renames LAST -- they break session-start imports until the flag-day marketplace re-add.
+Issue 1769 fase 1: build the source-side rename `claude-code-specialists` -> `dkj-claude-plugins`
+on this branch and **do NOT merge** -- the merge is the coordinated flag day in fase 3. The branch is
+a staging area; once the session-breaking edits land (see below) it is no longer a usable working
+environment, so those come last and fase 2 consumer branches / review fixes happen before them or
+off `main`.
+
+#### Scope of fase 1
+
+- `.claude-plugin/marketplace.json` `"name"` -- the single source of truth; `Get-MarketplaceName`
+  (`scripts/lib/release-lib.ps1`) derives from it, so most readers follow automatically.
+- The ~281 literal `@claude-code-specialists` refs in prose / comments / printed install-command
+  strings across `scripts/**`, `plugins/**`, docs, `INSTALL.md`, `UNINSTALL.md`, `README.md`,
+  `dkj-policy/README.md`. **Skip** `dkj-policy/releases/**` -- the #1526 / language-layers
+  historical carve-out.
+- The byte-identical `plugins/**/scripts/` mirrors kept in lockstep with `scripts/lib/**` and
+  `scripts/**` (shared-scripts drift lint). `.ps1` files stay ASCII.
+- `bootstrap.ps1` / `teardown.ps1`.
+- `.claude/rules/language-layers.md`, `CLAUDE.md` "Repo citation" section, `scripts/repo-config.ps1`
+  carve-out comment (r. 49-62) -- rewrite so it states the rename is done, not pending.
+- `connectors/` -- **see the open decision below.**
+- `.claude/settings.json` self-consumption: the 6 `enabledPlugins` keys, the `github` marketplace
+  source key, the `repo` field. **Session-breaking on this branch** -- the local marketplace clone
+  stays registered as `claude-code-specialists` until the fase 3 re-add, so a session started on
+  this branch after this edit loads no plugins. Last commit.
+- The live `@`-import paths (`~/.claude/plugins/marketplaces/claude-code-specialists/...`) in
+  `SPECIALISTS.md`, `.claude/specialists/lenses/{01-01,05-05,05-06}-extension.md`,
+  `.claude/specialists/README.md`, `INSTALL.md`, `UNINSTALL.md`, `README.md`, the
+  `adopt-dkj-policy-bwj` skill. **Also session-breaking** for the same reason. Last commit, with
+  settings.json.
+- ~91 test suites green (the issue's "~19" is stale) + `check-plugin-integrity.ps1`.
+
+#### Blast radius -- measured 2026-09-10
+
+Flipping only `marketplace.json` `"name"` and running all 91 suites: **exactly one suite fails --
+`connectors.tests.ps1` (exit 1)**, on the `[UNLISTED]` / retired-id checks. `check-connectors.ps1`
+compares a consumer's enabled `plugin@marketplace` id against `$ThisMarketplaceName` (from
+`marketplace.json`); the fixtures build ids with `@claude-code-specialists`, so the ordinal compare
+at `check-connectors.ps1:655` stops matching. Every other suite (`check-plugin-integrity-commands`
+included -- it validates `--scope project`, not the name) stays green, so the prose/command-string
+refs are drift to be cleaned, not gate failures.
+
+#### Open decision -- connector-file rename timing (for Dave)
+
+The plan lists `connectors/*.json` (6x) + renaming `connectors/claude-code-specialists.json` under
+fase 1. But `connectors/README.md` r. 107-119 is explicit doctrine: **a renamed id is not written
+into `plugins[].id` until the consumer itself has migrated** -- doing it early makes the register
+"a false alarm about a migration nobody performed". The `@<marketplace-name>` half is part of that
+id, and no consumer does the marketplace re-add before flag day (fase 3). The self-connector is the
+same: this repo re-installs itself on flag day too.
+
+- Option A (follows the doctrine): connectors move to **fase 3, per consumer**, alongside each
+  consumer's own PR. Fase 1 leaves `connectors/` untouched except `connectors.tests.ps1` +
+  `check-connectors.ps1` machinery, which must track `marketplace.json`.
+- Option B: rename connectors in fase 1 anyway; register is knowingly "ahead of reality" until flag
+  day.
+
+Recorded as an inconsistency between the plan (2026-09-10) and standing doctrine. Default pending
+Dave's word: **A**.
+
+#### Slug prose refs
+
+The ~830 `DKJ-Solutions/claude-code-specialists` / `DaveKJohn/claude-code-specialists` prose
+citations: **let drift, correct-on-edit**, per #1526 (the slug redirect holds as long as nothing is
+created at the old path). Not swept in fase 1 unless Dave says otherwise.
 
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [ ] Dave's word on the connector-rename timing (A or B above); adjust the two connector steps below
+- [ ] `marketplace.json` `"name"` -> `dkj-claude-plugins`
+- [ ] `check-connectors.ps1` + `connectors.tests.ps1` fixtures track the new name; suite green
+- [ ] Bulk rename literal `@claude-code-specialists` -> `@dkj-claude-plugins` in `scripts/**` +
+      `plugins/**/scripts/` mirrors (ASCII-safe, mirrors byte-identical), `bootstrap.ps1`,
+      `teardown.ps1`
+- [ ] Bulk rename literal `@claude-code-specialists` in docs / manuals / agent-defs / skills /
+      `INSTALL.md` / `UNINSTALL.md` / `README.md` / `dkj-policy/README.md` -- NOT
+      `dkj-policy/releases/**`
+- [ ] `.claude/rules/language-layers.md` + `CLAUDE.md` "Repo citation" + `scripts/repo-config.ps1`
+      carve-out comment
+- [ ] connectors: per the timing decision -- content of `connectors/*.json` (6x) + `git mv`
+      `connectors/claude-code-specialists.json` -> `dkj-claude-plugins.json` + `connectors/README.md`
+- [ ] `check-plugin-integrity.ps1` green + all 91 suites green
+- [ ] Victor (scripts) + Edith (docs/links) review -- branch stays open until fase 2 is built
+- [ ] LAST: `.claude/settings.json` self-consume keys + `github` source + `repo`
+- [ ] LAST: live `@`-import paths `marketplaces/claude-code-specialists/` ->
+      `marketplaces/dkj-claude-plugins/`
 
 ### TEST
 
