@@ -43,7 +43,38 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**4 / 15 minor entries** <!-- pending-tally -->
+**4 / 16 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1786-stale-test-docstring · 20260910-110446
+
+`connector-sessioncheck.tests.ps1`'s header said its first two branches drive the hook against this
+repo's own root `scripts/task/plugin-versions.ps1`. They drive the plugin mirror beside the hook --
+the `$cwd` candidate that once made the header true was removed on review. The docstrings now name
+the mirror, and state the consequence the wrong name hid: after editing the source engine, rebuild
+the mirror before running this suite standalone, or it reports on the previous version and says
+nothing about having done so.
+
+A test suite's own account of what it measures was wrong, and it cost one session a false all-clear
+(47/0 against an unrebuilt mirror, then 41/6 from the same suite once it was rebuilt). Small because
+the gate was never exposed to it -- the drift check errors on a stale mirror before the suites run,
+so only a standalone run could be fooled. Noticed the moment somebody edits `plugin-versions.ps1`
+and reaches for this suite.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+A docstring inside this repo's own test suite. Nothing here ships, and no consumer reads it.
+
+**Score:** N/A
+
+#### Pull Request
+
+connector-sessioncheck.tests.ps1's header names the mirror it actually drives
+
+[PR #1793](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1793)
+
+---
 
 ### DEPLOY: docs/1784-measured-figure-gate-line-counts · 20260910-104705
 
