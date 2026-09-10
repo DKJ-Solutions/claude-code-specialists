@@ -1612,6 +1612,28 @@ authorship for him in consumers that never granted it.
   was on record all along — in that PR's entry, folded into `CHANGELOG.md` one commit earlier. Before
   writing "this was never captured", grep `CHANGELOG.md` and `releases/**` too: an entry body is where
   this repo's findings land *first*, and a lens is usually the second home, not the first.
+- **And the quieter sibling of that: every `claude plugin install`/`uninstall --scope project` rewrites
+  this repo's tracked `.claude/settings.json` and strips the blank lines that group
+  `permissions.allow`.** Measured September 10, 2026 over nine such commands
+  ([#1774](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1774)): `enabledPlugins` came
+  back byte-identical, and the three blank lines separating the git / gh / scripts / release blocks of a
+  60-entry allowlist were gone. The mechanism is the CLI's own settings writer — a JSON parse and
+  re-serialise — so it is not this repo's code and there is nothing here to fix. The portable rule, with
+  the remedy and the reason a gate is the wrong answer, is in
+  [Sylvester's manual](../../../plugins/dkj-subagents/dkj-subagents-alpha/manuals/05-15-manual.md#sylvesters-hard-rules);
+  what is local is why it is met so often and what it costs here:
+  - **This repo consumes its own marketplace and enables all six plugins**, so plugin administration is
+    routine maintenance rather than a one-off — the rename of #1698 alone needed nine commands.
+  - **The grouping is deliberate authorship**, and it is what is lost: four labelled blocks in a
+    60-entry list, gone in one command, quietly.
+  - **The trunk rule makes the stray diff worse than untidy.** Nothing here may be committed directly on
+    `main`, so a session that ends with an unintended modification to a tracked file has to recognise it
+    as the CLI's and not its own. `git checkout -- .claude/settings.json` after plugin administration,
+    and read `git status` before staging.
+  - **Deliberately no check.** A gate refusing a whitespace-only diff on one file is the same shape as
+    the control-character rule declined above — a rule written for one careless afternoon — and seeding
+    an ungrouped list to make the file round-trip-stable would pay for it with the readability the
+    blocks exist for.
 - **When a tool refuses with "auto mode cannot determine the safety", retry it — do not route around it
   via the Bash tool.** A recurring platform fault on July 29, 2026 made PowerShell and Edit calls refuse
   intermittently; it comes and goes, and a plain retry clears it. That the Bash tool can usually do the
