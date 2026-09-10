@@ -26,6 +26,11 @@
     that it sits exactly one level under plugins/ -- and neither is a fact about plugins. They are
     facts about one particular layout, which this repo has already changed twice.
 
+    AND ONE READING OF ONE MANIFEST FIELD, for the same reason: Get-ManifestAgentEntries normalises the
+    'agents' key (string|string[], where a bare string is ONE entry). It is the same failure one layer in
+    -- two callers each carrying their own reading of a field neither owns -- so it lives beside the
+    location answers rather than in a lib of its own. See its own header for the two copies it replaced.
+
     Pure where it can be: Get-PluginRoots takes the JSON text and returns objects, so it is testable
     without a tree. Get-RepoPluginRoots is the one function that touches disk, and it returns an empty
     set rather than throwing when there is no marketplace.json -- a consumer that publishes nothing is
@@ -104,6 +109,45 @@ function Get-PluginRoots {
             ManifestPath = Join-Path $root '.claude-plugin\plugin.json'
         }
     }
+}
+
+function Get-ManifestAgentEntries {
+    <#
+        ONE READING OF THE 'agents' KEY. The field is string|string[] over paths to .md files, and a BARE
+        STRING IS ONE ENTRY -- the form a naive count gets wrong. In Windows PowerShell 5.1 a string's
+        .Count is 1 only by accident of scalar unrolling, and .Length is its character count, so a caller
+        that reaches for either is right for the wrong reason or simply wrong.
+
+        Before this function there were two independent readings of that one field (issue #1781):
+
+          * check-plugin-integrity.ps1's check 38 [agents-key], normalising to a list in order to
+            validate each entry;
+          * measure-skill-lib.ps1's Get-DeclaredAgentCount, normalising to a count.
+
+        They agreed, and both were asserted. What was unguarded is that they could not DISAGREE: if the
+        installer ever accepts a third form, one copy learns it and the other does not, and the failure is
+        silent in OPPOSITE directions -- the gate passes a manifest it should refuse, or measure-skill
+        reports an agent count that is not the plugin's. Same class as the five copies this lib was built
+        to replace, and the same answer.
+
+        TAKES THE PARSED MANIFEST, NOT A PATH, so it is pure and testable without a tree -- like
+        Get-PluginRoots above, and unlike the disk-reading callers. The property is PROBED rather than
+        read: Set-StrictMode throws on an absent one, and a manifest with no 'agents' key at all is the
+        ordinary case for every plugin that ships none.
+
+        RETURNS AN ARRAY, ALWAYS, and the outer @() at every call site is load-bearing for the reason the
+        header above gives -- an empty array unrolls to $null on the way out. A key that is absent, $null,
+        or an empty array all come back as an empty set: 'declares none'. Anything a caller must REFUSE --
+        an entry that is not a non-empty string -- is handed back untouched rather than filtered, because
+        deciding that is the validator's job and a silent drop here would make the gate pass what it
+        exists to catch.
+    #>
+    param([Parameter(Mandatory)][AllowNull()]$Manifest)
+    if ($null -eq $Manifest) { return @() }
+    if (-not $Manifest.PSObject.Properties['agents']) { return @() }
+    if ($null -eq $Manifest.agents) { return @() }
+    if ($Manifest.agents -is [string]) { return @([string]$Manifest.agents) }
+    return @($Manifest.agents)
 }
 
 function Get-MarketplacePath {
