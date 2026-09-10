@@ -208,8 +208,14 @@ if (Test-Path -LiteralPath $repoConfigPath -PathType Leaf) {
 # this script is run by connector-sessioncheck.ps1 at every session start, where -RemoteRunners is off
 # and nothing in that file would ever be called. A feature that is opt-in should be opt-in in what it
 # loads too.
+#
+# AND NOT ASKED AT ALL UNDER -OnlyConsumer, because the answer is unreachable there. That switch means a
+# session is asking about its own repo, whose checkout is present by definition, so 6b never fires and
+# $RemoteRunnerRead is never read -- while the probe itself would still spawn a gh process on the
+# SessionStart path, which is the one cost this whole design is arranged around. A refusal notice would
+# be wrong there too: nothing was going to be read either way, so there is nothing to report as refused.
 $RemoteRunnerRead = $false
-if ($RemoteRunners) {
+if ($RemoteRunners -and -not $OnlyConsumer) {
     if (-not $ThisRepoName) {
         Write-Info "-RemoteRunners was asked for, but this repo's own name could not be read from Get-RepoName (scripts/repo-config.ps1) -- so check 6 is off for this run in both directions, on the disk and over the network. Nothing about any consumer's runners was read."
     } elseif (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
@@ -486,7 +492,20 @@ function Get-RemoteConsumerWorkflow {
     $json = $null
     try { $json = ($call.Output -join "`n") | ConvertFrom-Json } catch { $json = $null }
     if ($null -eq $json) {
-        return @{ Status = 'unavailable'; Reason = "gh exited $($call.ExitCode) and answered with nothing this could parse as JSON"; Branch = ''; Files = @() }
+        # A SHORT READ IS A FACT ABOUT THIS RUN, NOT ABOUT THE REPOSITORY, and separating the two is the
+        # whole reason Invoke-NativeCapture carries the field (#1679). Passing -TimeoutSeconds routes
+        # this call through the Start-Process arm, which can answer exit 0 with a capture a grandchild
+        # was still writing -- and a truncated JSON document does not parse. Folded into the generic
+        # line below it would read as 'this consumer could not be read', which is 13d's sentence about a
+        # credential that cannot see the repo: the reader would go looking at the register or at their
+        # auth for something that settles on a re-run. Same split, and the same remedy sentence, that
+        # claim-issue.ps1 and verify-resolved-issues.ps1 already make at their own gh calls.
+        $reason = if ($call.ShortRead) {
+            'gh exited 0 but its capture was still being written when this run read it, so what arrived was not a whole JSON document -- a fact about this run rather than about that repository, and it normally settles on a re-run'
+        } else {
+            "gh exited $($call.ExitCode) and answered with nothing this could parse as JSON"
+        }
+        return @{ Status = 'unavailable'; Reason = $reason; Branch = ''; Files = @() }
     }
 
     # Read defensively throughout: StrictMode makes a missing property terminating, and every shape

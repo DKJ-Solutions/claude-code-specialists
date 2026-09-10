@@ -76,18 +76,47 @@ otherwise find #1808's subject landing after the branch it is a follow-up to.
 
 ### TEST
 
-- [x] `connectors.tests.ps1` scenario 13 (a-j), driven against a fake `gh` on PATH that logs every call:
+- [x] `connectors.tests.ps1` scenario 13 (a-k), driven against a fake `gh` on PATH that logs every call:
       the switch off makes no call at all, a stale path over the network is the same `[ERROR]` with the
       branch named, a current path is silent, an unreadable repository is a stated `[INFO]` quoting the
       API, no workflows directory is silence, a text-less blob is its own nothing while its sibling is
       still judged, both refusal doors say so, a malformed `repo` slug never reaches a call, and
-      `-OnlyConsumer` reads nothing about a third party. 309 pass, 0 fail (268 before).
-- [x] The real register, both ways. Default run: byte-identical to before, 0 errors, 6 infos. With
-      `-RemoteRunners`: the two consumers #1805 reported as red come back as the third state -- this
-      credential cannot see either -- and `DaveKJohn/djcylow-react` is read and reported clean, which
-      was verified by hand to be the truth rather than a silent failure (one workflow, `ci.yml`, naming
-      no checkout of this repository).
+      `-OnlyConsumer` spawns nothing at all. 314 pass, 0 fail (268 before this branch).
+- [x] The real register, both ways. **Default path unchanged, measured rather than asserted**: the
+      output of `-SkipDrift -SkipVersions` at this branch and at `origin/main` is byte-identical apart
+      from the commit stamp it prints (0 errors, 6 infos, 5,363 characters both times). Run by swapping
+      the one file in and out of the same checkout, because a `git worktree` is NOT a valid A/B here --
+      `localCheckout` is relative to the repo root, so a worktree in a temp directory makes the two BWJ
+      consumers read as absent and produces a difference the change had nothing to do with.
+      With `-RemoteRunners`: the two consumers #1805 reported as red come back as the third state --
+      this credential cannot see either -- and `DaveKJohn/djcylow-react` is read and reported clean,
+      verified by hand to be the truth rather than a silent failure (one workflow, `ci.yml`, naming no
+      checkout of this repository).
 - [x] `check-plugin-integrity.ps1` and the full suite gate, via `open-pr.ps1`.
+- [x] Review round (Victor, Sebastian, Edith in parallel on the diff) -- **three findings, two repaired
+      with their own regression scenarios and one filed**:
+      - *Victor 1.* The `gh` call passes `-TimeoutSeconds`, which routes it through the Start-Process
+        arm -- and that arm can answer exit 0 with a capture a grandchild was still writing, which does
+        not parse. Folded into the generic parse failure it printed the sentence a repository nobody can
+        read gets, sending the reader after their credential for something a re-run settles. `ShortRead`
+        now separates the two, as `claim-issue.ps1` and `verify-resolved-issues.ps1` already do at their
+        own `gh` calls. Scenario 13k pins the separation.
+      - *Victor 2.* The once-per-run capability probe ran before `-OnlyConsumer` was consulted, so a
+        session-start run with both switches spawned `gh auth status` for an answer nothing downstream
+        could reach. 13j now asserts the whole call log is empty rather than only that no `graphql` call
+        was made -- checking for `graphql` alone is what let the spawn through.
+      - *Sebastian.* No blocking findings. His advisory about `Format-SafeProseToken`'s docstring was
+        verified before it was repaired and **his reason does not hold**: the claim ("today's one
+        caller... has already split the document into lines") was already false for two existing callers,
+        and `check-claude-home.ps1`'s own comment records having measured one that sends it a whole file.
+        Not caused here, so filed as
+        [#1813](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1813) rather than
+        repaired on a branch whose subject is elsewhere -- the file is mirrored twice, so a one-line
+        comment fix carries a generator run with it.
+      - *Edith.* One measured figure in this document was wrong: the default-run bullet said "0 errors"
+        without naming the flags, and a bare no-argument run gives 4 -- the machine-record check on two
+        consumers whose plugin version is behind, which has nothing to do with this branch. Corrected
+        above by stating the flags and re-measuring properly.
 - [~] A verification against the two red consumers themselves -- dropped for the same reason #1805
       dropped it, and now for a reason the tooling states rather than a session asserting it: the read
       was attempted and the API answered that neither repository is visible to this credential. That is
@@ -135,5 +164,5 @@ every pull request in a repository nobody is visiting, which is precisely why no
 
 #### Pull Request
 
-check-connectors can read a registered consumer's CI runners over the network, on request
+check-connectors can judge the CI runners of a consumer that is not checked out here, on request
 

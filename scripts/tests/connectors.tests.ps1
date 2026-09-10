@@ -1468,6 +1468,27 @@ exit 1
     Assert-Equal 0 $r.Code '-OnlyConsumer over an absent third party: exit code 0'
     Assert-NotMatch 'graphql' $onlyCalls '-OnlyConsumer: no repository read for a consumer this session did not ask about'
     Assert-NotMatch 'does not exist here' $r.Out '-OnlyConsumer: and no finding about one either'
+    # (Victor's finding 2.) NOT ONE gh PROCESS, not merely no graphql call. The capability probe used to
+    # run before -OnlyConsumer was consulted, so a session-start run with both switches spawned
+    # `gh auth status` for an answer nothing downstream could reach. The assertion is on the WHOLE log
+    # for that reason: checking only for 'graphql' is what let the spawn through.
+    Assert-Equal '' $onlyCalls '-OnlyConsumer: and the capability probe is not spawned either -- the answer is unreachable there'
+
+    # 13k. A SHORT READ IS A FACT ABOUT THIS RUN, NOT ABOUT THE REPOSITORY (Victor's finding 1). Passing
+    #      -TimeoutSeconds routes the call through the Start-Process arm, which can answer exit 0 with a
+    #      capture still being written -- and truncated JSON does not parse. Folded into the generic
+    #      parse-failure line it would print 13d's sentence, sending the reader after the register or
+    #      their credential for something a re-run settles. The fake serves half a document at exit 0;
+    #      ShortRead itself cannot be provoked from here, so what this pins is the SEPARATION -- the two
+    #      causes must not share one sentence.
+    New-FixtureConsumer -ExtensionIds @('06-16')
+    $env:GH_GRAPHQL_BODY = '{"data":{"repository":{"defaultBranchRef":{"nam'
+    $mf = New-FixtureManifest -Extensions @('06-16')
+    $r = Invoke-Absent -ManifestPath $mf -Remote
+    Assert-Equal 0 $r.Code 'unparseable answer: exit code 0'
+    Assert-Match 'nothing this could parse as JSON' $r.Out 'unparseable answer: named as a parse failure'
+    Assert-NotMatch 'Could not resolve to a Repository' $r.Out 'unparseable answer: and NOT as a repository nobody can see'
+    Assert-NotMatch 'still being written' $r.Out 'unparseable answer: nor as a short read -- gh exited 0 with a whole (if broken) capture'
 } finally {
     if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture }
     if (Test-Path -LiteralPath $HookHome) { Remove-Item -Recurse -Force -LiteralPath $HookHome -ErrorAction SilentlyContinue }
