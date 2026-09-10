@@ -24,11 +24,37 @@
 #>
 
 # The GitHub repo where this workshop lives (owner/name). Single place this is stated.
-$script:RepoName = 'DKJ-Solutions/claude-code-specialists'
+$script:RepoName = 'DKJ-Solutions/dkj-claude-plugins'
 
 function Get-RepoName {
     <# owner/name of this repo, e.g. for `gh ... --repo`. #>
     return $script:RepoName
+}
+
+# --- Names this repo has been renamed AWAY from (Dave, September 10, 2026; issue #1769) -----------
+#
+# A rename does not reach the files other repositories already hold. Three of this workflow's CI
+# runners are scaffolded INTO a consumer and check this repository out by name --
+# `repository: <owner>/<name>` -- so every consumer scaffolded before a rename goes on naming the old
+# one. Those runners keep working, because GitHub answers a transfer redirect; what stops working is
+# the GUARD over them. check-connectors' check 6 finds a runner by matching the name half of that
+# `repository:` line, and after a rename it matches nothing -- so every consumer reads as clean, which
+# is indistinguishable from being clean and is the exact silence #1805 was filed to end.
+#
+# SO THE RETIRED NAMES ARE DATA, not a sweep. They are read alongside Get-RepoName and never expire:
+# a consumer's runner is repaired when that consumer is next touched for its own reasons, and until
+# then the guard has to be able to see it. This is the same reasoning check 6 already carries for the
+# old OWNER (its scenario 12c) -- a transfer left `DaveKJohn/` in consumers that still resolve -- one
+# axis over: owner and name are renamed by different acts and expire on different days.
+#
+# NEWEST FIRST, and the list only ever grows. 'claude-code-specialists' was this repo's name until
+# September 10, 2026. Read as an optional function, so a repo that has never been renamed simply does
+# not define it and check 6 matches on the current name alone.
+$script:RetiredRepoNames = @('claude-code-specialists')
+
+function Get-RetiredRepoNames {
+    <# Name halves this repo has previously been called, newest first. Empty = never renamed. #>
+    return $script:RetiredRepoNames
 }
 
 function Get-RepoBlobUrl {
@@ -55,10 +81,38 @@ function Get-RepoBlobUrl {
 # Dave has decided to rename this marketplace from 'claude-code-specialists' to 'dkj-claude-plugins',
 # accepting the exact cost the August 14 reasoning identified (every consumer's enabledPlugins key
 # breaks; no redirect for a marketplace name). It runs as a phased migration -- decision and plan on
-# #1769, fase 0 is this prep branch. WHAT IS NOT DECIDED YET: whether this business MIRROR follows the
-# source's new name or keeps 'claude-code-specialists' for its own consumers -- that is fase 4, and the
-# August 14 reasoning still applies to the mirror in isolation. No name is changed anywhere in fase 0;
-# this comment is the only edit.
+# #1769, fase 0 was the prep branch.
+#
+# THE MIRROR FOLLOWS THE SOURCE'S NEW NAME. Decision by Dave, September 10, 2026. It was carried as an
+# open fase 4 question until then, and that framing did not survive reading the script it would be
+# carried out by: publish-to-business.ps1 GENERATES the mirror's marketplace.json rather than copying
+# it, but only its 'plugins' array -- Remove-UnpublishedPlugins reads the source manifest, replaces
+# $manifest.plugins with the keep-set and writes it back. It never touches $manifest.name, there is no
+# name parameter (-TargetRepo, -Plugins, -RepoRoot, -Message, -Branch, -DryRun, -KeepClone is the whole
+# surface), and no assignment to .name exists in the file. So 'the mirror follows' was never a choice
+# to be made in fase 4 -- it is what the first publish after the fase 1 merge DOES, whoever runs it;
+# and 'the mirror keeps the old name' would have required building a name override first. Dave took
+# the default deliberately rather than by omission: one product, one name.
+#
+# WHAT THAT COSTS, so it is not discovered by a colleague instead: the mirror's own consumers are BWJ
+# colleagues on Claude Enterprise, who key on '<plugin>@claude-code-specialists' exactly as a CLI
+# consumer does and who are NOT in #1769's fase 2 list, because they have no checkout to prepare. They
+# need the same migration, delivered through Claude Enterprise rather than a CLI, and the release
+# notes of the flag-day cut are where it reaches them (fase 5).
+#
+# WHERE TO READ THE STATE, rather than a claim about it. The source-side rename landed with the fase 3
+# flag day: .claude-plugin/marketplace.json and every '<plugin>@<marketplace>' literal in this tree
+# read 'dkj-claude-plugins', in one movement with the repository rename, the major cut and the
+# per-machine re-installs. #1769 carries the phase-by-phase record and the re-install ledger; the fase 0
+# sentence 'no name is changed anywhere' described fase 0 and nothing since.
+#
+# THIS PARAGRAPH IS DELIBERATELY WRITTEN TO BE TRUE ON BOTH SIDES OF THAT MERGE, and that is a lesson
+# rather than a style choice. It said 'FASE 1 IS BUILT, NOT MERGED' until September 10, 2026 -- an
+# honest sentence that goes false at the merge, so the branch carried a step to rewrite it on the day.
+# The trouble is WHERE that lands: open-pr refuses to push while a step above DEPLOY is unresolved, so
+# the edit could only be made after the last chance to make it, and the flag day would have opened with
+# a gate deadlock at the least convenient moment. A sentence that has to be corrected by the act it
+# describes is a sentence to reword, not a step to schedule.
 $script:BusinessMarketplaceRepo = 'BWJ-ecommerce/claude-plugins-bwj'
 
 function Get-BusinessMarketplaceRepo {
@@ -975,7 +1029,7 @@ function Get-ReleaseNoteWording {
 #
 # THE PAGE'S OWN NAME. It is what a reader sees in the tab and at the top, so it is the repo's to
 # say rather than the script's. Without it the script falls back to the name half of Get-RepoName,
-# which is a real answer -- 'claude-code-specialists' -- and simply not the one to send anybody.
+# which is a real answer -- 'dkj-claude-plugins' -- and simply not the one to send anybody.
 # THE PRODUCT'S NAME AND NOTHING ELSE. It read 'Claude Specialists -- release notes' until August 21,
 # 2026, which put those words on the page twice. This answer is the masthead's EYEBROW and half the window
 # title; the heading itself is the template's own 'Release notes'. What the page IS belongs to the

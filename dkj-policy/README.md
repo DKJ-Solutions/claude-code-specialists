@@ -91,13 +91,13 @@ Two commands, from the root of the checkout you want to move — the refresh onc
 enabled plugin:
 
 ```powershell
-claude plugin marketplace update claude-code-specialists                            # 1. refresh the clone
-claude plugin update dkj-subagents-alpha@claude-code-specialists --scope project         # 2. then update, per plugin
-claude plugin update dkj-subagents-ecomm@claude-code-specialists --scope project
-claude plugin update dkj-subagents-lifehub@claude-code-specialists --scope project
-claude plugin update dkj-subagents-shopify@claude-code-specialists --scope project
-claude plugin update dkj-policy@claude-code-specialists --scope project
-claude plugin update dkj-policy-bwj@claude-code-specialists --scope project
+claude plugin marketplace update dkj-claude-plugins                            # 1. refresh the clone
+claude plugin update dkj-subagents-alpha@dkj-claude-plugins --scope project         # 2. then update, per plugin
+claude plugin update dkj-subagents-ecomm@dkj-claude-plugins --scope project
+claude plugin update dkj-subagents-lifehub@dkj-claude-plugins --scope project
+claude plugin update dkj-subagents-shopify@dkj-claude-plugins --scope project
+claude plugin update dkj-policy@dkj-claude-plugins --scope project
+claude plugin update dkj-policy-bwj@dkj-claude-plugins --scope project
 ```
 
 **The set step 2 walks is `.claude/settings.json`'s own, and a plugin left off it simply stays on its old

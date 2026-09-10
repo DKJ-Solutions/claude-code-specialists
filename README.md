@@ -235,7 +235,7 @@ were declined and the reasoning is recorded here, because it is the kind of prop
   was meant to cure.
 - **`scaffold` cannot distinguish one plugin from another**, because on the definition above every
   plugin here is scaffold. A prefix every member carries is a constant, and a constant belongs in the
-  namespace — which `dkj-` and `@claude-code-specialists` already are. It would also collide with the two
+  namespace — which `dkj-` and `@dkj-claude-plugins` already are. It would also collide with the two
   established senses listed above, in a tree that has spent real effort keeping them sharp.
 - **`dkj-scaffold-core` cannot reach its own content.** `${CLAUDE_PLUGIN_ROOT}` resolves per installed
   plugin and does not cross plugin boundaries. `dkj-policy-bwj` already demonstrates the consequence:
@@ -993,7 +993,7 @@ release you are on. Every plugin bumps in lockstep, so any one of them answers t
 
 For **what changed** in that release, read [`CHANGELOG.md`](dkj-policy/CHANGELOG.md) and
 [`dkj-policy/releases/`](dkj-policy/releases/) in the marketplace clone you already have —
-`~/.claude/plugins/marketplaces/claude-code-specialists/`. See [Consumption](#consumption) above for
+`~/.claude/plugins/marketplaces/dkj-claude-plugins/`. See [Consumption](#consumption) above for
 the mechanics.
 
 A newly added **skill** additionally needs a session restart before it becomes visible, and the

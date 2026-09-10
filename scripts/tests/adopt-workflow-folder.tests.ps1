@@ -166,7 +166,7 @@ try {
     $gateRel = '.github\workflows\branch-entry.yml'
     Assert-True (Test-Path -LiteralPath (Join-Path $c2 $gateRel) -PathType Leaf) '-Apply: the branch-entry gate workflow is placed'
     . (Join-Path $RepoRoot 'scripts\lib\consumer-runner-lib.ps1')
-    $gateRefs = @(Get-SharedScriptReference -WorkflowText ([System.IO.File]::ReadAllText((Join-Path $c2 $gateRel), [System.Text.Encoding]::UTF8)) -RepositoryName 'claude-code-specialists')
+    $gateRefs = @(Get-SharedScriptReference -WorkflowText ([System.IO.File]::ReadAllText((Join-Path $c2 $gateRel), [System.Text.Encoding]::UTF8)) -RepositoryName 'dkj-claude-plugins')
     Assert-Equal 1 $gateRefs.Count '-Apply: the gate reaches exactly one script out of a checkout of this repo'
     foreach ($judged in @(Test-SharedScriptReference -Reference $gateRefs -SourceRoot $RepoRoot)) {
         Assert-True $judged.Exists "-Apply: the gate runs '$($judged.Path)', and that path EXISTS in this tree"

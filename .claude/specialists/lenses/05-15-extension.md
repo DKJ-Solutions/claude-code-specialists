@@ -1378,8 +1378,8 @@ authorship for him in consumers that never granted it.
   so the session loaded no subagent, skill or hook at all. Recognize it by a **deliberate** run of
   [`check-roster-sync.ps1`](../../../scripts/sync/check-roster-sync.ps1) reporting
   `[NOT-INSTALLED-HERE]` — the session-start hook cannot report it, because that hook ships in the
-  plugin that did not load. The repair is `claude plugin marketplace update claude-code-specialists`
-  followed by `claude plugin install dkj-subagents-alpha@claude-code-specialists --scope project` from the new
+  plugin that did not load. The repair is `claude plugin marketplace update dkj-claude-plugins`
+  followed by `claude plugin install dkj-subagents-alpha@dkj-claude-plugins --scope project` from the new
   root, after which a leftover record naming the old folder is expected and inert. The mechanism, the
   other two ways a record goes missing, and why that leftover is not a stray duplicate are in the
   family's [INSTALL.md](../../../INSTALL.md#staying-up-to-date);
@@ -1387,7 +1387,7 @@ authorship for him in consumers that never granted it.
 - **The marketplace clone follows a REFRESH, not a push — and no version check can tell you it is
   behind.** The clone is what a document named by an absolute `@`-import reads — the orchestrator's
   body, in every repo here — and it advances only on
-  `claude plugin marketplace update claude-code-specialists`. Measured August 23, 2026
+  `claude plugin marketplace update dkj-claude-plugins`. Measured August 23, 2026
   ([#845](https://github.com/DaveKJohn/claude-code-specialists/issues/845)): after four PRs merged and
   pushed, the clone still stood on the previous day's `3e46b3de` while `main` was at `86f1a6c8` — the
   cached manual missing a section added that morning, the cached shared block missing a rule added that

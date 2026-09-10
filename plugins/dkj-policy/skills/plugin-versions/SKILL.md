@@ -63,15 +63,15 @@ partial or split install state is visible):
 
 ```text
 6 plugin(s): 4 up to date, 2 on the released version, with unreleased commits in the clone -- nothing to update (see below).
-  clone 'claude-code-specialists': <path>  [HEAD 0711d4175d75, committed 2026-09-10T08:52:24Z, last fetch 2026-09-10T10:57:51]
+  clone 'dkj-claude-plugins': <path>  [HEAD 0711d4175d75, committed 2026-09-10T08:52:24Z, last fetch 2026-09-10T10:57:51]
 
-dkj-subagents-alpha@claude-code-specialists
+dkj-subagents-alpha@dkj-claude-plugins
   installed here     4.33.0  0711d4175d75  project
   marketplace clone  4.33.0  HEAD 0711d4175d75
   verdict            up to date -- your install is at the clone's HEAD
-                     -> the clone advances only on: claude plugin marketplace update claude-code-specialists
+                     -> the clone advances only on: claude plugin marketplace update dkj-claude-plugins
 
-dkj-policy@claude-code-specialists
+dkj-policy@dkj-claude-plugins
   installed here     4.33.0  810a0af28930  project
   marketplace clone  4.33.0  HEAD 0711d4175d75
   verdict            your install is on the released version 4.33.0 and the clone holds newer commits carrying that same version -- unreleased work, so there is no version gap for a plugin update to close
@@ -138,7 +138,7 @@ cannot run -- `check-connectors.ps1` is source-only and is not plugin-carried --
 *"check skipped"* and a session got no version signal at all.
 
 ```text
-[ERROR] dkj-subagents-ecomm@claude-code-specialists: the clone is AHEAD of your install (4.31.0 -> 4.32.0) -- claude plugin update dkj-subagents-ecomm@claude-code-specialists --scope project
+[ERROR] dkj-subagents-ecomm@dkj-claude-plugins: the clone is AHEAD of your install (4.31.0 -> 4.32.0) -- claude plugin update dkj-subagents-ecomm@dkj-claude-plugins --scope project
 [INFO] some-other@another-marketplace: cannot determine -- the clone's marketplace.json could not be read
 [SUMMARY] 7 plugin(s) enabled here: 1 behind, 1 undetermined, 5 up to date.
 ```

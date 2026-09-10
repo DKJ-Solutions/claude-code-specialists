@@ -179,15 +179,25 @@ $PluginRoots = @(Get-RepoPluginRoots -RepoRoot $RepoRoot)
 # different question. (This family keeps other state keyed on a folder path -- the plugin install
 # record, #1449 -- and that is a neighbouring hazard rather than evidence for this one.)
 $ThisRepoName = ''
+# AND THE NAMES THIS REPO HAS BEEN RENAMED AWAY FROM, read from the same seam (#1769). A consumer
+# scaffolded before a rename still writes the old name into its runner, and that runner still works
+# because GitHub answers the transfer redirect -- so matching only the current name reports nothing
+# about it and the consumer reads as clean, which is the silence this check was filed to end. Same
+# reasoning as 12c below carries for the old OWNER, one axis over. Optional: a repo that has never
+# been renamed does not define the function, and the list stays empty.
+$ThisRepoRetiredNames = @()
 $repoConfigPath = Join-Path $RepoRoot 'scripts\repo-config.ps1'
 if (Test-Path -LiteralPath $repoConfigPath -PathType Leaf) {
-    $slug = & {
+    $seam = & {
         Set-StrictMode -Off
-        try { . $args[0] } catch { return '' }
-        if (Test-FunctionDefined 'Get-RepoName') { return [string](Get-RepoName) }
-        return ''
+        try { . $args[0] } catch { return @{ Slug = ''; Retired = @() } }
+        $s = if (Test-FunctionDefined 'Get-RepoName') { [string](Get-RepoName) } else { '' }
+        $r = if (Test-FunctionDefined 'Get-RetiredRepoNames') { @(Get-RetiredRepoNames) } else { @() }
+        return @{ Slug = $s; Retired = $r }
     } $repoConfigPath
+    $slug = [string]$seam.Slug
     if ($slug) { $ThisRepoName = $slug.Substring($slug.LastIndexOf('/') + 1) }
+    $ThisRepoRetiredNames = @($seam.Retired | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
 }
 
 # --- CAN THE OPT-IN NETWORK READ ACTUALLY BE MADE? Asked ONCE per run (#1808) --------------------
@@ -234,7 +244,7 @@ if ($RemoteRunners -and -not $OnlyConsumer) {
 }
 
 # THIS REPO'S OWN MARKETPLACE NAME, i.e. the segment after the '@' in an id like
-# 'dkj-policy@claude-code-specialists' (#1775). Needed by the per-connector [UNLISTED] check further
+# 'dkj-policy@dkj-claude-plugins' (#1775). Needed by the per-connector [UNLISTED] check further
 # down, which has to tell "an id this register is responsible for" from "an id naming a marketplace
 # this register has never heard of and has no business reporting on".
 #
@@ -386,7 +396,7 @@ function Write-RunnerPathFinding {
         [string]$Where = ''
     )
 
-    $refs = @(Get-SharedScriptReference -WorkflowText $WorkflowText -RepositoryName $ThisRepoName)
+    $refs = @(Get-SharedScriptReference -WorkflowText $WorkflowText -RepositoryName (@($ThisRepoName) + $ThisRepoRetiredNames))
     if ($refs.Count -eq 0) { return }
 
     $wfName = Format-SafePathToken -Value $WorkflowName
@@ -1020,8 +1030,8 @@ foreach ($mf in $manifestFiles) {
     # those five as 'completely silent' and folds the fifth (dkj-subagents-alpha@) into 'one printed an
     # [INFO] because it carries a retired id', on the reading that the manifest's 'dkj-team-alpha@' entry
     # is that plugin's old name. That reading is about the underlying PLUGIN; this check compares ID
-    # STRINGS, and 'dkj-team-alpha@claude-code-specialists' is not
-    # 'dkj-subagents-alpha@claude-code-specialists' -- so, run today, this check reports dkj-subagents-alpha@
+    # STRINGS, and 'dkj-team-alpha@dkj-claude-plugins' is not
+    # 'dkj-subagents-alpha@dkj-claude-plugins' -- so, run today, this check reports dkj-subagents-alpha@
     # as unlisted too, a fifth finding rather than folding into the retired-name one. That is not a
     # contradiction of #1775's count, only a sharper reading of the same five ids: every one of them was
     # unchecked, and this block is what makes each of the five say so on its own.

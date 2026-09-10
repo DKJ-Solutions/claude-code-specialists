@@ -144,7 +144,23 @@ via a PR.
   extension instead of disappearing — so body-in ≈ body-out + extension, never less. (b) *References
   outside the file come along:* not just doc cross-links, but also pointers in scripts and their
   comments/error messages that point to the moved content are adjusted to the new place.
-
+- **A rename sweep is not one rule, and the exceptions are what make it correct.** A name that appears
+  everywhere invites a single find-and-replace, and the sweep is then wrong in three predictable
+  places. **(a) A dated measurement or a quoted transcript keeps the name it measured** -- a citation
+  is only worth having while it stays re-verifiable, and a swept transcript asserts that a tool printed
+  a name which did not exist on the day it ran. **(b) A "what you currently have" statement keeps the
+  old name too** -- a migration table's *old* column, or prose naming the ids in a reader's config
+  today: they have not renamed anything, which is precisely why they are reading that section. **(c)
+  Anything the rename was deliberately NOT extended to** -- a mirror, a downstream copy, a layer under
+  a carve-out -- keeps its own name, and the decision saying so is usually written down somewhere the
+  sweeper never opened. So the sweep is done per occurrence with the question *which of these is this?*,
+  never per file.
+  **And the failure is asymmetric, which is why this is worth the slower pass:** a missed occurrence is
+  visible -- something still says the old name and a reader notices -- while an over-swept one is
+  invisible, because it reads fluently and is simply false. Measured in the source repo's own
+  marketplace rename (#1769, September 10, 2026): the first pass renamed every occurrence, and a copy
+  edit then found the new name inside six dated CLI transcripts, three migration tables' old columns,
+  and one paragraph about a mirror whose rename had explicitly been deferred.
 ## Tessa is lazy
 
 Recurring doc work runs through existing helpers instead of by hand. If a doc operation repeats,

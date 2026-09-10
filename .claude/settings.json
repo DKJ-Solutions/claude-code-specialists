@@ -64,18 +64,18 @@
     ]
   },
   "enabledPlugins": {
-    "dkj-subagents-alpha@claude-code-specialists": true,
-    "dkj-subagents-ecomm@claude-code-specialists": true,
-    "dkj-subagents-lifehub@claude-code-specialists": true,
-    "dkj-subagents-shopify@claude-code-specialists": true,
-    "dkj-policy@claude-code-specialists": true,
-    "dkj-policy-bwj@claude-code-specialists": true
+    "dkj-subagents-alpha@dkj-claude-plugins": true,
+    "dkj-subagents-ecomm@dkj-claude-plugins": true,
+    "dkj-subagents-lifehub@dkj-claude-plugins": true,
+    "dkj-subagents-shopify@dkj-claude-plugins": true,
+    "dkj-policy@dkj-claude-plugins": true,
+    "dkj-policy-bwj@dkj-claude-plugins": true
   },
   "extraKnownMarketplaces": {
-    "claude-code-specialists": {
+    "dkj-claude-plugins": {
       "source": {
         "source": "github",
-        "repo": "DKJ-Solutions/claude-code-specialists"
+        "repo": "DKJ-Solutions/dkj-claude-plugins"
       }
     }
   }

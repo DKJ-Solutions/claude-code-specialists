@@ -100,11 +100,11 @@ line) and `script-contract-sessioncheck.ps1` (through `check-script-contract.ps1
 
 ```jsonc
 "extraKnownMarketplaces": {
-  "claude-code-specialists": { "source": { "source": "github", "repo": "DKJ-Solutions/claude-code-specialists" } }
+  "dkj-claude-plugins": { "source": { "source": "github", "repo": "DKJ-Solutions/claude-code-specialists" } }
 },
 "enabledPlugins": {
-  "dkj-subagents-alpha@claude-code-specialists": true
-  // plus a domain plugin of choice, e.g. "dkj-subagents-shopify@claude-code-specialists": true
+  "dkj-subagents-alpha@dkj-claude-plugins": true
+  // plus a domain plugin of choice, e.g. "dkj-subagents-shopify@dkj-claude-plugins": true
 }
 ```
 
@@ -126,10 +126,10 @@ registered, a single session start was measured to write a full project-scoped r
 So run, from the root of the consuming repo, one command per plugin listed in `enabledPlugins`:
 
 ```powershell
-claude plugin marketplace update claude-code-specialists   # first: refresh the cached marketplace
-claude plugin install dkj-subagents-alpha@claude-code-specialists --scope project
+claude plugin marketplace update dkj-claude-plugins   # first: refresh the cached marketplace
+claude plugin install dkj-subagents-alpha@dkj-claude-plugins --scope project
 # plus each domain plugin, e.g.:
-claude plugin install dkj-subagents-shopify@claude-code-specialists --scope project
+claude plugin install dkj-subagents-shopify@dkj-claude-plugins --scope project
 ```
 
 **That first line matters if the marketplace is already cached on this machine, and skipping it
@@ -222,8 +222,8 @@ user-scope record** beside the project one and makes the plugin appear machine-w
 flag instead, from the consuming repo's root, one command per plugin:
 
 ```powershell
-claude plugin marketplace update claude-code-specialists
-claude plugin update dkj-subagents-alpha@claude-code-specialists --scope project
+claude plugin marketplace update dkj-claude-plugins
+claude plugin update dkj-subagents-alpha@dkj-claude-plugins --scope project
 ```
 
 Both lines — but the reason is stated per command now, because the shared version of it was tested and

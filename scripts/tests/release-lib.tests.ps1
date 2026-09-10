@@ -1519,7 +1519,7 @@ Assert-Match   $dblDiffClean '(?m)^\[PR #7\]\(u\)$' 'and the closing line still 
 # scope here through release-lib.ps1's dot-source of that lib, under the same name.
 
 Write-Host "Get-MarketplaceName" -ForegroundColor Cyan
-Assert-Equal 'claude-code-specialists' (Get-MarketplaceName -MarketplaceJson '{ "name": "claude-code-specialists", "plugins": [] }') 'reads the name field'
+Assert-Equal 'dkj-claude-plugins' (Get-MarketplaceName -MarketplaceJson '{ "name": "dkj-claude-plugins", "plugins": [] }') 'reads the name field'
 # Throwing beats returning empty: the two callers write this name into a consumer-facing file and
 # compare against it at the gate. An empty string would produce a plausible-looking '()' in the intro
 # and a gate holding every file against it, i.e. a wrong answer delivered quietly.

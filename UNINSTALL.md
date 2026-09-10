@@ -186,7 +186,7 @@ nothing and needs no `-Apply`.
 From your repo root:
 
 ```powershell
-claude plugin uninstall dkj-subagents-alpha@claude-code-specialists --scope project
+claude plugin uninstall dkj-subagents-alpha@dkj-claude-plugins --scope project
 # and once more for each add-on team you enabled -- and for
 # dkj-policy if you enabled the workflow
 ```
@@ -225,7 +225,7 @@ removed one. The command you want is the one above, with `--scope project`.
 **If that refuses with *"installed in local scope, not project"*, you are in the third scope and it is not
 your doing.** A session start can write a record by itself and flip an existing `project` record to
 `local` — no command run, no file in your repo changed, nothing reporting it. Remove that one with
-`claude plugin uninstall dkj-subagents-alpha@claude-code-specialists --scope local`. Which scope you are actually in
+`claude plugin uninstall dkj-subagents-alpha@dkj-claude-plugins --scope local`. Which scope you are actually in
 is the last thing this query prints:
 
 ```powershell
@@ -256,8 +256,8 @@ Two more things this command does that are worth expecting rather than discoveri
 The uninstall clears the *entry*; the keys you added in adoption Step 1 are yours to take back out. In
 `.claude/settings.json` (and `.claude/settings.local.json` if you used it), remove:
 
-- `enabledPlugins` — the `dkj-subagents-alpha@claude-code-specialists` entries, or the whole key if it is now `{}`;
-- `extraKnownMarketplaces` — the `claude-code-specialists` block. **Of the two, this is the one to be sure
+- `enabledPlugins` — the `dkj-subagents-alpha@dkj-claude-plugins` entries, or the whole key if it is now `{}`;
+- `extraKnownMarketplaces` — the `dkj-claude-plugins` block. **Of the two, this is the one to be sure
   about**: left behind, it can put the marketplace back and the machine rebuilds its own install without a
   command being run (the measured detail is a few paragraphs below);
 - **any `permissions` entry pointing into the plugin directory** (inbound
@@ -358,21 +358,21 @@ This is the step that also takes the cached clone — and with it this page — 
 it waits until Step 4 is done:
 
 ```powershell
-claude plugin marketplace remove claude-code-specialists
+claude plugin marketplace remove dkj-claude-plugins
 ```
 
 It takes an optional `--scope <user|project|local>`; omit it and the declaration is removed from every
 scope. Then the last verification: **`claude plugin marketplace list` no longer names
-`claude-code-specialists`.**
+`dkj-claude-plugins`.**
 
 **If you declared the marketplace at *user* scope, expect it to edit `~/.claude/settings.json` and to leave
 an empty key behind** (inbound [#357](https://github.com/DaveKJohn/claude-code-specialists/issues/357)). The
-`claude-code-specialists` block goes, `"extraKnownMarketplaces": {}` stays, and the file is re-serialised so the
+`dkj-claude-plugins` block goes, `"extraKnownMarketplaces": {}` stays, and the file is re-serialised so the
 key order may shift:
 
 ```jsonc
 // before
-{ "extraKnownMarketplaces": { "claude-code-specialists": { … } }, "theme": "dark" }
+{ "extraKnownMarketplaces": { "dkj-claude-plugins": { … } }, "theme": "dark" }
 // after
 { "extraKnownMarketplaces": {}, "theme": "dark" }
 ```

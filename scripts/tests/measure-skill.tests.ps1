@@ -12,8 +12,10 @@
     IT DOES NOT RUN `claude`, AND THAT IS THE POINT OF THE LIB. The parse is the one fragile thing in
     the measurement -- it reads a human-formatted table whose shape the CLI owns -- so the functions
     that do the reading take strings and are pinned here against CAPTURED output. The fixture below is
-    the real `claude plugin details dkj-subagents-alpha@claude-code-specialists` output at v4.17.0, all 19 rows,
-    so the sum cross-check is genuinely exercised rather than mocked to agree with itself.
+    the real `claude plugin details` output at v4.17.0, all 19 rows, so the sum cross-check is genuinely
+    exercised rather than mocked to agree with itself. The marketplace half of the id it names was
+    carried forward by the #1769 rename and is NOT part of the capture: the parse never reads that
+    name, so the shape is still the one that was measured.
 
     THE THREE THINGS THIS FILE EXISTS TO CATCH, each of which was a live defect during the build:
 
@@ -70,7 +72,7 @@ function Assert-Equal {
 $script:Fixture = @(
     'Claude Specialists - team alpha (the core team) (dkj-subagents-alpha) 4.17.0',
     '  Description: Portable executable core of the Claude Specialists system.',
-    '  Source: dkj-subagents-alpha@claude-code-specialists',
+    '  Source: dkj-subagents-alpha@dkj-claude-plugins',
     '',
     'Component inventory',
     '  Skills (4)  orchestrator, specialists-init, specialists-teardown, sync-roster',
@@ -267,7 +269,7 @@ Write-Host '== An empty table: owed vs. not owed (#1771) ==' -ForegroundColor Cy
 $script:AgentsOnlyFixture = @(
     'Claude Specialists - team e-commerce (subagent scaffold) (dkj-subagents-ecomm) 4.33.0',
     '  Description: Add-on team for commercial webshop repos (any platform): Sergio, Craig, Sean.',
-    '  Source: dkj-subagents-ecomm@claude-code-specialists',
+    '  Source: dkj-subagents-ecomm@dkj-claude-plugins',
     '',
     'Component inventory',
     '  Skills (0)',
@@ -305,7 +307,7 @@ Assert-True ((($strippedProblems -join ' ') -match '19')) `
 # present, so nothing here is a problem -- the caveat about what the total omits is the script's half.
 $script:KeyedFixture = @(
     'Claude Specialists - team alpha (the core team) (dkj-subagents-alpha) 4.33.0',
-    '  Source: dkj-subagents-alpha@claude-code-specialists',
+    '  Source: dkj-subagents-alpha@dkj-claude-plugins',
     '',
     'Component inventory',
     '  Skills (4)  orchestrator, specialists-init, specialists-teardown, sync-roster',

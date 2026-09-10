@@ -7,7 +7,7 @@
     Runs in EVERY repo that has the plugin (consumers and the workshop itself). Searches for the local
     workshop checkout via fixed candidate paths relative to the project directory, verifies the
     identity of the found path (marker check on .claude-plugin/marketplace.json with name
-    'claude-code-specialists' -- Sean guardrail: never run a script purely on a path guess), and
+    'dkj-claude-plugins' -- Sean guardrail: never run a script purely on a path guess), and
     runs scripts/sync/check-connectors.ps1 there. Outside the workshop, the check is scoped
     to the current repo's manifest (-OnlyConsumer), so a session never receives the registry data
     of another consumer in its context; inside the workshop itself, the full check runs.
@@ -174,7 +174,7 @@ function Test-WorkshopMarker([string]$Path) {
     try {
         $mp = Get-Content -LiteralPath $marker -Raw -Encoding UTF8 | ConvertFrom-Json
         if (-not ($mp.PSObject.Properties.Name -contains 'name')) { return $false }
-        return ($mp.name -eq 'claude-code-specialists')
+        return ($mp.name -eq 'dkj-claude-plugins')
     } catch {
         return $false
     }
@@ -252,9 +252,20 @@ try {
     } else {
         # The project directory itself (the workshop consumes itself), a sibling checkout, or the
         # convention <root>\<owner>\<repo> one level higher.
+        #
+        # BOTH REPO NAMES, and the list is ADDITIVE rather than replaced (#1769). The source repo was
+        # renamed from 'claude-code-specialists' to 'dkj-claude-plugins' on September 10, 2026, and a
+        # checkout's FOLDER name is not the repo's: a clone made before that day still sits in a folder
+        # named after the old slug, and renaming it would unlink the plugin install record, which is
+        # keyed on the folder path. So both spellings are candidates and neither expires -- a path that
+        # does not resolve costs one Test-Path, while a missing candidate costs a [SKIP] line that
+        # ASSERTS the source checkout is absent, which is the silent failure #1524 was made of.
         $candidates = @(
             $cwd,
+            (Join-Path $cwd '..\dkj-claude-plugins'),
             (Join-Path $cwd '..\claude-code-specialists'),
+            (Join-Path $cwd '..\..\DKJ-Solutions\dkj-claude-plugins'),
+            (Join-Path $cwd '..\..\DaveKJohn\dkj-claude-plugins'),
             (Join-Path $cwd '..\..\DaveKJohn\claude-code-specialists')
         )
     }

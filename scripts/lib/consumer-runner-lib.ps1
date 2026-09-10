@@ -11,7 +11,7 @@
 
         - uses: actions/checkout@v5
           with:
-            repository: DKJ-Solutions/claude-code-specialists
+            repository: DKJ-Solutions/dkj-claude-plugins
             ref: main
             path: .workflow-scripts
         - run: powershell ... -File .workflow-scripts/plugins/dkj-policy/scripts/lint/check-branch-entry.ps1
@@ -106,7 +106,14 @@ function Get-SharedScriptReference {
     #>
     param(
         [Parameter(Mandatory)][AllowEmptyString()][AllowNull()][string]$WorkflowText,
-        [Parameter(Mandatory)][string]$RepositoryName
+        # ONE OR MANY, because a rename does not reach a file another repository already holds
+        # (#1769). A consumer scaffolded before this repo was renamed still writes the old name, and
+        # its runner still WORKS -- GitHub answers the transfer redirect -- so a matcher that knows
+        # only the current name reports nothing about it and the consumer reads as clean. That is the
+        # silence this lib exists to end, arriving through the matcher itself. The caller supplies the
+        # current name plus whatever Get-RetiredRepoNames states; a single string still binds, so
+        # every existing call site is unchanged.
+        [Parameter(Mandatory)][string[]]$RepositoryName
     )
 
     if ([string]::IsNullOrWhiteSpace($WorkflowText)) { return @() }
@@ -142,7 +149,12 @@ function Get-SharedScriptReference {
         $repo = $m.Groups['val'].Value.Trim()
         if (-not $repo) { continue }
         $name = $repo.Substring($repo.LastIndexOf('/') + 1)
-        if (-not [string]::Equals($name, $RepositoryName, [System.StringComparison]::OrdinalIgnoreCase)) { continue }
+        $isOurs = $false
+        foreach ($candidate in $RepositoryName) {
+            if ([string]::IsNullOrWhiteSpace($candidate)) { continue }
+            if ([string]::Equals($name, $candidate, [System.StringComparison]::OrdinalIgnoreCase)) { $isOurs = $true; break }
+        }
+        if (-not $isOurs) { continue }
 
         $indent = $m.Groups['ind'].Value.Length
 

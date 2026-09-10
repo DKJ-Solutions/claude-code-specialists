@@ -9,7 +9,7 @@
 The orchestrator (Chris) is always loaded -- portable body from the plugin install and repo lens from
 `lenses/`; he routes on demand to the specialists below.
 
-@~/.claude/plugins/marketplaces/claude-code-specialists/plugins/dkj-subagents/dkj-subagents-alpha/personas/01-01-persona.md
+@~/.claude/plugins/marketplaces/dkj-claude-plugins/plugins/dkj-subagents/dkj-subagents-alpha/personas/01-01-persona.md
 
 @lenses/01-01-extension.md
 ## The Claude Specialists — who does what
@@ -226,7 +226,7 @@ carry skills, hooks and scripts — so the roster check skips them by design rat
 
 Each specialist has a repo lens at `.claude/specialists/lenses/<g>-<id>-extension.md`. For a
 
-full description, run `claude plugin details <plugin>@claude-code-specialists` or read their manual.
+full description, run `claude plugin details <plugin>@dkj-claude-plugins` or read their manual.
 
 
 

@@ -219,7 +219,7 @@ try {
         @{ Name = 'fold-on-merge.yml';   Text = $fold;   Expect = 2 },
         @{ Name = 'verify-resolved.yml'; Text = $verify; Expect = 1 }
     )) {
-        $refs = @(Get-SharedScriptReference -WorkflowText $runner.Text -RepositoryName 'claude-code-specialists')
+        $refs = @(Get-SharedScriptReference -WorkflowText $runner.Text -RepositoryName 'dkj-claude-plugins')
         Assert-Equal $runner.Expect $refs.Count "$($runner.Name): reaches $($runner.Expect) script(s) out of a checkout of this repo"
         foreach ($judged in @(Test-SharedScriptReference -Reference $refs -SourceRoot $RepoRoot)) {
             Assert-True $judged.Exists "$($runner.Name): runs '$($judged.Path)', and that path EXISTS in this tree"

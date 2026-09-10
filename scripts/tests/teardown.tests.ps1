@@ -51,7 +51,7 @@ function New-BootstrappedConsumer {
     if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture }
     New-Item -ItemType Directory -Path (Join-Path $Fixture '.claude') -Force | Out-Null
     [System.IO.File]::WriteAllText((Join-Path $Fixture '.claude\settings.json'),
-        '{ "enabledPlugins": { "dkj-subagents-alpha@claude-code-specialists": true, "dkj-policy@claude-code-specialists": true } }')
+        '{ "enabledPlugins": { "dkj-subagents-alpha@dkj-claude-plugins": true, "dkj-policy@dkj-claude-plugins": true } }')
     $md = @('# CLAUDE.md - my own project', '', '## Conventions', '', '- Feature work goes on a branch.') + $ExtraClaudeMdLines
     [System.IO.File]::WriteAllLines((Join-Path $Fixture 'CLAUDE.md'), $md)
     $prevPlugin = $env:CLAUDE_PLUGIN_ROOT
@@ -118,11 +118,32 @@ try {
     #     Disabling the plugin is the owner's act, and the bootstrap never wrote this file either. The
     #     symmetry that makes the teardown safe to run cuts both ways.
     $settings = [System.IO.File]::ReadAllText((Join-Path $Fixture '.claude\settings.json'), [System.Text.Encoding]::UTF8)
-    Assert-True ($settings -match 'dkj-subagents-alpha@claude-code-specialists') 'settings.json: still enables the plugin -- never edited'
+    Assert-True ($settings -match 'dkj-subagents-alpha@dkj-claude-plugins') 'settings.json: still enables the plugin -- never edited'
     Assert-True ($r.Out -match 'That file is yours') "settings.json: reported as the owner's to change"
     Assert-True ($r.Out -match 'restart') 'settings.json: the note says a restart is needed'
 
+    # --- 3b. THE UNMIGRATED CONSUMER: the retired marketplace name alone still triggers the note (#1769) -
+    #     The matcher added for #1769 is 'dkj-claude-plugins|claude-code-specialists', so that a consumer
+    #     who has not yet done the flag-day re-install -- and whose settings.json therefore still carries
+    #     the OLD marketplace name in every 'enabledPlugins' key -- still gets told the plugin is enabled.
+    #     Every other case in this suite builds its settings.json through New-BootstrappedConsumer, which
+    #     writes ONLY the current name ('dkj-claude-plugins'), so the retired half of that alternation was
+    #     never exercised. This fixture carries the retired name and nothing else.
+    Write-Host "#1769 -- the retired marketplace name alone still triggers the settings.json note" -ForegroundColor Cyan
+    if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture }
+    New-Item -ItemType Directory -Path (Join-Path $Fixture '.claude') -Force | Out-Null
+    [System.IO.File]::WriteAllText((Join-Path $Fixture '.claude\settings.json'),
+        '{ "enabledPlugins": { "dkj-subagents-alpha@claude-code-specialists": true }, "extraKnownMarketplaces": { "claude-code-specialists": { "source": { "source": "github", "repo": "DKJ-Solutions/claude-code-specialists" } } } }')
+    $ru = Invoke-Script -Path $Teardown -ScriptArgs @('-ConsumerRoot', $Fixture)
+    Assert-Equal 0 $ru.Code 'unmigrated: exit-code 0'
+    Assert-True ($ru.Out -match 'still enables the plugin') 'unmigrated: the settings.json note fires on the retired name alone (#1769)'
+    Assert-True ($ru.Out -match 'That file is yours') "unmigrated: reported as the owner's to change, same as the migrated case"
+
     # --- 4. Idempotent: a second run finds nothing and does not fail ---------------------------------
+    #     3b swapped $Fixture for a raw settings.json-only fixture, so restore the bootstrapped-then-
+    #     applied-once state this idempotency check depends on before running -Apply a second time.
+    New-BootstrappedConsumer | Out-Null
+    Invoke-Script -Path $Teardown -ScriptArgs @('-ConsumerRoot', $Fixture, '-Apply') | Out-Null
     $r2 = Invoke-Script -Path $Teardown -ScriptArgs @('-ConsumerRoot', $Fixture, '-Apply')
     Assert-Equal 0 $r2.Code 'second run: exit-code 0 (idempotent, like the bootstrap)'
     Assert-True ($r2.Out -match 'Summary: 0 item') 'second run: nothing left to remove'
@@ -588,7 +609,7 @@ function Get-LintScript { return `$script:LintScript }
     New-Item -ItemType Directory -Path (Join-Path $Fixture '.claude') -Force | Out-Null
     New-Item -ItemType Directory -Path (Join-Path $Fixture 'scripts\lib') -Force | Out-Null
     [System.IO.File]::WriteAllText((Join-Path $Fixture '.claude\settings.json'),
-        '{ "enabledPlugins": { "dkj-subagents-alpha@claude-code-specialists": true, "dkj-policy@claude-code-specialists": true } }')
+        '{ "enabledPlugins": { "dkj-subagents-alpha@dkj-claude-plugins": true, "dkj-policy@dkj-claude-plugins": true } }')
     # The consumer's OWN CLAUDE.md, which is also what triggers the report path that used to be broken:
     # this block only runs when a CLAUDE.md exists and does not yet carry the guard import.
     [System.IO.File]::WriteAllLines((Join-Path $Fixture 'CLAUDE.md'), @(
@@ -757,7 +778,7 @@ function Get-LintScript { return `$script:LintScript }
     if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture }
     New-Item -ItemType Directory -Path (Join-Path $Fixture '.claude') -Force | Out-Null
     [System.IO.File]::WriteAllText((Join-Path $Fixture '.claude\settings.json'),
-        '{ "enabledPlugins": { "dkj-subagents-alpha@claude-code-specialists": true, "dkj-policy@claude-code-specialists": true } }')
+        '{ "enabledPlugins": { "dkj-subagents-alpha@dkj-claude-plugins": true, "dkj-policy@dkj-claude-plugins": true } }')
     # Deliberately NO CLAUDE.md. That is the whole fixture.
     $prevPlugin = $env:CLAUDE_PLUGIN_ROOT
     $env:CLAUDE_PLUGIN_ROOT = $Plugin
@@ -843,14 +864,14 @@ function Get-LintScript { return `$script:LintScript }
         # an assumed 'project': an uninstall aimed at the wrong scope is the failure UNINSTALL.md spends
         # a paragraph on, and a session start can put a record in 'local' by itself.
         [System.IO.File]::WriteAllText($recordsFile, (@{
-            plugins = @{ 'dkj-subagents-alpha@claude-code-specialists' = @(@{
+            plugins = @{ 'dkj-subagents-alpha@dkj-claude-plugins' = @(@{
                 scope = 'local'; projectPath = $Fixture; version = '3.1.2'
             }) }
         } | ConvertTo-Json -Depth 6))
         $g1 = Invoke-Script -Path $Teardown -ScriptArgs @('-ConsumerRoot', $Fixture)
-        Assert-True ($g1.Out -match 'still has a record: dkj-subagents-alpha@claude-code-specialists \(scope local\)') `
+        Assert-True ($g1.Out -match 'still has a record: dkj-subagents-alpha@dkj-claude-plugins \(scope local\)') `
             'gate/record: the note names the plugin and the scope the record is actually in'
-        Assert-True ($g1.Out -match 'claude plugin uninstall dkj-subagents-alpha@claude-code-specialists --scope local') `
+        Assert-True ($g1.Out -match 'claude plugin uninstall dkj-subagents-alpha@dkj-claude-plugins --scope local') `
             'gate/record: and the command it prints carries that same scope'
         Assert-True (-not ($g1.Out -match 'No install record points at this repo')) `
             'gate/record: it does not also claim the repo is clean'
@@ -858,7 +879,7 @@ function Get-LintScript { return `$script:LintScript }
         # State 2 -- readable, nothing points here. THE case from #381: this is what the Step 4 re-run
         # must read like, and the old note said the opposite.
         [System.IO.File]::WriteAllText($recordsFile, (@{
-            plugins = @{ 'dkj-subagents-alpha@claude-code-specialists' = @(@{
+            plugins = @{ 'dkj-subagents-alpha@dkj-claude-plugins' = @(@{
                 scope = 'project'; projectPath = 'C:\somewhere\else'; version = '3.1.2'
             }) }
         } | ConvertTo-Json -Depth 6))
