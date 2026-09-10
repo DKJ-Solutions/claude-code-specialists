@@ -110,6 +110,30 @@
     that is correct everywhere. The fold touches only the .Token; the refusal note still shows the path
     the reader actually has, backslashes and all, so they can recognise it.
 
+    A SECOND ANSWER TO THE PATH AXIS EXISTED FOR ONE DAY, AND THIS ONE IS THE SURVIVOR (issue #1768,
+    September 10, 2026). Two branches answered #1762 eleven minutes apart and both landed. The other was
+    Format-PasteablePathToken in tidy-lib.ps1: it did not judge the path at all, it wrapped it in
+    PowerShell single quotes -- literal by that language's own rules -- and refused only what would
+    misrender when READ. On its own terms that is a stronger guarantee than an allowlist, and it is why
+    the choice was worth measuring rather than asserting.
+      IT LOST ON THE DESTINATION, WHICH IS THE ONE THING A PRINTED REMEDY DOES NOT KNOW. This header
+    commits to three shells, and a single-quoted literal is exact in one of them. Measured, git
+    2.55.0.windows.5: the token for `C:\it's\here` is `'C:\it''s\here'`, and bash reads a doubled quote
+    as a close followed by an open, so Git Bash resolves it to `C:\its\here` -- a different, entirely
+    plausible path, silently and with no error to notice. In cmd, where single quotes do not quote,
+    every spaced path splits into two arguments. A guard that is correct in one shell and silently
+    wrong in another is the same failure this lib's own header rejects double quotes for: it reads as
+    protection, so the next reader stops looking.
+      AND ITS PREMISE HAD EXPIRED BEFORE IT WAS READ. It argued that -Kind Path judged against
+    $RefPasteSafePattern and so refused every absolute path -- true until #1765, which is the change
+    directly above this paragraph. The noise it was built to remove was already gone.
+      SO A SPACE STAYS OUT OF $PathPasteSafePattern, AND THAT IS THE ANSWER RATHER THAN A GAP. #1768
+    proposed admitting one if the allowlist won. It must not be: the .Token is printed UNQUOTED, so
+    `git worktree remove C:/Program Files/x` splits into two arguments in bash, PowerShell and cmd
+    alike -- a space is the one character an allowlist over an unquoted token can never admit, whatever
+    the destination. The refusal is the correct answer and the note carries the reader the rest of the
+    way; the suite has asserted exactly that verdict for 'C:\Program Files\a b\x' since #1762.
+
     WHAT THIS LIB DOES NOT DO. It is not the creation-side
     guard -- Test-BranchName in the repo-owned scripts\lib\branch-info.ps1 holds the same allowlist so a
     branch this workflow CREATES is safe by construction. Neither half closes the hole alone: that file

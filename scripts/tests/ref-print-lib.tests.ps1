@@ -587,6 +587,16 @@ Assert-Equal '//server/share/lanes/x' (Get-PasteableRef -Ref '\\server\share\lan
 
 # THE FOLD DOES NOT RESCUE A DANGEROUS CHARACTER. Everything the ref pattern refuses, the path pattern
 # refuses too -- the two new characters are the only difference.
+#
+# AND THE SPACE IN THIS LIST IS THE ONE TO READ TWICE (#1768). It looks like the pattern's weakest
+# point -- 'C:\Program Files\...' is an ordinary Windows location, and #1768 proposed admitting a space
+# if the allowlist won the path axis. It must not be admitted, and the reason is not about hostility:
+# the .Token is printed UNQUOTED, on purpose, because this lib's header rejects quoting as the guard.
+# `git worktree remove C:/Program Files/x` therefore splits into two arguments in bash, PowerShell and
+# cmd alike. A space is the one character an allowlist over an unquoted token can never admit, whatever
+# the destination shell turns out to be -- so the placeholder plus the note is the correct answer here,
+# not a gap in it. The alternative that quoted instead of judging was retired by #1768 for being exact
+# in PowerShell and silently wrong in Git Bash.
 foreach ($bad in @('C:\a\b$(id -un).js', 'C:\Program Files\a b\x', "C:\a\it's.js", 'C:\a\b;touch.js', 'C:\a\b`id`.js')) {
     $r = Get-PasteableRef -Ref $bad -Placeholder '<path>' -Kind Path
     Assert-True (-not $r.IsSafe) "an absolute path carrying a shell metacharacter or space is still refused: '$bad'"
