@@ -43,7 +43,232 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**2 / 7 minor entries** <!-- pending-tally -->
+**3 / 13 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1779-stale-lib-line-count · 20260910-101138
+
+Seven docstring sentences across five libs sized `entry-scaffold-lib.ps1` at "three thousand lines" where it
+measures 8,289 -- each of them in the sentence carrying a layer or dependency decision, so the stale figure
+argued for the decision at a third of its real strength. They now say "thousands", which cannot go stale
+upward, and `release-lib.ps1` records why the number is deliberately absent. The two sites that sized the
+load of `release-lib` rather than the lib itself named a figure that understated either reading; both now
+name the dependency chain instead.
+
+The defect class is the point rather than the arithmetic: a size written into prose drifts with every commit
+to the file it describes, and it gets copied rather than re-measured -- `check-connectors.ps1` declined to
+call into `release-lib` and cited this docstring as its evidence (#1775), which is how one stale number
+became two.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+N/A -- comments inside this repo's own script layer. No behaviour changes, no consumer-facing text moves,
+and nothing a subscriber of a service could notice.
+
+**Score:** N/A
+
+#### Pull Request
+
+Correct the stale entry-scaffold-lib line count in the layer-decision docstrings
+
+Plugins: dkj-policy
+
+[PR #1787](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1787)
+
+---
+
+### DEPLOY: docs/1774-settings-reflow · 20260910-100232
+
+Every `claude plugin install`/`uninstall --scope project` rewrites the tracked `.claude/settings.json`
+and strips the blank lines that group its 60-entry `permissions.allow` into git / gh / scripts /
+release blocks -- measured over nine such commands with `enabledPlugins` byte-identical before and
+after. It is the CLI's own settings writer doing a JSON round trip, so there is nothing in this repo to
+repair; what there was, was a session meeting an unexplained diff with no warning and having to work out
+from it that the tool and not the work had caused it.
+
+So it is written down twice, split the way this repo's own rule splits a lesson. The **portable** half
+is in Sylvester's manual, because the mechanism belongs to any repo whose settings file is tracked and
+that does plugin administration at all: what the round trip loses, that `git checkout -- <file>` is the
+remedy and re-serialising the captured content is not, and that a `git add -A` in the same sitting
+commits the reflow silently -- valid JSON, functionally identical, past every check there is. The
+**local** half is in his lens, beside the `claude plugin marketplace remove` bullet it is the sibling
+of: the measurement, why this repo meets it routinely rather than once (it consumes its own marketplace
+with all six plugins enabled), and what the never-commit-on-`main` rule adds to the cost of a stray
+diff.
+
+Both halves say why the two mechanical repairs were declined. Dropping the grouping would pay for
+round-trip stability with the readability the blocks exist for; a gate refusing a whitespace-only diff
+on one file is the shape this lens already records as measured and declined for the control-character
+rule. Neither would change the CLI, which is the only thing that could actually stop it.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+N/A -- this repo publishes a plugin rather than a subscribed service. The reader who gains something is
+a consumer developer, who now receives the portable half with the next release instead of nothing at
+all, and that is the score above.
+
+**Score:** N/A
+
+#### Pull Request
+
+plugin administration reflows the tracked settings.json -- recorded where it is met
+
+Plugins: dkj-subagents-alpha
+
+[PR #1785](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1785)
+
+---
+
+### DEPLOY: fix/1773-retired-plugin-name-records · 20260910-095038
+
+`tidy-machine` gained an eleventh lane, and it closes the half of a defect lane 8 could never see: an
+install record naming a **plugin the marketplace no longer lists**, for a checkout that is still there.
+Lane 8 probes the record's `projectPath`, so a rename -- a deliberate act this workflow performs, twice
+in two days in #1697 and #1698 -- silently turned every existing record into dead weight that no lane
+reported. Measured on the machine this landed from: seven such records, under two retired naming
+generations. The lane names each one, hands over the uninstall, and says which checkout it has to be run
+from, because an uninstall is keyed on the directory it runs in.
+
+Three decisions inside it are worth naming. The authority is **each marketplace's own clone** under
+`~/.claude`, per marketplace, which is the caveat #1773 raised: a name alive in one marketplace says
+nothing about a record naming another, and a clone this run could not parse produces silence rather than
+a verdict. The printed `--scope` is the **record's own** and never a fixed `project`, because an
+uninstall at `project` refuses a record sitting at `local` (inbound #315) and a session start alone is
+enough to create one. And the lane is numbered 11 rather than slotted in beside its sibling: lane
+numbers are cited in the changelog, the skill page and a sibling suite, so adjacency would have cost
+more than it bought.
+
+Lane 8 also stopped printing findings with the plugin name missing. It read a `Plugin` field on the
+install record, which nothing writes -- the projection carries `Id` -- so every finding it has ever made
+named a path and no plugin. Its own fixture hand-wrote that field and no assert read the value back,
+which is exactly why the suite was green; the id is asserted now.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A -- this repo publishes a plugin rather than a subscribed service, so no subscriber sees a
+maintenance lane. The reader who does is a consumer developer running `dkj-policy`, and that is the
+score above.
+
+**Score:** N/A
+
+#### Pull Request
+
+tidy-machine reports install records under a retired plugin name
+
+Plugins: dkj-policy
+
+[PR #1783](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1783)
+
+---
+
+### DEPLOY: fix/1775-connector-unregistered-plugin · 20260910-095035
+
+`check-connectors.ps1` no longer goes silent about a plugin that a consumer has **enabled** but that
+consumer's `connectors/<repo>.json` does not **list**. Such a plugin was never handed to the per-plugin
+loop, so nothing about it was checked -- not the extension inventory, not the machine version -- and
+nothing was printed either, which made the register unauditable against the settings file it exists to
+describe. A new check 5 reports each one as an `[INFO]`, and adds a non-counting `[UNLISTED]` line for
+the repo the session is actually in, on the same terms and with the same `Test-IsSessionRepo` scoping as
+`[INVENTORY]`. Only ids naming this repo's own marketplace are in scope; a retired id still counts,
+because the register records what a consumer has.
+
+Measured here before the change: of the six plugins this repo enables, exactly one produced a line --
+the other five, one of them merely coinciding with a differently-named retired entry, were checked by
+nothing and reported by nothing. The asymmetry had been written down as acceptable on the ground that
+its population was zero; that stopped being true on September 8, 2026, and this is the repair rather
+than a second note saying so.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+A consumer running `dkj-policy` gets the new verdict at session start through
+`connector-sessioncheck.ps1`: where their own register entry is behind their own enabled set, the
+session now says so in one line instead of saying nothing. It changes nothing that was working and
+adds no failure -- the marker is non-counting, so it never turns a clean run red.
+
+**Score:** 2
+
+#### Pull Request
+
+check-connectors reports a plugin enabled in a consumer but absent from its register
+
+Plugins: dkj-policy
+
+[PR #1782](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1782)
+
+---
+
+### DEPLOY: docs/1769-marketplace-rename-prep · 20260910-093800
+
+The `claude-code-specialists` -> `dkj-claude-plugins` rename (#1769) now has a recorded decision and a
+phased migration plan on the issue, and `scripts/repo-config.ps1`'s carve-out comment no longer
+contradicts it. No rename has been performed -- this is the reversible fase 0 groundwork only.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+N/A -- no subscriber of any consuming service sees a prep branch. The rename itself reaches tier 2 at
+significance 5, but that lands in fase 3, not here.
+
+**Score:** N/A
+
+#### Pull Request
+
+Prepare the claude-code-specialists to dkj-claude-plugins rename
+
+[PR #1778](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1778)
+
+---
+
+### DEPLOY: fix/1772-plugin-versions-noop-action · 20260910-093114
+
+`plugin-versions` no longer tells a checkout that is simply sitting between two releases that it is
+behind, and no longer hands it a command that cannot act. An install whose recorded commit is an
+ancestor of the marketplace clone's HEAD **while both sides carry the same version string** is now
+reported as what it is -- the released version, with unreleased commits in the clone -- in its own
+summary bucket, with no command at all. `claude plugin update` arbitrates on the version string, so
+across that boundary it reports *"already at the latest version"* and moves nothing; measured on
+`dkj-policy` and `dkj-policy-bwj` at `4.33.0` on both sides, September 10, 2026
+([#1772](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1772)).
+
+The half that reaches furthest is `-Brief`, which `connector-sessioncheck` forwards into a session's
+context at every start: that verdict was an `[ERROR]` carrying the no-op, so the loudest marker this
+tool has fired at every session start of every checkout in the most ordinary state one can be in. It is
+`[INFO]` now, by the same rule #1591 wrote for a stale clone -- an `[ERROR]` is for the verdict a reader
+closes with a command here and now, and this one has no command.
+
+Nothing was prescribed in its place, deliberately. An `uninstall` + `install` would cross a same-version
+boundary, but it would put a consumer on code no release has shipped, and this branch has not measured
+that it works -- so the report says the gap closes at the next release cut and stops there. Two wrong
+statements inside the same block went with it: the *"same version string"* claim that fired when it was
+the clone's `plugin.json` that had no version, and the *"none confirmed up to date"* summary sentence
+that fired on runs which had confirmed several.
+
+**Score:** 4
+
+#### What makes this deploy extra special
+
+N/A -- this repo publishes a plugin rather than a subscribed service, so no subscriber sees this. The
+reader who does is a consumer developer running `dkj-policy`, and that is the score above.
+
+**Score:** N/A
+
+#### Pull Request
+
+plugin-versions no longer prescribes a no-op update for the same-version-newer-commit case
+
+Plugins: dkj-policy
+
+[PR #1777](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1777)
+
+---
 
 ### DEPLOY: fix/connector-record-catch-up · 20260910-092155
 

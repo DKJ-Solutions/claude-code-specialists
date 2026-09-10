@@ -4,8 +4,8 @@
 
 .DESCRIPTION
     WHY THIS SUITE EXISTS, AND WHY ALMOST ALL OF IT IS PURE. tidy-machine.ps1 is a conductor: six of
-    its ten lanes are a call into a script that already has its own suite, so testing those again here
-    would be testing prune-merged, check-claude-home and plugin-versions a second time. What is NEW is
+    its eleven lanes are a call into a script that already has its own suite, so testing those again
+    here would be testing prune-merged, check-claude-home and plugin-versions a second time. What is NEW is
     the classification -- and that is exactly the part that is pure, takes every input as a parameter,
     and can therefore be driven over states this machine has never been in.
 
@@ -164,18 +164,88 @@ Assert-True (-not ($lanes | Where-Object { $_.Path -eq 'C:\repo' })) 'the primar
 # --- 6. Orphaned install records ------------------------------------------------------------------
 Write-Host '-- 6. orphaned install records --' -ForegroundColor Cyan
 
+# THE FIXTURE SPELLS THE FIELDS Get-InstallRecord ACTUALLY PROJECTS, which is 'Id' and not 'Plugin'
+# (#1773). It hand-wrote a Plugin field until then, and no assert ever read the value back -- so lane 8
+# printed every finding with the plugin name missing while this suite stayed green. A fixture whose shape
+# does not match its producer's is the whole failure, so the id is now asserted too.
 $recs = @(
-    [pscustomobject]@{ Plugin = 'p-here';    ProjectPath = 'C:\here' }
-    [pscustomobject]@{ Plugin = 'p-gone';    ProjectPath = 'C:\gone' }
-    [pscustomobject]@{ Plugin = 'p-unknown'; ProjectPath = 'D:\unmounted' }
+    [pscustomobject]@{ Id = 'p-here@m';    ProjectPath = 'C:\here' }
+    [pscustomobject]@{ Id = 'p-gone@m';    ProjectPath = 'C:\gone' }
+    [pscustomobject]@{ Id = 'p-unknown@m'; ProjectPath = 'D:\unmounted' }
 )
 $orphans = @(Get-OrphanInstallRecords -Records $recs -PathExists @{ 'C:\here' = $true; 'C:\gone' = $false })
 Assert-Equal 1 $orphans.Count 'only the record whose path is proven gone is an orphan'
 Assert-Equal 'C:\gone' $orphans[0].ProjectPath 'and it is the right one'
+Assert-Equal 'p-gone@m' $orphans[0].Id 'the id travels with the finding -- a finding nobody can name is half a finding'
 
 # A PATH THE CALLER DID NOT PROBE IS SILENCE, NOT A FINDING. An unmounted drive is the false positive
 # to beat here, and a wrong claim about somebody's disk is worse than saying nothing.
 Assert-True (-not ($orphans | Where-Object { $_.ProjectPath -eq 'D:\unmounted' })) 'an unprobed path is never reported'
+
+# --- 6b. Records under a RETIRED plugin name (#1773) ----------------------------------------------
+Write-Host '-- 6b. retired-name install records --' -ForegroundColor Cyan
+
+# The complement of 6, and the two must not overlap: there the CHECKOUT is gone, here the PLUGIN NAME is,
+# and the remedies are opposites (re-install there vs. drop the record).
+$live = @{ 'mk' = @('alive-one', 'alive-two'); 'other' = @('alive-one') }
+$paths = @{ 'C:\here' = $true; 'C:\gone' = $false }
+
+$rn = @(Get-RetiredNameInstallRecords -Records @(
+    [pscustomobject]@{ Id = 'retired@mk';   ProjectPath = 'C:\here'; Scope = 'project'; Version = '4.31.0' }
+    [pscustomobject]@{ Id = 'alive-one@mk'; ProjectPath = 'C:\here'; Scope = 'project'; Version = '4.33.0' }
+) -LivePluginNames $live -PathExists $paths)
+Assert-Equal 1 $rn.Count 'only the name the marketplace no longer lists is reported'
+Assert-Equal 'retired@mk' $rn[0].Id 'and the finding carries the whole id'
+Assert-Equal 'retired' $rn[0].Plugin 'plus the two halves separately, which is what the printed command needs'
+Assert-Equal 'mk' $rn[0].Marketplace 'the marketplace half'
+Assert-Equal 'project' $rn[0].Scope 'and the record''s own scope -- `--scope project` refuses a record sitting at local (inbound #315)'
+Assert-Equal 'claude plugin uninstall' $rn[0].Command 'the VERB only, per this lib''s header -- the caller renders the id through the paste guard'
+Assert-True ($rn[0].Reason -like "*'mk'*" -and $rn[0].Reason -like "*'retired'*") 'the reason names both the marketplace and the plugin it no longer lists'
+
+# THE PER-MARKETPLACE SCOPING, which is the caveat #1773 itself flagged for whoever took it: a name that
+# is alive in ONE marketplace says nothing about a record naming ANOTHER.
+$rn = @(Get-RetiredNameInstallRecords -Records @(
+    [pscustomobject]@{ Id = 'alive-two@other'; ProjectPath = 'C:\here'; Scope = 'project' }
+) -LivePluginNames $live -PathExists $paths)
+Assert-Equal 1 $rn.Count 'a name live in one marketplace is still retired in another that does not list it'
+
+# AN AUTHORITY THE CALLER COULD NOT READ IS NOT EVIDENCE OF ABSENCE -- the same doctrine as an unprobed
+# path above. A marketplace with no entry, and one whose entry is empty, are both silence.
+$rn = @(Get-RetiredNameInstallRecords -Records @(
+    [pscustomobject]@{ Id = 'retired@unknown-mk'; ProjectPath = 'C:\here'; Scope = 'project' }
+    [pscustomobject]@{ Id = 'retired@empty-mk';   ProjectPath = 'C:\here'; Scope = 'project' }
+) -LivePluginNames @{ 'mk' = @('alive-one'); 'empty-mk' = @() } -PathExists $paths)
+Assert-Equal 0 $rn.Count 'a marketplace this run could not read reports nothing at all'
+
+# A CHECKOUT THAT IS GONE IS LANE 8'S FINDING, NOT THIS ONE'S, and an unprobed one is nobody's. Reporting
+# a record in both lanes would hand the reader two contradictory remedies for one record.
+$rn = @(Get-RetiredNameInstallRecords -Records @(
+    [pscustomobject]@{ Id = 'retired@mk'; ProjectPath = 'C:\gone';      Scope = 'project' }
+    [pscustomobject]@{ Id = 'retired@mk'; ProjectPath = 'D:\unmounted'; Scope = 'project' }
+    [pscustomobject]@{ Id = 'retired@mk'; ProjectPath = '';             Scope = 'user' }
+) -LivePluginNames $live -PathExists $paths)
+Assert-Equal 0 $rn.Count 'a gone, an unprobed and a path-less record are all left to their own lane'
+
+# ORDINAL AND CASE-SENSITIVE, the position Get-PluginRootByName already takes: a plugin name is a path
+# segment and an install id, so a case difference is a different plugin rather than a spelling of one.
+$rn = @(Get-RetiredNameInstallRecords -Records @(
+    [pscustomobject]@{ Id = 'Alive-One@mk'; ProjectPath = 'C:\here'; Scope = 'project' }
+) -LivePluginNames $live -PathExists $paths)
+Assert-Equal 1 $rn.Count 'a name differing only in case is not the same plugin'
+
+# AN ID IT CANNOT SPLIT UNAMBIGUOUSLY IS ONE IT SAYS NOTHING ABOUT. This function decides whether to tell
+# somebody a plugin is dead; a best-effort split is the wrong instinct for that.
+$rn = @(Get-RetiredNameInstallRecords -Records @(
+    [pscustomobject]@{ Id = 'no-marketplace';    ProjectPath = 'C:\here'; Scope = 'project' }
+    [pscustomobject]@{ Id = 'two@ats@mk';        ProjectPath = 'C:\here'; Scope = 'project' }
+    [pscustomobject]@{ Id = '@mk';               ProjectPath = 'C:\here'; Scope = 'project' }
+    [pscustomobject]@{ Id = 'retired@';          ProjectPath = 'C:\here'; Scope = 'project' }
+    [pscustomobject]@{ Id = '';                  ProjectPath = 'C:\here'; Scope = 'project' }
+) -LivePluginNames $live -PathExists $paths)
+Assert-Equal 0 $rn.Count 'an id that is not exactly <plugin>@<marketplace> is never reported'
+
+# An empty input is the normal state on a clean machine and must not fail on the single-element unwrap.
+Assert-Equal 0 @(Get-RetiredNameInstallRecords).Count 'no records at all is silence, not an error'
 
 # --- 7. The path formatter (issue #1762) ----------------------------------------------------------
 Write-Host '-- 7. paste-safe paths --' -ForegroundColor Cyan

@@ -232,7 +232,7 @@ if ($repo -match 'VUL-IN') {
 #
 # THE DEPENDENCY IS THE SMALL LIB, NOT release-lib. Get-TouchedPlugins moved down into plugin-tree-lib
 # on August 9, 2026 precisely so this dot-source could be the dependency-free one: release-lib pulls
-# entry-scaffold-lib in behind it, three thousand lines, and this script runs immediately after a merge
+# entry-scaffold-lib in behind it, thousands of lines, and this script runs immediately after a merge
 # and directly on the trunk.
 #
 # What decides the 'Plugins:' line is the marketplace, not the presence of a lib: a repo that declares

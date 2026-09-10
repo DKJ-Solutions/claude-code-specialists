@@ -1,7 +1,8 @@
 <#
 .SYNOPSIS
     One command for the clutter this workflow leaves on a machine: finished branches, stale lanes,
-    abandoned work, expired backups, orphaned plugin records and leftover fixture trees. It DELETES
+    abandoned work, expired backups, plugin records naming a checkout or a plugin name that is gone,
+    and leftover fixture trees. It DELETES
     only what prune-merged.ps1 can already prove; everything else it classifies and hands over.
 
 .DESCRIPTION
@@ -16,9 +17,9 @@
     proof it does not have is the defect inbound #1191 measured. What was missing was a command that
     NAMES the rest, plus the four kinds of clutter that are not branches at all.
 
-    SO THIS IS A CONDUCTOR, NOT A SECOND IMPLEMENTATION. Six of its ten lanes are a call into a script
-    that already exists and is already tested; only four carry new logic, and that logic is pure and
-    lives in tidy-lib.ps1. Nothing here re-derives a merge proof, re-reads a worktree list by hand, or
+    SO THIS IS A CONDUCTOR, NOT A SECOND IMPLEMENTATION. Six of its eleven lanes are a call into a
+    script that already exists and is already tested; only five carry new logic, and that logic is pure
+    and lives in tidy-lib.ps1. Nothing here re-derives a merge proof, re-reads a worktree list by hand, or
     re-answers a question another script in this repo already answers -- which is the whole of Ravi's
     rule and the reason issue #81 exists.
 
@@ -70,7 +71,10 @@
     THE MACHINE HALF READS ~/.claude/plugins/installed_plugins.json, which is this workflow's only
     machine-wide register. It is per-checkout install records keyed on FOLDER PATH, which is what makes
     a moved or renamed checkout leave a record behind pointing at nothing (issue #1449) -- and it is
-    already the file plugin-versions.ps1 reads, so nothing new is being trusted here. It is deliberately
+    already the file plugin-versions.ps1 reads, so nothing new is being trusted here. A record can go
+    dead from the OTHER end too, its checkout alive and its PLUGIN NAME retired by a rename in the
+    marketplace, and that is lane 11 (issue #1773): the same file, the same doctrine, the other half of
+    one defect. It is deliberately
     not connectors/, which exists only in the source repo: this script has to work in a consumer.
 
     IT VISITS NO OTHER CHECKOUT. Dave's second answer on September 10, 2026 was "this checkout plus the
@@ -89,10 +93,10 @@
     it is passed straight through to prune-merged.ps1. Use it the first time on any machine.
 
 .PARAMETER CheckoutOnly
-    Run only the six per-checkout lanes and skip the four machine-wide ones.
+    Run only the six per-checkout lanes and skip the five machine-wide ones.
 
 .PARAMETER MachineOnly
-    Run only the four machine-wide lanes. Useful when a checkout is mid-flight and you want the
+    Run only the five machine-wide lanes. Useful when a checkout is mid-flight and you want the
     ~/.claude and scratch answers without anything reading the branch list.
 
 .PARAMETER MaxAgeDays
@@ -147,6 +151,10 @@ if (Test-Path -LiteralPath $guardLib -PathType Leaf) { . $guardLib; Assert-OwnCo
 . (Join-Path $PSScriptRoot '..\lib\ref-print-lib.ps1')
 . (Join-Path $PSScriptRoot '..\lib\check-report-lib.ps1')
 . (Join-Path $PSScriptRoot '..\lib\command-probe-lib.ps1')
+# Lane 11 only, and for one function: Get-RepoPluginRoots, to read which plugins a MARKETPLACE CLONE
+# still lists. It is the same reader the release cut and the lint gate use, so a clone's manifest is
+# not parsed by hand here (#1773).
+. (Join-Path $PSScriptRoot '..\lib\plugin-tree-lib.ps1')
 . (Join-Path $PSScriptRoot '..\lib\tidy-lib.ps1')
 
 # Repo root -- dual context: if a consumer runs the shared plugin mirror, CLAUDE_PROJECT_DIR supplies
@@ -225,6 +233,41 @@ function Write-PathHandover {
     $tail = if ($Suffix) { " $Suffix" } else { '' }
     Write-Handover "$Prefix $($safe.Token)$tail"
     if ($safe.Note) { Write-Item "    $($safe.Note)" 'DarkGray' }
+}
+
+function Write-PluginHandover {
+    <#
+        A paste-ready `claude plugin uninstall <plugin>@<marketplace> --scope <scope>` for lane 11.
+
+        THE TWO HALVES OF THE ID ARE JUDGED SEPARATELY, and that is the whole reason this helper exists.
+        An install id is not a ref: `@` is in neither shared paste allowlist, so handing the whole id to
+        Get-PasteableRef refuses every legitimate id there is. Each half IS a ref-shaped token, so each
+        is judged on the ref axis and the `@` between them is this line's own literal -- which narrows
+        nothing and widens nothing in a pattern two other guards depend on (#1594, #1617).
+
+        THE SCOPE IS THE RECORD'S OWN, never a fixed `project`. `claude plugin uninstall ... --scope
+        project` REFUSES to remove a record sitting at local -- "Plugin ... is installed in local scope,
+        not project" (inbound #315) -- and a session start alone is enough to create a local record, or
+        to flip a project one to local (inbound #314). So printing `project` at a local record would hand
+        over the one command that cannot do the job. An unrecognised scope prints no flag at all and says
+        so, rather than guessing on the reader's behalf.
+    #>
+    param(
+        [string]$Prefix,
+        [string]$Plugin,
+        [string]$Marketplace,
+        [AllowEmptyString()][string]$Scope = ''
+    )
+    $p = Get-PasteableRef -Ref $Plugin -Placeholder '<plugin>'
+    $m = Get-PasteableRef -Ref $Marketplace -Placeholder '<marketplace>'
+    $scopeOk = ($Scope -match '^(project|local|user)$')
+    $tail = if ($scopeOk) { " --scope $Scope" } else { '' }
+    Write-Handover "$Prefix $($p.Token)@$($m.Token)$tail"
+    if ($p.Note) { Write-Item "    $($p.Note)" 'DarkGray' }
+    if ($m.Note) { Write-Item "    $($m.Note)" 'DarkGray' }
+    if (-not $scopeOk) {
+        Write-Item "    The record carries no scope this run recognises, so no --scope flag is printed; supply the one the record is at (project, local or user)." 'DarkGray'
+    }
 }
 
 $actedTotal = 0
@@ -487,6 +530,10 @@ if ($runMachine) {
 
 # ===================================================================================================
 # LANE 8 -- install records pointing at a checkout that is gone (#1449).
+#
+# ITS PROBE IS THE PROJECT PATH AND NOTHING ELSE, which is exactly why lane 11 exists: a record whose
+# checkout is alive but whose PLUGIN NAME the marketplace has retired is not an orphan by this test, and
+# this lane's own title says as much (#1773).
 # ===================================================================================================
 
 if ($runMachine) {
@@ -511,7 +558,11 @@ if ($runMachine) {
         if ($orphans.Count -eq 0) { Write-Item 'None.' 'DarkGray' }
         foreach ($o in $orphans) {
             $reportedTotal++
-            Write-Item "$($o.Plugin) -> $(Get-DisplayPath $o.ProjectPath)" 'Yellow'
+            # Format-SuspectToken, not the raw id: it comes from a JSON key in ~/.claude, and this line
+            # is prose rather than a command -- so the id is sanitized for display and the reader is told
+            # when sanitizing changed it. Until #1773 this read $o.Plugin, a field no producer writes, so
+            # the name was silently absent from every finding.
+            Write-Item "$(Format-SuspectToken -Value ([string]$o.Id)) -> $(Get-DisplayPath $o.ProjectPath)" 'Yellow'
             Write-Item "    $($o.Reason)" 'DarkGray'
         }
         if ($orphans.Count -gt 0) {
@@ -572,6 +623,96 @@ if ($runMachine) {
         }
         Write-Item (Get-TidySummaryLine -Lane 'Fixture trees' -Reported $leftover -Untouched ($live + $retained)) 'White'
         if ($retained -gt 0) { Write-Item "  ($retained retained-on-purpose artefact(s) skipped: sync-pr-body, test-suite-gate.)" 'DarkGray' }
+    }
+}
+
+# ===================================================================================================
+# LANE 11 -- install records under a plugin name the marketplace has retired (#1773).
+#
+# THE MIRROR IMAGE OF LANE 8, and it is numbered 11 rather than slotted in beside it on purpose: lane
+# numbers are quoted in this repo's changelog, in the skill page and in a sibling suite, and renumbering
+# to make two related lanes adjacent would silently invalidate every one of those references.
+# ===================================================================================================
+
+if ($runMachine) {
+    Write-Lane '11' 'Install records under a RETIRED plugin name -- a checkout that is still here'
+    $install11 = Get-InstallRecord -RepoRoot $repoRoot -UserHomeOverride $UserHomeOverride
+    if (-not $install11.Exists) {
+        Write-Item 'no install administration on this machine -- nothing to check.' 'DarkGray'
+    } elseif (-not $install11.Readable) {
+        Write-Item "the install administration could not be read: $($install11.Error)" 'Red'
+    } else {
+        $allRecs = @($install11.AllRecords)
+
+        # THE AUTHORITY IS EACH MARKETPLACE'S OWN CLONE, not this repo's marketplace.json. The question
+        # is machine-wide, a record can name a marketplace this repo has never heard of, and the clone
+        # under ~/.claude is the only per-marketplace manifest a consumer has. Same directory
+        # plugin-versions.ps1 reads, resolved the same way.
+        $userHome11 = Get-UserClaudeHome -UserHomeOverride $UserHomeOverride
+        $liveNames = @{}
+        $unreadable = @()
+        $marketplaces11 = @($allRecs |
+            ForEach-Object { $p = ([string]$_.Id) -split '@'; if ($p.Count -eq 2 -and $p[1]) { $p[1] } } |
+            Select-Object -Unique)
+        foreach ($mp in $marketplaces11) {
+            $cloneDir = if ($userHome11) { Join-Path $userHome11 (Join-Path '.claude' (Join-Path 'plugins' (Join-Path 'marketplaces' $mp))) } else { '' }
+            if (-not $cloneDir -or -not (Test-Path -LiteralPath $cloneDir -PathType Container)) {
+                $unreadable += "$mp (no clone at $(Get-DisplayPath $cloneDir))"
+                continue
+            }
+            # GUARDED, because Get-RepoPluginRoots throws on a marketplace.json it cannot parse -- and
+            # correctly so, that IS a misconfiguration. But an authority this run could not read is not
+            # evidence that a plugin is gone, so the marketplace simply gets no entry and every record
+            # naming it stays silent.
+            try {
+                $roots = @(Get-RepoPluginRoots -RepoRoot $cloneDir)
+                if ($roots.Count -gt 0) { $liveNames[$mp] = [string[]]@($roots | ForEach-Object { [string]$_.Name }) }
+                else { $unreadable += "$mp (the clone's marketplace.json lists no plugins)" }
+            } catch {
+                $unreadable += "$mp ($($_.Exception.Message))"
+            }
+        }
+
+        $probe11 = @{}
+        foreach ($rec in $allRecs) {
+            $p = [string]$rec.ProjectPath
+            if (-not $p) { continue }
+            if ($probe11.ContainsKey($p)) { continue }
+            $probe11[$p] = [bool](Test-Path -LiteralPath $p -PathType Container)
+        }
+
+        # Wrapped for the single-element unwrap described at the stale-lane call above.
+        $dead = @(Get-RetiredNameInstallRecords -Records $allRecs -LivePluginNames $liveNames -PathExists $probe11)
+        if ($dead.Count -eq 0) { Write-Item 'None.' 'DarkGray' }
+
+        # WHOSE RECORD IS IT? The register is machine-wide, so most findings here name a checkout that
+        # is not this one -- and `claude plugin uninstall` is keyed on the DIRECTORY IT RUNS IN, so the
+        # printed line is only directly runnable for a record whose projectPath is this checkout. Saying
+        # so is the difference between a handover and a line that quietly does nothing. Normalised the
+        # way Get-InstallRecord normalises the same comparison, so a separator or a trailing slash does
+        # not decide it.
+        $rootResolved = Resolve-Path -LiteralPath $repoRoot -ErrorAction SilentlyContinue
+        $rootKey = if ($rootResolved) { $rootResolved.Path.TrimEnd('\', '/') } else { ([string]$repoRoot).TrimEnd('\', '/') }
+        $elsewhere = 0
+        foreach ($d in $dead) {
+            $reportedTotal++
+            Write-Item "$(Format-SuspectToken -Value ([string]$d.Id)) -> $(Get-DisplayPath $d.ProjectPath)" 'Yellow'
+            Write-Item "    $($d.Reason)" 'DarkGray'
+            Write-PluginHandover -Prefix $d.Command -Plugin $d.Plugin -Marketplace $d.Marketplace -Scope $d.Scope
+            $recResolved = Resolve-Path -LiteralPath $d.ProjectPath -ErrorAction SilentlyContinue
+            $recKey = if ($recResolved) { $recResolved.Path.TrimEnd('\', '/') } else { ([string]$d.ProjectPath).TrimEnd('\', '/') }
+            if ($recKey -ine $rootKey) {
+                $elsewhere++
+                Write-Item '    Run it FROM that checkout -- an uninstall is keyed on the directory it runs in, so from here it would not reach this record.' 'DarkGray'
+            }
+        }
+        if ($elsewhere -gt 0) {
+            Write-Item "  $elsewhere of these belong to another checkout on this machine. They are reported, not acted on, for the same reason lane 8 reports rather than repairs: this run reads the machine-wide register and does not visit another repository." 'DarkGray'
+        }
+        if ($unreadable.Count -gt 0) {
+            Write-Item "  Not examined: $($unreadable.Count) marketplace(s) whose plugin list could not be read -- $($unreadable -join '; ')." 'DarkGray'
+        }
+        Write-Item (Get-TidySummaryLine -Lane 'Retired-name records' -Reported $dead.Count) 'White'
     }
 }
 

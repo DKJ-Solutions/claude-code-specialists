@@ -30,8 +30,17 @@
       - install sha == clone HEAD                -> up to date. The clone itself may still lag origin;
                                                    `claude plugin marketplace update <marketplace>`
                                                    refreshes it if you expect newer.
-      - install sha is an ANCESTOR of clone HEAD -> the clone is AHEAD of your install
+      - install sha is an ANCESTOR of clone HEAD,
+        and the two version strings DIFFER          -> the clone is AHEAD of your install
                                                    -> `claude plugin update <id> --scope project`
+      - install sha is an ANCESTOR of clone HEAD,
+        and both sides carry the SAME version       -> unreleased work in the clone, and NO command is
+                                                      handed over: `claude plugin update` arbitrates on
+                                                      the version string, so it reports success and
+                                                      moves nothing (measured, #1772). This is the
+                                                      ordinary state of any checkout between releases,
+                                                      so it is not counted as behind and is never an
+                                                      [ERROR] in -Brief.
       - install sha exists but is NOT an ancestor of clone HEAD, or is unknown to the clone
                                                 -> your install is ahead, or the clone is stale
                                                    -> `claude plugin marketplace update <marketplace>`
@@ -343,15 +352,41 @@ foreach ($id in $ids) {
             } else {
                 $anc = (Invoke-CloneGit -CloneDir $clone.Dir -GitArgs @('merge-base', '--is-ancestor', $instSha, 'HEAD')).ExitCode -eq 0
                 if ($anc) {
-                    $code = 'behind'
+                    # THE VERSION STRINGS DECIDE WHETHER THERE IS ANYTHING TO RUN, and until #1772 they
+                    # did not: the ancestry says the clone's commit is newer, and the action was set
+                    # unconditionally to `claude plugin update`. That command arbitrates on the VERSION
+                    # STRING, so where the two sides carry the same one it has nothing to compare and
+                    # exits successfully without moving the install -- measured September 10, 2026 in
+                    # the source repo, on dkj-policy and dkj-policy-bwj at 4.33.0 on both sides:
+                    # "already at the latest version (4.33.0)". The run then reported them as behind and
+                    # handed over a command that reports success and changes nothing, which is the worst
+                    # shape a report can have: it looks acted on.
+                    #
+                    # AND IT IS THE NORMAL STATE OF EVERY CHECKOUT BETWEEN RELEASES, not an edge case.
+                    # The clone tracks the source's trunk and advances on a marketplace refresh; an
+                    # install sits on the last release. So the gap is UNRELEASED WORK, and no command
+                    # here closes it -- the next release cut does. That is also why nothing is
+                    # prescribed: an uninstall + re-install WOULD cross the boundary, but it would put a
+                    # consumer on code no release has shipped, which is not what a staleness report
+                    # should be nudging anyone towards, and this run has not measured that it works.
                     if ($instVer -and $cloneVer -and $instVer -ne $cloneVer) {
+                        $code = 'behind'
                         $verdict = "the clone is AHEAD of your install ($instVer -> $cloneVer)"
-                    } elseif ($instVer) {
-                        $verdict = "the clone is AHEAD of your install (same version string $instVer, newer commit)"
+                        $action = "claude plugin update $id --scope project"
+                    } elseif ($instVer -and $cloneVer -and $instVer -eq $cloneVer) {
+                        $code = 'unreleased'
+                        $verdict = "your install is on the released version $instVer and the clone holds newer commits carrying that same version -- unreleased work, so there is no version gap for a plugin update to close"
+                        $action = "nothing to run -- 'claude plugin update' arbitrates on the version string and reports success without moving the install (measured, #1772); this closes at the next release cut"
                     } else {
-                        $verdict = "the clone is AHEAD of your install (newer commit; no version recorded for your install)"
+                        # A VERSION STRING MISSING ON EITHER SIDE, so the two cases above cannot be told
+                        # apart: the newer commit may or may not cross a release boundary. The old
+                        # wording claimed "same version string" here whenever the install had one, which
+                        # was a wrong statement when it was the CLONE's plugin.json that had none.
+                        $code = 'behind'
+                        $missingSide = if (-not $instVer) { 'no version recorded for your install' } else { "no version in the clone's plugin.json" }
+                        $verdict = "the clone is AHEAD of your install (newer commit; $missingSide, so whether that crosses a release boundary cannot be read from here)"
+                        $action = "claude plugin update $id --scope project"
                     }
-                    $action = "claude plugin update $id --scope project"
                 } else {
                     # Present in the clone's history but not an ancestor of HEAD -- reachable after a
                     # history rewrite in the clone where the old object survives but is unreachable from
@@ -426,6 +461,11 @@ foreach ($id in $ids) {
 
 $good = @($rows | Where-Object { @('match', 'ver-match') -contains $_.Code })
 $behind = @($rows | Where-Object { @('behind', 'clone-behind') -contains $_.Code })
+# ITS OWN BUCKET, AND NOT FOLDED INTO EITHER NEIGHBOUR (#1772). It is not 'behind': nothing here
+# closes the gap, so counting it there means every checkout between releases is told to run a command
+# that does nothing. And it is not 'up to date' either: the clone genuinely holds newer commits, which
+# is the fact somebody reading this report came for.
+$unreleased = @($rows | Where-Object { $_.Code -eq 'unreleased' })
 $unknown = @($rows | Where-Object { $_.Code -eq 'indeterminate' })
 $total = $rows.Count
 
@@ -456,6 +496,11 @@ if ($Brief) {
     #>
     $behindOnly = @($rows | Where-Object { $_.Code -eq 'behind' })
     $staleClone = @($rows | Where-Object { $_.Code -eq 'clone-behind' })
+    # 'unreleased' IS [INFO] BY THE SAME RULE AS A STALE CLONE, and it is the case that rule was
+    # written for without knowing it: the only verdict worth an [ERROR] is the one a reader closes
+    # with a command here and now, and this one has no command at all (#1772). Before the split it was
+    # an [ERROR] at every session start of every checkout sitting between two releases -- the loudest
+    # marker this tool has, on the most ordinary state a consumer can be in, prescribing a no-op.
 
     # EVERY FIELD ON A BRIEF LINE IS SANITIZED, and this mode is where that stops being optional
     # (Sebastian, on #1591). The default view above prints to a terminal somebody is reading; these
@@ -491,7 +536,7 @@ if ($Brief) {
             $line = "[ERROR] ${safeId}: $safeVerdict"
             if ($safeAction) { $line += " -- $safeAction" }
             Write-Host $line
-        } elseif (@('clone-behind', 'indeterminate') -contains $row.Code) {
+        } elseif (@('clone-behind', 'unreleased', 'indeterminate') -contains $row.Code) {
             Write-Host "[INFO] ${safeId}: $safeVerdict"
         }
         # 'match' / 'ver-match': nothing to say, and the summary below says how many.
@@ -499,6 +544,7 @@ if ($Brief) {
 
     $parts = @("$($behindOnly.Count) behind")
     if ($staleClone.Count -gt 0) { $parts += "$($staleClone.Count) ahead of a stale clone" }
+    if ($unreleased.Count -gt 0) { $parts += "$($unreleased.Count) on the released version with unreleased clone commits" }
     if ($unknown.Count -gt 0)    { $parts += "$($unknown.Count) undetermined" }
     $parts += "$($good.Count) up to date"
     Write-Host "[SUMMARY] $total plugin(s) enabled here: $($parts -join ', ')."
@@ -513,10 +559,23 @@ if ($good.Count -eq $total) {
     } else {
         Write-Host "All $total plugin(s) match their marketplace clone (clone versions: $($vers -join ', '))." -ForegroundColor Green
     }
-} elseif ($behind.Count -eq 0) {
+} elseif ($unknown.Count -eq $total) {
+    # THE CONDITION IS 'ALL of them undetermined', not 'none behind' as it was until #1772. The old
+    # test let this sentence fire while some rows were confirmed up to date, and it then said "none
+    # confirmed up to date" at a run that had confirmed several. Pinning it to the all-undetermined
+    # case keeps the missing-clone hint, which is the useful half, and stops it lying about the rest.
     Write-Host "$total plugin(s): none confirmed up to date and none confirmed behind -- $($unknown.Count) could not be determined (see below; a missing marketplace clone is the usual cause)." -ForegroundColor Yellow
+} elseif ($behind.Count -eq 0) {
+    $bits = @()
+    if ($good.Count -gt 0)       { $bits += "$($good.Count) up to date" }
+    if ($unreleased.Count -gt 0) { $bits += "$($unreleased.Count) on the released version, with unreleased commits in the clone" }
+    if ($unknown.Count -gt 0)    { $bits += "$($unknown.Count) could not be determined" }
+    Write-Host "$total plugin(s): $($bits -join ', ') -- nothing to update (see below)." -ForegroundColor Yellow
 } else {
-    $tail = if ($unknown.Count -gt 0) { " ($($unknown.Count) could not be determined)" } else { "" }
+    $tailBits = @()
+    if ($unknown.Count -gt 0)    { $tailBits += "$($unknown.Count) could not be determined" }
+    if ($unreleased.Count -gt 0) { $tailBits += "$($unreleased.Count) on the released version, with unreleased commits in the clone" }
+    $tail = if ($tailBits.Count -gt 0) { " ($($tailBits -join '; '))" } else { "" }
     Write-Host "$($behind.Count) of $total plugin(s) behind -- run the update command shown for each$tail." -ForegroundColor Yellow
 }
 
@@ -542,6 +601,9 @@ foreach ($row in $rows) {
     $vcolor = switch ($row.Code) {
         'match'      { 'Green' }
         'ver-match'  { 'Green' }
+        # Green because the colour answers "must I do something?" and the answer is no: the install is
+        # on the released version and no command here moves it. The verdict text carries the rest.
+        'unreleased' { 'Green' }
         'behind'     { 'Yellow' }
         default      { 'Yellow' }
     }
