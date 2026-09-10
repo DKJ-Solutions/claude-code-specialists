@@ -568,6 +568,60 @@ try {
     Assert-Equal 'feat/standing-here' (Get-HeadName -Dir $dirE2) 'trunk held: with the caller left exactly where it was -- nothing was ever checked out'
     Invoke-FixtureGit -Arguments @('-C', $dirE2, 'worktree', 'remove', '--force', $trunkLane)
 
+    # --- (e3) A MERGED branch a second worktree is standing on (issue #1760) -------------------------
+    #     The mirror image of (e2): there a lane held the TRUNK and cost the fast-forward; here a lane
+    #     holds a branch the two proofs have just cleared for deletion. git refuses to delete a branch
+    #     that is checked out anywhere in the clone, and that refusal takes precedence over -d's own
+    #     unmerged check -- so it lands on exactly the branches this script was about to reap. Step 4c
+    #     can only move THIS tree's HEAD; no tree may move another one, so the answer is a sentence.
+    #
+    #     WHAT THIS ASSERTS THAT (e2) DOES NOT: the vocabulary. Before #1760 the delete was attempted
+    #     and its refusal reported as `git branch -d refused: <git's own text>` -- true, and naming a
+    #     worktree rather than a proof, with no hand-back in it. The pair below is the point: the
+    #     branch survives (it always did), AND the reader is handed the way out instead of git's text.
+    Write-Host "prune-merged.ps1 -- a merged branch is held by another worktree" -ForegroundColor Cyan
+    $dirE3 = New-Fixture -Label 'e3'
+    New-MergedBranch -Dir $dirE3 -Name 'feat/landed-in-a-lane'
+    $branchLane = "$dirE3-lane"
+    if (Test-Path -LiteralPath $branchLane) { Remove-Item -Recurse -Force -LiteralPath $branchLane }
+    Invoke-FixtureGit -Arguments @('-C', $dirE3, 'worktree', 'add', '-q', $branchLane, 'feat/landed-in-a-lane')
+
+    # THE LOOK-FIRST RUN FIRST, because it is the half that used to lie. -DryRun printed "Would delete
+    # feat/landed-in-a-lane" for a delete the real run cannot perform -- a promise from the one mode
+    # whose whole purpose is to say what will happen. That is why 4d is asked ABOVE the DryRun branch
+    # rather than beside the delete.
+    $rE3d = Invoke-PruneMerged -Dir $dirE3 -DryRun
+    Assert-Equal 0 $rE3d.Code 'branch held, dry run: exit 0'
+    Assert-DoesNotSay $rE3d.Out 'Would delete feat/landed-in-a-lane' 'branch held, dry run: it does not promise a delete the real run cannot perform'
+    Assert-Says $rE3d.Out 'another worktree is standing on it' 'branch held, dry run: it reports the reason the real run will act on'
+
+    $rE3 = Invoke-PruneMerged -Dir $dirE3
+    Assert-Equal 0 $rE3.Code 'branch held: exit 0 -- one unreapable branch is not a failed run'
+    Assert-True ((Get-LocalBranches -Dir $dirE3) -contains 'feat/landed-in-a-lane') 'branch held: the branch is still there'
+    Assert-Says $rE3.Out 'another worktree is standing on it' 'branch held: reported in this script vocabulary, not git refusal text'
+    Assert-Says $rE3.Out (Split-Path -Leaf $branchLane) 'branch held: and it names the directory holding it'
+    Assert-Says $rE3.Out 'HandBack' 'branch held: with the way out, not only the verdict'
+    Assert-DoesNotSay $rE3.Out 'refused:' 'branch held: git own refusal is never what the reader is handed'
+    Assert-Equal 'main' (Get-HeadName -Dir $dirE3) 'branch held: and this checkout was never moved'
+    Invoke-FixtureGit -Arguments @('-C', $dirE3, 'worktree', 'remove', '--force', $branchLane)
+
+    # --- (e4) An UNMERGED branch in a lane keeps its OWN reason ---------------------------------------
+    #     The bound on (e3). A lane holding unfinished work is the ordinary state this script exists to
+    #     leave alone, and it is already kept for a reason of its own -- which is the reason a reader
+    #     needs. Reporting the worktree there would name an obstacle when nothing was going to touch
+    #     that branch, so 4d is asked AFTER the two proofs rather than at the top of the loop.
+    Write-Host "prune-merged.ps1 -- an unmerged branch in a lane keeps its own reason" -ForegroundColor Cyan
+    $dirE4 = New-Fixture -Label 'e4'
+    New-UnmergedBranch -Dir $dirE4 -Name 'feat/still-working'
+    $wipLane = "$dirE4-lane"
+    if (Test-Path -LiteralPath $wipLane) { Remove-Item -Recurse -Force -LiteralPath $wipLane }
+    Invoke-FixtureGit -Arguments @('-C', $dirE4, 'worktree', 'add', '-q', $wipLane, 'feat/still-working')
+    $rE4 = Invoke-PruneMerged -Dir $dirE4
+    Assert-Equal 0 $rE4.Code 'lane, unmerged: exit 0'
+    Assert-True ((Get-LocalBranches -Dir $dirE4) -contains 'feat/still-working') 'lane, unmerged: the branch is still there'
+    Assert-Says $rE4.Out 'not an ancestor of the trunk' 'lane, unmerged: kept for its own reason -- the proofs, not the worktree'
+    Assert-DoesNotSay $rE4.Out 'another worktree is standing on it' 'lane, unmerged: and the lane is not reported as an obstacle to something nothing was going to do'
+    Invoke-FixtureGit -Arguments @('-C', $dirE4, 'worktree', 'remove', '--force', $wipLane)
     # --- (f) It never deletes a remote branch -------------------------------------------------------
     #     A deliberate decision rather than an omission: with the remote reaping its own merged heads,
     #     a remote delete would only ever reach branches that are NOT merged.
