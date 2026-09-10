@@ -25,10 +25,12 @@
 
     THE TWO NARROW SLICES THAT *ARE* AUTOMATIC ARE ECHOED, NOT REBUILT. Get-RetiredDocNameMention
     (#1389, a retired filename) and Get-SupremacyDeclaration (#1415, 'CLAUDE.md' adjacent to
-    'wins'/'wint') are the two greps #1380 recorded as proportionate, and each already has its own
-    SessionStart hook. This report calls those same two functions so its picture is complete and so
-    there is one definition of each -- the same move check-branch-entry makes on open-pr's two -- and it
-    labels them as already-gated, so nobody reads a silence here as coverage the hooks do not give.
+    'wins'/'wint') are the two greps #1380 recorded as proportionate, and both already run from
+    check-consumer-prose.ps1 behind the consumer-prose-sessioncheck hook -- one script and one hook
+    since #1421 merged their two, before either had shipped. This report calls those same two functions
+    so its picture is complete and so there is one definition of each -- the same move
+    check-branch-entry makes on open-pr's two -- and it labels them as already-gated, so nobody reads a
+    silence here as coverage the hook does not give.
 
     THE CONSUMER'S SIDE IS THE #1380 CORPUS, and it is not re-derived: Get-CheckProseCorpus supplies the
     always-on closure and Get-ConsumerProseDocuments decides which of those documents a prose check may

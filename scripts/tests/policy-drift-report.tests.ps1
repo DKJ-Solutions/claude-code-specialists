@@ -18,11 +18,11 @@
       2. THE RANK-1 ORDER. dkj-policy before a companion plugin is the top rung's own internal
          order out of "A third rank sits above both". A sort that lost it would still print every page
          and read as correct.
-      3. THE SOURCE-REPO SKIP IS THE HOOKS' SKIP. The two detector FUNCTIONS carry no skip -- it lives in
-         the two entry scripts -- so a report that called them straight would print findings under a
-         heading claiming those hooks cover it, two lines from where the hook prints [OK]. Both
-         directions are pinned: skipped where the marketplace publishes this workflow, reported where it
-         does not.
+      3. THE SOURCE-REPO SKIP IS THE HOOK'S SKIP. The two detector FUNCTIONS carry no skip -- it lives in
+         check-consumer-prose.ps1, the entry script #1421 merged both detectors into -- so a report that
+         called them straight would print findings under a heading claiming the consumer-prose-sessioncheck
+         hook covers it, two lines from where that hook prints [OK]. Both directions are pinned: skipped
+         where the marketplace publishes this workflow, reported where it does not.
 
     THE USER LAYER IS REDIRECTED FOR EVERY RUN. Get-EnabledPlugins reads the whole settings chain, so
     this machine's own ~/.claude/settings.json would otherwise add plugins to a fixture's rank 1 and the
