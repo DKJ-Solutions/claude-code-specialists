@@ -198,6 +198,13 @@
          so a non-primary tree returns to its own branch once the fold has SUCCEEDED. Only on success: a
          failed fold leaves this tree on main mid-repair, which is where whoever finishes it by hand
          needs to be standing. It never fails the ship.
+
+         AND A FOLD LOST TO fold-on-merge.yml IS A SUCCESS, NOT A FAILED SHIP (step 5c, issue #1792).
+         Both fold on the ordinary path now that the merge queue is retired (#1720), so the merge one
+         step above triggers the job this step is racing. Losing that race means the entry is already
+         upstream: the fold script says so with exit code 3, this run carries on, and step 5c prints the
+         two commands (preserve, then realign) that bring THIS checkout's own trunk back into line --
+         the only thing the race actually costs.
       6. Verify the issues the PR declared it closes are actually CLOSED, and close any that are not
          (verify-resolved-issues.ps1 -- its own script, and tested there).
       7. Say so when the repo does not delete head branches on merge, so the merged branch is not left
@@ -2741,7 +2748,39 @@ $foldExit = $LASTEXITCODE
 # three paths the function above exists for.
 Remove-ShipFoldWorktree -Path $foldTree
 
-if ($foldExit -ne 0) { Write-Error "fold-changelog-entry failed -- the fold is NOT committed or NOT pushed. Its own output above says which; do not re-run the fold if it already removed the entry file."; exit 1 }
+# --- THE FOLD CAN BE LOST TO A RACE AND HAVE HAPPENED ANYWAY (issue #1792) ------------------------
+#
+# THE RACE. fold-on-merge.yml runs on EVERY push to main, so the merge one line above triggers it -- and
+# with the merge queue retired (#1720) that job and this step both fold on the ordinary path. Whichever
+# gets its push in second is refused. When the loser is this session the fold script commits on the LOCAL
+# trunk, cannot push, establishes that the entry is already upstream with an identical body, and stops.
+#
+# EXIT 3 IS THAT VERDICT AND NOTHING ELSE (see the fold script's own EXIT CODES block). It is not "the
+# fold failed": it is "the fold happened, somebody else made it". So the SHIP succeeded -- merged, folded,
+# pushed -- and this run carries on to step 5b, step 6 and the report, exactly as on a clean fold.
+#
+# WHY THE OLD `-ne 0` WAS EXPENSIVE OUT OF PROPORTION TO ITS SIZE. Measured shipping PR #1789 on
+# 2026-09-10: the two fold commits had IDENTICAL TREES and origin/main was correct, so nothing was at
+# stake in the content -- and yet this line reported a hard failure and left the session's own main
+# diverged 1/1, a state this repo's rules reserve every obvious way out of (reset --hard, a rebase on a
+# shared branch) to Dave. A correct ship must not end by handing the operator a trunk they may not fix.
+#
+# IT REPORTS THE LEFTOVER RATHER THAN CLEARING IT, and that boundary is the fold script's, kept here for
+# the same reason: every route off a trunk is a history operation the constitution reserves to a person.
+# What was missing was never the power to rewrite, it was the sentence saying WHICH two commands to run --
+# so those are printed, after step 5b, once this tree has finished moving (a lane hands the trunk back
+# there, and that changes which of the two realignments is the correct one).
+$foldStoodDown = $false
+if ($foldExit -eq 3) {
+    $foldStoodDown = $true
+    Write-Host "ship-pr: this session LOST the fold race -- the entry was already on 'main' when the push went out." -ForegroundColor Yellow
+    Write-Host "  Not a failed ship: PR #$pr is merged AND folded (by fold-on-merge.yml, or by another device), and the fold script's" -ForegroundColor DarkGray
+    Write-Host "  lines above prove it -- the entry is upstream once, with a body identical to the one this run wrote." -ForegroundColor DarkGray
+    Write-Host "  What is left is local only: a redundant fold commit on this checkout's 'main'. Reported at the end of the run." -ForegroundColor DarkGray
+} elseif ($foldExit -ne 0) {
+    Write-Error "fold-changelog-entry failed -- the fold is NOT committed or NOT pushed. Its own output above says which; do not re-run the fold if it already removed the entry file."
+    exit 1
+}
 
 # --- Step 5b: give the trunk back, if this is not the primary checkout (issue #1069) ---------------
 # THE ROOT CAUSE, AND IT IS ONE LINE ABOVE: the in-place arm leaves this tree standing on 'main'. In the
@@ -2753,6 +2792,11 @@ if ($foldExit -ne 0) { Write-Error "fold-changelog-entry failed -- the fold is N
 # SO THE RULE IS NOT "always return", IT IS "return where staying was never the point". Only a
 # non-primary tree hands the trunk back, and only after a SUCCESSFUL fold: a failed one leaves this tree
 # on main mid-repair, which is exactly where whoever finishes it by hand needs to be standing.
+#
+# A STOOD-DOWN FOLD (exit 3, issue #1792) REACHES HERE AND SHOULD. It is a successful fold made by
+# somebody else, so staying was never the point -- and the local leftover it does owe the operator is a
+# branch-pointer move, which is EASIER off the trunk than on it. Step 5c reads HEAD after this block for
+# exactly that reason and prints whichever of the two commands the tree it finds can actually run.
 #
 # BACK TO THE BRANCH RATHER THAN DETACHED, so the lane is where its author left it. Detaching is the
 # fallback and not the preference: it always works (nothing can hold a commit) but it hands back a tree
@@ -2775,6 +2819,53 @@ if (-not $foldTree -and -not $shipTreeIsPrimary) {
     }
 }
 
+# --- Step 5c: the redundant fold commit this run lost the race with (issue #1792) -----------------
+#
+# BELOW STEP 5b DELIBERATELY. A lane hands the trunk back up there, and whether 'main' is still checked
+# out HERE decides which realignment is the correct one: a checked-out branch cannot be moved with
+# `git branch -f`, and a branch nothing holds does not need a reset. So HEAD is read now rather than
+# assumed from the arm this run took, and exactly one command is printed.
+#
+# THE BACKUP REF COMES FIRST, and it is what makes the second line safe to hand to somebody: the commit
+# is preserved under refs/heads/backup/ before the trunk pointer moves, so a reader who disagrees with
+# this run's verdict can still read, diff or cherry-pick it. That is the shape the operator of the
+# measured incident arrived at by hand (#1792) -- "works but not something a reader would derive", which
+# is the whole reason it is printed here.
+#
+# AND THERE ARE TWO COMMANDS, NOT THREE: no fetch is printed, because the fold's own diagnosis fetched
+# origin/<trunk> in order to reach this verdict at all -- it read the remote changelog out of that ref.
+# So origin/main is current by construction here, and a printed fetch would suggest the reader has a
+# question to answer that they do not.
+#
+# NEITHER COMMAND IS RUN. `reset --keep` is not `reset --hard`, but a script that moves a trunk pointer on
+# its own has taken a power nobody granted it, and the fold script this step delegates to declines the
+# same thing in as many words. The gap #1792 measured was guidance, not authority.
+if ($foldStoodDown) {
+    # 'HEAD' is what --abbrev-ref answers on a DETACHED tree, and it is not a branch name: nothing holds
+    # 'main' there either, so it takes the same arm as a tree standing on its own branch -- it simply must
+    # not be printed back as though the tree were on a branch called HEAD.
+    $headAfter = Invoke-NativeCapture -FilePath 'git' -Arguments @('-C', $repoRoot, 'rev-parse', '--abbrev-ref', 'HEAD') -DiscardStderr
+    $headName  = if ($headAfter.ExitCode -eq 0) { (($headAfter.Output -join '') -replace '\s', '') } else { '' }
+    $backupRef = Get-PasteableRef -Ref "backup/fold-$($branch -replace '/', '-')" -Placeholder '<backup/fold-your-branch>'
+
+    Write-Host "ship-pr: this checkout's 'main' still carries the redundant fold commit -- origin/main is CORRECT and is not waiting on it." -ForegroundColor Yellow
+    Write-Host "  Preserve it, then realign the trunk (nothing in it is missing upstream, so neither command loses work):" -ForegroundColor Yellow
+    Write-Host "    git -C `"$repoRoot`" branch $($backupRef.Token) main" -ForegroundColor Yellow
+    if ($headName -eq 'main') {
+        # --keep rather than --hard: it moves the pointer, updates only the files that differ, and ABORTS
+        # on a local change it would overwrite. In the measured case the two trees were identical, so it
+        # touches nothing at all -- and where they are not, aborting is the right answer from a script's
+        # printed advice.
+        Write-Host "    git -C `"$repoRoot`" reset --keep origin/main" -ForegroundColor Yellow
+        Write-Host "  ('main' is checked out here, so the pointer moves with reset --keep -- not --hard, which this repo reserves to Dave.)" -ForegroundColor DarkGray
+    } else {
+        $whereNote = if ($headName -and $headName -ne 'HEAD') { " -- this tree is on '$(Get-DisplayRef -Ref $headName)'" } elseif ($headName -eq 'HEAD') { ' -- this tree is detached' } else { '' }
+        Write-Host "    git -C `"$repoRoot`" branch -f main origin/main" -ForegroundColor Yellow
+        Write-Host "  (nothing holds 'main' here$whereNote, so the pointer moves without touching a working tree.)" -ForegroundColor DarkGray
+    }
+    if ($backupRef.Note) { Write-Host "  $($backupRef.Note)" -ForegroundColor DarkGray }
+}
+
 # --- Step 6: the issues the PR declared it closes are actually closed -----------------------------
 # Its own script, so this state-MUTATING logic (it comments and closes) is testable against a fake gh
 # instead of only reachable through a full live ship -- and so the same check is usable on its own to
@@ -2782,7 +2873,15 @@ if (-not $foldTree -and -not $shipTreeIsPrimary) {
 & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'verify-resolved-issues.ps1') -Pr $pr -Repo $repo
 if ($LASTEXITCODE -ne 0) { Write-Warning "the issue-closing check reported a problem -- verify by hand with: gh issue list --repo $repo --state open" }
 
-Write-Host "Done: PR #$pr shipped -- opened, CI green, merged, folded on main." -ForegroundColor Green
+# THE CLOSING LINE SAYS WHO FOLDED (issue #1792). On a stood-down fold the trunk is just as folded and
+# the ship is just as complete -- but this checkout is one command short of matching it, and a closing
+# line reading "folded on main" would be the last thing the operator sees and would say nothing about
+# that. Same sentence, one clause different, so the two runs are told apart at a glance.
+if ($foldStoodDown) {
+    Write-Host "Done: PR #$pr shipped -- opened, CI green, merged, folded on main by whoever won the fold race (step 5c: two commands realign this checkout)." -ForegroundColor Green
+} else {
+    Write-Host "Done: PR #$pr shipped -- opened, CI green, merged, folded on main." -ForegroundColor Green
+}
 
 # --- Step 7: the remote branch, if nothing on GitHub is reaping it --------------------------------
 # WHY THIS IS A READ AND NOT A FLAG (inbound #815, August 21, 2026). The merge above deliberately does

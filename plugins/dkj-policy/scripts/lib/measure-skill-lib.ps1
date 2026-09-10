@@ -26,6 +26,12 @@
     Pure ASCII (repo convention for .ps1).
 #>
 
+# THE ONE DEPENDENCY, for the one field this lib does not own. Get-ManifestAgentEntries is the shared
+# reading of a manifest's 'agents' key; Get-DeclaredAgentCount below carried its own until #1781. Safe to
+# pull in here for the reason plugin-tree-lib's own header states: it has no dependencies of its own, so
+# this costs one small file rather than a chain of them.
+. (Join-Path $PSScriptRoot 'plugin-tree-lib.ps1')
+
 # EVERY FIGURE IS FORMATTED INVARIANTLY, and that is not a style choice. Formatted on a Dutch machine,
 # '{0:N0}' renders 13700 as '13.700' -- which an English reader of this repo reads as 13.7, off by a
 # factor of a thousand and still plausible. That is the same trap ConvertTo-TokenCount guards against in
@@ -100,21 +106,30 @@ function Expand-ListArgument {
 
 function Read-PluginDetailsOutput {
     <#
-        Parses the output of `claude plugin details <id>` into the four things a measurement needs:
-        the version, the printed Always-on total, the skills the component inventory names, and one row
-        per component. Takes LINES rather than running the command, so it can be pinned by a suite
-        against captured output.
+        Parses the output of `claude plugin details <id>` into the five things a measurement needs:
+        the version, the printed Always-on total, the component inventory's own COUNTS, the skills that
+        inventory names, and one row per component. Takes LINES rather than running the command, so it
+        can be pinned by a suite against captured output.
 
-        Returns a pscustomobject: Version, AlwaysOnTotal, InventorySkills, Rows (Component, AlwaysOn,
-        OnInvoke). Anything it could not find is $null or an empty array -- judging that is
-        Get-PluginDetailsParseProblems' job, not this function's.
+        Returns a pscustomobject: Version, AlwaysOnTotal, InventoryCounts, RowProducingCount,
+        InventorySkills, Rows (Component, AlwaysOn, OnInvoke). Anything it could not find is $null or an
+        empty array -- judging that is Get-PluginDetailsParseProblems' job, not this function's.
+
+        THE COUNTS ARE READ BECAUSE AN EMPTY TABLE HAS TWO CAUSES, and they are opposite facts. The CLI
+        prints no per-component table at all for a plugin whose inventory is all zeroes -- there is
+        nothing to tabulate -- and it prints none if the format moves under this parser. Only the
+        inventory itself can tell those apart, so it is parsed rather than inferred. RowProducingCount is
+        skills plus agents: hooks are marked harness-only and MCP/LSP servers carry no model context, so
+        neither of those produces a row.
     #>
     param([string[]]$Lines)
 
     $version         = $null
     $alwaysOnTotal   = $null
+    $inventoryCounts = [ordered]@{}
     $inventorySkills = @()
     $rows            = @()
+    $inInventory     = $false
     $inTable         = $false
 
     foreach ($line in @($Lines)) {
@@ -123,6 +138,24 @@ function Read-PluginDetailsOutput {
         # The header line ends in the version: '... (dkj-subagents-alpha) 4.17.0'. First match only, so a
         # version-looking string further down cannot overwrite it.
         if ($null -eq $version -and $line -match '\s(\d+\.\d+\.\d+)\s*$') { $version = $Matches[1] }
+
+        # Every inventory line, by name and count -- 'Skills (4)', 'Agents (0)', 'MCP servers (0)'. The
+        # count is what the CLI BELIEVES it has, which is the only thing that says whether a table was
+        # owed at all. Deliberately not matched against a fixed list of component kinds: a kind this
+        # parser has never heard of is still counted, so a new one cannot make an owed table look unowed.
+        #
+        # READ ONLY INSIDE THE 'Component inventory' BLOCK, the same way the table below is read only
+        # inside its own. The pattern is '<words> (<digits>)', which is ordinary prose: measured, an
+        # indented line reading 'See also (2) related notes.' parses as a component called 'See also'
+        # with a count of 2, inflating what the check below thinks was owed. Excluding ':' from the name
+        # keeps today's Description and Source lines out, but that is a property of today's wording
+        # rather than a rule -- the block boundary is structural, so a note the CLI adds tomorrow cannot
+        # become a component wherever it is worded.
+        if ($line -match '^\S') { $inInventory = $false }
+        if ($line -match '^Component inventory\s*$') { $inInventory = $true; continue }
+        if ($inInventory -and $line -match '^\s{2,}([A-Za-z][A-Za-z ]*?)\s*\((\d+)\)\s*(?:\s\S.*)?$') {
+            $inventoryCounts[$Matches[1]] = [int]$Matches[2]
+        }
 
         if ($line -match '^\s*Skills\s*\(\d+\)\s+(.+)$') {
             $inventorySkills = @($Matches[1] -split ',' |
@@ -148,11 +181,30 @@ function Read-PluginDetailsOutput {
         }
     }
 
+    # $null, not 0, where the inventory could not be read: 'no table was owed' and 'the format moved
+    # under the parser' must not collapse into one value -- the same three-state lesson claim-issue's
+    # read-back learned in #1628, where one boolean carried two opposite facts and printed the wrong one.
+    #
+    # BOTH KINDS MUST BE PRESENT, or the answer is $null. Summing whichever of the two happened to parse
+    # was the weaker rule: rename 'Skills (N)' alone and the block still yields lines, so the count stays
+    # non-$null and silently loses that kind's contribution -- undercounting TOWARDS 0, which is the
+    # direction that turns a refusal into a pass. Requiring both means a per-kind drift lands on the
+    # [ERROR] this check exists for rather than on the quiet branch. It also means a future CLI dropping
+    # either line outright is refused, which is the correct failure direction: loud, and one line to fix.
+    $rowProducing = $null
+    $kinds = @('Skills', 'Agents')
+    if (@($kinds | Where-Object { $inventoryCounts.Contains($_) }).Count -eq $kinds.Count) {
+        $rowProducing = 0
+        foreach ($kind in $kinds) { $rowProducing += [int]$inventoryCounts[$kind] }
+    }
+
     return [pscustomobject]@{
-        Version         = $version
-        AlwaysOnTotal   = $alwaysOnTotal
-        InventorySkills = $inventorySkills
-        Rows            = $rows
+        Version           = $version
+        AlwaysOnTotal     = $alwaysOnTotal
+        InventoryCounts   = $inventoryCounts
+        RowProducingCount = $rowProducing
+        InventorySkills   = $inventorySkills
+        Rows              = $rows
     }
 }
 
@@ -171,6 +223,15 @@ function Get-PluginDetailsParseProblems {
         Returns the problems as strings; an empty array means the parse can be trusted. Reporting and
         refusing belong to the caller.
 
+        AN EMPTY TABLE IS ONLY A PROBLEM WHERE THE INVENTORY SAYS ONE WAS OWED. The CLI prints no
+        per-component table for a plugin whose inventory declares no skills and no agents -- there is
+        nothing to tabulate, and 'Always-on: ~0 tok' corroborates it. Reading that as a format change was
+        a FALSE refusal on exactly the plugins that ship subagents and no skills (#1771): two of this
+        repo's six enabled plugins reported '[ERROR] ... did not parse as expected', with the CLI's
+        format entirely intact. So the emptiness is judged against RowProducingCount, and where the
+        inventory could not be read at all ($null) the old refusal stands -- an unreadable inventory is
+        the format change this check exists for.
+
         THE TOLERANCE IS NOT SLACK. Every printed figure is rounded to two significant figures, so the
         sum CANNOT equal the total: measured on this repo, 19 rows summing to 3,010 against a printed
         3,031. 5% of the total with a floor of 100 covers that rounding across a plugin of any size and
@@ -179,7 +240,16 @@ function Get-PluginDetailsParseProblems {
     param([Parameter(Mandatory = $true)]$Details)
 
     $problems = @()
-    if (@($Details.Rows).Count -eq 0) { $problems += 'the per-component table produced no rows' }
+    if (@($Details.Rows).Count -eq 0) {
+        $owed = $Details.RowProducingCount
+        if ($null -eq $owed) {
+            $problems += ('the per-component table produced no rows, and the component inventory could ' +
+                'not be read either, so nothing says whether a table was owed')
+        } elseif ($owed -gt 0) {
+            $problems += ("the per-component table produced no rows, while the component inventory " +
+                "declares $owed skill(s)/agent(s) that each owe one")
+        }
+    }
     if ($null -eq $Details.AlwaysOnTotal) { $problems += 'no Always-on total was found' }
 
     if (@($Details.Rows).Count -gt 0 -and $null -ne $Details.AlwaysOnTotal) {
@@ -200,4 +270,44 @@ function Get-PluginDetailsParseProblems {
     }
 
     return @($problems)
+}
+
+function Get-DeclaredAgentCount {
+    <#
+        WHAT THE MANIFEST DECLARES, WHERE THE INVENTORY CANNOT SAY. `claude plugin details` reports
+        'Agents (N)' by counting only defs found by convention in a plugin's default agents\ directory:
+        measured against Claude Code 2.1.267, a def named by the manifest's 'agents' key LOADS in a
+        session and is counted as 0 there. So that count is not evidence about a plugin's agents, and
+        this reads the manifest for the one thing that is -- how many the plugin declares.
+
+        Read from the TREE, which is also where the version comparison gets its answer: that is the copy
+        this repo can act on, and the caller names it whenever it differs from the measured one.
+
+        Returns Found / Version / AgentCount. A manifest that is missing or unparseable is Found=$false
+        with a count of 0, so a caller cannot mistake 'could not look' for 'declares none' -- the same
+        three-state care Read-PluginDetailsOutput takes over the inventory.
+    #>
+    param(
+        [Parameter(Mandatory = $true)][string]$RepoRoot,
+        [Parameter(Mandatory = $true)][string]$ShortName
+    )
+
+    $manifest = @(Get-ChildItem -Path (Join-Path $RepoRoot "plugins\*\$ShortName\.claude-plugin\plugin.json") -ErrorAction SilentlyContinue |
+        Select-Object -First 1)
+    if ($manifest.Count -ne 1) { return [pscustomobject]@{ Found = $false; Version = $null; AgentCount = 0 } }
+    try {
+        $json = Get-Content -LiteralPath $manifest[0].FullName -Raw | ConvertFrom-Json
+    } catch {
+        return [pscustomobject]@{ Found = $false; Version = $null; AgentCount = 0 }
+    }
+
+    # string|string[], the two forms the installer accepts -- a bare string is one entry, and the absent
+    # key is the ordinary case for every plugin that ships none. Both of those answers come from
+    # plugin-tree-lib's Get-ManifestAgentEntries, the ONE reading of this field: check 38 of
+    # check-plugin-integrity.ps1 validates the same key through the same function, so the gate and this
+    # count cannot silently drift apart (#1781). 'version' is still PROBED here, because Set-StrictMode
+    # throws on an absent property and that one has no shared reader.
+    $agents = @(Get-ManifestAgentEntries -Manifest $json).Count
+    $version = if ($json.PSObject.Properties['version']) { $json.version } else { $null }
+    return [pscustomobject]@{ Found = $true; Version = $version; AgentCount = $agents }
 }

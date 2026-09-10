@@ -960,6 +960,23 @@ infrastructure.
     worse than predictably red and is still the fourth self-healing meaning #1539's triage exists to keep
     out. The list below therefore stays **three**: a stand-down is this job declining to answer a question
     a successor run is already queued to answer, not a way of failing.
+
+    **AND THE SAME RACE RUN THE OTHER WAY LANDS ON `ship-pr`, WITH A CODE OF ITS OWN** (issue
+    [#1792](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1792), measured here on
+    2026-09-10, shipping PR #1789). With the queue retired (#1720) both runners fold on the ordinary
+    path, so the loser is sometimes the **session** — and the two losses were never equally cheap: a red
+    CI job is read once and closed, while `ship-pr`'s `-ne 0` ended a *correct* ship by reporting a
+    failure and leaving the session's local `main` diverged 1/1, which `CLAUDE.md` reserves every obvious
+    way out of (`reset --hard`, a rebase on a shared branch) to Dave. The fold's redundant-commit verdict
+    now exits **3** — its second and last code of its own — and `ship-pr` reads it as a stood-down
+    success, carries on through steps 5b/6, and prints in a step 5c the two commands that realign this
+    checkout: a `backup/fold-<branch>` ref, then `reset --keep origin/main` (trunk checked out here) or
+    `branch -f main origin/main` (nothing holds it). **`2` and `3` are not merged**, because after `2`
+    nothing was written and after `3` a commit is on the local trunk — and neither script repairs it, so
+    conflating them would either invent a leftover or hide one. **Both codes have one testable end each
+    in `fold-changelog.tests.ps1`**: `exit 3` from exactly one place, and `ship-pr.ps1`'s own reading
+    pinned as source text, because that orchestrator has no suite of its own and `-ne 0` is precisely
+    what stayed the tested behaviour on the caller side through #1586.
   - **#1544 — the concurrency group is constant per trunk.** Keyed on `github.sha` it was its own group
     every run and serialised nothing, so two trunk pushes close together raced — and this job *pushes*.
     `github.ref` keeps `cancel-in-progress: false` (no fold dropped) and adds queueing (no race). Same
@@ -1701,6 +1718,167 @@ already been bitten by, and the list would need to hold the entire consumer-faci
 sidesteps the anchor question entirely, because a document knows where it sits — 4 subjects tree-wide,
 0 findings today, and verified against `33a41a2` to fire on the real defect. Not built, because four
 subjects is close to nothing to guard; worth revisiting when per-directory READMEs multiply.
+
+**Extending check 16 to LINE COUNTS was measured and declined** (September 10, 2026,
+[#1784](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1784)). It came out of
+[#1779](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1779), which found seven
+docstring sentences across five libs sizing `entry-scaffold-lib.ps1` at "three thousand lines" where
+it measured 8,289 — and each figure sat in the sentence that carried a layer or dependency decision, so
+the stale number argued for that decision at a third of its real strength. Check 16 misses the class twice over and
+both misses are structural: `lines` is not in its unit list (`$figurePattern`,
+[`check-plugin-integrity.ps1:2426`](../../../scripts/lint/check-plugin-integrity.ps1)), and a `.ps1`
+comment is not in its `$consumerDocs` file set — that second gap is real and is where both recorded
+instances of the class happened. It was filed on its own as
+[#1790](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1790) — measured and declined in
+its own right, write-up below.
+The proposal was a check of its own: a sentence naming a repo file and giving a line count for it, held
+against that file's actual length.
+
+**THE REASON THAT SETTLES IT COMES FIRST, BECAUSE IT IS NOT THE ONE THE PROPOSAL ARGUES ABOUT: the
+reported defect carries no digit.** #1779's seven sites read **"three thousand lines"**, spelled out in
+words — `release-lib.ps1:706` records it in those terms (*"It read 'three thousand lines' from the day
+this function moved"*). Every candidate in this family is anchored on `\d`, check 16's own
+`$figurePattern` included, so **not one of them can see the defect that motivated the proposal**, however
+precisely it is tuned. That is the whole argument, and the measurement below is only about the figures a
+digit-anchored rule *can* see.
+
+**It is not born green, and the shape of the failure is the point.** Measured against `main` at
+`69264276`, over every tracked `.md` and `.ps1` outside the archived release history, pairing each count
+with the nearest file token to its left and resolving by path then basename: **19 pairings on the wide
+pattern, 16 on a narrowed one that requires a word boundary before the digit — and under a ±5% tolerance
+band, every single one is a finding.** Exactly **one** is a real defect. The other fifteen fall into six
+classes no regex separates from it:
+
+| class | sites | why it is not a defect |
+|---|---|---|
+| a deliberate historical record | 6 | the figure **is** the past state and is the whole point — `CLAUDE.md` "328 → 282 lines", the July 28 measurement table, `cut-release.ps1` "was 284 lines" under a paragraph that says "the finding as it stood then", and `teardown.tests.ps1:469`'s "instead of 43 lines scattered through `CLAUDE.md`" (history *of* a section, which is why it counts here and not in the row below) |
+| a delta, not a length | 4 | "`CLAUDE.md` +4 lines from a round trip that should have returned to zero" — the teardown round-trip assert, in three mirrored copies plus `teardown.ps1` |
+| a section, not the file | 1 | "the roster/routing table (53 lines)" inside `CLAUDE.md` |
+| another repo's file | 2 | `teardown.tests.ps1:574` records life-hub's `repo-config.ps1` (55 lines) and `branch-info.ps1` (88) — the same "whose repo is this line about" failure that sank the stale-path rule above |
+| a **correctly bound** historical measurement | 1 | `README.md:1254`'s "101, across 492 lines" sits under *"measured against the `life-hub` consumer on July 29, 2026"* — it already does what check 16 asks, and a re-measurement check flags it anyway. This is the class that decides the remedy question below |
+| a pairing failure | 1 (+3 wide-only) | see below. The three are counted per **site**, as the delta row is: two kinds of artifact, one of which sits in two mirrored copies — which is also why wide − narrow is 3 |
+
+**The pairing failure is the one worth reading, because its victim is the best-behaved figure in the
+tree.** `check-connectors.ps1:119` reads *"release-lib dot-sources entry-scaffold-lib behind it
+(release-lib.ps1:113), and that file is 8,289 lines (measured: `wc -l scripts/lib/entry-scaffold-lib.ps1`)"*.
+The figure is accurate, present-tense, and states its own method — it is #1779's repair done right. Its
+subject is an antecedent two clauses back, so the nearest file token is `release-lib.ps1` at 1,776 lines
+and the check flags it 4.7× over. The wide pattern adds three more sites of the same kind, from digits
+that were never counts — `entry-scaffold-lib.ps1 line by line` yields "1 line" off the `1` of `.ps1`
+(twice, once per mirrored copy), and `the pre-#1591 line` yields "1591 line" off an issue number.
+
+**A resolver DOES fix that one, and the honest record says so.** Requiring the filename to sit in
+backticks immediately before a present-tense copula — `` `<file>` is/are/measures/stood at N lines `` —
+never has to resolve an English subject at all, because it refuses to fire unless the two are adjacent.
+Measured against `main` at `69264276`: **1 finding, and it is the real one. Born green, 1 of 1.** So this
+family is not impossible to gate, and the claim that it was — which stood in this paragraph until Marlowe
+red-teamed it — was an overclaim. **It is left UNBUILT rather than declined**, which is the same verdict
+and the same shape as the title-path rule two paragraphs up, on three measured prices:
+
+1. **One subject tree-wide.** The same "close to nothing to guard" bar that left the title rule unbuilt.
+2. **Blind to the motivating defect**, per the digit argument above — so building it would answer #1779
+   with a check that could not have caught #1779.
+3. **It still penalises citation, just less.** On the branch that records this decline the same narrow
+   pattern goes from **1 finding to 3**, and both new ones are this write-up quoting the defect verbatim
+   — the repaired site's own history sentence, and the paragraph above. Two thirds of its findings are
+   then the documentation doing what this repo requires of it.
+
+**Revisit condition**, stated so this is a priced option rather than a closed door: if a present-tense
+`` `<file>` is N lines `` claim ever reaches three or four live subjects, the adjacency variant is
+buildable in an afternoon and is green today. What must not be revived is the wide form.
+
+**And the tolerance band is not a tuning knob, it is mandatory — which is itself the argument.**
+`entry-scaffold-lib.ps1` went **8,289 → 8,290 during this branch's own `git pull`, eight commits**. So
+the tree's single self-citing, method-stating, correctly-measured line count went stale inside one
+fast-forward. Under an exact compare the check nags it; under a band it passes and every real finding
+smaller than 5% passes with it. A figure that decays that fast is one a reader must re-run, not one a
+gate can pin.
+
+**The remedy is the wrong shape too, and in the opposite direction from the one #1784 predicted.** The
+issue argued that check 16's binding would wrongly *pass* a stale line count. Measured, the reverse is
+what happens: the tree's bound figures are bound correctly — `README.md:1254`'s "101, across 492 lines"
+sits under *"measured against the `life-hub` consumer on July 29, 2026"* — so a re-measurement check
+flags **history that already did what it was asked**, while the one real defect
+(`06-25-extension.md:264`, "`CLAUDE.md` is 875 lines in 9 sections", against 526 in 3) is unbound and
+present-tense. Adopting the check therefore means writing `<!-- unbound-figure: … -->` onto fifteen
+correct sites to catch one, which is the exemption list this repo has already been bitten by.
+
+**And the wide form has one more price, which is the one that generalises.** Recording this decline honestly — citing each instance
+verbatim, as this repo requires of a measurement — took the same rule from **16 findings to 26** on the
+branch that declines it. Ten fresh sites, every one a correctly-attributed count in a sentence that
+argues from it, several of them the figures in the table above. So the rule does not merely mis-fire on
+history: **it penalises the act of measuring and writing the result down**, which is the one habit this
+gate's other rules exist to encourage. A check whose findings grow fastest in the documents that do
+their job is aimed at the wrong thing, and the narrow variant inherits a third of that.
+
+**Check 16's own docstring reached the same place a month earlier, for the wide form.** Its gateability
+argument is that *"there is no authored, non-measured reason to write '939,860 bytes' — so the haystack
+needs no heuristic to identify"*. A line count fails exactly that test: the same characters are a
+snapshot, a delta, a section size, another repo's file, or a historical record, and telling them apart
+is the heuristic the sentence rules out. The unit list is byte-shaped **deliberately**, and this
+measurement is why it stays that way.
+
+**What is left holding this class is the writing rule — and it is worth being exact about how strong
+that is, because it is weaker than "already covered".** *"A re-derivable figure states its method, so
+the next reader re-runs it instead of trusting it"* is in
+[Tessa's portable manual](../../../plugins/dkj-subagents/dkj-subagents-alpha/manuals/06-16-manual.md)
+and describes #1779 exactly. But it **predates** #1779, and #1779 is seven sites that did not follow it
+— so it is a rule already measured failing, not one shown to suffice. Two things keep it as the answer
+anyway, and neither is that it works reliably: no digit-anchored gate can see the form the failure took,
+and the one enforcement gap that *looked* addressable — a figure gate reaching script docstrings at all —
+was measured under [#1790](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1790) and
+declined too (below). What the rule
+demonstrably buys is legibility after the fact: `check-connectors.ps1:119` followed it, went stale by a
+line inside one fast-forward, and is **still correct to read**, because the sentence says how to
+re-derive it. That is the property worth insisting on, and it is not the same thing as prevention.
+
+**Extending check 16's file set to `.ps1` COMMENTS was measured and declined** (September 10, 2026,
+[#1790](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1790)). This is the second gap
+#1784 named — not `lines` as a unit, but the byte-shaped pattern check 16 already runs, pointed at
+script comments, where both recorded instances of the class ([#1779](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1779),
+[#1775](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1775)) actually happened. The
+narrow question was: should `$figurePattern` read `scripts/**` and `plugins/**/scripts/**` comments as
+well as `$consumerDocs`?
+
+**THE REASON THAT SETTLES IT: check 16's gateability claim is true of consumer prose and false of a
+`.ps1`.** Its docstring argues the byte-shaped haystack needs no heuristic because *"there is no
+authored, non-measured reason to write '939,860 bytes'"*. In a script there are two. **A design ceiling
+is an authored byte figure** — `script-contract-lib.ps1:459` and `build-release-notes-page.ps1:215`
+both write "32 KB per mark and 64 KB in total", beside the literals `$maxPerMark = 32KB` /
+`$maxTotal = 64KB` that enforce them. **And a `.ps1` has no fence**, which is the markup boundary check
+16 leans on to tell prose from code: in a script "everything outside a fence" is the whole file, so the
+pattern reads numeric literals, `Write-Host "... / 1KB)) KB"` interpolation and
+`Assert-Equal 0 $deadRow.Bytes 'a missing import costs 0 bytes'` as prose.
+
+**Measured against `main` at `130a4794`, over `scripts/*.ps1` with check 16's own pattern and window
+logic: 49 pattern hits, 26 flagged, and not one is a real defect.** The plugin mirrors under
+`plugins/dkj-policy/scripts/` and `plugins/dkj-subagents/dkj-subagents-shopify/scripts/` add 26 more raw
+hits — the triple-report the issue predicted — but the source-tree number sinks it on its own. The
+flagged sites fall into classes no regex separates from a defect:
+
+| class | why it is not a defect |
+|---|---|
+| encoding / mojibake prose | "the two UTF-8 bytes of U+00B7", "Windows-1252 bytes", "middot (U+00B7, bytes C2 B7)" — the digit-then-`bytes` shape fires on codepoint arithmetic, which this repo's script comments carry in a dozen places (the BOM / code-page trap) |
+| an ANSI escape in a test string | `"fix/a$([char]0x1B)[31mb"` yields "1mb" off `\x1B[31m` + a following `b`, and `-match` is case-insensitive — three sites in `ref-print-lib.tests.ps1` alone |
+| an authored design ceiling | `32 KB per mark`, `64 KB in total`, and the `32KB` / `64KB` literals beside them — the "no authored reason" premise, false here |
+| code read as prose | numeric literals, `Write-Host` size interpolation, `Assert-*` message strings — no fence, so no prose/code line |
+| check 16's own test fixtures | `check-plugin-integrity-entries.tests.ps1` holds "288 bytes" eight times as deliberate fixture data for this very check |
+| check 16's own docstring | "939,860 bytes" and "~/.claude/settings.json at 22 bytes" are cited there as illustrations of the class |
+| a degenerate constant | "0 bytes" meaning empty output (`native-capture-lib.ps1`, `ship-pr.ps1`) — it cannot drift |
+| a one-time historical delta | `subagent-shared-lib.ps1:38` — "dropping it takes those 178 lines from 17,332 to 13,027 bytes", a past-tense record of what one edit did |
+| a hedged approximate size | "~203 KB of portable prose", "~72MB of heap" — `~` is not in `$figureBinding` |
+
+**The one script comment that already does what the check would ask is
+`verify-resolved-issues.ps1:98`** — "measured September 9, 2026, 0 bytes at exit 0" — which carries a
+date and passes. That is the writing rule working, not a gate.
+
+**Same verdict and same shape as #1784.** The digit-anchored pattern cannot see #1779's actual form,
+it penalises the comments that measure and say so, and the mirror multiplication triples every finding.
+The unit list stays byte-shaped **and** the file set stays `$consumerDocs`-only; both are deliberate,
+and this measurement is why. **Revisit condition**: if a present-tense `` `<file>` is N KB `` claim
+carrying a decision ever reaches three or four live sites in script comments, revisit — but a file-set
+extension needs a PowerShell-aware comment extractor first, not `.ps1` bolted onto `$consumerDocs`,
+because the classes above are what "no fence" costs.
 
 **The PR template that caused the collision is itself the change** (Dave, August 9, 2026). It now carries
 one section — the changelog entry — because `open-pr.ps1` composes the body from
@@ -2512,6 +2690,84 @@ a wrong live one. And the two zero-state coverage notes **cannot be asserted fro
 fixture run invokes a copy of this script inside the fixture, and that copy carries the list, so one
 valid span always exists there. Both are written into the check's own header, because an unstated gap
 reads as coverage.
+
+#### Check 38 was proposed for removal, and the proposal was DECLINED on a measurement (September 10, 2026, [#1771](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1771))
+
+**The report asked for the opposite of what the gate does, and was wrong on its central claim.** #1771
+concluded that the manifest's `agents` key *"registers nothing, in every form the validator passes"*, that
+the four team plugins therefore ship no specialists at all, that `subagents/` must be renamed back to
+`agents/` across 44 occurrences with the key dropped, and that check 38 should additionally **refuse the
+key existing at all**. Its evidence was `claude plugin details` reporting `Agents (0)` for each of the
+four, reproduced against a two-plugin control.
+
+**That measurement is real and it answers a different question.** `plugin details` reports what its own
+inventory counts, and the inventory counts only defs found by convention in a plugin's default `agents/`
+directory. What it cannot tell you is what a **session** loads — and the session filing the report had
+all 26 subagents in its own agent list, from these four plugins, out of `subagents/`, named by the key.
+Nothing in the report's evidence contradicted that, because none of it looked there.
+
+**The evidence that needs no rig at all, and it was in the room.** The specialist who red-teamed this
+conclusion is `06-29-agent.md`, and in the resolved plugin cache that def is reachable **only** through
+`dkj-subagents-alpha`'s `agents` key: the cache holds `subagents/` and **no** `agents/` directory, so no
+convention scan could have found him. A subagent arguing about whether subagents load is a primary
+measurement, and it costs nothing to take.
+
+**The control that settles the exclusivity half, and the shape worth reusing.** A throwaway local
+marketplace, one plugin, two agent defs in one non-default directory with only **one** of them named in
+the `agents` key — installed **fresh** into a scratch project, then each one **actually dispatched**
+through `claude -p`:
+
+| def | in the `agents` key | in the resolved cache | `plugin details` | dispatched |
+|---|---|---|---|---|
+| `zebrafish` | yes | yes | not counted | **`ok ZEBRAFISH`** |
+| `quokka` | no, same directory | yes | not counted | **`Agent type 'keyed:quokka' not found`** |
+
+**Both columns on the right are the point, and the first version of this control had neither.** It asked
+a session to *list* the `subagent_type` values it had, which a model can answer from belief rather than
+from the harness — so the run above **invokes** instead, and a returned `ZEBRAFISH` is a dispatch that
+happened. And it installed at 1.0.0 and then *updated in place* to add the second def, against a CLI that
+had just printed `Restart to apply changes` — which makes `quokka` absent for a reason that has nothing
+to do with the key. Both defs are present from the first version now, and the cache is listed before the
+dispatch, so *"named loads, unnamed does not"* is the only reading left. Marlowe caught both holes in
+review; the conclusion survived, its proof did not, and a conclusion resting on a control this repo
+would not accept is one bad rerun away from being wrong.
+
+So the key **is** honoured by the loader, and honoured **exclusively** — which is the very sentence
+check 38's completeness rule already states (*"once the key is present it REPLACES convention discovery,
+so the list is the only way in"*), inferred from the validator in #1764 and now measured against the
+loader. Refusing the key would have forbidden the mechanism that works and un-guarded the one that
+does not. The rename was not built, and #1764's repair 1 stays declined.
+
+**And that leaves a standing cost, which is a trade rather than a repair.** Check 38's own header names
+it: this repo carries a hand-maintained list of 26 paths across four manifests, *"which is the shape this
+file exists to refuse"*. A specialist whose def ships without its manifest entry loads for nobody, and
+check 38 is the only thing in the tree that looks. That tax was accepted in exchange for not renaming a
+directory a fifth time; it is worth re-reading whenever the list grows, because the alternative did not
+become wrong, only unnecessary.
+
+**What DID need repairing was the instrument, and it had gone red without anyone reading it.**
+`measure-skill.ps1` refused two of the six enabled plugins with *"the output of `claude plugin details`
+did not parse as expected"* — `-ecomm` and `-lifehub`, the two that ship only agents — because the CLI
+prints no per-component table at all for a plugin whose inventory is all zeroes, and an empty table was
+read as a format change. The emptiness is now judged against the inventory's own counts: nothing owed is
+an `[INFO]` naming why, something owed is still the `[ERROR]`, and an inventory that could not be read
+**stays** the `[ERROR]` this check exists for — the three-state lesson `claim-issue`'s read-back learned
+in [#1628](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1628), where one boolean
+carried two opposite facts and printed the wrong one. The report's own second half is why it matters that
+the tool was believed: `Agents (0)` was read as *ships none*, and a share computed over a skills-only
+total was reading as *the skills are effectively all of this plugin's cost* while ~2,260 tokens of agent
+descriptions sat outside it. Both are now stated in the output;
+[Nolan's lens](06-25-extension.md#how-to-measure-it--claude-plugin-details-july-28-2026) carries the
+measurement half.
+
+**The transferable lesson is the one this repo's constitution already states** — *a reported finding's
+reason is verified before it is repaired, not just its symptom.* #1771's symptom reproduced exactly, on
+the first command; the reason behind it did not survive the second one. Had the reason been taken at its
+word, the repair would have moved 44 occurrences, reversed a rename decided the day before, and turned a
+working guard into one that refuses the working configuration — a change that satisfies the report, is
+wrong, and now carries a citation. The report's own author named the hazard in its last section and did
+not apply it to itself: *"that choice was made on my measurement of what the validator accepts, and I did
+not measure whether an accepted form loads."* The measurement missing at the top was the same one.
 
 In short: the **how** (managing the harness, scripts, config, safety guards) is portable; the **what**
 (the plugin lint + drift lint, `branch-info.ps1`, `.claude/settings.json` with the github source, and

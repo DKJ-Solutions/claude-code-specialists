@@ -35,12 +35,19 @@ $ErrorActionPreference = 'Stop'
 $RepoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
 $Script   = Join-Path $RepoRoot 'scripts\maintenance\tidy-machine.ps1'
 
-# tidy-lib depends on both of the first two: the pair test comes from merged-pr-lib, and the display
-# class Format-PasteablePathToken refuses on is ASKED of ref-print-lib's Get-DisplayPath rather than
-# re-typed here -- pr-issues.tests.ps1 pins that exactly two libs may type it, and an earlier draft of
-# this lib was the third.
+# tidy-lib depends on merged-pr-lib: the pair test comes from there. ref-print-lib is loaded because
+# tidy-machine.ps1 loads it -- this suite asserts that script's structure below -- and NOT because
+# tidy-lib needs it any more. It did until #1768, when Format-PasteablePathToken was retired in favour
+# of the one path answer this repo keeps, Get-PasteableRef -Kind Path; that function's own suite carries
+# the cases this file used to.
 . (Join-Path $RepoRoot 'scripts\lib\merged-pr-lib.ps1')
 . (Join-Path $RepoRoot 'scripts\lib\ref-print-lib.ps1')
+# command-probe-lib is for ONE assertion in section 9: that tidy-lib no longer defines the retired
+# formatter. Test-FunctionDefined rather than the Get-Command idiom it replaced (#1729) -- this probe
+# is a MISS by design, which is the expensive case there: a bare Get-Command answers a miss by scanning
+# every PATH directory for an executable of that name, and command-probe-lib.tests.ps1 refuses the idiom
+# tree-wide, which is how the first draft of this line was caught.
+. (Join-Path $RepoRoot 'scripts\lib\command-probe-lib.ps1')
 . (Join-Path $RepoRoot 'scripts\lib\worktree-lib.ps1')
 . (Join-Path $RepoRoot 'scripts\lib\tidy-lib.ps1')
 
@@ -247,32 +254,8 @@ Assert-Equal 0 $rn.Count 'an id that is not exactly <plugin>@<marketplace> is ne
 # An empty input is the normal state on a clean machine and must not fail on the single-element unwrap.
 Assert-Equal 0 @(Get-RetiredNameInstallRecords).Count 'no records at all is silence, not an error'
 
-# --- 7. The path formatter (issue #1762) ----------------------------------------------------------
-Write-Host '-- 7. paste-safe paths --' -ForegroundColor Cyan
-
-$t = Format-PasteablePathToken -Path 'C:\Users\x\repo-lanes\feat--thing'
-Assert-True $t.IsSafe 'an ordinary absolute Windows path is safe -- the shared ref allowlist refuses all of these'
-Assert-Equal "'C:\Users\x\repo-lanes\feat--thing'" $t.Token 'and it comes back single-quoted, which is literal in PowerShell'
-
-$t = Format-PasteablePathToken -Path "C:\it's\here"
-Assert-Equal "'C:\it''s\here'" $t.Token "an embedded single quote is doubled, the only escape the literal form has"
-
-# A '$(...)' inside a SINGLE-quoted PowerShell string is characters, not syntax. That is the whole
-# argument for this formatter over a double-quoted interpolation, which ref-print-lib's header calls
-# out by name as reading like a guard while being none.
-$t = Format-PasteablePathToken -Path 'C:\tmp\$(whoami).txt'
-Assert-True $t.IsSafe 'a shell metacharacter is inert inside the literal form, so it is not refused'
-Assert-Equal "'C:\tmp\`$(whoami).txt'" $t.Token 'and it survives verbatim, so the command targets the real file'
-
-$t = Format-PasteablePathToken -Path "C:\tmp\one$([char]0x202E)two"
-Assert-True (-not $t.IsSafe) 'a path that would repaint the terminal IS refused -- quoting cannot fix reading'
-Assert-True ($t.Note -like '*control or format characters*') 'and the note says why'
-
-$t = Format-PasteablePathToken -Path ''
-Assert-True (-not $t.IsSafe) 'an empty path is refused rather than printing a hole in a command'
-
-# --- 8. Scratch attribution -----------------------------------------------------------------------
-Write-Host '-- 8. scratch attribution --' -ForegroundColor Cyan
+# --- 7. Scratch attribution -----------------------------------------------------------------------
+Write-Host '-- 7. scratch attribution --' -ForegroundColor Cyan
 
 # A CONSTANT, NOT A FRESH GUID, AND NOT NAMED ONE EITHER. This is the hex tail of a NAME being
 # classified -- a string this suite reads, never a path it writes -- so the fixture rule's reason
@@ -286,19 +269,25 @@ Assert-Equal 'live'      (Get-ScratchLeftoverVerdict -Name "native-capture-777-$
 Assert-Equal 'live'      (Get-ScratchLeftoverVerdict -Name "native-capture-778-$leafHex" -LivePids @() -AgeHours 1) 'a young tree is live even with no matching pid -- the pid-reuse belt'
 Assert-Equal 'leftover'  (Get-ScratchLeftoverVerdict -Name "native-capture-779-$leafHex" -LivePids @() -AgeHours 999) 'an old tree whose pid is gone is attributable to a run that ended'
 
-# --- 9. The summary line --------------------------------------------------------------------------
-Write-Host '-- 9. the summary line --' -ForegroundColor Cyan
+# --- 8. The summary line --------------------------------------------------------------------------
+Write-Host '-- 8. the summary line --' -ForegroundColor Cyan
 Assert-Equal 'Lanes -- nothing found.' (Get-TidySummaryLine -Lane 'Lanes') 'an empty lane says so in words, not as three zeroes'
 Assert-Equal 'Lanes -- 1 acted on, 2 handed over, 3 left alone, of 6.' (Get-TidySummaryLine -Lane 'Lanes' -Acted 1 -Reported 2 -Untouched 3) 'and a populated one tallies'
 
-# --- 10. The structural promises ------------------------------------------------------------------
-Write-Host '-- 10. what the script may never contain --' -ForegroundColor Cyan
+# --- 9. The structural promises ------------------------------------------------------------------
+Write-Host '-- 9. what the script may never contain --' -ForegroundColor Cyan
 
 $src = [System.IO.File]::ReadAllText($Script, [Text.Encoding]::UTF8)
 
 # Comments carry the words 'delete' and 'remote' constantly -- the header is largely ABOUT not deleting
-# -- so the scan is over code lines only, with the comment tail of each stripped.
-$code = @($src -split '\r?\n' | ForEach-Object { ($_ -replace '#.*$', '') } | Where-Object { $_.Trim() })
+# -- so the scan is over code lines only. BLOCK comments are removed first and line-comment tails
+# second, and the order is the whole point: a `<# ... #>` body has no leading '#' on its inner lines,
+# so the tail strip alone leaves every one of them standing as apparent code. That was silent while the
+# forbidden words happened not to appear in one, and #1768 made it fire -- a function-comment paragraph
+# NAMING the retired formatter failed the assertion that the formatter is not CALLED. Both halves of
+# this section have always meant "in code", so the scan now says that.
+$srcNoBlocks = [regex]::Replace($src, '(?s)<#.*?#>', '')
+$code = @($srcNoBlocks -split '\r?\n' | ForEach-Object { ($_ -replace '#.*$', '') } | Where-Object { $_.Trim() })
 $codeText = ($code -join "`n")
 
 Assert-True ($codeText -notmatch "'--delete'") 'no --delete argument, in single quotes'
@@ -314,6 +303,17 @@ Assert-True ($codeText -notmatch 'ReapScratch') 'and the scratch-sweep flag does
 # what the first real run of this script did.
 Assert-True ($codeText -match "'is:unmerged'") 'the closed-PR lookup filters unmerged ON THE SERVER'
 Assert-True ($codeText -match "'--state', 'merged'") 'and the merged lookup is its own call'
+
+# ONE ANSWER FOR A PATH IN A PRINTED COMMAND (#1768). This script printed its lane paths through a
+# second mechanism for one day -- tidy-lib's Format-PasteablePathToken, a PowerShell single-quote
+# literal -- while sync-main.ps1 and check-plugin-integrity.ps1 printed theirs through the shared
+# allowlist. The literal is exact in PowerShell and silently WRONG in Git Bash, which reads its doubled
+# quote as close-then-open and resolves C:\it's\here to a different, existing-looking path; the second
+# of the two commands printed per lane is a bare `git worktree remove`, which is exactly what a reader
+# pastes into Git Bash. Pinned in both directions so the second mechanism cannot come back by halves.
+Assert-True ($codeText -notmatch 'Format-PasteablePathToken') 'the retired literal-quote formatter is not called here'
+Assert-True ($codeText -match "-Kind Path")                   'and the path handover goes through the shared allowlist'
+Assert-True (-not (Test-FunctionDefined 'Format-PasteablePathToken')) 'tidy-lib no longer defines it at all'
 
 Write-Host ''
 Write-Host "tidy-lib.tests: $script:pass passed, $script:fail failed." -ForegroundColor $(if ($script:fail -eq 0) { 'Green' } else { 'Red' })

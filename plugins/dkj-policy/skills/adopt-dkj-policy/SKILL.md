@@ -67,17 +67,33 @@ own plugin cache instead, so the easy route is to ask for the skill rather than 
 
 - **Strictly additive, never overwrites.** Every file that already exists is left exactly as it is,
   whatever it contains -- so a re-run finds nothing to do, and everything you wrote past the `VUL-IN`
-  markers is yours. **Nothing is ever rewritten**, which is new since August 23, 2026: `new-branch` used
+  markers is yours. **No FILE is ever rewritten**, which is new since August 23, 2026: `new-branch` used
   to refresh the generated `branch/templates/` on drift, and the merged development document carries its own
-  guidance, so there is no reference beside it left to keep current.
-- **With one bounded exception, and it is additive too: the folder README's UPDATE section.** A re-run
-  **appends** that section when your `README.md` does not carry it, and leaves the file alone once it
-  does. Create-when-absent is right for a page you then write in, and it is also the reason a section
-  added to this scaffold *later* reaches an already-adopted repo not at all -- so this one section
-  carries a marker comment (`<!-- dkj-policy:update-section -->`) that the run recognises. Bounded to one
-  append at the end of one file, in whichever folder `Get-WorkflowFolderName` says you actually have;
-  nothing else in the page is read, and nothing is rewritten. Delete the marker and the next `-Apply`
-  writes the section again, which is also how you take a newer version of it.
+  guidance, so there is no reference beside it left to keep current. (Since #1766 one *region* of one
+  file is -- the fenced block below. The file is still never rewritten as a whole, and nothing outside
+  those two markers is so much as read.)
+- **With one bounded exception: the fenced block in your folder README, which IS rewritten** (issue
+  #1766). One region of one file -- everything between `<!-- dkj-policy:update-section -->` and
+  `<!-- /dkj-policy:update-section -->` -- is the *plugin's* writing rather than yours, and `-Apply`
+  replaces it with the current version. It holds what this workflow is, where the three portable pages
+  live, how to update the plugins, and how to ask which version you are on. Nothing outside those two
+  markers is read, compared or written, in that file or any other.
+
+  **Why it is rewritten where nothing else is.** The block used to be appended once and then left
+  forever, which closed *"a section added later never arrives"* and left *"a section that arrived is
+  never corrected"* wide open. Everything in it is generated -- so a consumer's page went on naming the
+  branch document `development.md`, and went on listing two pre-rename plugin ids, a year after both
+  changed, with nothing to tell the reader whose sentence had gone stale. A block the plugin writes is
+  a block the plugin has to be able to correct.
+
+  **Three ways out, and they are all yours.** Write above or below the block and your words are never
+  touched. **Delete both markers** and the paragraphs become ordinary text in your file that no run
+  writes again. Or edit inside it -- and know that the next `-Apply` replaces what you wrote there,
+  which is the one place in this whole command where that is true.
+
+  **A page from before the fence is left exactly as it is.** An opening marker with no closing one has
+  no machine-readable end, so cutting to the end of the file would take your own writing with it. The
+  run says the section predates the fence and names the edit that opts in; it never guesses.
 - **The branch document comes from the shared formatter** -- the same one `new-branch` and the fold
   call -- so the scaffold cannot write a shape of its own.
 - **Refused in a repo that publishes plugins** (`.claude-plugin/marketplace.json` present). The source
@@ -424,17 +440,32 @@ A red run of that job has **three** entirely different causes, and only the log 
 1. the **checkout** failing on the token -- rule this out first, it is the only one that leaves every
    later step `skipped` and the fold step with no last lines at all;
 2. the fold **refusing** -- it ran and declined; its own last lines say why;
-3. the fold **succeeding** and its push being rejected by the ruleset -- a clean fold above a `GH013`.
+3. the fold **succeeding** and its push being rejected **by the ruleset** -- a clean fold above a `GH013`.
+   Read the rejection rather than the exit code: a push refused as a **non-fast-forward** wears this
+   cause's clothes and is not it -- that one is the race below. `GH013` names a rule and a ruleset; a
+   non-fast-forward names a ref and tells you to fetch first.
 
 **Read the fold step's own last lines before concluding anything** -- once there is a fold step to read.
 
-**One refusal is deliberately not on that list, because it no longer turns the job red** (inbound #1586).
-Where a second merge lands between the job's checkout and the fold, the fold's trunk-freshness guard
-refuses -- correctly, on an entry somebody else has by then already folded -- and the placed runner
-**stands down green** instead: exit code `2` from the fold, which nothing else in that script returns. It
-is lossless because that guard fires in a pre-pass, before a single entry is folded, and because the push
-that moved your trunk queues its own run of the same job behind this one. So a `Stood down:` line in the
-log is the job working, not a fold that went missing -- and every **other** non-zero code still fails.
+**Two refusals are deliberately not on that list, because neither turns the job red any more.** They are
+the two halves of one race -- another fold reaching your trunk while this job is folding the same entry --
+and they are separate codes because what has been *written* by the time each fires is different:
+
+- **exit `2`, the wide half** (inbound #1586). The other fold landed **before** the job's pre-pass read
+  the trunk, so the fold's trunk-freshness guard refuses having written nothing at all. It is lossless
+  because that guard fires in a pre-pass, before a single entry is folded, and because the push that moved
+  your trunk queues its own run of the same job behind this one.
+- **exit `3`, the narrow half** (inbound #1796). The other fold landed in the window **between** that
+  pre-pass and this job's own push, which no check at the top of a run can close. Entries were folded, a
+  commit was made, and the push came back a non-fast-forward. The fold earns this code by **measuring**
+  that every entry it carried is already upstream with an identical body -- so your trunk holds exactly
+  what the job exists to put there. The redundant commit is local to the runner's ephemeral workspace and
+  dies with it, which is why the placed runner may stand down here while a session folding onto a real
+  trunk may not.
+
+A `Stood down:` line in the log is the job working, not a fold that went missing -- and every **other**
+non-zero code still fails, including a non-fast-forward the fold could **not** prove redundant (one entry
+upstream, another genuinely new), because that commit carries work your trunk does not have.
 
 ### Exit code
 

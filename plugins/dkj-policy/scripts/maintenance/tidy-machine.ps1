@@ -223,13 +223,41 @@ function Write-RefHandover {
 
 function Write-PathHandover {
     <#
-        The same guard for a command carrying a FILESYSTEM PATH. -Kind Path selects the noun the
-        refusal note speaks in; the placeholder says which hole to fill, since '<branch>' would be the
-        wrong word for a worktree directory. The path is quoted here because a lane directory legally
-        contains spaces -- this repo's own default lane root is a sibling of the checkout.
+        The same guard for a command carrying a FILESYSTEM PATH. -Kind Path selects the pattern the
+        value is judged against, the noun the refusal note speaks in, and the strip that renders it
+        there; the placeholder says which hole to fill, since '<branch>' would be the wrong word for a
+        worktree directory.
+
+        THIS WENT THROUGH A SECOND MECHANISM FOR ONE DAY, AND THE ALLOWLIST WON (issue #1768). A
+        literal-quote formatter lived in tidy-lib.ps1 -- Format-PasteablePathToken -- which wrapped the
+        path in PowerShell single quotes instead of judging it, on the ground that it could then refuse
+        nothing but a path that would REPAINT the line. Two things retired it.
+
+        ITS PREMISE HAD ALREADY EXPIRED WHEN IT LANDED. It argued that Get-PasteableRef -Kind Path
+        judges against the ref allowlist, so "NO absolute Windows path can pass it, ever" -- true of the
+        pattern it was written against, and false eleven minutes later: #1765 gave the path axis its own
+        $PathPasteSafePattern with ':' and a folded '\', and an ordinary lane path passes it. The noise
+        that justified a second mechanism was gone before the second mechanism was read.
+
+        AND ITS GUARANTEE IS ONE SHELL'S, WHILE THE TWO COMMANDS BELOW ARE NOT. The single-quoted
+        literal is exact in PowerShell and in nothing else this workflow commits to. Measured,
+        September 10, 2026: the token for C:\it's\here is 'C:\it''s\here', and bash reads a doubled
+        quote as a CLOSE followed by an OPEN, so Git Bash resolves it to C:\its\here -- a different,
+        plausible-looking path, silently, with no error to notice. In cmd, where single quotes are not
+        quoting at all, any spaced path splits into two arguments. That matters here specifically
+        because the two lines this function prints per lane are 'worktree-lane.ps1 -HandBack -Lane ...',
+        which is PowerShell-only, and 'git worktree remove ...' directly beneath it, which is exactly
+        the kind a reader pastes into Git Bash.
+
+        SO A SPACE IS REFUSED RATHER THAN ADMITTED, AND THAT IS THE ANSWER, NOT A GAP. The token is
+        printed UNQUOTED -- ref-print-lib's header is explicit that quoting is not the guard -- so a
+        space admitted to the allowlist would produce 'git worktree remove C:/Program Files/x', which
+        splits in every shell rather than one. The refusal prints the placeholder and a note naming the
+        real path as inert prose, for the reader to quote for the shell they are actually in.
+        ref-print-lib.tests.ps1 has asserted that verdict for 'C:\Program Files\a b\x' since #1762.
     #>
     param([string]$Prefix, [string]$Path, [string]$Suffix = '', [string]$Placeholder = '<that lane>')
-    $safe = Format-PasteablePathToken -Path $Path -Placeholder $Placeholder
+    $safe = Get-PasteableRef -Ref $Path -Kind Path -Placeholder $Placeholder
     $tail = if ($Suffix) { " $Suffix" } else { '' }
     Write-Handover "$Prefix $($safe.Token)$tail"
     if ($safe.Note) { Write-Item "    $($safe.Note)" 'DarkGray' }

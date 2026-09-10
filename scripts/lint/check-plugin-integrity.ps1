@@ -4483,6 +4483,18 @@ Write-Coverage -Category 'check-list' -Checked $clChecked `
 # BORN GREEN, over the repair in the same branch: 4 plugin(s) declaring 26 def(s), 26 named, 0 findings, 0
 # exemptions. Against the tree as v4.33.0 shipped it the same reader reports 4 -- one per team plugin -- so
 # it fires on what it was written for rather than merely passing.
+#
+# AND THE COMPLETENESS RULE IS MEASURED AGAINST THE LOADER NOW, not only inferred from the validator
+# (#1771, September 10, 2026). It was proposed that this check should additionally REFUSE the key outright,
+# on the ground that 'claude plugin details' reports 'Agents (0)' for all four team plugins and the key
+# therefore registers nothing. That count is the inventory's, and the inventory counts only defs found by
+# convention in the default agents/ directory -- it says nothing about what a session loads. A two-plugin
+# control settles it: two defs in one non-default directory, only one named by the key, installed into a
+# scratch project and read back from a real session via 'claude -p'. The named def is THERE; the unnamed
+# one, same directory, is NOT. So the key is honoured, and honoured exclusively, exactly as the
+# completeness finding above says -- and refusing it would forbid the mechanism that works. The defect
+# #1771 actually found is in the instrument: measure-skill.ps1 read the empty per-component table of an
+# agents-only plugin as a CLI format change, which is repaired there.
 $akPlugins  = 0
 $akDeclared = 0
 $akFindings = 0
@@ -4530,8 +4542,10 @@ foreach ($akPlugin in $akRoots) {
         continue
     }
 
-    # string|string[]: a bare string is one element, which is what the validator accepts.
-    $akEntries = if ($akManifest.agents -is [string]) { @([string]$akManifest.agents) } else { @($akManifest.agents) }
+    # string|string[]: a bare string is one element, which is what the validator accepts. Read through
+    # plugin-tree-lib's Get-ManifestAgentEntries, the ONE reading of this field -- measure-skill-lib's
+    # Get-DeclaredAgentCount carried a second one until #1781, and the two could not disagree loudly.
+    $akEntries = @(Get-ManifestAgentEntries -Manifest $akManifest)
     $akNamed = @{}
     foreach ($akEntry in $akEntries) {
         $akDeclared++

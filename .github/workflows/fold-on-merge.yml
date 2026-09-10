@@ -58,12 +58,19 @@
 #
 #   2. THE FOLD REFUSING. It ran and declined; its own last lines say why. The #1497 misread of
 #      dkj-policy/CHANGELOG.md (2026-09-05 23:56 and 2026-09-06 07:32, repaired by #1498) was this.
-#      ONE refusal is excluded from this list and no longer turns the job red at all -- the trunk-gap
-#      guard, exit code 2, which the fold step translates into a stood-down green (#1586, below). The
-#      list stays three because that case is not a failure mode: it is this job declining to answer a
-#      question a successor run is already queued to answer.
+#      TWO refusals are excluded from this list and no longer turn the job red at all -- the trunk-gap
+#      guard, exit code 2 (#1586), and the redundant-fold verdict, exit code 3 (#1796), both of which
+#      the fold step translates into a stood-down green. The list stays three because neither is a
+#      failure mode: both are this job finding that the trunk already holds, or is about to hold, the
+#      entry it was triggered to put there. See THE RACE HAS TWO SIDES below.
 #
-#   3. THE FOLD SUCCEEDING and its push being rejected by the ruleset -- a clean fold above a GH013.
+#   3. THE FOLD SUCCEEDING and its push being rejected BY THE RULESET -- a clean fold above a GH013.
+#      READ THE REJECTION, because a push can also be refused as a NON-FAST-FORWARD, which looks like
+#      this cause and is not it: that one is the race below, and where the fold proves the entry is
+#      already upstream it never reaches this list at all (exit 3). GH013 names a rule and a ruleset;
+#      a non-fast-forward names a ref and tells you to fetch first. A non-fast-forward that the fold
+#      canNOT prove redundant -- one entry upstream, another genuinely new -- is still exit 1 and is
+#      still this cause, correctly: that commit carries work the trunk does not have.
 #      Measured verbatim in run 34020828593, the push carrying the #1498 merge, 2026-09-06 08:04:
 #
 #        Folded and removed: dkj-policy/fix-1497-fold-all-reserved-names.md (tier 2, significance 4 -- ...)
@@ -91,7 +98,7 @@
 # and by 08:50:42 the shipping session had pushed that branch's own fold, leaving this checkout 1 behind
 # and the guard refusing on an entry already folded. The guard was right, and the trunk ended correct.
 #
-# SO THIS JOB STANDS DOWN ON THAT ONE REFUSAL RATHER THAN GOING RED, and the argument is #1543's own,
+# SO THIS JOB STANDS DOWN ON THAT REFUSAL RATHER THAN GOING RED, and the argument is #1543's own,
 # one step further along: this job exists to answer "does the trunk carry a leftover NOW", and a trunk
 # that moved under it has changed what "now" means. The push that moved it is itself a push to main, so
 # it has its own run of this workflow queued behind this one (cancel-in-progress: false, constant group),
@@ -102,6 +109,31 @@
 # FETCH + --ff-only BEFORE THE FOLD WAS THE OTHER CANDIDATE AND WAS DECLINED. It would shrink the window
 # from ~11s to ~1s without closing it, which leaves this job red RARELY -- worse than predictably red,
 # and still the fourth self-healing meaning the three modes below exist to keep out.
+#
+# THE RACE HAS TWO SIDES, AND THE ~1s THAT SURVIVES ABOVE IS THE OTHER ONE (issue #1796). Everything
+# down to here is the WIDE half: the other fold landed before this job's pre-pass read the trunk, so the
+# guard refuses having written nothing (exit 2). Reaching the NARROW half needs the other fold to land
+# inside the window between that read and this job's own push -- and then the pre-pass passes, entries
+# are folded, a commit is made, and the push comes back refused as a non-fast-forward. No check at the
+# top of a run can close a window that opens after it, which is why declining the --ff-only shrink above
+# did not decide this and a second code was needed rather than a better pre-pass.
+#
+# THIS JOB STANDS DOWN ON THAT ONE TOO (exit 3), AND ITS GROUND IS DIFFERENT FROM #1586'S -- worth
+# stating, because reusing #1586's reasoning here would be wrong twice over. That argument is "nothing
+# was written, and a successor run is already queued to answer the question". Neither holds here: a
+# commit WAS made, and no successor is owed anything, because the trunk is ALREADY correct. The ground
+# is simpler and stronger -- the fold script proves every entry it folded is upstream already, present
+# with an identical body, which is the only outcome this job exists to bring about. The redundant
+# commit is real, and it is real in an EPHEMERAL WORKSPACE: unlike the session's side of the same race
+# (#1792), where it lands on a trunk somebody has to live with, here it dies with the runner and there
+# is nothing left to clean up.
+#
+# THE CODE ITSELF IS #1792'S, AND THAT IS WHY IT IS TRUSTWORTHY HERE. Both sides of this race were found
+# and repaired within hours of each other -- #1792 from the session's side, this from the runner's -- and
+# both reached for the same third code independently, on the same measurement, before either knew of the
+# other. So exit 3 is not a signal invented for this file's convenience: it is the fold script's own
+# verdict, defined and asserted where the fold lives, with two callers that read it and answer it
+# differently. Read its EXIT CODES block before adding a third reader.
 #
 # NO CONCURRENCY CANCELLATION, AND A CONSTANT GROUP (issue #1544), unlike unfolded-entry.yml's read-only
 # report -- that one can let a later run supersede an earlier one, because both report the same fact.
@@ -196,6 +228,25 @@ jobs:
           if ($foldExitCode -eq 2) {
             Write-Host "Stood down: the trunk moved between this job's checkout and the fold, so nothing was folded and nothing was written."
             Write-Host "  The push that moved it has its own run of this workflow, whose checkout includes it. See fold-on-merge.yml's header (#1586)."
+            exit 0
+          }
+
+          # EXIT 3 IS "SOMEBODY ELSE FOLDED THIS WHILE I WAS FOLDING IT", AND THIS JOB STANDS DOWN ON IT
+          # TOO (issue #1796). It is the narrow half of the same race exit 2 answers: 2 when the other
+          # fold landed before this job read the trunk, 3 when it landed in the ~1s between that read and
+          # this push. The fold script earns this code by MEASURING it -- every entry this run folded is
+          # already upstream with an identical body -- not by the push having failed, so a GH013 ruleset
+          # rejection (cause 3 in the header) still fails below, exactly as it always did.
+          #
+          # THE COMMIT THIS ONE LEAVES BEHIND IS WHY IT IS A SEPARATE CODE AND NOT MERGED INTO 2. A run
+          # that ends here HAS committed, redundantly, in this runner's workspace -- which is thrown away
+          # when the job ends, so there is nothing to clean up and no half-state for anybody to inherit.
+          # ship-pr.ps1 stands down on the same code (issue #1792) and CANNOT stop there: its commit sits
+          # on a real trunk, so its step 5c prints the commands to preserve and realign it. Two readers,
+          # one code, and deliberately different answers -- the difference is whose trunk it is.
+          if ($foldExitCode -eq 3) {
+            Write-Host "Stood down: the fold's push lost the race, and every entry it carried is already on the trunk with an identical body -- so the trunk holds what this job exists to put there."
+            Write-Host "  The redundant commit is local to this runner's workspace and dies with it. See fold-on-merge.yml's header (#1796)."
             exit 0
           }
 

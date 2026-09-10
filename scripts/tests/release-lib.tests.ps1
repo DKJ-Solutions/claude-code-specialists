@@ -1412,6 +1412,61 @@ Assert-Equal './plugins/dkj-subagents/dkj-subagents-alpha' $nestedRoots[0].Sourc
 Assert-Throws { Get-PluginRoots -RepoRoot $fakeRoot -MarketplaceJson '{"plugins": [{"name": "x", "source": "../outside"}]}' } 'source with a ..-path outside the repo throws (containment)'
 Assert-Throws { Get-PluginRoots -RepoRoot $fakeRoot -MarketplaceJson '{"plugins": [{"name": "x", "source": "C:\\elsewhere"}]}' } 'absolute source throws (containment)'
 
+Write-Host "Get-ManifestAgentEntries" -ForegroundColor Cyan
+
+# EVERY FORM THE INSTALLER ACCEPTS, over a real ConvertFrom-Json object rather than a hashtable: the two
+# callers both hand this function a parsed manifest, and a PSCustomObject is the only thing whose
+# PSObject.Properties probe behaves as they rely on. #1781 -- these asserts exist so that the gate's
+# reading and measure-skill's count cannot drift apart, which is what two independent copies allowed.
+$akArray = '{ "name": "a", "agents": ["./subagents/a.md", "./subagents/b.md", "./subagents/c.md"] }' | ConvertFrom-Json
+Assert-Equal 3 (@(Get-ManifestAgentEntries -Manifest $akArray)).Count 'an array key yields its elements'
+Assert-Equal './subagents/a.md' (@(Get-ManifestAgentEntries -Manifest $akArray))[0] 'and in the order the manifest wrote them'
+
+# THE FORM A NAIVE COUNT GETS WRONG, and the reason this function exists at all. In 5.1 a string's
+# .Count is 1 only by accident of scalar unrolling and .Length is its character count -- 17 here.
+$akBare = '{ "name": "a", "agents": "./subagents/only.md" }' | ConvertFrom-Json
+Assert-Equal 1 (@(Get-ManifestAgentEntries -Manifest $akBare)).Count 'a BARE STRING is ONE entry, not its character count'
+Assert-Equal './subagents/only.md' (@(Get-ManifestAgentEntries -Manifest $akBare))[0] 'and the entry is the whole path, not its first character'
+
+# THE THREE WAYS 'DECLARES NONE' ARRIVES, all of them the ordinary case for a plugin that ships none.
+Assert-Equal 0 (@(Get-ManifestAgentEntries -Manifest ('{ "name": "a" }' | ConvertFrom-Json))).Count 'no agents key at all -> empty set'
+Assert-Equal 0 (@(Get-ManifestAgentEntries -Manifest ('{ "name": "a", "agents": null }' | ConvertFrom-Json))).Count 'an explicit null -> empty set'
+Assert-Equal 0 (@(Get-ManifestAgentEntries -Manifest ('{ "name": "a", "agents": [] }' | ConvertFrom-Json))).Count 'an empty array -> empty set'
+Assert-Equal 0 (@(Get-ManifestAgentEntries -Manifest $null)).Count 'and a manifest that could not be parsed at all -> empty set, not a throw'
+
+# WHAT MUST NOT BE FILTERED. An entry that is not a non-empty string is exactly what check 38 exists to
+# REFUSE, so it has to arrive at the caller. Dropping it here would make the gate silently pass the
+# manifest whose whole plugin the installer then fails to install ('agents: Invalid input', #1764).
+$akBad = '{ "name": "a", "agents": ["./subagents/a.md", "", 7] }' | ConvertFrom-Json
+Assert-Equal 3 (@(Get-ManifestAgentEntries -Manifest $akBad)).Count 'an empty string and a number are handed back, not silently dropped'
+Assert-Equal '' (@(Get-ManifestAgentEntries -Manifest $akBad))[1] 'the empty entry survives the normaliser so the validator can refuse it'
+
+# THE PROBE, UNDER THE STRICT MODE ITS CALLER ACTUALLY RUNS. check-plugin-integrity.ps1 sets
+# Set-StrictMode -Version Latest, where reading an absent property THROWS -- so the happy-path assert
+# above proves nothing about the keyless case. Scoped to this block, and restored by leaving it.
+& {
+    Set-StrictMode -Version Latest
+    Assert-Equal 0 (@(Get-ManifestAgentEntries -Manifest ('{ "name": "a" }' | ConvertFrom-Json))).Count `
+        'the keyless manifest is an empty set under Set-StrictMode -Version Latest, not a PropertyNotFoundException'
+    Assert-Equal 1 (@(Get-ManifestAgentEntries -Manifest ('{ "name": "a", "agents": "./o.md" }' | ConvertFrom-Json))).Count `
+        'and the bare string still reads as one entry there'
+}
+
+# THE CALLERS ACTUALLY REACH IT -- the structural half, asserted on the source text. A shared reading is
+# correct and pointless if a caller still carries its own, and this is the duplication #1781 was filed
+# about, so the suite is where its return would be caught. Same shape as git-porcelain-lib.tests.ps1's
+# assert over park-lib and fanout-lib, for the same reason (#1682).
+$akRepoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
+foreach ($akCaller in @('scripts\lint\check-plugin-integrity.ps1', 'scripts\lib\measure-skill-lib.ps1')) {
+    $akText = [System.IO.File]::ReadAllText((Join-Path $akRepoRoot $akCaller))
+    Assert-Match   $akText 'Get-ManifestAgentEntries' "$akCaller calls Get-ManifestAgentEntries"
+    Assert-NoMatch $akText '\.agents -is \[string\]'   "$akCaller no longer carries its own 'agents' reading"
+}
+# And the shared copy is the ONE place that test allows the pattern to live, so a third caller cannot
+# quietly reintroduce it under a name this loop does not list.
+$akLibText = [System.IO.File]::ReadAllText((Join-Path $akRepoRoot 'scripts\lib\plugin-tree-lib.ps1'))
+Assert-Equal 1 (@([regex]::Matches($akLibText, '\.agents -is \[string\]'))).Count 'the normaliser holds exactly one such reading'
+
 Write-Host "Get-PluginRootByName" -ForegroundColor Cyan
 Assert-Equal 'plugins\dkj-policy' (Get-PluginRootByName -PluginRoots $nestedRoots -Name 'dkj-policy').RelativeRoot 'resolves a name to its root'
 Assert-Equal $null (Get-PluginRootByName -PluginRoots $nestedRoots -Name 'workflow-nobody') 'an unknown name resolves to $null rather than a guessed path'

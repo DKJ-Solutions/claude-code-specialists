@@ -104,7 +104,8 @@ The six steps, stopping on the first failure:
    [which copy of the document both gates read](#the-two-merge-gates-read-the-branchs-commit-and-why-they-used-to-read-the-tree).
 5. **Check out the main branch, fast-forward, and fold** — handed to `fold-changelog-entry.ps1 -Push`,
    which folds the entry, commits it and pushes it. See
-   [Why the fold is delegated](#why-the-fold-is-delegated-rather-than-inlined).
+   [Why the fold is delegated](#why-the-fold-is-delegated-rather-than-inlined) and
+   [losing that fold to `fold-on-merge` is a success](#losing-the-fold-race-is-a-stood-down-success-not-a-failed-ship-1792).
 6. **Verify the issues the PR declared it closes are actually closed**, and close any that are not.
 
 ## The parameters
@@ -650,6 +651,38 @@ on a clean main immediately after a merge and prune — and it aborts in the one
 the fold, which is the state nothing reports: the PR is merged, the entry file is still in the root, and
 every gate stays green until a release trips over it. Git raises that when handed more than one ref;
 naming `origin/main` explicitly hands it exactly one.
+
+### Losing the fold race is a stood-down success, not a failed ship ([#1792](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1792))
+
+`fold-on-merge.yml` runs on **every** push to the trunk, so the merge in step 4 triggers the very job
+step 5 is racing. Where a repo has no merge queue — which is most of them, and this workflow's ordinary
+path since [#1720](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1720) — both fold, and
+whichever gets its push in second is refused. Losing it is not a defect in either runner: the trunk ends
+up folded exactly once, which is the whole point of having the second runner at all.
+
+**What it used to cost when the loser was this session.** Step 5 read the fold's exit code as `-ne 0`, so
+a race lost by seconds was reported as *"the fold is NOT committed or NOT pushed"* — over a ship that had
+merged, folded and closed its issues correctly. Measured shipping PR #1789 on 2026-09-10: the two fold
+commits had **identical trees**, `origin/main` was right, and the session was left standing on a local
+trunk diverged 1/1 — a state whose obvious remedies (`reset --hard`, a rebase on a shared branch) a repo
+running this workflow typically reserves to a person, so the operator was handed a state they were not
+allowed to fix.
+
+**The repair is the fold's `3`, read here as a stand-down.** `fold-changelog-entry.ps1` returns `3` only
+when it committed, its push was refused, and **every** entry that commit carries is already upstream with
+an identical body — see the [`fold-changelog` skill](../fold-changelog/SKILL.md). That is "the fold
+happened, somebody else made it", so `ship-pr` carries straight on to step 5b, step 6 and its report, and
+the closing line names who folded. Any other non-zero code is the hard failure it always was.
+
+**And step 5c says what the race actually cost, which is local only.** The fold commit is still sitting on
+this checkout's trunk, so the run prints two commands: a `backup/fold-<branch>` ref that preserves the
+commit, then the one realignment the tree it finds can run — `reset --keep origin/main` where the trunk is
+checked out here, `branch -f main origin/main` where nothing holds it (a detached tree included). No fetch
+is printed: the fold's own diagnosis had to fetch `origin/<trunk>` to reach this verdict at all, so it is
+already current. **Neither command is executed.** `--keep` is not `--hard`, but a script that moves a trunk
+pointer on its own has taken a power nobody granted it, and the fold script it delegates to declines the
+same thing in as many words. What #1792 measured missing was never the authority — it was the sentence
+naming which two commands, which the operator of that incident had to derive by hand.
 
 ## Step 6 on its own: repairing bookkeeping after the fact
 

@@ -29,7 +29,7 @@ joke at its own expense.
 | always-on + on-invoke tokens, per skill, with a baseline delta | **this skill**, pass 1 |
 | wall-clock of the script behind a skill | **this skill**, pass 2 — read-only invocations only |
 | the always-on **document** path — `CLAUDE.md` plus its `@`-imports, per document and per section | **this skill**, via [`measure-always-on.ps1`](#the-second-script-on-this-page--the-always-on-document-path) — a different subject: what the repo's own instruction documents cost, not what the plugins cost |
-| frontmatter, dead links, parameter coverage, printed install commands | `check-plugin-integrity.ps1` — 27 checks. Not duplicated here: two verdicts on one subject is worse than one. |
+| frontmatter, dead links, parameter coverage, printed install commands | `check-plugin-integrity.ps1`, which carries a numbered check for each. Not duplicated here: two verdicts on one subject is worse than one. |
 | whether the skill actually WORKS — does it fire, does it beat no-skill | `claude plugin eval`. Designed for, not built. See [Pass 3](#pass-3--effectiveness-designed-not-built) below. |
 
 **It computes no token count of its own, deliberately.** Pass 1 parses `claude plugin details`, whose
@@ -75,6 +75,21 @@ whose shape the CLI owns. Two cross-checks run before any figure is printed: the
 printed `Always-on` total within tolerance, and every skill the component inventory names must have
 produced a row. Either failing is an `[ERROR]` and **no table is printed for that plugin** — a
 plausible wrong number is worse than a refusal.
+
+**Failing loudly is only a virtue where the failure is real**, and this refused two of six enabled
+plugins over output that was entirely intact ([#1771](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1771)).
+The CLI prints **no per-component table at all** for a plugin whose inventory declares no skills and no
+agents — there is nothing to tabulate, and `Always-on: ~0 tok` corroborates it. So an empty table is
+judged against that inventory rather than on its own: no rows **and** something owed is still the
+`[ERROR]`, no rows and nothing owed is an `[INFO]` naming why, and an inventory that could not be read at
+all stays the `[ERROR]` the check was written for.
+
+**And it says what the figures do NOT cover.** The inventory's `Agents (N)` counts only defs found by
+convention in a plugin's default `agents/` directory. A def named by the manifest's `agents` key **loads
+in a session** and is counted as **0** — measured with a two-plugin control against Claude Code 2.1.267 —
+so for such a plugin every always-on figure here, its printed total included, is **skills only**. The
+report states that rather than letting a 100% share imply the skills are the whole cost, and rather than
+letting `Agents (0)` read as *ships none*: that second misreading is what #1771 was filed on.
 
 Two notations share one table and both are handled: `~3.031` is **3031** (the dot is a thousands
 separator) while `~1.3k` is **1300**. A parser that read the first as 3.031 would under-report by a

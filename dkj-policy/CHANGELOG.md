@@ -43,7 +43,348 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**3 / 13 minor entries** <!-- pending-tally -->
+**6 / 22 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1796-fold-push-race-stand-down · 20260910-125423
+
+`fold-on-merge.yml` no longer goes red when it loses the fold race at the **push**. That race has two
+halves: the other fold landing before the job's pre-pass reads the trunk (exit `2`, stood down since
+#1586), and it landing in the ~1s between that read and the job's own push -- which no check at the top
+of a run can close, because the window opens after it. The second half folded, committed, and came back
+a non-fast-forward, and the job went red on a trunk that was already correct.
+
+`fold-changelog-entry.ps1` signals that case with exit code `3` -- introduced by #1792 hours earlier for
+the session's side of the same race, and earned by a measurement rather than by the push having failed:
+every entry the run folded is already upstream, present with an identical body. The runner stands down
+on it, and the redundant commit it leaves behind dies with the ephemeral workspace. A push refused for
+any other reason -- a ruleset `GH013`, a credential, or a non-fast-forward where one entry is upstream
+and another is genuinely new -- is still exit `1` and still red, which is what keeps this from becoming
+a blanket "ignore a failed push".
+
+So one code now has two readers that answer it differently, on purpose: `ship-pr.ps1` stands down and
+then reports the redundant commit, because it sits on a trunk somebody has to live with; this runner
+stands down and says nothing more, because its workspace is discarded. The suite that owns the code
+pins both readers -- the workflow's half was asserted nowhere until now, only the template it ships.
+
+The header's three-cause triage could not tell a ruleset rejection from a non-fast-forward -- the
+report's own point -- so cause 3 now names the difference in the reader's terms: `GH013` names a rule
+and a ruleset, a non-fast-forward names a ref and tells you to fetch first.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+A consumer running the placed fold runner gets the same stand-down through `adopt-merge-queue.ps1`'s
+template, and the `adopt-dkj-policy` skill now documents two stood-down refusals as the two halves of
+one race rather than one. Nothing for them to do: an adopted runner picks it up with the plugin update,
+and a red run they would otherwise have read as a ruleset problem stops happening.
+
+**Score:** 2
+
+#### Pull Request
+
+The fold-on-merge runner stands down when it loses the fold race at the push
+
+Plugins: dkj-policy
+
+[PR #1798](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1798)
+
+---
+
+### DEPLOY: fix/1781-agents-key-one-normaliser · 20260910-124041
+
+The manifest's `agents` key has one reader. It is `string|string[]`, a bare string being one entry, and
+two scripts each carried their own reading of it: check 38 `[agents-key]` in `check-plugin-integrity.ps1`,
+normalising to a list in order to validate each element, and `Get-DeclaredAgentCount` in
+`measure-skill-lib.ps1`, normalising to a count. Both now call `Get-ManifestAgentEntries` in
+`plugin-tree-lib.ps1` -- the lib built to end exactly this, one layer up, when five separate copies each
+encoded their own idea of where a plugin lives.
+
+Nothing behaves differently today, and the point is that it cannot start to. The two copies agreed and
+both were asserted, so what was unguarded was that they could not DISAGREE: if the installer ever accepts
+a third form, one copy learns it and the other does not, and the failure is silent in opposite directions
+-- the gate passes a manifest it should refuse, or `measure-skill` reports an agent count that is not the
+plugin's. The guard against the copies returning is structural rather than a convention: the suite asserts
+on source text that neither caller carries its own reading and that the normaliser holds exactly one.
+
+**Score:** 1
+
+#### What makes this deploy extra special
+
+Both libs travel in the `dkj-policy` mirror, so a consumer receives the refactor -- but no behaviour
+changes for them: every existing assert holds unmodified. Nothing to notice.
+
+**Score:** N/A
+
+#### Pull Request
+
+One reading of the manifest 'agents' key, shared by check 38 and measure-skill-lib
+
+Plugins: dkj-policy
+
+[PR #1799](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1799)
+
+---
+
+### DEPLOY: fix/1792-fold-race-stand-down · 20260910-121848
+
+**A fold lost to `fold-on-merge.yml` no longer fails the ship.** `fold-changelog-entry.ps1` returns a new
+exit code **`3`** when it committed, its push was refused, and **every** entry that commit carries is
+already upstream with an identical body -- "the fold happened, somebody else made it". `ship-pr.ps1` reads
+that as a stood-down success and carries on through its remaining steps instead of reporting a hard failure,
+and its closing line names who folded. Every other non-zero code is the failure it always was, and an
+ordinary divergence keeps `1`, because that commit carries work. Fixes #1792.
+
+**A new step 5c says what the race actually cost, which is local only:** the redundant fold commit still
+sitting on this checkout's trunk. It prints a `backup/fold-<branch>` ref that preserves the commit, then the
+one realignment the tree it finds can run -- `reset --keep origin/main` where the trunk is checked out here,
+`branch -f main origin/main` where nothing holds it -- and **runs neither**. `--keep` is not `--hard`, but a
+script that moves a trunk pointer has taken a power nobody granted it, and the fold script declines the same
+thing one step below. What #1792 measured missing was never the authority; it was the sentence naming which
+two commands.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+Measured shipping PR #1789 on 2026-09-10: the two fold commits had **identical trees** and `origin/main` was
+correct, so nothing was at stake in the content -- and the shipping session was still told its ship had
+failed and left holding a state its own constitution forbade every obvious route out of. That asymmetry is
+the whole finding: a red CI job is read once and closed, while this ended a correct chain on a trunk the
+operator was not allowed to fix.
+
+**`2` and `3` are deliberately not one code.** After the pre-pass's `2` nothing was written and there is
+nothing to clean up; after `3` a commit is on the local trunk. Neither script repairs it, so a caller that
+conflated them would either invent a leftover that does not exist or stay silent about one that does -- and
+silence is the one outcome worse than the hard failure this removes.
+
+**Score:** N/A
+
+#### Pull Request
+
+The fold losing the race to fold-on-merge is a stood-down success, not a failed ship
+
+Plugins: dkj-policy
+
+[PR #1797](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1797)
+
+---
+
+### DEPLOY: docs/1790-figure-gate-script-comments · 20260910-114054
+
+The `[measured-figure]` gate stays byte-shaped and `$consumerDocs`-scoped. #1790 proposed pointing its
+existing pattern at `.ps1` comments; measured over `scripts/*.ps1` it flags 26 sites and zero real
+defects — encoding prose, ANSI escapes in test strings, authored design ceilings, code read as prose,
+and the check's own fixtures and docstring. Declined for the same reasons as #1784's line-count
+proposal, recorded in the system-administration lens.
+
+It prevents nothing that has failed; it closes a proposal so the next reader does not re-measure the
+same haystack.
+
+**Score:** 1
+
+#### What makes this deploy extra special
+
+A lens write-up about an internal lint gate; no consumer of the plugins notices.
+
+**Score:** N/A
+
+#### Pull Request
+
+Decline extending the measured-figure gate to .ps1 comments, and record the haystack
+
+[PR #1795](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1795)
+
+---
+
+### DEPLOY: fix/1771-plugin-details-agent-count · 20260910-113257
+
+`measure-skill` no longer refuses a plugin that ships only subagents. `claude plugin details` prints no
+per-component table for a plugin whose inventory is all zeroes, and reading that as a CLI format change
+put an `[ERROR]` on two of this repo's six enabled plugins — `dkj-subagents-ecomm` and
+`dkj-subagents-lifehub` — over output that was entirely intact. The emptiness is now judged against the
+inventory's own counts, so nothing owed is an `[INFO]` naming why, something owed is still an `[ERROR]`,
+and an unreadable inventory stays the `[ERROR]` the check exists for.
+
+It also says what its figures do not cover. The inventory's `Agents (N)` counts only defs discovered by
+convention in a plugin's default `agents/` directory; a def named by the manifest's `agents` key loads in
+a session and is counted as 0. Every always-on figure for such a plugin is therefore skills only, which
+made the report read as *"the skill descriptions account for effectively ALL of this plugin's always-on
+cost"* over `dkj-subagents-alpha`, whose 15 uncounted agent descriptions are roughly three times the
+figure printed. Both readings are now stated in the output — including that `Agents (0)` means *not
+counted here*, never *ships none*, which is the misreading #1771 was filed on.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A — the tool measures what a plugin costs a session; it ships to no subscriber and changes nothing a
+consumer's own repo does.
+
+**Score:** N/A
+
+#### Pull Request
+
+measure-skill stops misreading an agents-only plugin as a CLI format change
+
+Plugins: dkj-policy
+
+[PR #1788](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1788)
+
+---
+
+### DEPLOY: feat/1766-plugin-owned-region · 20260910-111206
+
+`dkj-policy/README.md` now carries a **fenced block that belongs to the plugin and is kept current**.
+Everything between `<!-- dkj-policy:update-section -->` and `<!-- /dkj-policy:update-section -->` is
+replaced by a re-run of the `adopt-dkj-policy` skill's Part 1; everything outside those two markers is
+yours and is never read. The block says what this workflow is, names the three portable pages in code,
+and answers *"which version am I on?"* with `/dkj-policy:plugin-versions` rather than a number -- a
+version is per (plugin, checkout), so a number committed into a repo is right for at most one clone.
+Fixes inbound #1766.
+
+**This is the one place the scaffold rewrites anything**, and it exists because everything in that block
+was always the plugin's writing sitting in a file the plugin had promised not to touch. A consumer's page
+went on naming the branch document `development.md` and listing two pre-rename plugin ids, with no way to
+correct it and no way for a reader to tell whose sentence had gone stale. Three ways out, all the
+consumer's: write outside the block, delete both markers to own the paragraphs, or edit inside and know
+they are replaced. **A page from before the fence is left exactly as it is** -- an opening marker with no
+closing one has no machine-readable end, so the run reports it and names the edit that opts in.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+Neither shape the issue proposed was built, and the reasons are measurements rather than preferences. A
+vendored `HELP/` subtree duplicates ~203 KB into every consumer and repeats the defect #664 closed; a
+separate pointer page duplicates what the folder README's intro already says, creating a second drift
+surface inside one folder -- which is the complaint itself. Neither would have fixed the staleness that
+was actually measured, because both leave the stale README standing.
+
+One of the report's supporting claims also failed on contact with the tree: it treats pre-marker repos as
+unreachable, and that case has been built and tested since the marker existed
+(`adopt-workflow-folder.tests.ps1`, `$c12`). Their page carries no marker because Part 1 has not been
+re-run there.
+
+**Score:** 2
+
+#### Pull Request
+
+A refreshable plugin-owned region in the consumer's dkj-policy/README.md
+
+Plugins: dkj-policy
+
+[PR #1794](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1794)
+
+---
+
+### DEPLOY: fix/1786-stale-test-docstring · 20260910-110446
+
+`connector-sessioncheck.tests.ps1`'s header said its first two branches drive the hook against this
+repo's own root `scripts/task/plugin-versions.ps1`. They drive the plugin mirror beside the hook --
+the `$cwd` candidate that once made the header true was removed on review. The docstrings now name
+the mirror, and state the consequence the wrong name hid: after editing the source engine, rebuild
+the mirror before running this suite standalone, or it reports on the previous version and says
+nothing about having done so.
+
+A test suite's own account of what it measures was wrong, and it cost one session a false all-clear
+(47/0 against an unrebuilt mirror, then 41/6 from the same suite once it was rebuilt). Small because
+the gate was never exposed to it -- the drift check errors on a stale mirror before the suites run,
+so only a standalone run could be fooled. Noticed the moment somebody edits `plugin-versions.ps1`
+and reaches for this suite.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+A docstring inside this repo's own test suite. Nothing here ships, and no consumer reads it.
+
+**Score:** N/A
+
+#### Pull Request
+
+connector-sessioncheck.tests.ps1's header names the mirror it actually drives
+
+[PR #1793](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1793)
+
+---
+
+### DEPLOY: docs/1784-measured-figure-gate-line-counts · 20260910-104705
+
+The proposed line-count gate from #1784 is **declined on measurement**, and the measurement is recorded
+where the gate's other declined rules live. **The reason that settles it is not the one the proposal
+argues about: the defect it was filed over carries no digit** -- #1779's seven sites read "three thousand
+lines" in words -- so no digit-anchored pattern can see it, check 16's own included, however precisely
+tuned. For the figures such a pattern *can* see, extending check 16 (`[measured-figure]`) to line counts
+produces 16 findings across the trunk of which exactly **1** is a real defect, in six classes no regex
+separates from it; and writing the decline up with each instance cited verbatim, as a measurement here
+must be, took the same rule from 16 findings to 26 -- so it penalises measuring and recording the result,
+which is what the gate's other rules exist to encourage. One narrow variant **is** green -- a backticked
+filename immediately before a present-tense copula, 1 of 1 on the trunk -- and it is recorded as measured
+and left **unbuilt**, with its revisit condition, rather than declined: one subject tree-wide, blind to
+the motivating defect, and still firing on the prose that cites it. Check 16's unit list stays
+byte-shaped, deliberately. Its *file set* is a separate and real gap -- no figure gate reaches a `.ps1`
+comment, which is where both recorded instances of this class happened -- filed as #1790. The one real
+defect the measurement found is repaired.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+N/A -- nothing here reaches a consumer. The declined rule, its measurement and the repaired figure are all
+this repo's own maintenance prose; no plugin payload, script or manifest changes.
+
+**Score:** N/A
+
+#### Pull Request
+
+Record the measurement that declines a line-count figure gate, and the writing convention behind it
+
+[PR #1791](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1791)
+
+---
+
+### DEPLOY: fix/1768-path-paste-one-answer · 20260910-103648
+
+A filesystem path printed into a paste-ready command now has **one** answer again, the shared allowlist
+`Get-PasteableRef -Kind Path`. Two branches answered #1762 eleven minutes apart and both landed;
+`tidy-lib.ps1`'s `Format-PasteablePathToken` -- which quoted the path as a PowerShell literal rather than
+judging it -- is retired, and `tidy-machine.ps1` joins `sync-main.ps1` and `check-plugin-integrity.ps1`
+on the allowlist. Fixes inbound #1768.
+
+The literal lost on the destination, which is the one thing a printed remedy does not know. It is exact
+in PowerShell and silently wrong in Git Bash, which reads its doubled quote as close-then-open and turns
+`C:\it's\here` into `C:\its\here` -- a different, plausible path, with no error to notice -- while cmd
+splits any spaced path in two. `tidy-machine.ps1` prints a PowerShell-only `worktree-lane.ps1 -HandBack`
+and a bare `git worktree remove` from the same call, one line apart, and the second is exactly what a
+reader pastes into Git Bash. Its own justification had also expired before it was read: it argued no
+absolute path could pass the allowlist, which #1765 had fixed eleven minutes earlier.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+The report's own proposed alternative is declined with a measurement rather than adopted: *"if the
+allowlist wins, it needs at least a space"* would break the guard rather than widen it, because the token
+is printed **unquoted** by design and a spaced path splits in all three shells, not one. A space is the
+one character an allowlist over an unquoted token can never admit -- so the refusal plus the note is the
+answer, and the suite has asserted it since #1762.
+
+That is the second of #1768's two halves to fail on contact with the tree. The first is its claim that
+`tidy-lib.ps1` cites #1762 as open and carries a sentence about where the reasoning belongs; neither is
+in the repo. The symptom it reports -- two mechanisms for one question -- was real and is what got fixed.
+
+**Score:** 3
+
+#### Pull Request
+
+One answer for a path in a printed command: the allowlist, not the PowerShell literal
+
+Plugins: dkj-policy, dkj-subagents-shopify
+
+[PR #1789](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1789)
+
+---
 
 ### DEPLOY: fix/1779-stale-lib-line-count · 20260910-101138
 
