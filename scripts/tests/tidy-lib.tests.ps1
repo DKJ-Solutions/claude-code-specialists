@@ -42,6 +42,12 @@ $Script   = Join-Path $RepoRoot 'scripts\maintenance\tidy-machine.ps1'
 # the cases this file used to.
 . (Join-Path $RepoRoot 'scripts\lib\merged-pr-lib.ps1')
 . (Join-Path $RepoRoot 'scripts\lib\ref-print-lib.ps1')
+# command-probe-lib is for ONE assertion in section 9: that tidy-lib no longer defines the retired
+# formatter. Test-FunctionDefined rather than the Get-Command idiom it replaced (#1729) -- this probe
+# is a MISS by design, which is the expensive case there: a bare Get-Command answers a miss by scanning
+# every PATH directory for an executable of that name, and command-probe-lib.tests.ps1 refuses the idiom
+# tree-wide, which is how the first draft of this line was caught.
+. (Join-Path $RepoRoot 'scripts\lib\command-probe-lib.ps1')
 . (Join-Path $RepoRoot 'scripts\lib\worktree-lib.ps1')
 . (Join-Path $RepoRoot 'scripts\lib\tidy-lib.ps1')
 
@@ -237,7 +243,7 @@ Assert-True ($codeText -match "'--state', 'merged'") 'and the merged lookup is i
 # pastes into Git Bash. Pinned in both directions so the second mechanism cannot come back by halves.
 Assert-True ($codeText -notmatch 'Format-PasteablePathToken') 'the retired literal-quote formatter is not called here'
 Assert-True ($codeText -match "-Kind Path")                   'and the path handover goes through the shared allowlist'
-Assert-True (-not (Get-Command -Name 'Format-PasteablePathToken' -ErrorAction SilentlyContinue)) 'tidy-lib no longer defines it at all'
+Assert-True (-not (Test-FunctionDefined 'Format-PasteablePathToken')) 'tidy-lib no longer defines it at all'
 
 Write-Host ''
 Write-Host "tidy-lib.tests: $script:pass passed, $script:fail failed." -ForegroundColor $(if ($script:fail -eq 0) { 'Green' } else { 'Red' })
