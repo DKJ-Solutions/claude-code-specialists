@@ -1,4 +1,4 @@
-## fix/1821-connector-origin-mismatch
+﻿## fix/1821-connector-origin-mismatch
 
 > **How this file is read.** A step is `- [ ]` until it is resolved -- `- [x]` done, or
 > `- [~]` dropped with the reason, which exists so nobody ticks a box for work they did not do.
@@ -64,10 +64,10 @@ session start.
 
 ### TEST
 
-- [ ] `scripts/tests/connectors.tests.ps1`: cover the three arms that can be fixtured -- a checkout
+- [x] `scripts/tests/connectors.tests.ps1`: cover the three arms that can be fixtured -- a checkout
       whose `origin` disagrees (the finding fires and the plugin verdicts are withheld), one that
       agrees (unchanged), and one that cannot be asked (unchanged).
-- [ ] The existing suites stay green -- `connectors.tests.ps1` and `connector-sessioncheck.tests.ps1`.
+- [x] The existing suites stay green -- `connectors.tests.ps1` and `connector-sessioncheck.tests.ps1`.
 - [ ] Review round on the diff: code review, copy edit, security.
 
 ### DEPLOY: fix/1821-connector-origin-mismatch

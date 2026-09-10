@@ -167,6 +167,23 @@ function Set-FixtureEnabledPlugins {
     [System.IO.File]::WriteAllText((Join-Path $Fixture '.claude\settings.json'), ('{ "enabledPlugins": ' + $enabled + ' }'))
 }
 
+# Turns $Fixture into a real git work tree (for check 1b, #1821), optionally with an 'origin' remote.
+# NO NETWORK: 'git init' and 'git remote add' only ever write local .git config, and the URL passed in
+# is never fetched from or pushed to -- check 1b itself only ever reads .git/config via
+# 'remote get-url'. Called AFTER New-FixtureConsumer, which rebuilds $Fixture from scratch and would
+# wipe a '.git' folder written before it. Same '2>$null' + $LASTEXITCODE idiom check-connectors.ps1's
+# own check 1b uses for the identical local git calls (see its comment on why this is not routed
+# through native-capture-lib.ps1: that lib exists to bound a call that LEAVES the machine).
+function Set-FixtureGitCheckout {
+    param([string]$OriginUrl = '')
+    & git -C $Fixture init -q 2>$null
+    if ($LASTEXITCODE -ne 0) { throw "git init failed in fixture ($Fixture)" }
+    if ($OriginUrl) {
+        & git -C $Fixture remote add origin $OriginUrl 2>$null
+        if ($LASTEXITCODE -ne 0) { throw "git remote add origin failed in fixture ($Fixture)" }
+    }
+}
+
 try {
     Write-Host "== connectors.tests ==" -ForegroundColor Cyan
     # -UserHomeOverride pins the USER layer of the settings chain to a dir that does not exist (inbound
@@ -190,6 +207,89 @@ try {
     $r = Invoke-Ps $Script ($base + @('-Manifest', $mf, '-ConsumerPathOverride', $Fixture))
     Assert-Equal 0 $r.Code 'plugin path: exit code 0'
     Assert-Match 'all 2 registered extensions present' $r.Out 'plugin path: extensions OK'
+
+    # --- 1c. Check 1b (#1821), arm 1: origin agrees with the manifest, HTTPS shape -> silent, ordinary
+    #      verdicts still print. Covers the first of the two URL shapes the parse regex handles.
+    New-FixtureConsumer -ExtensionIds @('06-16')
+    Set-FixtureGitCheckout -OriginUrl 'https://github.com/acme-org/widgets.git'
+    $mf = New-FixtureManifest -Extensions @('06-16') -Repo 'acme-org/widgets'
+    $r = Invoke-Ps $Script ($base + @('-Manifest', $mf, '-ConsumerPathOverride', $Fixture))
+    Assert-Equal 0 $r.Code 'origin agrees (https): exit code 0'
+    Assert-Match '\[OK\]\s+plugin is enabled' $r.Out 'origin agrees (https): ordinary verdicts still print'
+    Assert-Match 'all 1 registered extensions present' $r.Out 'origin agrees (https): extensions OK still prints'
+    Assert-NotMatch "could not read this checkout's own git identity" $r.Out 'origin agrees (https): no arm-4 SKIP'
+    Assert-NotMatch 'differs from the manifest' $r.Out 'origin agrees (https): no arm-2 SKIP'
+    Assert-NotMatch "this checkout's 'origin' is" $r.Out 'origin agrees (https): no arm-3 ERROR'
+
+    # --- 1d. Check 1b, arm 1 again: SSH shape, no '.git' suffix -> same silent agreement -------------
+    #      Nothing else pins that the parse handles this shape too.
+    New-FixtureConsumer -ExtensionIds @('06-16')
+    Set-FixtureGitCheckout -OriginUrl 'git@github.com:acme-org/widgets'
+    $mf = New-FixtureManifest -Extensions @('06-16') -Repo 'acme-org/widgets'
+    $r = Invoke-Ps $Script ($base + @('-Manifest', $mf, '-ConsumerPathOverride', $Fixture))
+    Assert-Equal 0 $r.Code 'origin agrees (ssh): exit code 0'
+    Assert-Match '\[OK\]\s+plugin is enabled' $r.Out 'origin agrees (ssh): ordinary verdicts still print'
+    Assert-NotMatch "this checkout's 'origin' is" $r.Out 'origin agrees (ssh): no arm-3 ERROR'
+
+    # --- 1e. Check 1b, arm 3: a GENUINE mismatch -- this is the whole point of #1821. The fixture is
+    #      set up so that, WITHOUT check 1b's 'continue', two of the ordinary verdicts below would
+    #      ALSO have fired here: the plugin is disabled (-> '[ERROR] ... is NOT (or no longer)
+    #      enabled') and the one registered extension is actually present on disk (-> '[OK] all 1
+    #      registered extensions present'). Neither may print: the whole defect #1821 was filed over
+    #      is a register printing confident, true-about-the-folder, false-about-the-repo verdicts, and
+    #      this is the regression guard that a future edit cannot quietly drop the 'continue' and
+    #      still pass -- if it did, the two Assert-NotMatch below would fail.
+    New-FixtureConsumer -ExtensionIds @('06-16') -PluginEnabled $false
+    Set-FixtureGitCheckout -OriginUrl 'https://github.com/other-org/gadgets.git'
+    $mf = New-FixtureManifest -Extensions @('06-16') -Repo 'acme-org/widgets'
+    $r = Invoke-Ps $Script ($base + @('-Manifest', $mf, '-ConsumerPathOverride', $Fixture))
+    Assert-Equal 1 $r.Code 'origin mismatch: exit code 1'
+    Assert-Match '\[ERROR\]' $r.Out 'origin mismatch: an ERROR is printed'
+    Assert-Match 'other-org/gadgets' $r.Out 'origin mismatch: the ERROR names the origin slug'
+    Assert-Match 'acme-org/widgets' $r.Out 'origin mismatch: the ERROR names the manifest slug'
+    Assert-NotMatch 'is NOT \(or no longer\) enabled' $r.Out 'origin mismatch: the withheld plugin-enabled ERROR never prints'
+    Assert-NotMatch 'registered extensions present' $r.Out 'origin mismatch: the withheld extensions OK never prints'
+
+    # --- 1f. Check 1b, arm 2: this repo's OWN rename history landing on a transfer redirect ---------
+    #      Depends on the real, current values scripts\repo-config.ps1 states for THIS repo (the same
+    #      dependency test 12h below already carries for check 6): Get-RepoName() is
+    #      'DKJ-Solutions/dkj-claude-plugins' and Get-RetiredRepoNames() lists 'claude-code-specialists'
+    #      (the pre-#1769 name). So a manifest naming this repo's CURRENT slug, checked out from an
+    #      origin that still names the RETIRED slug, is exactly the transfer-redirect case arm 2 exists
+    #      for -- and is reproduced here rather than contorted through New-StubWorkshop, because it is
+    #      the one case that genuinely needs $ThisRepoSlug to equal the manifest's 'repo', which only
+    #      this tree's own repo-config.ps1 can supply.
+    New-FixtureConsumer -ExtensionIds @('06-16')
+    Set-FixtureGitCheckout -OriginUrl 'https://github.com/DKJ-Solutions/claude-code-specialists.git'
+    $mf = New-FixtureManifest -Extensions @('06-16') -Repo 'DKJ-Solutions/dkj-claude-plugins'
+    $r = Invoke-Ps $Script ($base + @('-Manifest', $mf, '-ConsumerPathOverride', $Fixture))
+    Assert-Equal 0 $r.Code 'own rename history: exit code 0 (no false alarm)'
+    Assert-Match '\[SKIP\]' $r.Out 'own rename history: a SKIP is printed'
+    Assert-Match 'differs from the manifest' $r.Out 'own rename history: names it as a transfer redirect'
+    Assert-Match 'git -C <this checkout> remote set-url origin https://github\.com/DKJ-Solutions/dkj-claude-plugins\.git' $r.Out 'own rename history: names the one command that ends it'
+    Assert-Match '\[OK\]\s+plugin is enabled' $r.Out 'own rename history: proceeds exactly as on agreement'
+    Assert-NotMatch "this checkout's 'origin' is" $r.Out 'own rename history: no arm-3 ERROR'
+
+    # --- 1g. Check 1b, arm 4: not a git work tree at all -> the question could not be asked ---------
+    #      New-FixtureConsumer's plain folder is never a git work tree, so every scenario ABOVE this
+    #      one that never calls Set-FixtureGitCheckout already exercises this arm implicitly -- this
+    #      scenario is what pins it explicitly, so it stays true on purpose rather than by accident.
+    New-FixtureConsumer -ExtensionIds @('06-16')
+    $mf = New-FixtureManifest -Extensions @('06-16') -Repo 'acme-org/widgets'
+    $r = Invoke-Ps $Script ($base + @('-Manifest', $mf, '-ConsumerPathOverride', $Fixture))
+    Assert-Equal 0 $r.Code 'not a git work tree: exit code unchanged'
+    Assert-Match "could not read this checkout's own git identity" $r.Out 'not a git work tree: names why the question could not be asked'
+    Assert-Match '\[OK\]\s+plugin is enabled' $r.Out 'not a git work tree: checks below still run'
+    Assert-Match 'all 1 registered extensions present' $r.Out 'not a git work tree: extensions check still runs too'
+
+    # --- 1h. Check 1b, arm 4 again: IS a work tree, but has no 'origin' remote ----------------------
+    New-FixtureConsumer -ExtensionIds @('06-16')
+    Set-FixtureGitCheckout
+    $mf = New-FixtureManifest -Extensions @('06-16') -Repo 'acme-org/widgets'
+    $r = Invoke-Ps $Script ($base + @('-Manifest', $mf, '-ConsumerPathOverride', $Fixture))
+    Assert-Equal 0 $r.Code 'work tree, no origin: exit code unchanged'
+    Assert-Match "could not read this checkout's own git identity" $r.Out 'work tree, no origin: same SKIP as no-git-at-all'
+    Assert-Match '\[OK\]\s+plugin is enabled' $r.Out 'work tree, no origin: checks below still run'
 
     # --- 2. Registered extension is missing -> exit 1 ----------------------------------------
     New-FixtureConsumer -ExtensionIds @('06-16')

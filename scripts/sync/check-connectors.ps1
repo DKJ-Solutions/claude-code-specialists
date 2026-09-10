@@ -16,6 +16,18 @@
       1. Checkout present on this machine?          no -> [SKIP] (not an error). 'Present' means any
          one of the manifest's localCheckout candidates resolves; the [SKIP] names all of them, so a
          register that is merely stale about this machine's layout can be told from a genuine absence.
+      1b. THE SAME SUBJECT AS 1, A DIFFERENT QUESTION: now that a checkout resolves, IS it a clone of
+         the repository the manifest names, or merely a folder that happens to sit at that path
+         (#1821)? Read via 'git ... remote get-url origin', before ANYTHING below (checks 2-6) reads
+         that disk on the named repo's behalf. Agreement -> silent. A genuine mismatch, or one this
+         run cannot tell apart from an old spelling landing on a transfer redirect (this check makes
+         no network call) -> [ERROR] naming both slugs, and every verdict below is withheld for this
+         connector rather than printed against a repository that was never actually read. A mismatch
+         that is only THIS repo's own rename history landing on a transfer redirect -> [SKIP] naming
+         the one command that ends it, and the run then proceeds exactly as on agreement. The
+         question itself could not be asked (no git, not a work tree, no 'origin' remote naming
+         GitHub) -> [SKIP], and the run proceeds exactly as before this check existed -- never
+         asserted as a mismatch from a failed read.
       2. Per plugin: enabled anywhere in the consumer's settings CHAIN? no -> [ERROR]. Read via
          Get-EnabledPlugins, so the verdict names the layer it came from (inbound #294); this line used
          to say '.claude/settings.json', which is the single-file reading that produced that inbound.
@@ -179,6 +191,11 @@ $PluginRoots = @(Get-RepoPluginRoots -RepoRoot $RepoRoot)
 # different question. (This family keeps other state keyed on a folder path -- the plugin install
 # record, #1449 -- and that is a neighbouring hazard rather than evidence for this one.)
 $ThisRepoName = ''
+# AND THE FULL SLUG, KEPT ALONGSIDE THE NAME HALF, for check 1b (#1821): that check's arm 2 has to ask
+# "does this manifest describe THIS repo's own connector" before it may loosen a comparison to the name
+# half alone, and the only honest way to ask that is the full owner/name Get-RepoName states, not a
+# guess reconstructed from $ThisRepoName plus whatever owner happens to be on the manifest.
+$ThisRepoSlug = ''
 # AND THE NAMES THIS REPO HAS BEEN RENAMED AWAY FROM, read from the same seam (#1769). A consumer
 # scaffolded before a rename still writes the old name into its runner, and that runner still works
 # because GitHub answers the transfer redirect -- so matching only the current name reports nothing
@@ -196,7 +213,7 @@ if (Test-Path -LiteralPath $repoConfigPath -PathType Leaf) {
         return @{ Slug = $s; Retired = $r }
     } $repoConfigPath
     $slug = [string]$seam.Slug
-    if ($slug) { $ThisRepoName = $slug.Substring($slug.LastIndexOf('/') + 1) }
+    if ($slug) { $ThisRepoName = $slug.Substring($slug.LastIndexOf('/') + 1); $ThisRepoSlug = $slug }
     $ThisRepoRetiredNames = @($seam.Retired | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
 }
 
@@ -720,6 +737,96 @@ foreach ($mf in $manifestFiles) {
     $matched++
 
     Write-Host "`n== connector: $($m.repo)" -ForegroundColor Cyan
+
+    # --- 1b. THE CHECKOUT'S OWN GIT IDENTITY, ASKED BEFORE ANYTHING READS IT BY NAME (#1821) ---------
+    # Check 1 above only asks whether A FOLDER is present at localCheckout; it never asks WHICH
+    # repository that folder actually is. Reproduced on this machine: smartwatchbanden.json names
+    # 'BWJ-Development/smartwatchbanden', while '../../bwjecommerce/smartwatchbanden' -- the candidate
+    # that resolved -- is a clone of 'BWJ-ecommerce/smartwatchbanden', a DIFFERENT, archived repository
+    # that merely shares a name half. Left unasked, every verdict from here on (checks 2-6) is read off
+    # that wrong repo's disk and printed under the register's name -- worse than silence, because it
+    # invites 'fixing' a consumer that was already correct. So this runs BEFORE
+    # Get-EnabledPlugins/Get-InstallRecord touch that disk on the named repo's behalf.
+    #
+    # THE READ IS LOCAL, NOT NETWORK -- 'git -C <checkout> remote get-url origin' opens .git/config on
+    # this machine, the same class of call the $sourceStamp block above already makes against this
+    # repo's own HEAD (bare '&', '2>$null', a try/catch rather than a Get-Command probe -- so a
+    # missing git degrades the same way there and here, silently into arm 4 below). It is not routed
+    # through native-capture-lib.ps1: that lib exists to bound a call that LEAVES the machine, and
+    # this one never does.
+    $originRepo = $null
+    try {
+        $isWorkTree = (& git -C $checkout rev-parse --is-inside-work-tree 2>$null)
+        if ($LASTEXITCODE -eq 0 -and $isWorkTree -eq 'true') {
+            $rawOrigin = (& git -C $checkout remote get-url origin 2>$null)
+            if ($LASTEXITCODE -eq 0 -and $rawOrigin) {
+                # BOTH URL SHAPES GITHUB HANDS OUT: 'https://github.com/<owner>/<name>(.git)?' and
+                # 'git@github.com:<owner>/<name>(.git)?'. Anything else -- a non-GitHub remote, a bare
+                # local path -- names no owner/name pair and falls through to arm 4 below, unasked
+                # rather than guessed at.
+                if ($rawOrigin.Trim() -match '^(?:https://github\.com/|git@github\.com:)([^/]+)/(.+?)(?:\.git)?/?$') {
+                    $originRepo = "$($Matches[1])/$($Matches[2])"
+                }
+            }
+        }
+    } catch {
+        $originRepo = $null
+    }
+
+    # 'repo' is manifest content, so its presence is probed rather than assumed (StrictMode), exactly
+    # as $connectorLabel and the -RemoteRunners block above already do it.
+    $manifestRepo = [string]$(if ($m.PSObject.Properties.Name -contains 'repo') { $m.repo } else { '' })
+
+    if ($null -eq $originRepo) {
+        # ARM 4 -- THE QUESTION COULD NOT BE ASKED (no git, not a git work tree, no readable 'origin',
+        # or a remote this pattern does not recognise as GitHub). Silence would read as agreement; a
+        # dim line instead, and everything below runs exactly as it did before this check existed.
+        # NEVER asserted as a mismatch from a failed read -- the same doctrine new-branch.ps1's
+        # stale-base block already follows for a question its own git call could not answer.
+        Write-Skip "could not read this checkout's own git identity (no git on PATH, not a git work tree, or no readable 'origin' remote naming GitHub) -- check 1b was not able to ask whether it is a clone of '$(Format-SafePathToken -Value $manifestRepo)'. Every check below still runs against it."
+    } elseif ([string]::Equals($originRepo, $manifestRepo, [System.StringComparison]::OrdinalIgnoreCase)) {
+        # ARM 1 -- agreement. Silent; everything below proceeds exactly as it always did.
+    } elseif ($ThisRepoSlug -and
+              [string]::Equals($manifestRepo, $ThisRepoSlug, [System.StringComparison]::OrdinalIgnoreCase) -and
+              (& { $half = $originRepo.Substring($originRepo.LastIndexOf('/') + 1)
+                   foreach ($n in (@($ThisRepoName) + $ThisRepoRetiredNames)) {
+                       if ([string]::Equals($n, $half, [System.StringComparison]::OrdinalIgnoreCase)) { return $true }
+                   }
+                   return $false })) {
+        # ARM 2 -- THIS REPO'S OWN RENAME HISTORY, AND BOUNDED TO IT. Measured on this machine:
+        # connectors/dkj-claude-plugins.json names 'DKJ-Solutions/dkj-claude-plugins' (the #1769
+        # rename), while THIS checkout's own origin is still
+        # 'https://github.com/DKJ-Solutions/claude-code-specialists.git' -- a transfer redirect, not a
+        # different repository. Without this arm, check 1b fires a false [ERROR] on the source repo's
+        # OWN connector, at every session start, in the very repo that ships the check.
+        #
+        # LOOSE NAME-HALF MATCHING, IGNORING OWNER, IS SAFE ONLY INSIDE THIS BOUND: the manifest's
+        # 'repo' is pinned FIRST to $ThisRepoSlug, this repo's own CURRENT full slug, before the name
+        # half is ever compared. CLAUDE.md forbids anything ever being created at a retired path of
+        # THIS repo, so no other owner can come to hold 'claude-code-specialists' or any future
+        # retired name of this one -- which is exactly what makes dropping the owner half safe here.
+        # Across repos in general the same looseness IS the smartwatchbanden failure this issue was
+        # filed over: 'BWJ-ecommerce/smartwatchbanden' and 'BWJ-Development/smartwatchbanden' share a
+        # name half and are two different, unrelated repositories. Accepting the name half regardless
+        # of owner is itself deliberate, not a gap in the bound: this repo has retired an OWNER as
+        # well as a name ('DaveKJohn/' -> 'DKJ-Solutions/', September 2, 2026), and only the name
+        # halves are recorded in a seam (Get-RetiredRepoNames) -- there is no matching
+        # Get-RetiredRepoOwners to hold the owner half to.
+        Write-Skip "this checkout's origin ('$(Format-SafePathToken -Value $originRepo)') differs from the manifest's own current name ('$(Format-SafePathToken -Value $manifestRepo)') only in a way this repo's rename history explains -- a transfer redirect, not a different repository. 'git -C <this checkout> remote set-url origin https://github.com/$(Format-SafePathToken -Value $ThisRepoSlug).git' ends it."
+    } else {
+        # ARM 3 -- A GENUINE MISMATCH, OR ONE THIS RUN CANNOT TELL APART FROM ONE. This run makes no
+        # network call (that is what -RemoteRunners is for, and this is not that path), so it cannot
+        # distinguish 'a different repository' from 'an old spelling still answering a transfer
+        # redirect'. So it asserts only what was measured -- the origin names one slug, the record
+        # names another -- and withholds every verdict below rather than print any of them against a
+        # repository that was never actually read. [ERROR] rather than [INFO], on the same precedent
+        # check 4 already sets: a machine that simply has nothing is [INFO] ('machine-specific, not a
+        # gate breach'), while the register asserting one thing and the machine answering another is
+        # an [ERROR] -- and the session hook surfaces [ERROR] and suppresses [INFO]/[SKIP], so this is
+        # the line that replaces the five wrong ones this issue was filed over.
+        Write-Failure "this checkout's 'origin' is '$(Format-SafePathToken -Value $originRepo)', but $($mf.Name) names '$(Format-SafePathToken -Value $manifestRepo)' -- nothing about '$(Format-SafePathToken -Value $manifestRepo)' was checked. This could be a different repository, or an old spelling still answering a transfer redirect; this run does not call GitHub to tell the two apart. Either this checkout is a clone of a different repository (repoint it: git -C <checkout> remote set-url origin https://github.com/$(Format-SafePathToken -Value $manifestRepo).git), or this record's localCheckout points at the wrong folder on this machine (correct connectors/$($mf.Name))."
+        continue
+    }
 
     # Read the consumer's enable state once, from the whole settings chain rather than settings.json
     # alone (inbound #294 -- Get-EnabledPlugins carries the measurement and the reasoning). This check
