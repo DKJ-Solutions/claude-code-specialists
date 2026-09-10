@@ -43,7 +43,38 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**0 / 1 patch entry** <!-- pending-tally -->
+**1 / 2 minor entries** <!-- pending-tally -->
+
+### DEPLOY: docs/release-title-convention · 20260910-080700
+
+From `v4.33.0` on, this repo titles every release `Release version X.Y.Z` and stops composing a
+one-sentence summary that a large multi-theme cut makes meaningless. The decision and its reasoning are
+in `dkj-policy/releases/README.md`'s *Local decisions* section; Rendall's lens carries the operating
+instruction. The `-Title` parameter is untouched — a descriptive sentence is still valid for a repo
+whose releases each carry one theme, and `-SummaryFile` still handles a genuine milestone.
+
+**Score:** 1
+
+The failure it prevents: a `history.md` title column and a GitHub Release heading filling up with
+forced one-liners that describe none of the dozens of unrelated entries beneath them.
+
+#### What makes this deploy extra special
+
+One portable clause reaches a consumer, in the `cut-release` skill they read: a stable
+`Release version X.Y.Z` is named as a legitimate title rather than something to apologise for. It
+changes no command and no behaviour — the entries and attachments carry the detail either way.
+
+**Score:** 1
+
+#### Pull Request
+
+Record that this repo titles every release Release version X.Y.Z
+
+Plugins: dkj-policy
+
+[PR #1761](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1761)
+
+---
 
 ### DEPLOY: docs/1719-concurrent-pair-voiding-rate · 20260910-075556
 
