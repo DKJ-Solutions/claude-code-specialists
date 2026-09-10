@@ -43,7 +43,38 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**9 / 29 minor entries** <!-- pending-tally -->
+**10 / 30 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1816-retired-doc-name-citations · 20260910-194223
+
+`check-policy-drift`'s report and its consumer-facing skill page no longer send a reader after two
+scripts and two hooks that #1421 folded away before either had ever shipped. The report's explanation
+of *why* it copies the hook's publishing-repo skip now cites the script that makes it, so the reasoning
+can be checked; its printed heading names `consumer-prose-sessioncheck` instead of claiming a hook each;
+and the skill page's table names the two detector functions that do exist, with the fold's own history
+under it in the shape `seam-lib.ps1` already uses. The four citations that narrate the fold in the past
+tense are untouched.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+A consumer holding the `check-policy-drift` skill page was told to look for `retired-doc-name-sessioncheck`
+and `supremacy-declaration-sessioncheck`, two hook names no release ever carried, and would find one
+hook called `consumer-prose-sessioncheck`. That page is the reference for a check whose whole subject is
+documents contradicting each other, so it was the worst place in the tree for this to sit.
+
+**Score:** 3
+
+#### Pull Request
+
+Name check-consumer-prose.ps1 where the retired detector scripts were still cited in the present tense
+
+Plugins: dkj-policy
+
+[PR #1818](https://github.com/DKJ-Solutions/dkj-claude-plugins/pull/1818)
+
+---
 
 ### DEPLOY: fix/1813-safe-prose-docstring · 20260910-191402
 
