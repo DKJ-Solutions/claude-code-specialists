@@ -43,7 +43,55 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**9 / 27 minor entries** <!-- pending-tally -->
+**9 / 28 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1812-payload-cache-artefact · 20260910-190335
+
+**A session loads neither this tree nor the marketplace clone.** It loads an extracted copy under
+`~/.claude/plugins/cache/<marketplace>/<plugin>/<version-or-sha>/`, named by the `installPath` of the
+install record for that checkout. Measured September 10, 2026 (Claude Code 2.1.267): the running process
+writes a lease at `<installPath>/.in_use/<pid>` and holds it for the life of the session, and the clone
+holds none. Two accounts of this stood in the tree, each half of one mechanism -- `CLAUDE.md` and two
+lenses said the clone is what a session reads, #1802 said a dead consumer survives because its cache
+survives. Both are now stated as what they are: **plugin components load from the payload, and a document
+named by an absolute `@`-import loads from the clone**, which is why a refresh visibly moved #845's
+`@`-imported persona while leaving every hook and skill on the same bytes.
+
+**And the conclusion that bullet rested on does not survive the measurement.** A
+`claude plugin marketplace update` advanced the clone 104 commits and left every payload byte-identical,
+with `installed_plugins.json` unchanged to the byte; `update --scope project` then answered *"already at
+the latest version"* and `install --scope project` *"already installed"*, neither extracting anything,
+with the clone's copy of that same version carrying a skill the installed payload did not. Both verbs
+decide on the **version string**, so content that lands without a bump is unreachable by the documented
+pair -- not stale by hours, but until the next cut. That is the arithmetic #1810 was missing, and it is
+the load-bearing half: the unit that reaches a session is a release, pulled per checkout, per machine.
+
+**Lane 12 of `tidy-machine.ps1` reports the artefact nothing was reading.** The harness marks a tree no
+record points at with `.orphaned_at` and stamps `.last_inuse_sweep`, but marking is not reaping: 30 of 41
+trees on the machine measured carried that mark, 22.2 MB of 32.6 MB, the oldest six days old and every one
+still on disk -- and `claude plugin uninstall` was measured to remove the record and leave the payload,
+so lane 11's handover grows that pile. The lane groups by plugin id, never counts a tree a live process
+still holds a lease on, and hands over **no command at all**: there is no plugin-cache verb, and a
+recursive delete under a user's home is the primitive #1659 exists to prevent.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A -- how a plugin reaches a session is machine administration for the people who run these repos; no
+subscriber of any service reaches it.
+
+**Score:** N/A
+
+#### Pull Request
+
+The extracted payload cache is what a session loads
+
+Plugins: dkj-policy
+
+[PR #1815](https://github.com/DKJ-Solutions/dkj-claude-plugins/pull/1815)
+
+---
 
 ### DEPLOY: feat/1808-remote-runner-read · 20260910-182243
 
