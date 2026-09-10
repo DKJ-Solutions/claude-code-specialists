@@ -3543,8 +3543,9 @@ function Get-BranchCycleSectionLevel {
 #
 # WHAT MADE THE MOVE NECESSARY rather than tidy: Get-PreFlatChangelogRefusal below is that shared
 # answer (inbound #561), and it cannot be written without a splitter. Leaving the splitter up in
-# release-lib would have meant either the fold loading three thousand lines of release machinery
-# immediately after a merge and directly on the trunk -- which its own header rejects, by name -- or a
+# release-lib would have meant either the fold loading release-lib -- and this file, thousands of lines,
+# behind it -- immediately after a merge and directly on the trunk, which its own header rejects by
+# name -- or a
 # second boundary rule written beside the first, free to disagree with it about where the intro ends.
 #
 # The names deliberately did not gain an 'Entry' prefix on the way down: these readers scan a whole
