@@ -36,11 +36,39 @@
 
 ### PLAN
 
+Issue [#1821](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1821): `check-connectors.ps1`
+follows a record's `localCheckout` **by path**, and a path says nothing about which repository is in
+the folder. Reproduced on this machine before any edit: the record for
+`BWJ-Development/smartwatchbanden` resolves to a clone whose `origin` is
+`BWJ-ecommerce/smartwatchbanden` -- two distinct repositories, not a redirect -- and the check printed
+five confident `[ERROR]` lines about a repository it never opened.
+
+The repair is check **1b**: read the checkout's `origin`, compare it with the record's `repo`, and
+where they disagree say so instead of reading that disk on the named repo's behalf.
+
+#### The arm that makes it safe to ship
+
+A naive comparison was measured against every record on this machine first, and it fires falsely on
+the source repo's **own** connector: `connectors/dkj-claude-plugins.json` names
+`DKJ-Solutions/dkj-claude-plugins` while this checkout's `origin` is still
+`DKJ-Solutions/claude-code-specialists` -- the #1769 rename, landing on a transfer redirect. So the
+check reads its own rename history (`Get-RepoName` + `Get-RetiredRepoNames`, the seams the file
+already loads for check 6) and stays quiet there, rather than crying wolf about itself at every
+session start.
+
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [ ] `scripts/sync/check-connectors.ps1`: check 1b -- four arms (agree / this repo's own retired
+      spelling / disagree / question could not be asked), placed after the checkout resolves and
+      before anything reads its settings, with the `.DESCRIPTION` list updated to match.
 
 ### TEST
+
+- [ ] `scripts/tests/connectors.tests.ps1`: cover the three arms that can be fixtured -- a checkout
+      whose `origin` disagrees (the finding fires and the plugin verdicts are withheld), one that
+      agrees (unchanged), and one that cannot be asked (unchanged).
+- [ ] The existing suites stay green -- `connectors.tests.ps1` and `connector-sessioncheck.tests.ps1`.
+- [ ] Review round on the diff: code review, copy edit, security.
 
 ### DEPLOY: fix/1821-connector-origin-mismatch
 
