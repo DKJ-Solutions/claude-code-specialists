@@ -53,6 +53,23 @@ and safe hook construction.
   It applies most sharply to rules proposed by `fewer-permission-prompts`: it derives them from
   concrete transcript invocations and will therefore include the version, so the trap is built into
   the tooling rather than being a one-off slip. Generalise them before adopting them.
+- **Plugin administration REWRITES the whole `settings.json`, so nothing about that file's formatting
+  is durable.** `claude plugin install` / `uninstall` / `marketplace add` and their siblings parse the
+  file and serialise it back, which is a JSON round trip: blank lines, grouping and any hand-applied
+  layout do not survive it, whether or not the command changed a single setting. Where the file is
+  **tracked** — which is the normal case for a project-scope one — the visible result is a modified
+  working copy after a command that, as far as the operator was concerned, only enabled a plugin.
+  **Two consequences, and the second is the one that costs something.** A session that did plugin
+  administration ends holding an unintended diff, which it has to know to undo:
+  `git checkout -- <the settings file>` is the whole remedy, and it is the right one because
+  re-serialising the captured content is what caused the diff in the first place (see the
+  `Set-Content -Encoding utf8` rule for the sibling trap). And a `git add -A` in the same sitting
+  commits the reflow silently: it is valid JSON, functionally identical, and passes every check there
+  is. So **check the working copy after plugin administration, before staging anything**.
+  **Do not answer this with a gate, and do not answer it by flattening the file either.** A check that
+  refuses a whitespace-only diff would be a rule written for one tool's serialiser, and dropping the
+  grouping to make the file round-trip-stable pays for tidiness with the readability the grouping
+  exists for. It is a property of the CLI, so the durable answer is knowing it.
 - **Never add a permission or hook that undermines the safety rules.** The safety rules stand above
   any config convenience: no allowlist rule that would blindly let a dangerous or irreversible action
   through. The concrete per-repo details live in the `## Specific to this repo` extension.
