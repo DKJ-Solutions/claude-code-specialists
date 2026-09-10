@@ -59,7 +59,15 @@
               only on a branch that has just been PROVEN merged. The run then ends on the trunk,
               because there is no longer a branch to end on, and says so.
 
-         A branch with neither proof is KEPT and reported with the reason. That is the whole safety
+            d. and where ANOTHER worktree is standing on that branch, it is kept instead of deleted
+              (issue #1760). git allows one worktree per branch and refuses to delete a branch that is
+              checked out anywhere in the clone -- a refusal that takes precedence over -d's own
+              unmerged check, so it lands only on branches the two proofs have just cleared. No tree
+              may move another one, so the answer is this script's own sentence plus the hand-back
+              command, not git's message relayed. Asked before the -DryRun branch, so a look-first run
+              stops promising a delete the real run cannot perform.
+
+        A branch with neither proof is KEPT and reported with the reason. That is the whole safety
          property: a parked branch (`park-branch.ps1`), unfinished work, or a branch pushed from
          another machine is never lost, because none of them has either proof.
 
@@ -238,6 +246,26 @@ function Invoke-Git {
     return Invoke-NativeCapture -FilePath 'git' -Arguments (@('-C', $repoRoot) + $Arguments)
 }
 
+# THE WORKTREE LIST, READ AT MOST ONCE PER RUN. Two places need it and neither is on every path: the
+# fast-forward failure below names the tree holding the trunk (#1069), and step 4 asks the same question
+# of every reap candidate (#1760). Reading it lazily keeps a run that needs neither free of the call,
+# and reading it ONCE keeps the two answers from being taken at different moments -- git allows one
+# worktree per branch, so a second read could disagree with the first about who holds what.
+#
+# BEST-EFFORT IN BOTH CALLERS: an unreadable list answers "nobody else holds it", which for the
+# fast-forward means falling back to git's own message, and for step 4 means attempting the delete
+# exactly as before. Neither is a new failure -- both are the behaviour that stood before this cache.
+$worktreeLines     = @()
+$worktreeLinesRead = $false
+function Get-WorktreePorcelain {
+    if (-not $script:worktreeLinesRead) {
+        $script:worktreeLinesRead = $true
+        $res = Invoke-NativeCapture -FilePath 'git' -Arguments @('worktree', 'list', '--porcelain')
+        if ($res.ExitCode -eq 0) { $script:worktreeLines = @($res.Output) }
+    }
+    return @($script:worktreeLines)
+}
+
 # DID THIS RUN MOVE HEAD AT ALL? Since #1147 the answer is no on every run but one, and this flag is
 # the whole of the bookkeeping. It is set in exactly one place -- step 4c, stepping off a start branch
 # that has just been proven merged -- because that is the only remaining reason this script has to
@@ -394,10 +422,7 @@ if ($ffRes.ExitCode -ne 0) {
     # own message. Only asked on the fetch path; a run standing on the trunk itself holds it.
     $holder = ''
     if ($startBranch -ne $trunk) {
-        $wtRes = Invoke-NativeCapture -FilePath 'git' -Arguments @('worktree', 'list', '--porcelain')
-        if ($wtRes.ExitCode -eq 0) {
-            $holder = Get-WorktreeHoldingBranch -PorcelainLines $wtRes.Output -Branch $trunk -SelfPath $repoRoot
-        }
+        $holder = Get-WorktreeHoldingBranch -PorcelainLines (Get-WorktreePorcelain) -Branch $trunk -SelfPath $repoRoot
     }
     if ($holder) {
         Write-Warning "'$trunk' could not be fast-forwarded -- another worktree holds it: $holder, and git will not write a ref that is checked out. Continuing against the local '$trunk'; fewer branches will look merged, never more. Move that tree off the trunk (git -C `"$holder`" checkout <its branch>), or hand it back if it is a finished lane (scripts\task\worktree-lane.ps1 -HandBack -Lane `"$holder`")."
@@ -586,6 +611,46 @@ foreach ($branch in $branches) {
     # replaces it. Choosing -D on ancestry as well would throw the second check away for nothing.
     $flag   = if ($ancestor) { '-d' } else { '-D' }
     $proof  = if ($ancestor) { 'ancestor of ' + $trunk } else { 'merged PR' }
+
+    # --- 4d. A BRANCH ANOTHER WORKTREE IS STANDING ON (issue #1760) -------------------------------
+    # NUMBERED AFTER 4c AND ASKED BEFORE IT, which is not a contradiction: 4c is about the one tree
+    # this run is allowed to move -- its own -- and a branch HEAD is on here can never be the branch
+    # another worktree holds, so the two cases are disjoint and neither can shadow the other. The
+    # label follows the header's list; the position follows the DryRun argument below.
+    #
+    # git allows one worktree per branch and refuses to delete a branch that is checked out anywhere
+    # in the clone -- and that refusal takes precedence over -d's own unmerged check, so it lands on
+    # exactly the branches the two proofs above have just cleared. Step 4c handles the one tree this
+    # run can move (its own HEAD); no tree may move another one, so for a LANE the only answer is a
+    # sentence.
+    #
+    # IT IS ASKED HERE, AFTER THE PROOFS AND BEFORE THE DryRun BRANCH, and both halves of that
+    # position are deliberate:
+    #
+    #   - AFTER the proofs, because a lane holding UNFINISHED work is the ordinary state this script
+    #     exists to leave alone. That branch is already kept for a reason of its own ("not an ancestor
+    #     of the trunk and no merged PR"), which is the reason a reader needs; adding a worktree note
+    #     to it would report the lane as an obstacle when nothing was going to touch it.
+    #   - BEFORE the DryRun branch, because the look-first run has to answer the same question the
+    #     real one will. Asked any later, -DryRun printed "Would delete <branch>" for a delete the
+    #     next run cannot perform -- a promise from the one mode whose whole purpose is to tell you
+    #     what will happen.
+    #
+    # AND IT SAYS WHAT #1069's SENTENCE SAYS, for the same reason. git's message names a worktree and
+    # stops there; relaying it would hand a reader this script's word "Kept" wrapped around git's
+    # vocabulary, with no way out in it. Before this the delete was attempted and its refusal reported
+    # as `git branch -D refused: <git's text>` -- true, and not actionable. The seam between the two
+    # scripts is where this defect lived: worktree-lane.ps1's header says it "removes no branch,
+    # locally or on the remote -- branch cleanup is prune-merged.ps1's", so a lane whose work has
+    # landed was owned by neither, and the hand-back is a manual act nothing prompted for.
+    $heldBy = Get-WorktreeHoldingBranch -PorcelainLines (Get-WorktreePorcelain) -Branch $branch -SelfPath $repoRoot
+    if ($heldBy) {
+        $kept += [pscustomobject]@{
+            Branch = $branch
+            Why    = "proven merged ($proof), but another worktree is standing on it: $heldBy, and git will not delete a branch that is checked out. Hand that lane back (scripts\task\worktree-lane.ps1 -HandBack -Lane `"$heldBy`"), or move it off (git -C `"$heldBy`" checkout <another branch>), then rerun."
+        }
+        continue
+    }
 
     if ($DryRun) {
         # A LOOK-FIRST RUN NEVER STEPS OFF ANYTHING. It deletes nothing, so the one reason to move HEAD
