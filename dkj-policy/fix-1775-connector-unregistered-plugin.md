@@ -36,21 +36,90 @@
 
 ### PLAN
 
+#### The defect, verified against the tree before the branch was cut
+
+`check-connectors.ps1` walks `foreach ($p in @($m.plugins))` -- the plugins a `connectors/<repo>.json`
+manifest **lists**. A plugin that is enabled in the consumer's settings chain but absent from that
+manifest is therefore never handed to the loop, and the run prints nothing whatsoever about it: not
+`[ERROR]`, not `[INFO]`, not `[SKIP]`. The neighbouring case one level in -- a lens present in the
+consumer but not registered -- already prints an `[INFO]` plus a non-counting `[INVENTORY]` line. The
+plugin level had no equivalent.
+
+#### Why the reason for leaving it standing has expired
+
+The asymmetry was written down deliberately in `connectors/xoxowildhearts.json`'s 2026-08-21 note, on the
+stated ground that the population was zero. It stopped being zero on 2026-09-08, when this repo enabled
+every plugin in the marketplace without updating its own `connectors/claude-code-specialists.json`.
+
+#### Scope: the checker, not the register
+
+The register data is being corrected on the separate parked branch `fix/connector-record-catch-up`, which
+did not touch the checker -- which is why #1775 exists as its own issue. Nothing under `connectors/*.json`
+is edited here.
+
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [x] `check-connectors.ps1`: read this repo's own marketplace name once, via the already-dot-sourced
+      `Get-MarketplacePath`, degrading to `''` (which switches the new check off) rather than guessing.
+- [x] `check-connectors.ps1`: add check 5 after the per-plugin loop closes and connector scope is
+      restored -- a counting `[INFO]` per unlisted id, plus one aggregated non-counting `[UNLISTED]` line
+      under `Test-IsSessionRepo`, following the `[INVENTORY]`/`[NOT-INSTALLED-HERE]` doctrine exactly.
+- [x] Scope the predicate to ids whose marketplace segment is this repo's own, ordinally: a third-party
+      marketplace is not this register's business, and a **retired** id still counts, because the existing
+      `retired` branch already treats that state as something the register should record.
+- [x] `connector-sessioncheck.ps1`: the hook filters the child's output on a fixed bracket-token list, so
+      `[UNLISTED]` is added to `$notices`, to the composite output branches, and given its own verdict.
+- [x] `connectors/README.md`: document the new marker as the fourth named exception to the `[INFO]`
+      silence, beside the three already written up there.
+- [x] Update both docstrings -- the script's enumeration of checks 1-4 and its exit-code sentence, and
+      the hook's "three exceptions" count. A count going stale reads as authority.
 
 ### TEST
 
+- [x] `scripts/tests/connectors.tests.ps1`: eight script-level cases (unlisted id reported; the
+      `[UNLISTED]` line present only in the session repo and the run still exit 0; a different marketplace
+      and an id with no `@` silently excluded; a fully-listed manifest silent; a retired id still
+      reported; no settings file at all stays silent) plus three hook-level cases via the existing
+      `New-StubWorkshop` machinery.
+- [x] Suites green: `connectors.tests.ps1` 179 -> 215 assertions, `connector-sessioncheck.tests.ps1`
+      47 unchanged.
+- [~] No cases added to `connector-sessioncheck.tests.ps1` -- dropped deliberately, not skipped. Every
+      fixture in that file points `-WorkshopPathOverride` at a path that does not exist, forcing the
+      no-source-checkout fallback, so no fixture there can reach the branch that emits `[UNLISTED]` at
+      all. Its siblings `[INVENTORY]` and `[NOT-INSTALLED-HERE]` are tested next door for the same
+      reason, and the coverage went there.
+- [x] `check-plugin-integrity.ps1`: 0 errors.
+- [x] Ran the check against this repo's real register and confirmed the finding by measurement rather
+      than from the report: before the change exactly one of six enabled ids produced any line at all.
+
 ### DEPLOY: fix/1775-connector-unregistered-plugin
 
-**Score:**
+`check-connectors.ps1` no longer goes silent about a plugin that a consumer has **enabled** but that
+consumer's `connectors/<repo>.json` does not **list**. Such a plugin was never handed to the per-plugin
+loop, so nothing about it was checked -- not the extension inventory, not the machine version -- and
+nothing was printed either, which made the register unauditable against the settings file it exists to
+describe. A new check 5 reports each one as an `[INFO]`, and adds a non-counting `[UNLISTED]` line for
+the repo the session is actually in, on the same terms and with the same `Test-IsSessionRepo` scoping as
+`[INVENTORY]`. Only ids naming this repo's own marketplace are in scope; a retired id still counts,
+because the register records what a consumer has.
+
+Measured here before the change: of the six plugins this repo enables, exactly one produced a line --
+the other five, one of them merely coinciding with a differently-named retired entry, were checked by
+nothing and reported by nothing. The asymmetry had been written down as acceptable on the ground that
+its population was zero; that stopped being true on September 8, 2026, and this is the repair rather
+than a second note saying so.
+
+**Score:** 3
 
 #### What makes this deploy extra special
 
-**Score:**
+A consumer running `dkj-policy` gets the new verdict at session start through
+`connector-sessioncheck.ps1`: where their own register entry is behind their own enabled set, the
+session now says so in one line instead of saying nothing. It changes nothing that was working and
+adds no failure -- the marker is non-counting, so it never turns a clean run red.
+
+**Score:** 2
 
 #### Pull Request
 
 check-connectors reports a plugin enabled in a consumer but absent from its register
-
