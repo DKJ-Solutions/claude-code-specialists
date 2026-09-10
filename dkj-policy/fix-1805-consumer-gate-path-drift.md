@@ -80,6 +80,21 @@ at all -- not that it lands, not that its script exists.
 - [~] A verification of the two red consumers -- dropped: neither is checked out on this machine and
       `gh` here has no access to them, so the reported state is taken as reported. The mechanism is
       what was verified instead.
+- [x] Review round (Victor, Sebastian, Edith in parallel on the diff) -- **four findings, all
+      repaired and each given its own regression scenario**, taking the suite to 268 asserts:
+      - *Sebastian 1, blocking.* The path came out of a consumer's file and went straight into
+        `Test-Path`, so `../../../../x.ps1` made this check an existence oracle for the maintainer's
+        own disk -- answered by whether an `[ERROR]` appeared, unattended, at every session start.
+        Containment is now tested by string normalisation and an escaping reference reaches no
+        filesystem call at all.
+      - *Sebastian 2.* `$wf.Name` was the one value in the message printed raw while its two
+        neighbours were wrapped. Square brackets are legal in an NTFS filename and the hooks COUNT
+        `[ERROR]` over a check's whole output, so a consumer's own filename could forge a verdict.
+      - *Victor 1 and 2, both false negatives -- the dangerous direction.* The parser scanned only
+        forward from `repository:`, so a `path:` written above it registered no prefix; and both key
+        regexes were anchored at `$`, so an ordinary trailing YAML comment defeated them. Either
+        made a whole file read as carrying no reference -- #1805 recurring one layer down, inside
+        the detector built to close it.
 
 ### DEPLOY: fix/1805-consumer-gate-path-drift
 
