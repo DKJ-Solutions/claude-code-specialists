@@ -34,7 +34,7 @@
         label) and the summary names what the run covered -- all registered connectors, or just this
         repo under -OnlyConsumer. Without that, two consumers on the same outdated plugin version
         produced two identical, unattributable [ERROR] lines (inbound #203);
-    - three exceptions to the [INFO] silence, all non-counting lines the check emits only about the repo
+    - four exceptions to the [INFO] silence, all non-counting lines the check emits only about the repo
         the session is in -- so none of them can reintroduce other-machine noise:
         [UNREGISTERED], because an unregistered consumer is reported as [INFO] and a brand-new repo was
         therefore told "no errors" -- a positive all-clear for a repo the workshop cannot see at all
@@ -42,12 +42,18 @@
         [INVENTORY], one step further in: the repo IS registered, but its entry lists fewer lenses than
         the repo holds. Also an [INFO], so also silent -- which let six missing ids sit in this
         workshop's own entry until a hand-run found them. Found 2026-07-29;
-        [NOT-INSTALLED-HERE], the only one of the three that is not about the register's view: a plugin
+        [NOT-INSTALLED-HERE], the only one of the four that is not about the register's view: a plugin
         is enabled for this repo and has no install record for this path, so a session here loads none of
         it. An [INFO] for every connector because the install may belong to another machine -- a reading
         that does not exist for the repo the session is running in, which is why check-connectors adds
         the marker there. Found 2026-08-09 (#533), after a mid-session pull carried this repo across the
         plugin rename and left BOTH enabled plugins without a record, silently;
+        [UNLISTED], one level further OUT than [INVENTORY]: a whole PLUGIN block enabled in this repo's
+        settings that its manifest's 'plugins' list does not name at all, so check-connectors' per-plugin
+        loop never even reached it -- no extension check, no version check, nothing. Also an [INFO], so
+        also silent by default. Found 2026-09-10 (#1775): five of this repo's own six enabled plugins sat
+        outside that loop, one of them merely coinciding with a differently-named retired entry that
+        happened to print something for an unrelated reason;
     - the summary says WHEN its version claims were true (#533): it lifts the source commit out of
         check-connectors' own header rather than measuring one here, so the stamp names the moment the
         versions were read. Without it a 'source on vX' line is fact-shaped and undated, indistinguishable
@@ -503,11 +509,24 @@ try {
     # (see its docstring: a session start writes the record itself before any hook can look). Found by hand.
     $notInstalled = @($out | Where-Object { $_ -cmatch '\[NOT-INSTALLED-HERE\]' })
 
-    # All three markers are non-counting: they must never turn an exit-0 run into a "signals found"
-    # summary, because in none of the three is anything wrong with the SOURCE -- only with the register's
+    # [UNLISTED] rides along on the same terms, one level further OUT than [INVENTORY]: not a lens the
+    # register's own entry forgot to list, but a WHOLE PLUGIN BLOCK it forgot -- an id enabled here that
+    # check-connectors' per-plugin loop never even reached, because no id in the manifest named it, so
+    # nothing about it was checked at all (#1775). Also an [INFO] in the check, hence also invisible here
+    # by the same rule; surfaced for the identical reason the other three are, and scoped the same way --
+    # check-connectors only emits it for the repo the session is actually in, so no other-machine noise
+    # can reach this list.
+    #
+    # Why it was needed: measured 2026-09-10 against this repo's own register, where five of six enabled
+    # plugins sat outside that loop and produced no line whatsoever -- four of them with nothing else
+    # saying so anywhere in the run.
+    $unlisted = @($out | Where-Object { $_ -cmatch '\[UNLISTED\]' })
+
+    # All four markers are non-counting: they must never turn an exit-0 run into a "signals found"
+    # summary, because in none of the four is anything wrong with the SOURCE -- only with the register's
     # view of this repo, or with what this machine has of the plugin. Same reasoning as [ORPHANS] in
     # roster-sessioncheck.
-    $notices = @($unregistered) + @($inventory) + @($notInstalled)
+    $notices = @($unregistered) + @($inventory) + @($notInstalled) + @($unlisted)
 
     # Did the child run to completion? Write-CheckSummary's "Summary: N error(s)" line is the check's
     # last statement, so its absence means the run stopped early and the list below may be partial
@@ -564,7 +583,7 @@ try {
             foreach ($line in $notInstalled) { Write-Host "  $($line.Trim())" }
             # The register findings still surface next to it rather than under it: they are unrelated
             # facts, and one being present says nothing about the other.
-            foreach ($line in @($unregistered) + @($inventory)) { Write-Host "  $($line.Trim())" }
+            foreach ($line in @($unregistered) + @($inventory) + @($unlisted)) { Write-Host "  $($line.Trim())" }
         } elseif ($unregistered.Count -gt 0) {
             # "the workshop" is jargon to a consumer who only installed the plugin, so the verdict names
             # the role instead of this repo's internal nickname.
@@ -577,6 +596,18 @@ try {
             # Folding both under one line would blur exactly that distinction.
             Write-Host "connector-sessioncheck: no errors, but the register's lens inventory for this repo is behind:"
             foreach ($line in $inventory) { Write-Host "  $($line.Trim())" }
+            # [UNLISTED] rides beside it rather than under it, for the same reason [NOT-INSTALLED-HERE]
+            # carries the other two above: a lens the register forgot and a whole plugin block it forgot
+            # are unrelated facts about the same register, and one being present says nothing about the
+            # other.
+            foreach ($line in $unlisted) { Write-Host "  $($line.Trim())" }
+        } elseif ($unlisted.Count -gt 0) {
+            # Its own verdict, for the same reason [INVENTORY] has its own rather than sharing
+            # [UNREGISTERED]'s: "a plugin block is entirely missing from the register" is a different
+            # situation, with a different fix, from "the whole connector is missing" or "an extension
+            # list is behind" -- folding it under either would blur which of the three is true.
+            Write-Host "connector-sessioncheck: no errors, but this repo's register entry does not list every plugin it has enabled:"
+            foreach ($line in $unlisted) { Write-Host "  $($line.Trim())" }
         } else {
             Write-Host 'connector-sessioncheck: no errors.'
         }

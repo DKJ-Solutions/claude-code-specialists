@@ -143,6 +143,20 @@ function New-StubWorkshop {
     return $root
 }
 
+# Overwrites the fixture's settings.json to enable exactly these ids (helper for check 5 / the
+# [UNLISTED] scenarios, #1775). New-FixtureConsumer only ever enables the one hardcoded plugin id
+# ('dkj-subagents-alpha@claude-code-specialists'), and check 5's whole subject is a SECOND id sitting
+# beside it that the manifest does not list -- so those scenarios need a settings.json this helper can
+# shape freely, written AFTER New-FixtureConsumer (which rebuilds $Fixture from scratch and would wipe
+# this file if called afterwards).
+function Set-FixtureEnabledPlugins {
+    param([string[]]$Ids)
+    $obj = [ordered]@{}
+    foreach ($id in $Ids) { $obj[$id] = $true }
+    $enabled = if ($Ids.Count -eq 0) { '{ }' } else { ($obj | ConvertTo-Json -Compress) }
+    [System.IO.File]::WriteAllText((Join-Path $Fixture '.claude\settings.json'), ('{ "enabledPlugins": ' + $enabled + ' }'))
+}
+
 try {
     Write-Host "== connectors.tests ==" -ForegroundColor Cyan
     # -UserHomeOverride pins the USER layer of the settings chain to a dir that does not exist (inbound
@@ -808,6 +822,46 @@ try {
     Assert-Match 'register checks \(consumer registration, lens inventory, agent-def drift\) did not run' $r.Out 'fake workshop: rejected as a workshop -- register checks did not run'
     Assert-NotMatch 'FAKE-EXECUTED' $r.Out 'fake workshop: script was NOT executed'
 
+    # 9r (#1775). [UNLISTED] on its own: its own verdict line, not folded into [UNREGISTERED]'s or
+    #     [INVENTORY]'s -- same reasoning as 9f/9i for the two neighbouring markers' own-verdict
+    #     scenarios: a whole plugin block the register never named is a different situation, with a
+    #     different fix, from "not registered at all" or "an extension list is behind".
+    $stub = New-StubWorkshop -Name 'stub-unlisted' -ExitCode 0 -OutputLines @(
+        "  [INFO]  DKJ-Solutions/claude-code-specialists / dkj-policy@claude-code-specialists: plugin 'dkj-subagents-ecomm@claude-code-specialists' is enabled in .claude/settings.json but this manifest's 'plugins' list does not name it -- it was never looped over above, so nothing about it was checked here (no extension check, no version check). Add a plugins[] block for it to claude-code-specialists.json, in the same change that enabled it, or remove the enable if that was not intended.",
+        "  [UNLISTED] this repo has 1 plugin(s) enabled that its own entry in the connector register does not list (dkj-subagents-ecomm@claude-code-specialists) -- add a plugins[] block for each to claude-code-specialists.json, in the same change that enabled it. Nothing is broken: the register's view of this repo is simply behind reality.",
+        'Summary: 0 error(s), 1 info signal(s).'
+    )
+    $r = Invoke-Ps $Hook @('-WorkshopPathOverride', $stub)
+    Assert-Equal 0 $r.Code 'unlisted stub: exit code 0'
+    Assert-Match '\[UNLISTED\]' $r.Out 'unlisted stub: the marker reaches the session context'
+    Assert-Match "this repo's register entry does not list every plugin it has enabled" $r.Out 'unlisted stub: its own verdict line, not the unregistered or inventory one'
+    Assert-NotMatch "not in the plugin maintainer's register" $r.Out 'unlisted stub: NOT reported as unregistered -- the entry exists, it is just missing a plugin block'
+    Assert-NotMatch 'lens inventory for this repo is behind' $r.Out 'unlisted stub: NOT reported as an inventory drift -- a different subject entirely'
+    Assert-NotMatch 'signals found' $r.Out 'unlisted stub: NOT escalated to a signals summary (nothing is wrong with the install)'
+    Assert-NotMatch '\[INFO\]' $r.Out 'unlisted stub: the per-signal [INFO] line still stays out'
+
+    # 9s. A clean run gains nothing -- the guard against this becoming a line every session start carries.
+    $stub = New-StubWorkshop -Name 'stub-no-unlisted' -ExitCode 0 -OutputLines @(
+        '  [OK]    plugin is enabled in .claude/settings.json',
+        'Summary: 0 error(s), 0 info signal(s).'
+    )
+    $r = Invoke-Ps $Hook @('-WorkshopPathOverride', $stub)
+    Assert-Match 'no errors\.' $r.Out 'no-unlisted stub: the plain no-errors line is unchanged'
+    Assert-NotMatch 'UNLISTED' $r.Out 'no-unlisted stub: no marker'
+    Assert-NotMatch 'does not list every plugin' $r.Out 'no-unlisted stub: no wording about it at all'
+
+    # 9t. Real signals AND [UNLISTED] in one run: both surface -- same regression guard as 9k/9n, the
+    #     marker must not be dropped precisely when something else is also wrong.
+    $stub = New-StubWorkshop -Name 'stub-unlisted-mixed' -ExitCode 1 -OutputLines @(
+        '  [ERROR] life-hub / dkj-subagents-alpha@claude-code-specialists: machine record is on v2.9.0, source on v2.11.0',
+        '  [UNLISTED] this repo has 1 plugin(s) enabled that its own entry in the connector register does not list (dkj-subagents-ecomm@claude-code-specialists) -- add a plugins[] block for each to claude-code-specialists.json, in the same change that enabled it. Nothing is broken: the register''s view of this repo is simply behind reality.',
+        'Summary: 1 error(s), 1 info signal(s).'
+    )
+    $r = Invoke-Ps $Hook @('-WorkshopPathOverride', $stub)
+    Assert-Match 'signals found' $r.Out 'unlisted mixed: the signals branch fires'
+    Assert-Match 'v2\.9\.0' $r.Out 'unlisted mixed: the real [ERROR] surfaces'
+    Assert-Match '\[UNLISTED\]' $r.Out 'unlisted mixed: the marker surfaces alongside it'
+
     # --- 10. A plugin id the marketplace no longer declares --------------------------------------------
     #      THE THREE WAYS Get-PluginDir CAN MISS ARE NOT ONE FINDING, and telling them apart is this
     #      scenario's whole subject. While the lookup was a directory probe there was only one way to
@@ -837,6 +891,99 @@ try {
     Assert-Equal 1 $r.Code 'malformed id: still exits 1'
     Assert-Match '\[ERROR\]' $r.Out 'malformed id: still an error -- a register file defect is not a migration'
     Assert-Match 'invalid or unknown plugin field' $r.Out 'malformed id: and keeps its own wording'
+
+    # --- 11. Check 5 / [UNLISTED]: a plugin enabled in the consumer's settings chain that this
+    #      manifest's own 'plugins' list never names at all (#1775). $RepoRoot inside the SCRIPT UNDER
+    #      TEST is always this real checkout (it is derived from $PSScriptRoot, not from the fixture), so
+    #      $ThisMarketplaceName there is always 'claude-code-specialists' -- every id below is chosen with
+    #      that in mind.
+    Write-Host "check 5 / [UNLISTED]: a plugin enabled here that the manifest's own list does not name" -ForegroundColor Cyan
+
+    # 11a. Enabled, not listed -> a counting [INFO] naming it, exit 0 (informational, not a gate breach).
+    New-FixtureConsumer -ExtensionIds @('06-16')
+    Set-FixtureEnabledPlugins -Ids @('dkj-subagents-alpha@claude-code-specialists', 'dkj-subagents-ecomm@claude-code-specialists')
+    $mf = New-FixtureManifest -Extensions @('06-16')
+    $r = Invoke-Ps $Script ($base + @('-Manifest', $mf, '-ConsumerPathOverride', $Fixture))
+    Assert-Equal 0 $r.Code 'unlisted plugin: exit code 0 (INFO, not an error)'
+    Assert-Match "\[INFO\].*'dkj-subagents-ecomm@claude-code-specialists'.*does not name it" $r.Out 'unlisted plugin: INFO names the id the manifest never lists'
+    # 11a / item 3: NOT the session repo (no -OnlyConsumer) -> the [INFO] stands, the [UNLISTED] must not.
+    Assert-NotMatch '\[UNLISTED\]' $r.Out 'unlisted plugin, NOT the session repo: no [UNLISTED] marker'
+
+    # 11b. Same fixture, but the consumer IS the session repo (-OnlyConsumer) -> the non-counting
+    #      [UNLISTED] line rides alongside the [INFO], and the run still exits 0.
+    $r = Invoke-Ps $Script ($base + @('-Manifest', $mf, '-ConsumerPathOverride', $Fixture, '-OnlyConsumer', $Fixture))
+    Assert-Equal 0 $r.Code 'unlisted plugin, SESSION repo: exit 0 -- non-counting, nothing is broken about the source'
+    Assert-Match '\[UNLISTED\]' $r.Out 'unlisted plugin, SESSION repo: the marker fires'
+    Assert-Match 'dkj-subagents-ecomm@claude-code-specialists' $r.Out 'unlisted plugin, SESSION repo: the marker names the id'
+    Assert-Match "\[INFO\].*'dkj-subagents-ecomm@claude-code-specialists'" $r.Out 'unlisted plugin, SESSION repo: the [INFO] is kept too -- a deliberate run should still list everything'
+
+    # 11c. An id naming a DIFFERENT marketplace is silently out of scope -- not this register's business
+    #      to judge a catalogue it does not own. Checked with -OnlyConsumer too, the stronger claim: even
+    #      when this IS the session repo, an out-of-scope id raises neither line.
+    New-FixtureConsumer -ExtensionIds @('06-16')
+    Set-FixtureEnabledPlugins -Ids @('dkj-subagents-alpha@claude-code-specialists', 'some-plugin@other-marketplace')
+    $mf = New-FixtureManifest -Extensions @('06-16')
+    $r = Invoke-Ps $Script ($base + @('-Manifest', $mf, '-ConsumerPathOverride', $Fixture, '-OnlyConsumer', $Fixture))
+    Assert-Equal 0 $r.Code 'different marketplace id: exit code 0'
+    Assert-NotMatch 'some-plugin@other-marketplace' $r.Out 'different marketplace id: not mentioned anywhere -- not this register''s catalogue to judge'
+    Assert-NotMatch '\[UNLISTED\]' $r.Out 'different marketplace id: no [UNLISTED] marker, even in the session repo'
+
+    # 11d. An id with NO '@' at all cannot be attributed to any marketplace -- also silently excluded.
+    New-FixtureConsumer -ExtensionIds @('06-16')
+    Set-FixtureEnabledPlugins -Ids @('dkj-subagents-alpha@claude-code-specialists', 'no-at-sign-id')
+    $mf = New-FixtureManifest -Extensions @('06-16')
+    $r = Invoke-Ps $Script ($base + @('-Manifest', $mf, '-ConsumerPathOverride', $Fixture, '-OnlyConsumer', $Fixture))
+    Assert-Equal 0 $r.Code 'id without @: exit code 0'
+    Assert-NotMatch 'no-at-sign-id' $r.Out 'id without @: not mentioned anywhere -- there is nothing to compare it against'
+    Assert-NotMatch '\[UNLISTED\]' $r.Out 'id without @: no [UNLISTED] marker'
+
+    # 11e. Every enabled id is also named in the manifest's own list -> neither line, even in the
+    #      session repo. The regression guard against this becoming a line every session start carries.
+    New-FixtureConsumer -ExtensionIds @('06-16')
+    $mf = New-FixtureManifest -Extensions @('06-16')
+    $r = Invoke-Ps $Script ($base + @('-Manifest', $mf, '-ConsumerPathOverride', $Fixture, '-OnlyConsumer', $Fixture))
+    Assert-NotMatch '\[UNLISTED\]' $r.Out 'fully listed: no [UNLISTED] marker'
+    Assert-NotMatch 'does not name it' $r.Out 'fully listed: no unlisted-plugin INFO either'
+
+    # 11f. A RETIRED id (this marketplace's own segment, a name the marketplace no longer declares) that
+    #      is enabled and absent from the manifest IS still reported -- the predicate agrees with the
+    #      existing 'retired' branch in the per-plugin loop rather than re-excluding by segment what that
+    #      branch already treats as worth recording. 'specialists@claude-code-specialists' is the id case
+    #      10 above already establishes as retired for this marketplace.
+    New-FixtureConsumer -ExtensionIds @('06-16')
+    Set-FixtureEnabledPlugins -Ids @('dkj-subagents-alpha@claude-code-specialists', 'specialists@claude-code-specialists')
+    $mf = New-FixtureManifest -Extensions @('06-16')
+    $r = Invoke-Ps $Script ($base + @('-Manifest', $mf, '-ConsumerPathOverride', $Fixture, '-OnlyConsumer', $Fixture))
+    Assert-Equal 0 $r.Code 'retired id, unlisted: exit code 0 (non-error)'
+    Assert-Match "\[INFO\].*'specialists@claude-code-specialists'.*does not name it" $r.Out 'retired id, unlisted: the INFO reports it too'
+    Assert-Match '\[UNLISTED\]' $r.Out 'retired id, unlisted: the [UNLISTED] marker fires'
+    Assert-Match 'specialists@claude-code-specialists' $r.Out 'retired id, unlisted: the marker names the retired id'
+
+    # 11g. No settings file at all -> AnyFileExists is false, and check 5 stays silent entirely: an
+    #      absence claim drawn from a file that does not exist is exactly what this repo refuses. The run
+    #      still fails overall (the pre-existing 'no settings file found' guardrail), but that is a
+    #      different, pre-existing finding -- not this check speaking where it has nothing to read.
+    if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture }
+    New-Item -ItemType Directory -Path $Fixture -Force | Out-Null
+    $mf = New-FixtureManifest -Extensions @('06-16')
+    $r = Invoke-Ps $Script ($base + @('-Manifest', $mf, '-ConsumerPathOverride', $Fixture, '-OnlyConsumer', $Fixture))
+    Assert-Equal 1 $r.Code 'no settings file: still exit 1 (the pre-existing guardrail, not check 5)'
+    Assert-Match '\[ERROR\].*no settings file found' $r.Out 'no settings file: the pre-existing guardrail still fires'
+    Assert-NotMatch '\[UNLISTED\]' $r.Out 'no settings file: check 5 stays silent -- nothing to read'
+    Assert-NotMatch 'does not name it' $r.Out 'no settings file: no unlisted-plugin INFO either'
+
+    # 11h (Victor's finding 4). An id where '@' is the FIRST character carries an attributable
+    #      marketplace segment (everything after it) but an EMPTY plugin-name segment before it -- not a
+    #      real plugin id, the same shape Test-PluginNameSlug rejects elsewhere in this file as malformed.
+    #      Deliberately excluded, same as an id with no '@' at all (11d): there is no plugin name to write
+    #      an 'add a plugins[] block for it' finding about. Checked with -OnlyConsumer, the stronger claim.
+    New-FixtureConsumer -ExtensionIds @('06-16')
+    Set-FixtureEnabledPlugins -Ids @('dkj-subagents-alpha@claude-code-specialists', '@claude-code-specialists')
+    $mf = New-FixtureManifest -Extensions @('06-16')
+    $r = Invoke-Ps $Script ($base + @('-Manifest', $mf, '-ConsumerPathOverride', $Fixture, '-OnlyConsumer', $Fixture))
+    Assert-Equal 0 $r.Code 'id with empty plugin name: exit code 0'
+    Assert-NotMatch '\[UNLISTED\]' $r.Out 'id with empty plugin name: no [UNLISTED] marker'
+    Assert-NotMatch 'does not name it' $r.Out 'id with empty plugin name: no unlisted-plugin INFO either'
 } finally {
     if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture }
     if (Test-Path -LiteralPath $HookHome) { Remove-Item -Recurse -Force -LiteralPath $HookHome -ErrorAction SilentlyContinue }
