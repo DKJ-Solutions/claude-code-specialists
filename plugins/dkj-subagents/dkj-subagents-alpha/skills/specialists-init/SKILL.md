@@ -100,7 +100,7 @@ line) and `script-contract-sessioncheck.ps1` (through `check-script-contract.ps1
 
 ```jsonc
 "extraKnownMarketplaces": {
-  "claude-code-specialists": { "source": { "source": "github", "repo": "DKJ-Solutions/claude-code-specialists" } }
+  "dkj-claude-plugins": { "source": { "source": "github", "repo": "DKJ-Solutions/claude-code-specialists" } }
 },
 "enabledPlugins": {
   "dkj-subagents-alpha@dkj-claude-plugins": true
@@ -112,7 +112,7 @@ line) and `script-contract-sessioncheck.ps1` (through `check-script-contract.ps1
 marketplace; a **session start** does. Measured on a virgin profile in three states (inbound
 [#329](https://github.com/DaveKJohn/claude-code-specialists/issues/329)): without the settings file the
 refresh below fails, with the settings file in the same session it still fails, and after one session
-start it succeeds — reporting `Marketplace 'dkj-claude-plugins' not found` until then, which reads as a
+start it succeeds — reporting `Marketplace 'claude-code-specialists' not found` until then, which reads as a
 misspelled name rather than a missing act. `claude plugin marketplace add <owner>/<repo> --scope project`
 registers it without a restart if that is preferable; keep the scope flag, because `add` defaults to
 `user`.
@@ -140,7 +140,7 @@ on July 31 right after `v3.0.5`, same machine and same minute: **without** the r
 `3.0.4` and the clone did not move; **with** it, a second fresh folder got `3.0.5`. Unlike `plugin
 update`, `install` does **not** refresh for itself — so for this command the line is load-bearing rather
 than insurance. And the output cannot tell you: the success line names the **scope and no version at
-all**, which is why step 0c below verifies against the install record. `claude plugin marketplace update dkj-claude-plugins` followed by a `plugin
+all**, which is why step 0c below verifies against the install record. `claude plugin marketplace update claude-code-specialists` followed by a `plugin
 update` then moved it `3.0.1 -> 3.0.2` in one step. A refresh mechanism exists (the command reports
 `Refreshing marketplace cache (timeout: 120s)`), so a cache does not stay stale indefinitely; on what
 schedule it refreshes by itself was not established, which is why the explicit line is in the
@@ -213,7 +213,7 @@ directly. **Nothing in this plugin depends on that being fixed**: the checks now
 plugin update` also defaults to user scope, so on a project-scoped install the plain command fails:
 
 ```
-✘ Failed to update plugin "dkj-subagents-alpha@dkj-claude-plugins": Plugin "specialists" is not installed at scope user
+✘ Failed to update plugin "dkj-subagents-alpha@claude-code-specialists": Plugin "specialists" is not installed at scope user
 ```
 
 That message is literally true and reads as *"this plugin is not installed"* on a machine where it
@@ -257,7 +257,7 @@ record had **moved**, not never existed — worth knowing, because the two call 
 list nevertheless reported:
 
 ```
-❯ dkj-subagents-alpha@dkj-claude-plugins   Version: 3.0.1   Scope: project   Status: ✔ enabled
+❯ dkj-subagents-alpha@claude-code-specialists   Version: 3.0.1   Scope: project   Status: ✔ enabled
 ```
 
 The command enumerates install records beyond the current repo, so a green line is no evidence that

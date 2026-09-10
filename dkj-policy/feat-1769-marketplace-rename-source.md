@@ -165,7 +165,15 @@ merge, and do not treat a green run from an earlier day as proof.
       pending) and `scripts/repo-config.ps1`'s "FASE 1 IS BUILT, NOT MERGED" (it merged). Both say
       "does not merge until fase 3" in as many words, so neither degrades quietly; found by Edith on
       review, September 10, 2026
-- [ ] Victor (scripts) + Edith (docs/links) review -- branch stays open until fase 2 is built- [ ] LAST (session-breaking on this branch until flag day): `.claude/settings.json` self-consume
+- [x] Victor (scripts) + Edith (docs/links) review, September 10, 2026 -- four half-landed renames
+      repaired (plus the same fault in `check-report-lib.ps1` and its two mirrors, which the review
+      missed), one test gap closed by Tycho, and the sweep's own over-reach corrected by Tessa across
+      15 places in 5 files: dated transcripts and migration tables' OLD columns keep the retired name.
+      The branch stays open until fase 2 is built
+- [ ] FLAG DAY: the three migration procedures in `INSTALL.md` need a marketplace remove+add step
+      between their uninstall and install halves, or they cannot run at all after the rename --
+      filed as [#1801](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1801) because the
+      repair defines part of the procedure and interacts with fase 5's release notes- [ ] LAST (session-breaking on this branch until flag day): `.claude/settings.json` self-consume
       keys + `github` source + `repo`
 - [ ] LAST (session-breaking): live `@`-import paths + clone-dir path segments
       `marketplaces/claude-code-specialists/` -> `marketplaces/dkj-claude-plugins/`,

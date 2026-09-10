@@ -206,9 +206,9 @@ command does not act on a project-scoped install. What it says instead depends o
 `2.1.220` (measured, round v11) it is:
 
 ```text
-✘ Failed to uninstall plugin "dkj-subagents-alpha@dkj-claude-plugins": Plugin "dkj-subagents-alpha@dkj-claude-plugins"
+✘ Failed to uninstall plugin "dkj-subagents-alpha@claude-code-specialists": Plugin "dkj-subagents-alpha@claude-code-specialists"
   is enabled at project scope (.claude/settings.json, shared with your team). To disable just for you:
-  claude plugin disable dkj-subagents-alpha@dkj-claude-plugins --scope local
+  claude plugin disable dkj-subagents-alpha@claude-code-specialists --scope local
 ```
 
 **Do not follow the remedy the CLI suggests there.** `plugin disable --scope local` is a different
