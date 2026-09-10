@@ -40,17 +40,42 @@ Dave decided 2026-09-10, at the v4.33.0 cut, that a forced one-sentence release 
 
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [x] `dkj-policy/releases/README.md` › *Local decisions*: a dated Dave decision that every cut passes
+      `-Title "Release version X.Y.Z"`, with the reasoning (a release rolls up everything since the last
+      one; one sentence cannot describe a large multi-theme one). Notes the mechanism is unchanged and a
+      single-theme repo should still use a descriptive line.
+- [x] `.claude/specialists/lenses/05-06-extension.md` › *Versioning & releases*: the operating
+      instruction for Rendall — pass that string on every cut here — pointing at the README for the why.
+- [x] `plugins/dkj-policy/skills/cut-release/SKILL.md`: one portable clause by the `-Title` explanation,
+      that a stable `Release version X.Y.Z` is a legitimate title where a release rolls up too many
+      unrelated changes for one sentence to fit.
 
 ### TEST
 
+- [x] Lint gate + suites green from the trunk baseline before the branch; the change is prose only —
+      `-Title` is free-text and no script or test reads its shape, so there is nothing behavioural to
+      pin. Copy edit on the diff (Edith) and `open-pr`'s own gates cover the rest.
+
 ### DEPLOY: docs/release-title-convention
 
-**Score:**
+From `v4.33.0` on, this repo titles every release `Release version X.Y.Z` and stops composing a
+one-sentence summary that a large multi-theme cut makes meaningless. The decision and its reasoning are
+in `dkj-policy/releases/README.md`'s *Local decisions* section; Rendall's lens carries the operating
+instruction. The `-Title` parameter is untouched — a descriptive sentence is still valid for a repo
+whose releases each carry one theme, and `-SummaryFile` still handles a genuine milestone.
+
+**Score:** 1
+
+The failure it prevents: a `history.md` title column and a GitHub Release heading filling up with
+forced one-liners that describe none of the dozens of unrelated entries beneath them.
 
 #### What makes this deploy extra special
 
-**Score:**
+One portable clause reaches a consumer, in the `cut-release` skill they read: a stable
+`Release version X.Y.Z` is named as a legitimate title rather than something to apologise for. It
+changes no command and no behaviour — the entries and attachments carry the detail either way.
+
+**Score:** 1
 
 #### Pull Request
 
