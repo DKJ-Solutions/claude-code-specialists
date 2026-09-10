@@ -64,6 +64,18 @@
          the only repair that can reach a repo which adopted before the move: fixing the scaffolder
          cannot, because it writes once. Switched off entirely, rather than guessing, when
          Get-RepoName cannot be read.
+      6b. THE SAME CHECK, ASKED OVER THE NETWORK, and only under -RemoteRunners (#1808). Check 6 reads
+         the consumer's local checkout, so it inherits check 1: an absent consumer is [SKIP] and its
+         runners are not read at all -- and the consumers most likely to carry a stale path are the
+         ones nobody visits, which are the ones least likely to be checked out where you happen to be
+         running. So on request the workflow files are read from the repository's default branch
+         through 'gh api graphql' and judged by exactly the same code, with the finding saying which
+         branch it read. THREE OUTCOMES AGAIN, and the third is the one that earns the switch: a repo
+         this token cannot read, or a call that does not answer, is an [INFO] naming the repo and the
+         command to run by hand -- never silence, which on a check whose whole subject is an unnoticed
+         breach would be indistinguishable from an all-clear. Off at session start because a network
+         call per absent connector does not belong on that path; the same shape -SkipDrift and
+         -SkipVersions already establish here, inverted.
     The register no longer keeps a syncedVersion bookkeeping: the check reads the actual installed
     version from the machine record, and register administration that only duplicates numbers
     produced nothing but maintenance PRs (Dave's decision, July 20, 2026).
@@ -92,6 +104,14 @@
 .PARAMETER SkipVersions
     Skip the machine-record check (e.g. on CI, where no plugin administration exists).
 
+.PARAMETER RemoteRunners
+    (Opt-in) For a consumer whose checkout is NOT on this machine, read its CI runners over the
+    GitHub API instead of off the disk, so check 6 judges it rather than skipping it (#1808). OFF by
+    default and deliberately so: this script runs from connector-sessioncheck.ps1 at every session
+    start, and a network call per absent connector is a different cost class from everything else it
+    does. Where the read cannot be made -- no gh, no auth, no answer -- it says so per connector and
+    never falls through to silence, which would read as an all-clear.
+
 .PARAMETER UserHomeOverride
     (Optional, for tests) Use this dir as the user home when resolving the user layer of a consumer's
     settings chain (~/.claude/settings.json), instead of $env:USERPROFILE. Without it a fixture would
@@ -102,6 +122,8 @@
     .\scripts\sync\check-connectors.ps1
 .EXAMPLE
     .\scripts\sync\check-connectors.ps1 -SkipDrift -SkipVersions
+.EXAMPLE
+    .\scripts\sync\check-connectors.ps1 -RemoteRunners
 #>
 param(
     [string]$Manifest = '',
@@ -109,6 +131,7 @@ param(
     [string]$OnlyConsumer = '',
     [switch]$SkipDrift,
     [switch]$SkipVersions,
+    [switch]$RemoteRunners,
     [string]$UserHomeOverride = ''
 )
 
@@ -165,6 +188,43 @@ if (Test-Path -LiteralPath $repoConfigPath -PathType Leaf) {
         return ''
     } $repoConfigPath
     if ($slug) { $ThisRepoName = $slug.Substring($slug.LastIndexOf('/') + 1) }
+}
+
+# --- CAN THE OPT-IN NETWORK READ ACTUALLY BE MADE? Asked ONCE per run (#1808) --------------------
+# -RemoteRunners is a request, not a capability, and the two ways it can be unmeetable are properties
+# of the MACHINE rather than of any one connector: gh is not installed, or gh is installed and holds no
+# credential. Asking per connector would print the same sentence once for every absent checkout in the
+# register and teach the reader nothing three times over -- so it is settled here, and the per-connector
+# lines below are then only ever about a specific repository.
+#
+# AND A REFUSED REQUEST IS SAID OUT LOUD. The switch was typed on purpose; falling back to the ordinary
+# [SKIP] would answer a deliberate question with the silence it was typed to end. That is the same
+# doctrine the -OnlyConsumer "not registered" notice already stands on further down: the worst outcome
+# available here is a positive-sounding run over consumers nothing looked at.
+#
+# THE LIB IS DOT-SOURCED LAZILY, INSIDE THE SWITCH, and that is the cost argument being carried out
+# rather than stated. native-capture-lib.ps1 exists for exactly this call -- Windows PowerShell 5.1
+# promotes a native command's stderr to a terminating error, and a network call has to be bounded -- but
+# this script is run by connector-sessioncheck.ps1 at every session start, where -RemoteRunners is off
+# and nothing in that file would ever be called. A feature that is opt-in should be opt-in in what it
+# loads too.
+$RemoteRunnerRead = $false
+if ($RemoteRunners) {
+    if (-not $ThisRepoName) {
+        Write-Info "-RemoteRunners was asked for, but this repo's own name could not be read from Get-RepoName (scripts/repo-config.ps1) -- so check 6 is off for this run in both directions, on the disk and over the network. Nothing about any consumer's runners was read."
+    } elseif (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
+        Write-Info "-RemoteRunners was asked for, but 'gh' is not on PATH -- no consumer's runners were read over the network. A checkout that IS present on this machine is still judged off the disk by check 6."
+    } else {
+        . (Join-Path $PSScriptRoot '..\lib\native-capture-lib.ps1')
+        # -DiscardStderr because `gh auth status` writes its whole report to stderr even when it
+        # succeeds, and nothing here parses it: the exit code is the answer.
+        $ghAuth = Invoke-NativeCapture -FilePath 'gh' -Arguments @('auth', 'status') -DiscardStderr -TimeoutSeconds $NativeCaptureNetworkTimeoutSeconds
+        if ($ghAuth.ExitCode -ne 0) {
+            Write-Info "-RemoteRunners was asked for, but 'gh auth status' exited $($ghAuth.ExitCode) -- no consumer's runners were read over the network. Run 'gh auth login' and try again: this register's manifests carry a 'visibility' field and the private ones cannot be read without a credential, which is exactly the set this switch exists for."
+        } else {
+            $RemoteRunnerRead = $true
+        }
+    }
 }
 
 # THIS REPO'S OWN MARKETPLACE NAME, i.e. the segment after the '@' in an id like
@@ -293,6 +353,181 @@ function Test-IsSessionRepo {
     return $Checkout -eq $RepoRoot
 }
 
+function Write-RunnerPathFinding {
+    <#
+        Check 6's verdicts about ONE workflow file, whatever route the text arrived by (#1808).
+
+        Extracted rather than copied when the network read was added: the local half and the remote
+        half differ only in how the bytes are obtained, and two copies of the judgement would be two
+        places for the [ERROR] wording, the token wrapping and the three-outcome split to drift apart.
+        The one thing the caller supplies is $Where -- a clause naming where this text came from,
+        which is empty for a working copy (the reader is standing in it) and names the branch for a
+        remote read (the reader is not, and a finding about a file they cannot open has to say which
+        revision it is about).
+
+        EVERY VALUE LIFTED OUT OF THE CONSUMER'S FILE IS WRAPPED, THE FILENAME INCLUDED.
+        Format-SafePathToken rather than Format-SafeToken, because all three subjects here are
+        path-shaped and #414 is exactly that argument -- the id charset deletes what makes a path
+        findable. What it strips is the class that matters on this route: control characters, which
+        could forge a line in the session context the SessionStart hook forwards, and square brackets,
+        which the hooks COUNT as verdict markers. A workflow file named 'x[ERROR] evil.yml' is a legal
+        filename on NTFS and would otherwise change a hook's verdict from a consumer's own directory
+        listing -- and over the network it is a name anybody with push access to that repo chooses.
+    #>
+    param(
+        [Parameter(Mandatory = $true)][string]$WorkflowName,
+        [Parameter(Mandatory = $true)][AllowEmptyString()][AllowNull()][string]$WorkflowText,
+        [string]$Where = ''
+    )
+
+    $refs = @(Get-SharedScriptReference -WorkflowText $WorkflowText -RepositoryName $ThisRepoName)
+    if ($refs.Count -eq 0) { return }
+
+    $wfName = Format-SafePathToken -Value $WorkflowName
+    $suffix = if ($Where) { " ($Where)" } else { '' }
+    foreach ($judged in @(Test-SharedScriptReference -Reference $refs -SourceRoot $RepoRoot)) {
+        if ($judged.Exists) { continue }
+
+        # AN ESCAPING REFERENCE IS ITS OWN FINDING, and deliberately not phrased as a missing path:
+        # nothing was looked up, because looking it up is what the lib refuses to do (it would answer
+        # whether an arbitrary file exists on this machine).
+        if ($judged.Escapes) {
+            Write-Failure "$wfName line $($judged.Line) runs '$(Format-SafePathToken -Value $judged.Path)', which does not stay inside the checkout of this repo it is resolved against -- so it was NOT looked up here. A runner reaching outside its own checkout cannot work on a CI machine whatever this tree holds; correct it in that consumer.$suffix"
+            continue
+        }
+
+        $where = if ($judged.MovedTo.Count -gt 0) {
+            "it is at $((@($judged.MovedTo) | ForEach-Object { Format-SafePathToken -Value $_ }) -join ' / ') now"
+        } else {
+            'no file of that name exists anywhere here, so it was removed rather than moved'
+        }
+        Write-Failure "$wfName line $($judged.Line) runs '$(Format-SafePathToken -Value $judged.Path)' out of a checkout of this repo, and that path does not exist here -- $where. That runner is red on every pull request in this consumer until the path is corrected there; nothing in this repo can correct it from here.$suffix"
+    }
+}
+
+function Get-RemoteConsumerWorkflow {
+    <#
+        Every '.github/workflows/*.yml' of $Repo's default branch, WITH ITS TEXT, in one call (#1808).
+
+        Returns @{ Status; Reason; Branch; Files } where Status is one of:
+          'read'        -- Files holds @{ Name; Text } per workflow (possibly empty: a repo may have
+                           the directory and no .yml in it, which is the same nothing-to-say as a
+                           consumer whose runners are all current)
+          'no-workflows'-- the repository was read and has no .github/workflows at all -> silence, the
+                           same verdict the local half reaches when the directory is not there
+          'unavailable' -- nothing was learned. Reason says what happened, and the CALLER must print
+                           it: this is the state the switch exists to make visible.
+
+        ONE GraphQL CALL, NOT 2+N REST ONES, and the reason is the third state rather than the count.
+        The REST route is `contents/.github/workflows` to list, then `contents/<path>` per file, and
+        its listing call answers a repository this token cannot see and a repository with no workflows
+        directory with the SAME HTTP 404 -- so it cannot tell 'nothing to report' from 'nothing was
+        read', which is the one distinction this whole function is for. GraphQL answers both in one
+        response and distinguishes them structurally: a null 'repository' is no access, a null
+        'object' is no such tree. That it is also one round trip instead of four is a bonus, not the
+        argument.
+
+        THE DEFAULT BRANCH IS THE SUBJECT, and 'HEAD:' is how that is said in an expression -- the
+        runner that fires on a consumer's pull requests is the one on their trunk, not whatever a
+        topic branch is carrying. The branch NAME is read back and returned so a finding can cite it,
+        because a reader who cannot open the file needs to know which revision was judged.
+
+        THE EXPRESSION IS A GraphQL VARIABLE AND NOT AN INLINE STRING, WHICH IS A 5.1 HAZARD AND NOT A
+        STYLE PREFERENCE. Written the obvious way -- object(expression:"HEAD:.github/workflows") --
+        the query carries double quotes, and Windows PowerShell 5.1 does not pass those through to a
+        native command intact: gh received expression:HEAD:.github/workflows and answered
+        'Expected NAME, actual: COLON (":") at [1, 118]'. Measured on the first run of this function,
+        against three real connectors, and it failed IDENTICALLY on all three -- which is the shape
+        worth recording: a transport fault that is total looks exactly like a repository nobody can
+        read, so it would have been reported as the third state for every consumer and believed. As a
+        variable the query string contains no quote at all, and the value travels as its own argument
+        where nothing rewrites it.
+
+        THE SLUG IS GUARDED BEFORE IT REACHES A URL. 'repo' is manifest content from a public
+        repository -- the same data the localCheckout guardrails above already refuse to trust -- and
+        here it would become the owner and name of an API call. Held to GitHub's own shape rather than
+        merely escaped: an owner is alphanumeric with hyphens, a repository name adds '.' and '_', and
+        anything else is not a slug this register can have meant.
+
+        stderr IS DISCARDED AND NOTHING IS LOST BY IT, because GraphQL puts its diagnosis in the BODY.
+        A repository this credential cannot see comes back as HTTP 200 with data.repository = null and
+        an errors[] block carrying "Could not resolve to a Repository with the name '<slug>'" -- on
+        stdout, which is what this parses. gh still exits 1 on such a response, so the exit code is
+        deliberately NOT consulted before the parse: reading it first would replace that sentence with
+        'gh exited 1' on every private consumer, which is the single most common outcome this function
+        has. The exit code is the fallback for a response there is no JSON in at all.
+
+        THE API'S OWN MESSAGE IS WRAPPED BEFORE IT IS PRINTED. It quotes the slug back, which came
+        from a manifest in a public repository, so the round trip through GitHub is not laundering:
+        the same value returns inside a sentence this script prints into a session.
+    #>
+    param([Parameter(Mandatory = $true)][string]$Repo)
+
+    $slash = $Repo.IndexOf('/')
+    if ($slash -le 0 -or $slash -eq $Repo.Length - 1) {
+        return @{ Status = 'unavailable'; Reason = "the manifest's 'repo' field is not an 'owner/name' slug"; Branch = ''; Files = @() }
+    }
+    $owner = $Repo.Substring(0, $slash)
+    $name  = $Repo.Substring($slash + 1)
+    if ($owner -notmatch '^[A-Za-z0-9][A-Za-z0-9-]*$' -or $name -notmatch '^[A-Za-z0-9][A-Za-z0-9._-]*$') {
+        return @{ Status = 'unavailable'; Reason = "the manifest's 'repo' field is not a valid GitHub owner/name slug -- rejected before it became an API call"; Branch = ''; Files = @() }
+    }
+
+    $query = 'query($owner:String!,$name:String!,$expr:String!){repository(owner:$owner,name:$name){defaultBranchRef{name} object(expression:$expr){... on Tree{entries{name type object{... on Blob{text}}}}}}}'
+    $call = Invoke-NativeCapture -FilePath 'gh' `
+        -Arguments @('api', 'graphql', '-f', "query=$query", '-f', "owner=$owner", '-f', "name=$name", '-f', 'expr=HEAD:.github/workflows') `
+        -DiscardStderr -TimeoutSeconds $NativeCaptureNetworkTimeoutSeconds
+
+    if ($call.TimedOut) {
+        return @{ Status = 'unavailable'; Reason = "gh did not answer within $NativeCaptureNetworkTimeoutSeconds seconds"; Branch = ''; Files = @() }
+    }
+
+    # PARSED BEFORE THE EXIT CODE IS LOOKED AT -- see the docstring. The body is where GraphQL says why.
+    $json = $null
+    try { $json = ($call.Output -join "`n") | ConvertFrom-Json } catch { $json = $null }
+    if ($null -eq $json) {
+        return @{ Status = 'unavailable'; Reason = "gh exited $($call.ExitCode) and answered with nothing this could parse as JSON"; Branch = ''; Files = @() }
+    }
+
+    # Read defensively throughout: StrictMode makes a missing property terminating, and every shape
+    # below is a legitimate answer from the API rather than a corrupt response.
+    $repoNode = Get-JsonField -Object (Get-JsonField -Object $json -Name 'data' -Default $null) -Name 'repository' -Default $null
+    if ($null -eq $repoNode) {
+        $apiSaid = ''
+        foreach ($e in @(Get-JsonField -Object $json -Name 'errors' -Default @())) {
+            $msg = [string](Get-JsonField -Object $e -Name 'message' -Default '')
+            if ($msg) { $apiSaid = Format-SafeProseToken -Value $msg; break }
+        }
+        $reason = if ($apiSaid) {
+            "the API answered: $apiSaid -- so it does not exist, or this credential cannot see it"
+        } else {
+            "the API returned no repository (gh exited $($call.ExitCode)) -- it does not exist, or this credential cannot see it"
+        }
+        return @{ Status = 'unavailable'; Reason = $reason; Branch = ''; Files = @() }
+    }
+
+    $branch = [string](Get-JsonField -Object (Get-JsonField -Object $repoNode -Name 'defaultBranchRef' -Default $null) -Name 'name' -Default '')
+    $tree = Get-JsonField -Object $repoNode -Name 'object' -Default $null
+    if ($null -eq $tree) {
+        return @{ Status = 'no-workflows'; Reason = ''; Branch = $branch; Files = @() }
+    }
+
+    $files = @()
+    foreach ($entry in @(Get-JsonField -Object $tree -Name 'entries' -Default @())) {
+        if ([string](Get-JsonField -Object $entry -Name 'type' -Default '') -ne 'blob') { continue }
+        $entryName = [string](Get-JsonField -Object $entry -Name 'name' -Default '')
+        if ($entryName -notmatch '\.ya?ml$') { continue }
+        # A null 'text' is a blob the API declined to render as text (binary, or over its size limit).
+        # Reported as its own file-level nothing rather than treated as an empty workflow, which would
+        # read as 'this file names no reference' -- the exact false negative the lib's header warns
+        # about, arriving through the transport instead of through the parser.
+        $text = Get-JsonField -Object (Get-JsonField -Object $entry -Name 'object' -Default $null) -Name 'text' -Default $null
+        $files += @{ Name = $entryName; Text = $(if ($null -eq $text) { $null } else { [string]$text }) }
+    }
+
+    return @{ Status = 'read'; Reason = ''; Branch = $branch; Files = @($files) }
+}
+
 # WHICH SOURCE TREE THE VERSION VERDICTS BELOW WERE READ FROM (#533).
 #
 # Every 'source on vX' in this run comes from a plugin.json in THIS checkout, read now. That is a
@@ -383,7 +618,61 @@ foreach ($mf in $manifestFiles) {
     if (-not $checkout -or -not (Test-Path -LiteralPath $checkout)) {
         if (-not $OnlyConsumer) {
             Write-Host "`n== connector: $($m.repo)" -ForegroundColor Cyan
-            Write-Skip "checkout '$($candidates -join "', '")' not present on this machine -- not checked."
+            # THE [SKIP] SENTENCE CHANGES WITH THE SWITCH, because under -RemoteRunners it would
+            # otherwise be false: one thing about this consumer IS about to be checked. A verdict line
+            # that contradicts the lines under it is the class of defect this register keeps filing
+            # against itself, so it is worded from what the run actually did.
+            if ($RemoteRunnerRead) {
+                Write-Skip "checkout '$($candidates -join "', '")' not present on this machine -- everything needing the disk is unchecked; its CI runners are read over the API below (-RemoteRunners)."
+            } else {
+                Write-Skip "checkout '$($candidates -join "', '")' not present on this machine -- not checked."
+            }
+
+            # --- 6b. CHECK 6, OVER THE NETWORK, ON REQUEST ONLY (#1808) --------------------------
+            # This is the one thing about an absent consumer that can be learned from anywhere, and the
+            # one this register most wants to know: a stale runner path is a required check red on every
+            # pull request in a repo nobody is visiting, which is precisely why nobody has noticed. So
+            # the [SKIP] above is no longer the last word when the switch is on -- everything else here
+            # genuinely needs the disk (an extension inventory, a settings chain, a machine record), and
+            # this alone does not.
+            #
+            # INSIDE THE -OnlyConsumer GUARD, deliberately. With -OnlyConsumer the session is asking
+            # about its own repo, whose checkout is present by definition -- so an absent one reached
+            # here is somebody else's, and reading it would put another consumer's findings in a
+            # session that asked about neither. Same reasoning the [SKIP] itself is already suppressed
+            # under.
+            #
+            # 'repo' is manifest content, so its presence is probed rather than assumed (StrictMode),
+            # exactly as $connectorLabel above does it. Without it there is no repository to ask about
+            # and the reason says so, rather than an empty slug reaching a URL.
+            if ($RemoteRunnerRead) {
+                $remoteRepo = [string]$(if ($m.PSObject.Properties.Name -contains 'repo') { $m.repo } else { '' })
+                if (-not $remoteRepo) {
+                    Write-Info "-RemoteRunners: $($mf.Name) names no 'repo', so its runners could not be read over the network either -- nothing about this consumer's CI was checked."
+                } else {
+                    $remote = Get-RemoteConsumerWorkflow -Repo $remoteRepo
+                    if ($remote.Status -eq 'unavailable') {
+                        # THE THIRD STATE, AND THE WHOLE REASON THE SWITCH IS WORTH HAVING. Silence here
+                        # would be indistinguishable from a clean read on a check whose subject is a
+                        # breach nobody has noticed -- so it says what happened and hands over the one
+                        # command that shows gh's own message, which was discarded to keep the JSON
+                        # parseable.
+                        Write-Info "-RemoteRunners: this consumer's CI runners could not be read -- $($remote.Reason). Nothing about them was checked; 'gh api repos/$(Format-SafePathToken -Value $remoteRepo)' shows what gh itself says about the repository."
+                    } elseif ($remote.Status -eq 'read') {
+                        $onBranch = if ($remote.Branch) { "read from $(Format-SafePathToken -Value $remote.Branch) over the API -- no checkout of this consumer is on this machine" } else { 'read over the API -- no checkout of this consumer is on this machine' }
+                        foreach ($rf in @($remote.Files)) {
+                            if ($null -eq $rf.Text) {
+                                Write-Info "-RemoteRunners: $(Format-SafePathToken -Value $rf.Name) came back without text (binary, or past the API's size limit), so it was NOT judged. Every other workflow in that repository was."
+                                continue
+                            }
+                            Write-RunnerPathFinding -WorkflowName $rf.Name -WorkflowText $rf.Text -Where $onBranch
+                        }
+                    }
+                    # 'no-workflows' is silence on purpose: it is the same verdict the local half
+                    # reaches when .github/workflows is not there, and a consumer that runs none of
+                    # these runners has nothing for this check to say about it.
+                }
+            }
         }
         continue
     }
@@ -819,46 +1108,25 @@ foreach ($mf in $manifestFiles) {
     #
     # IT READS THE LOCAL CHECKOUT, so it inherits check 1: an absent consumer is [SKIP] and its
     # runners are not read at all. That is the register's standing behaviour and right for every other
-    # check here, and it lands awkwardly on this one -- the consumers most likely to carry a stale path
+    # check here, and it landed awkwardly on this one -- the consumers most likely to carry a stale path
     # are the ones nobody visits, which are the ones least likely to be checked out on the machine you
     # run this from. Measured on the branch that built this: of six connectors, three were [SKIP] here,
-    # including both of the two #1805 reported as red. #1808 carries the network-read shape and the two
-    # reasons it was not built (a gh call per connector on the SessionStart path, and four private
-    # repos needing a third verdict) -- do not widen this silently.
+    # including both of the two #1805 reported as red, so on that machine this check would not have
+    # found the case that produced it.
+    #
+    # THAT GAP IS NOW CLOSED FROM THE OTHER END, ON REQUEST (#1808): -RemoteRunners reads an absent
+    # consumer's runners over the API and judges them with the same function this block calls, up at
+    # the [SKIP] where the loop turns back. It stays OPT-IN and the two reasons it was not simply
+    # switched on are unchanged: a gh call per connector does not belong on the SessionStart path this
+    # script runs from, and a private repository a credential cannot read needs a third verdict of its
+    # own rather than falling into either of the two here. Both are honoured there -- do not widen
+    # this block itself to the network.
     if ($ThisRepoName) {
         $workflowDir = Join-Path $checkout '.github\workflows'
         if (Test-Path -LiteralPath $workflowDir -PathType Container) {
             foreach ($wf in @(Get-ChildItem -LiteralPath $workflowDir -File -ErrorAction SilentlyContinue |
                               Where-Object { $_.Extension -in @('.yml', '.yaml') } | Sort-Object Name)) {
-                $refs = @(Get-SharedScriptReference -WorkflowText ([System.IO.File]::ReadAllText($wf.FullName)) -RepositoryName $ThisRepoName)
-                if ($refs.Count -eq 0) { continue }
-                # EVERY VALUE LIFTED OUT OF THE CONSUMER'S FILE IS WRAPPED, THE FILENAME INCLUDED.
-                # Format-SafePathToken rather than Format-SafeToken, because all three subjects here are
-                # path-shaped and #414 is exactly that argument -- the id charset deletes what makes a
-                # path findable. What it strips is the class that matters on this route: control
-                # characters, which could forge a line in the session context the SessionStart hook
-                # forwards, and square brackets, which the hooks COUNT as verdict markers. A workflow
-                # file named 'x[ERROR] evil.yml' is a legal filename on NTFS and would otherwise change
-                # a hook's verdict from a consumer's own directory listing.
-                $wfName = Format-SafePathToken -Value $wf.Name
-                foreach ($judged in @(Test-SharedScriptReference -Reference $refs -SourceRoot $RepoRoot)) {
-                    if ($judged.Exists) { continue }
-
-                    # AN ESCAPING REFERENCE IS ITS OWN FINDING, and deliberately not phrased as a
-                    # missing path: nothing was looked up, because looking it up is what the lib
-                    # refuses to do (it would answer whether an arbitrary file exists on this machine).
-                    if ($judged.Escapes) {
-                        Write-Failure "$wfName line $($judged.Line) runs '$(Format-SafePathToken -Value $judged.Path)', which does not stay inside the checkout of this repo it is resolved against -- so it was NOT looked up here. A runner reaching outside its own checkout cannot work on a CI machine whatever this tree holds; correct it in that consumer."
-                        continue
-                    }
-
-                    $where = if ($judged.MovedTo.Count -gt 0) {
-                        "it is at $((@($judged.MovedTo) | ForEach-Object { Format-SafePathToken -Value $_ }) -join ' / ') now"
-                    } else {
-                        'no file of that name exists anywhere here, so it was removed rather than moved'
-                    }
-                    Write-Failure "$wfName line $($judged.Line) runs '$(Format-SafePathToken -Value $judged.Path)' out of a checkout of this repo, and that path does not exist here -- $where. That runner is red on every pull request in this consumer until the path is corrected there; nothing in this repo can correct it from here."
-                }
+                Write-RunnerPathFinding -WorkflowName $wf.Name -WorkflowText ([System.IO.File]::ReadAllText($wf.FullName))
             }
         }
     }
