@@ -43,7 +43,73 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**4 / 14 minor entries** <!-- pending-tally -->
+**4 / 16 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1786-stale-test-docstring · 20260910-110446
+
+`connector-sessioncheck.tests.ps1`'s header said its first two branches drive the hook against this
+repo's own root `scripts/task/plugin-versions.ps1`. They drive the plugin mirror beside the hook --
+the `$cwd` candidate that once made the header true was removed on review. The docstrings now name
+the mirror, and state the consequence the wrong name hid: after editing the source engine, rebuild
+the mirror before running this suite standalone, or it reports on the previous version and says
+nothing about having done so.
+
+A test suite's own account of what it measures was wrong, and it cost one session a false all-clear
+(47/0 against an unrebuilt mirror, then 41/6 from the same suite once it was rebuilt). Small because
+the gate was never exposed to it -- the drift check errors on a stale mirror before the suites run,
+so only a standalone run could be fooled. Noticed the moment somebody edits `plugin-versions.ps1`
+and reaches for this suite.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+A docstring inside this repo's own test suite. Nothing here ships, and no consumer reads it.
+
+**Score:** N/A
+
+#### Pull Request
+
+connector-sessioncheck.tests.ps1's header names the mirror it actually drives
+
+[PR #1793](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1793)
+
+---
+
+### DEPLOY: docs/1784-measured-figure-gate-line-counts · 20260910-104705
+
+The proposed line-count gate from #1784 is **declined on measurement**, and the measurement is recorded
+where the gate's other declined rules live. **The reason that settles it is not the one the proposal
+argues about: the defect it was filed over carries no digit** -- #1779's seven sites read "three thousand
+lines" in words -- so no digit-anchored pattern can see it, check 16's own included, however precisely
+tuned. For the figures such a pattern *can* see, extending check 16 (`[measured-figure]`) to line counts
+produces 16 findings across the trunk of which exactly **1** is a real defect, in six classes no regex
+separates from it; and writing the decline up with each instance cited verbatim, as a measurement here
+must be, took the same rule from 16 findings to 26 -- so it penalises measuring and recording the result,
+which is what the gate's other rules exist to encourage. One narrow variant **is** green -- a backticked
+filename immediately before a present-tense copula, 1 of 1 on the trunk -- and it is recorded as measured
+and left **unbuilt**, with its revisit condition, rather than declined: one subject tree-wide, blind to
+the motivating defect, and still firing on the prose that cites it. Check 16's unit list stays
+byte-shaped, deliberately. Its *file set* is a separate and real gap -- no figure gate reaches a `.ps1`
+comment, which is where both recorded instances of this class happened -- filed as #1790. The one real
+defect the measurement found is repaired.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+N/A -- nothing here reaches a consumer. The declined rule, its measurement and the repaired figure are all
+this repo's own maintenance prose; no plugin payload, script or manifest changes.
+
+**Score:** N/A
+
+#### Pull Request
+
+Record the measurement that declines a line-count figure gate, and the writing convention behind it
+
+[PR #1791](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1791)
+
+---
 
 ### DEPLOY: fix/1768-path-paste-one-answer · 20260910-103648
 
