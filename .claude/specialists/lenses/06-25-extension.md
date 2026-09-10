@@ -261,8 +261,9 @@ and it is the always-on face of the consequence
 [`CLAUDE.md`](../../../CLAUDE.md#specific-to-this-repo-claude-code-specialists) already records: through
 the `github` source the team sees the last *pushed* plugins. Resolve the load path before measuring it.
 
-**WHERE THE COST IS: IT IS NOT DIFFUSE, IT IS ONE SUB-ITEM.** `CLAUDE.md` is 875 lines in 9 sections,
-and breaking it down was the finding rather than the total:
+**WHERE THE COST IS: IT IS NOT DIFFUSE, IT IS ONE SUB-ITEM.** `CLAUDE.md` stood at 875 lines in 9
+sections on the day of this measurement (re-derive with `wc -l CLAUDE.md` and `grep -c '^## '` — it is
+526 in 3 as of September 10, 2026), and breaking it down was the finding rather than the total:
 
 | | bytes | share of `CLAUDE.md` |
 |---|---|---|

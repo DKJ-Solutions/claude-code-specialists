@@ -43,7 +43,117 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**3 / 12 minor entries** <!-- pending-tally -->
+**4 / 15 minor entries** <!-- pending-tally -->
+
+### DEPLOY: docs/1784-measured-figure-gate-line-counts · 20260910-104705
+
+The proposed line-count gate from #1784 is **declined on measurement**, and the measurement is recorded
+where the gate's other declined rules live. **The reason that settles it is not the one the proposal
+argues about: the defect it was filed over carries no digit** -- #1779's seven sites read "three thousand
+lines" in words -- so no digit-anchored pattern can see it, check 16's own included, however precisely
+tuned. For the figures such a pattern *can* see, extending check 16 (`[measured-figure]`) to line counts
+produces 16 findings across the trunk of which exactly **1** is a real defect, in six classes no regex
+separates from it; and writing the decline up with each instance cited verbatim, as a measurement here
+must be, took the same rule from 16 findings to 26 -- so it penalises measuring and recording the result,
+which is what the gate's other rules exist to encourage. One narrow variant **is** green -- a backticked
+filename immediately before a present-tense copula, 1 of 1 on the trunk -- and it is recorded as measured
+and left **unbuilt**, with its revisit condition, rather than declined: one subject tree-wide, blind to
+the motivating defect, and still firing on the prose that cites it. Check 16's unit list stays
+byte-shaped, deliberately. Its *file set* is a separate and real gap -- no figure gate reaches a `.ps1`
+comment, which is where both recorded instances of this class happened -- filed as #1790. The one real
+defect the measurement found is repaired.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+N/A -- nothing here reaches a consumer. The declined rule, its measurement and the repaired figure are all
+this repo's own maintenance prose; no plugin payload, script or manifest changes.
+
+**Score:** N/A
+
+#### Pull Request
+
+Record the measurement that declines a line-count figure gate, and the writing convention behind it
+
+[PR #1791](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1791)
+
+---
+
+### DEPLOY: fix/1768-path-paste-one-answer · 20260910-103648
+
+A filesystem path printed into a paste-ready command now has **one** answer again, the shared allowlist
+`Get-PasteableRef -Kind Path`. Two branches answered #1762 eleven minutes apart and both landed;
+`tidy-lib.ps1`'s `Format-PasteablePathToken` -- which quoted the path as a PowerShell literal rather than
+judging it -- is retired, and `tidy-machine.ps1` joins `sync-main.ps1` and `check-plugin-integrity.ps1`
+on the allowlist. Fixes inbound #1768.
+
+The literal lost on the destination, which is the one thing a printed remedy does not know. It is exact
+in PowerShell and silently wrong in Git Bash, which reads its doubled quote as close-then-open and turns
+`C:\it's\here` into `C:\its\here` -- a different, plausible path, with no error to notice -- while cmd
+splits any spaced path in two. `tidy-machine.ps1` prints a PowerShell-only `worktree-lane.ps1 -HandBack`
+and a bare `git worktree remove` from the same call, one line apart, and the second is exactly what a
+reader pastes into Git Bash. Its own justification had also expired before it was read: it argued no
+absolute path could pass the allowlist, which #1765 had fixed eleven minutes earlier.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+The report's own proposed alternative is declined with a measurement rather than adopted: *"if the
+allowlist wins, it needs at least a space"* would break the guard rather than widen it, because the token
+is printed **unquoted** by design and a spaced path splits in all three shells, not one. A space is the
+one character an allowlist over an unquoted token can never admit -- so the refusal plus the note is the
+answer, and the suite has asserted it since #1762.
+
+That is the second of #1768's two halves to fail on contact with the tree. The first is its claim that
+`tidy-lib.ps1` cites #1762 as open and carries a sentence about where the reasoning belongs; neither is
+in the repo. The symptom it reports -- two mechanisms for one question -- was real and is what got fixed.
+
+**Score:** 3
+
+#### Pull Request
+
+One answer for a path in a printed command: the allowlist, not the PowerShell literal
+
+Plugins: dkj-policy, dkj-subagents-shopify
+
+[PR #1789](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1789)
+
+---
+
+### DEPLOY: fix/1779-stale-lib-line-count · 20260910-101138
+
+Seven docstring sentences across five libs sized `entry-scaffold-lib.ps1` at "three thousand lines" where it
+measures 8,289 -- each of them in the sentence carrying a layer or dependency decision, so the stale figure
+argued for the decision at a third of its real strength. They now say "thousands", which cannot go stale
+upward, and `release-lib.ps1` records why the number is deliberately absent. The two sites that sized the
+load of `release-lib` rather than the lib itself named a figure that understated either reading; both now
+name the dependency chain instead.
+
+The defect class is the point rather than the arithmetic: a size written into prose drifts with every commit
+to the file it describes, and it gets copied rather than re-measured -- `check-connectors.ps1` declined to
+call into `release-lib` and cited this docstring as its evidence (#1775), which is how one stale number
+became two.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+N/A -- comments inside this repo's own script layer. No behaviour changes, no consumer-facing text moves,
+and nothing a subscriber of a service could notice.
+
+**Score:** N/A
+
+#### Pull Request
+
+Correct the stale entry-scaffold-lib line count in the layer-decision docstrings
+
+Plugins: dkj-policy
+
+[PR #1787](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1787)
+
+---
 
 ### DEPLOY: docs/1774-settings-reflow · 20260910-100232
 

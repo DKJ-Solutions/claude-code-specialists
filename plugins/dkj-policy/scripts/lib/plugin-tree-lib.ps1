@@ -48,7 +48,7 @@
     connector-sessioncheck hook -- where pulling a heavyweight lib in to resolve a handful of paths is a
     cost paid on every single session. The other reason is the fold: fold-changelog-entry.ps1 needs
     Get-TouchedPlugins and runs immediately after a merge, directly on the trunk, and reaching it
-    through release-lib would load three thousand lines of entry-scaffold-lib behind it.
+    through release-lib would load thousands of lines of entry-scaffold-lib behind it.
 
     Pure ASCII (repo convention for .ps1).
 #>
@@ -204,7 +204,7 @@ function Get-TouchedPlugins {
 
         LIVED IN release-lib.ps1 UNTIL AUGUST 9, 2026, where a note now points here. It reads plugin
         roots, so it belongs beside them -- and the fold script, which is its one caller, can now reach
-        it without dot-sourcing a lib that pulls three thousand more lines in behind it.
+        it without dot-sourcing a lib that pulls thousands more lines in behind it.
 
         $PluginRoots comes from Get-RepoPluginRoots, which returns an empty set in a repo with no
         marketplace.json -- so a consumer folds without a 'Plugins:' line, which is the right answer
