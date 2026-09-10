@@ -43,7 +43,30 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**2 / 8 minor entries** <!-- pending-tally -->
+**2 / 9 minor entries** <!-- pending-tally -->
+
+### DEPLOY: docs/1769-marketplace-rename-prep · 20260910-093800
+
+The `claude-code-specialists` -> `dkj-claude-plugins` rename (#1769) now has a recorded decision and a
+phased migration plan on the issue, and `scripts/repo-config.ps1`'s carve-out comment no longer
+contradicts it. No rename has been performed -- this is the reversible fase 0 groundwork only.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+N/A -- no subscriber of any consuming service sees a prep branch. The rename itself reaches tier 2 at
+significance 5, but that lands in fase 3, not here.
+
+**Score:** N/A
+
+#### Pull Request
+
+Prepare the claude-code-specialists to dkj-claude-plugins rename
+
+[PR #1778](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1778)
+
+---
 
 ### DEPLOY: fix/1772-plugin-versions-noop-action · 20260910-093114
 
