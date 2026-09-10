@@ -244,30 +244,42 @@ foreach ($id in $ids) {
     $mp = $parts[-1]
     $clone = $clones[$mp]
 
-    # IS THIS ID SAFE TO BUILD A PASTE-READY COMMAND OUT OF? (Sebastian, on this branch.) An
-    # 'enabledPlugins' key is an arbitrary JSON string from a settings file -- this file's own -Brief
-    # comment already names it as exactly that value class (inbound #309) -- and the $action strings
-    # below embed it raw into a `claude plugin ...` line. Format-SafeProseToken, applied at emission,
-    # deliberately does NOT restrict the charset: its whole reason for existing is that an id charset
-    # "deletes most of a sentence", so it keeps the punctuation a shell reads. A ';' or a backtick in
-    # an id therefore survives into a line shaped for pasting.
+    # IS THIS ID SAFE TO BUILD A PASTE-READY COMMAND OUT OF? (Sebastian, #1591; widened to every site
+    # by #1803.) An 'enabledPlugins' key is an arbitrary JSON string from a settings file -- this
+    # file's own -Brief comment already names it as exactly that value class (inbound #309) -- and the
+    # $action strings below embed it, and the $mp derived from it, raw into a `claude plugin ...` line
+    # shaped for pasting into a shell verbatim. Format-SafeProseToken, applied at emission, deliberately
+    # does NOT restrict the charset: its whole reason for existing is that an id charset "deletes most
+    # of a sentence", so it keeps the punctuation a shell reads. A ';', a backtick, a '$()', a '|' or an
+    # '&' in an id therefore survives into that line.
     #
-    # THE DOCTRINE IS Get-PasteableRef's (#1594): where the value fails validation, the command is
+    # THE DOCTRINE IS Get-PasteableRef's (#1594): where the value fails validation the command is
     # WITHHELD and the reason is said, because a guard whose own output is the injection surface is
-    # worse than no guard. Both halves are checked, since both become path segments and both are
-    # interpolated.
+    # worse than no guard. Get-PasteableRef itself cannot be the check here -- its allowlist has no
+    # '@', so it refuses every legitimate plugin id -- but the id's allowlist already exists in this
+    # tree: the slug pair either side of the '@' (Test-PluginNameSlug / Test-PluginMarketplaceSlug),
+    # which is exactly $idIsCommandSafe. $mp is judged on its own half, since a `marketplace update`
+    # line carries only that segment.
     #
-    # SCOPED TO THE VERDICT THIS BRANCH MADE REACHABLE, deliberately and not for want of noticing the
-    # rest. Until this branch only the 'behind' code emitted an $action in -Brief; every "cannot
-    # determine" row printed its verdict alone, so promoting 'not-installed' to [ERROR] is what first
-    # puts a command built from this value in front of a reader for a state that needs no version
-    # mismatch to reach -- just an enable with no install record. The other eighteen $action sites and
-    # the default view's raw $row.Id carry the same untrusted value and are NOT repaired here: that is
-    # a standing defect wider than this branch, filed as
-    # https://github.com/DKJ-Solutions/claude-code-specialists/issues/1803 rather than folded in. That
-    # issue also carries the two decisions a full repair has to make -- withhold versus sanitize, and
-    # whether the default view is held to the same rule -- neither of which is settled from here.
-    $idIsCommandSafe = (Test-PluginNameSlug -Name $name) -and (Test-PluginMarketplaceSlug -Marketplace $mp)
+    # #1803 SETTLED THE TWO DECISIONS #1591 SCOPED OUT. (1) Withhold, not sanitize: a sanitized id
+    # produces `claude plugin update <altered-id>`, a command that cannot work, so every redacted
+    # command is replaced wholesale by one sentence saying why -- the shape Get-PasteableRef's .Note
+    # has, and the shape the 'not-installed' branch already used since #1591. (2) The default view is
+    # held to the same rule: its per-row block below now sanitizes every emitted field exactly as
+    # -Brief does, because a person pasting from a terminal is the higher-stakes paste target, not a
+    # lower one, and a legitimate plugin id is a clean lowercase slug pair -- so the guard refuses
+    # nothing anybody here has ever wanted (the same "costs nothing real" argument #1594 made after
+    # measuring all 994 of this repo's PR head refs against its own allowlist).
+    $mpIsCommandSafe = Test-PluginMarketplaceSlug -Marketplace $mp
+    $idIsCommandSafe = (Test-PluginNameSlug -Name $name) -and $mpIsCommandSafe
+
+    # THE PASTE-SAFE STAND-INS. Every `claude plugin ...` string below is built from $idTok / $mpTok
+    # rather than $id / $mp; where the real value was withheld the token carries a '<...>' placeholder,
+    # which the redaction step after the verdict chain detects and turns into the withhold sentence.
+    # A well-formed id -- the overwhelming common case -- passes both checks and $idTok / $mpTok ARE
+    # $id / $mp, so nothing changes for it.
+    $idTok = if ($idIsCommandSafe) { $id } else { '<plugin-id>' }
+    $mpTok = if ($mpIsCommandSafe) { $mp } else { '<marketplace>' }
 
     $recs = @()
     if ($install.RecordsById.ContainsKey($id)) { $recs = @($install.RecordsById[$id]) }
@@ -329,14 +341,14 @@ foreach ($id in $ids) {
         # a plugin added upstream since the last refresh is absent from a clone that is merely
         # behind, and a clone whose marketplace.json will not parse is re-fetched by the same command.
         $verdict = if ($clone.Error) { "cannot determine -- the clone's marketplace.json could not be read" } else { "cannot determine -- '$name' is not in the clone's marketplace.json" }
-        $action = "refresh the clone and re-run: claude plugin marketplace update $mp"
+        $action = "refresh the clone and re-run: claude plugin marketplace update $mpTok"
     } elseif ($recs.Count -gt 1) {
         $verdict = "cannot determine -- this checkout has $($recs.Count) conflicting install records"
-        $action = "repair: claude plugin install $id --scope project"
+        $action = "repair: claude plugin install $idTok --scope project"
     } elseif ($recs.Count -eq 0) {
         if ($pathless.Count -ge 1) {
             $verdict = "cannot determine for this checkout -- only a path-less (machine-wide) record exists"
-            $action = "install here: claude plugin install $id --scope project"
+            $action = "install here: claude plugin install $idTok --scope project"
         } elseif (-not $install.Readable -and $install.Exists) {
             # AN ADMINISTRATION THAT DOES NOT PARSE YIELDS NO RECORDS, WHICH IS NOT THE SAME FACT AS
             # HOLDING NONE (Victor, on this branch; the doctrine is inbound #302's). Get-InstallRecord
@@ -372,20 +384,18 @@ foreach ($id in $ids) {
             $code = 'not-installed'
             $verdict = "cannot determine -- not installed in this checkout (enabled declaratively only)"
 
-            # The install command is withheld for an id that is not a valid slug on both halves -- see
-            # $idIsCommandSafe above. The verdict still stands: whether the plugin is installed here is
-            # a separate question from whether its id can safely be pasted into a shell.
-            $action = if ($idIsCommandSafe) {
-                "install here: claude plugin install $id --scope project"
-            } else {
-                "no command is offered here: this plugin id is not a valid slug on both halves, so it is not pasted into one -- correct the 'enabledPlugins' key first"
-            }
+            # The install command is built from $idTok, so an id that is not a valid slug on both
+            # halves leaves a '<plugin-id>' placeholder here that the redaction step below the verdict
+            # chain replaces with the withhold sentence -- the same treatment every other command site
+            # now gets (#1803). The verdict still stands: whether the plugin is installed here is a
+            # separate question from whether its id can safely be pasted into a shell.
+            $action = "install here: claude plugin install $idTok --scope project"
         }
     } elseif ($instSha -and $clone.Head) {
         if ($instSha -ieq $clone.Head) {
             $code = 'match'
             $verdict = "up to date -- your install is at the clone's HEAD"
-            $action = "the clone advances only on: claude plugin marketplace update $mp"
+            $action = "the clone advances only on: claude plugin marketplace update $mpTok"
         } elseif (-not $clone.IsGit) {
             # A non-git marketplace fetch: the shas differ but there is no history to say which way.
             # Fall back to the version comparison entirely.
@@ -393,14 +403,14 @@ foreach ($id in $ids) {
             if ($null -ne $verCmp -and $verCmp -lt 0) {
                 $code = 'behind'
                 $verdict = "the clone is AHEAD of your install ($instVer -> $cloneVer); the clone is a non-git fetch so the commit history cannot confirm direction"
-                $action = "claude plugin update $id --scope project"
+                $action = "claude plugin update $idTok --scope project"
             } elseif ($null -ne $verCmp -and $verCmp -gt 0) {
                 $code = 'clone-behind'
                 $verdict = "your install ($instVer) is AHEAD of the clone ($cloneVer)"
-                $action = "claude plugin marketplace update $mp"
+                $action = "claude plugin marketplace update $mpTok"
             } else {
                 $verdict = "cannot determine -- versions match ($instVer) but the recorded shas differ and the clone is a non-git fetch with no history to compare"
-                $action = "claude plugin marketplace update $mp   (then: claude plugin update $id --scope project)"
+                $action = "claude plugin marketplace update $mpTok   (then: claude plugin update $idTok --scope project)"
             }
         } else {
             $existsInClone = (Invoke-CloneGit -CloneDir $clone.Dir -GitArgs @('rev-parse', '-q', '--verify', "$instSha^{commit}")).ExitCode -eq 0
@@ -409,11 +419,11 @@ foreach ($id in $ids) {
                 if ($null -ne $verCmp -and $verCmp -lt 0) {
                     $code = 'behind'
                     $verdict = "your install ($instVer, $(Format-ShortSha $instSha)) is BEHIND the clone ($cloneVer) and its commit is not in the clone's history"
-                    $action = "claude plugin update $id --scope project  (then re-run; if it still differs: claude plugin marketplace update $mp)"
+                    $action = "claude plugin update $idTok --scope project  (then re-run; if it still differs: claude plugin marketplace update $mpTok)"
                 } else {
                     $code = 'clone-behind'
                     $verdict = "your install ($(Format-ShortSha $instSha)) is not in the clone's history -- the clone is stale, or your install predates a history rewrite"
-                    $action = "claude plugin marketplace update $mp"
+                    $action = "claude plugin marketplace update $mpTok"
                 }
             } else {
                 $anc = (Invoke-CloneGit -CloneDir $clone.Dir -GitArgs @('merge-base', '--is-ancestor', $instSha, 'HEAD')).ExitCode -eq 0
@@ -438,7 +448,7 @@ foreach ($id in $ids) {
                     if ($instVer -and $cloneVer -and $instVer -ne $cloneVer) {
                         $code = 'behind'
                         $verdict = "the clone is AHEAD of your install ($instVer -> $cloneVer)"
-                        $action = "claude plugin update $id --scope project"
+                        $action = "claude plugin update $idTok --scope project"
                     } elseif ($instVer -and $cloneVer -and $instVer -eq $cloneVer) {
                         $code = 'unreleased'
                         $verdict = "your install is on the released version $instVer and the clone holds newer commits carrying that same version -- unreleased work, so there is no version gap for a plugin update to close"
@@ -451,7 +461,7 @@ foreach ($id in $ids) {
                         $code = 'behind'
                         $missingSide = if (-not $instVer) { 'no version recorded for your install' } else { "no version in the clone's plugin.json" }
                         $verdict = "the clone is AHEAD of your install (newer commit; $missingSide, so whether that crosses a release boundary cannot be read from here)"
-                        $action = "claude plugin update $id --scope project"
+                        $action = "claude plugin update $idTok --scope project"
                     }
                 } else {
                     # Present in the clone's history but not an ancestor of HEAD -- reachable after a
@@ -463,11 +473,11 @@ foreach ($id in $ids) {
                     if ($null -ne $verCmp -and $verCmp -lt 0) {
                         $code = 'behind'
                         $verdict = "the clone is AHEAD of your install ($instVer -> $cloneVer); your install's commit is in the clone's history but not an ancestor of HEAD (history rewrite?)"
-                        $action = "claude plugin update $id --scope project"
+                        $action = "claude plugin update $idTok --scope project"
                     } else {
                         $code = 'clone-behind'
                         $verdict = "your install is AHEAD of the clone -- the clone is stale"
-                        $action = "claude plugin marketplace update $mp"
+                        $action = "claude plugin marketplace update $mpTok"
                     }
                 }
             }
@@ -485,15 +495,15 @@ foreach ($id in $ids) {
             } else {
                 $verdict = "versions match ($instVer); the marketplace clone has no HEAD commit to compare finer"
             }
-            $action = "if you expect newer: claude plugin marketplace update $mp"
+            $action = "if you expect newer: claude plugin marketplace update $mpTok"
         } elseif ($cmp -lt 0) {
             $code = 'behind'
             $verdict = "the clone is AHEAD of your install ($instVer -> $cloneVer)"
-            $action = "claude plugin update $id --scope project"
+            $action = "claude plugin update $idTok --scope project"
         } else {
             $code = 'clone-behind'
             $verdict = "your install ($instVer) is AHEAD of the clone ($cloneVer) -- the clone is stale"
-            $action = "claude plugin marketplace update $mp"
+            $action = "claude plugin marketplace update $mpTok"
         }
     } else {
         # NAME WHICHEVER OF THE FOUR FIELDS IS ACTUALLY ABSENT, per field and not per side. This
@@ -510,6 +520,17 @@ foreach ($id in $ids) {
         if (-not $cloneVer)   { $missing += "no version in the clone's plugin.json" }
         if (-not $clone.Head) { $missing += 'no HEAD or sha on the clone side' }
         $verdict = "cannot determine -- $($missing -join '; ')"
+    }
+
+    # THE WITHHOLD SENTENCE, applied once for whichever command site above fell back to a placeholder
+    # (#1803). $idTok / $mpTok carry '<plugin-id>' / '<marketplace>' exactly when the real value failed
+    # its slug check, so their presence in $action is the signal that a `claude plugin ...` line was
+    # redacted. The command is replaced wholesale rather than shown with the placeholder in it: a
+    # `claude plugin update <plugin-id>` is a line that cannot be run, and Get-PasteableRef's doctrine
+    # (#1594) is that a withheld command is named, not half-printed. The verdict is untouched -- what
+    # state the plugin is in is a separate question from whether its id is pasteable.
+    if ($action -match '<plugin-id>|<marketplace>') {
+        $action = "no paste-ready command -- the 'enabledPlugins' key is not a valid plugin id (bad slug); fix it in .claude/settings.json and re-run"
     }
 
     $rows.Add([pscustomobject]@{
@@ -644,7 +665,10 @@ if ($Brief) {
 
 Write-Host ""
 if ($good.Count -eq $total) {
-    $vers = @($rows | ForEach-Object { $_.CloneVer } | Where-Object { $_ } | Sort-Object -Unique)
+    # $_.CloneVer is a version string read out of a per-plugin plugin.json inside a third-party
+    # marketplace clone, so it is sanitized before it reaches the line (#1803), on the same grounds as
+    # the -Brief verdict text.
+    $vers = @($rows | ForEach-Object { $_.CloneVer } | Where-Object { $_ } | Sort-Object -Unique | ForEach-Object { Format-SafeProseToken -Value ([string]$_) -MaxLength 60 })
     if ($vers.Count -eq 1) {
         Write-Host "All $total plugin(s) up to date on $($vers[0])." -ForegroundColor Green
     } else {
@@ -670,25 +694,39 @@ if ($good.Count -eq $total) {
     Write-Host "$($behind.Count) of $total plugin(s) behind -- run the update command shown for each$tail." -ForegroundColor Yellow
 }
 
-# one line about each clone consulted
+# one line about each clone consulted. The marketplace label is the segment after the last '@' of an
+# untrusted settings key, and $c.Dir is a path built from it -- sanitized on the same #1803 grounds as
+# the per-plugin block below: Format-SuspectToken for the slug, Format-SafePathToken for the path (its
+# id-charset sibling would eat the drive letter and separators).
 foreach ($mp in $marketplaces) {
     $c = $clones[$mp]
+    $mpLabel = Format-SuspectToken -Value ([string]$mp)
+    $dirLabel = Format-SafePathToken -Value ([string]$c.Dir) -MaxLength 400
     if ($c.Exists) {
         $bits = @("$(if ($c.IsGit) { 'HEAD' } else { 'sha' }) $(Format-ShortSha $c.Head)")
         if ($c.HeadDate) { $bits += "committed $($c.HeadDate)" }
         if ($c.FetchTime) { $bits += "last fetch $($c.FetchTime)" }
         if (-not $c.IsGit) { $bits += "non-git fetch" }
-        Write-Host "  clone '$mp': $($c.Dir)  [$($bits -join ', ')]" -ForegroundColor DarkGray
+        Write-Host "  clone '$mpLabel': $dirLabel  [$($bits -join ', ')]" -ForegroundColor DarkGray
     } else {
-        Write-Host "  clone '$mp': not present ($($c.Dir))" -ForegroundColor DarkGray
+        Write-Host "  clone '$mpLabel': not present ($dirLabel)" -ForegroundColor DarkGray
     }
 }
 
+# THE DEFAULT VIEW SANITIZES EVERY EMITTED FIELD, EXACTLY AS -Brief DOES (#1803). The -Brief block
+# above forwards its lines into a session's context, which is why it has always sanitized; the default
+# view prints to a terminal a person reads and pastes from, which #1803 settled is the higher-stakes
+# paste target, not a lower one. Id, InstText, CloneText and Verdict all interpolate the untrusted
+# plugin id (or the $name / version strings derived from the same settings key and from a third-party
+# marketplace clone), so a control or format character in any of them could repaint the terminal or
+# forge a line; Action additionally carries the paste-ready command, already placeholder-guarded on
+# the paste axis by $idTok / $mpTok above. Format-SuspectToken for the id (it IS an id, and it says so
+# when sanitizing changed it); Format-SafeProseToken for the four sentences.
 foreach ($row in $rows) {
     Write-Host ""
-    Write-Host $row.Id -ForegroundColor White
-    Write-Host ("  installed here     " + $row.InstText)
-    Write-Host ("  marketplace clone  " + $row.CloneText)
+    Write-Host (Format-SuspectToken -Value ([string]$row.Id)) -ForegroundColor White
+    Write-Host ("  installed here     " + (Format-SafeProseToken -Value ([string]$row.InstText) -MaxLength 400))
+    Write-Host ("  marketplace clone  " + (Format-SafeProseToken -Value ([string]$row.CloneText) -MaxLength 400))
     $vcolor = switch ($row.Code) {
         'match'      { 'Green' }
         'ver-match'  { 'Green' }
@@ -698,8 +736,8 @@ foreach ($row in $rows) {
         'behind'     { 'Yellow' }
         default      { 'Yellow' }
     }
-    Write-Host ("  verdict            " + $row.Verdict) -ForegroundColor $vcolor
-    if ($row.Action) { Write-Host ("                     -> " + $row.Action) -ForegroundColor $vcolor }
+    Write-Host ("  verdict            " + (Format-SafeProseToken -Value ([string]$row.Verdict) -MaxLength 400)) -ForegroundColor $vcolor
+    if ($row.Action) { Write-Host ("                     -> " + (Format-SafeProseToken -Value ([string]$row.Action) -MaxLength 400)) -ForegroundColor $vcolor }
 }
 
 Write-Host ""

@@ -82,6 +82,14 @@
                                                                    gets its own command
       29 Fix 2: id MARKETPLACE half not a valid slug          -> same withhold -- both halves are
                                                                    checked
+      30 #1803: a bad-slug id that reaches a 'behind' verdict -> the `claude plugin update` command is
+                                                                   withheld too, not just `install`
+                                                                   (-Brief); every $action site is
+                                                                   built from $idTok / $mpTok now
+      31 #1803: the SAME id, default view (no -Brief)         -> command withheld AND the id header /
+                                                                   verdict / action are sanitized at
+                                                                   emission -- the default view is held
+                                                                   to the same rule as -Brief
     Every scenario asserts exit code 0 explicitly (this is a report, not a gate).
 
     Scenarios 12/13 build the "reachable but not an ancestor" state the way a real marketplace clone
@@ -924,7 +932,7 @@ try {
     Assert-Equal 0 $r.Code '28: exit 0'
     Assert-Has   $r 'plugbad@ccs-fixture' '28: fixture sanity -- the sanitized display of the bad id is present (row not suppressed)'
     Assert-LacksBetween $r 'plugbad@ccs-fixture' '[SUMMARY]' 'claude plugin install' '28: no paste-ready install command is built out of the unsafe id, scoped to that row'
-    Assert-HasBetween   $r 'plugbad@ccs-fixture' '[SUMMARY]' 'no command is offered here: this plugin id is not a valid slug on both halves' '28: the withhold sentence is printed instead, scoped to that row'
+    Assert-HasBetween   $r 'plugbad@ccs-fixture' '[SUMMARY]' "no paste-ready command -- the 'enabledPlugins' key is not a valid plugin id (bad slug)" '28: the withhold sentence is printed instead, scoped to that row (#1803 unified wording)'
     Assert-Has  $r "claude plugin install $ID --scope project" '28: a normal well-formed id in the SAME run still gets its install command -- the guard is per-row, not global'
     Assert-Has  $r '[SUMMARY] 2 plugin(s) enabled here: 0 behind, 2 enabled but not installed here, 0 up to date.' '28: both rows still counted in the "enabled but not installed here" bucket -- withholding the command does not suppress the finding'
 
@@ -942,9 +950,44 @@ try {
     $r = Invoke-PV -Repo $c.Repo -UserHome $c.Home -Brief
     Assert-Equal 0 $r.Code '29: exit 0'
     Assert-Lacks $r 'claude plugin install' '29: no paste-ready install command is built out of the unsafe marketplace half'
-    Assert-Has  $r 'no command is offered here: this plugin id is not a valid slug on both halves' '29: the withhold sentence is printed'
+    Assert-Has  $r "no paste-ready command -- the 'enabledPlugins' key is not a valid plugin id (bad slug)" '29: the withhold sentence is printed (#1803 unified wording)'
     Assert-Has  $r 'plug-ok@ccsfixture' '29: the row is still reported (sanitized display), not suppressed'
     Assert-Has  $r '[SUMMARY] 1 plugin(s) enabled here: 0 behind, 1 enabled but not installed here, 0 up to date.' '29: still counted in the "enabled but not installed here" bucket'
+
+    # --- 30. #1803: the withhold is not only the INSTALL command. A bad-slug id that reaches a --------
+    # -- 'behind' verdict has its `claude plugin update` command withheld too -- #1591 gated only the
+    # one `install` line it made reachable; #1803 built every $action string from $idTok / $mpTok, so
+    # a metacharacter in the id can no longer survive into ANY paste-ready line, in either mode.
+    Write-Host "30. #1803: a bad-slug id at a 'behind' verdict -> the UPDATE command is withheld too (-Brief)" -ForegroundColor Cyan
+    $c = New-Case 'badslug-behind-brief'
+    $evilName = 'plug;evil'
+    $evilId = "$evilName@ccs-fixture"
+    New-Clone -Dir $c.Clone -Version '4.33.0' -PluginNames @($evilName) -NoGit | Out-Null
+    Set-Enabled -RepoDir $c.Repo -Ids @($evilId)
+    Write-Admin -Path $c.Admin -Plugins @{ $evilId = @( (New-Rec -ProjectPath $c.Repo -Version '4.32.0') ) }
+    $r = Invoke-PV -Repo $c.Repo -UserHome $c.Home -Brief
+    Assert-Equal 0 $r.Code '30: exit 0'
+    Assert-Has   $r 'the clone is AHEAD of your install (4.32.0 -> 4.33.0)' '30: fixture sanity -- the row really is a "behind" verdict'
+    Assert-Lacks $r 'claude plugin update' '30: no paste-ready update command is built out of the unsafe id -- the withhold now covers this site too'
+    Assert-Lacks $r 'plug;evil'            '30: and the raw metacharacter id never reaches the line'
+    Assert-Has   $r "no paste-ready command -- the 'enabledPlugins' key is not a valid plugin id (bad slug)" '30: the withhold sentence stands in for the update command'
+    Assert-Has   $r '[ERROR] plugevil@ccs-fixture' '30: the row is still an [ERROR] and still names the (sanitized) plugin'
+
+    # --- 31. #1803: the default view is held to the same rule as -Brief. Same bad-slug id, no -Brief:
+    # -- the update command is withheld AND the id header / verdict / action are sanitized at emission
+    # (display axis), exactly as the -Brief block has always done. Decision (2) of the issue.
+    Write-Host "31. #1803: default view -> command withheld AND every emitted field sanitized" -ForegroundColor Cyan
+    $c = New-Case 'badslug-behind-default'
+    New-Clone -Dir $c.Clone -Version '4.33.0' -PluginNames @($evilName) -NoGit | Out-Null
+    Set-Enabled -RepoDir $c.Repo -Ids @($evilId)
+    Write-Admin -Path $c.Admin -Plugins @{ $evilId = @( (New-Rec -ProjectPath $c.Repo -Version '4.32.0') ) }
+    $r = Invoke-PV -Repo $c.Repo -UserHome $c.Home
+    Assert-Equal 0 $r.Code '31: exit 0'
+    Assert-Lacks $r 'claude plugin update' '31: the update command is withheld in the default view too'
+    Assert-Lacks $r 'plug;evil'            '31: the raw metacharacter id never appears -- the id header is Format-SuspectToken-sanitized'
+    Assert-Has   $r 'plugevil@ccs-fixture' '31: the sanitized id is what heads the block'
+    Assert-Has   $r 'shown sanitized'      '31: and the reader is told the id was altered (Format-SuspectToken note)'
+    Assert-Has   $r "no paste-ready command -- the 'enabledPlugins' key is not a valid plugin id (bad slug)" '31: the withhold sentence stands in for the command in the default view'
 }
 finally {
     if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture -ErrorAction SilentlyContinue }
