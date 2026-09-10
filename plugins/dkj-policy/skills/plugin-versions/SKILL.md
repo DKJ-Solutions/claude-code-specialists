@@ -62,21 +62,29 @@ A one-line summary, then one block per enabled plugin (every plugin is listed ev
 partial or split install state is visible):
 
 ```text
-5 of 7 plugin(s) behind -- run the update command shown for each (1 could not be determined).
-  clone 'claude-code-specialists': <path>  [HEAD 437366a44132, committed 2026-09-08T08:33:02Z, last fetch 2026-09-08T10:37:39]
+6 plugin(s): 4 up to date, 2 on the released version, with unreleased commits in the clone -- nothing to update (see below).
+  clone 'claude-code-specialists': <path>  [HEAD 0711d4175d75, committed 2026-09-10T08:52:24Z, last fetch 2026-09-10T10:57:51]
 
-dkj-policy@claude-code-specialists
-  installed here     4.32.0  437366a44132  project
-  marketplace clone  4.32.0  HEAD 437366a44132
+dkj-subagents-alpha@claude-code-specialists
+  installed here     4.33.0  0711d4175d75  project
+  marketplace clone  4.33.0  HEAD 0711d4175d75
   verdict            up to date -- your install is at the clone's HEAD
                      -> the clone advances only on: claude plugin marketplace update claude-code-specialists
 
-dkj-subagents-alpha@claude-code-specialists
-  installed here     4.32.0  3e13000b3fbe  project
-  marketplace clone  4.32.0  HEAD 437366a44132
-  verdict            the clone is AHEAD of your install (same version string 4.32.0, newer commit)
-                     -> claude plugin update dkj-subagents-alpha@claude-code-specialists --scope project
+dkj-policy@claude-code-specialists
+  installed here     4.33.0  810a0af28930  project
+  marketplace clone  4.33.0  HEAD 0711d4175d75
+  verdict            your install is on the released version 4.33.0 and the clone holds newer commits carrying that same version -- unreleased work, so there is no version gap for a plugin update to close
+                     -> nothing to run -- 'claude plugin update' arbitrates on the version string and reports success without moving the install (measured, #1772); this closes at the next release cut
 ```
+
+**That second block is the ordinary state of a checkout between two releases, and it is deliberately
+not called *behind*.** The clone tracks the source's trunk; an install sits on the last release. So the
+gap is unreleased work, and the reason no command is handed over is measured rather than cautious:
+`claude plugin update` arbitrates on the **version string**, so across a same-version boundary it
+reports *"already at the latest version"* and moves nothing
+([#1772](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1772), September 10, 2026).
+Until then this row was counted as behind and printed that command -- a report that looks acted on.
 
 **Before pasting this output into a public issue, redact the paths.** The checkout root, the
 install-administration path and the marketplace clone path are absolute, and on Windows they carry
@@ -87,7 +95,9 @@ your OS username -- replace each with a placeholder like the `<path>` above.
 | what it reads | verdict |
 |---|---|
 | install `gitCommitSha` **==** clone HEAD | **up to date.** The clone itself may still lag origin -- `claude plugin marketplace update <marketplace>` refreshes it if you expect newer. |
-| install `gitCommitSha` is an **ancestor** of clone HEAD | **the clone is AHEAD of your install** -> `claude plugin update <id> --scope project`. Fires even when the two `version` strings are equal -- the sha is the finer truth. |
+| install `gitCommitSha` is an **ancestor** of clone HEAD, and the two `version` strings **differ** | **the clone is AHEAD of your install** -> `claude plugin update <id> --scope project`. |
+| install `gitCommitSha` is an **ancestor** of clone HEAD, and both sides carry the **same** `version` | **unreleased work in the clone**, and no command at all -- see the note under the output above. Counted in its own bucket, never as behind, and never an `[ERROR]` in `-Brief` (#1772). |
+| install `gitCommitSha` is an **ancestor** of clone HEAD, but one side has **no** `version` | the same *clone is AHEAD* verdict and update command, with the line saying which side is missing and that the release boundary cannot be read from here. |
 | install `gitCommitSha` exists but is **not** an ancestor of clone HEAD, or is unknown to the clone | **your install is ahead, or the clone is stale** -> `claude plugin marketplace update <marketplace>`. If the install `version` is also behind, it says so and names `claude plugin update` first. |
 | **no `gitCommitSha`** on one side (an older record shape, or a non-git marketplace fetch) | the two `version` strings are compared instead, and the line says a sha was not available. |
 | a whole side is **missing** -- no marketplace clone, no install record for this checkout, conflicting records | **cannot determine**, and the line says which side and the command that would fix it. |
@@ -147,6 +157,11 @@ an `[ERROR]`, because it is the only verdict a reader closes with a command here
 not own, it costs nothing until the next update, and a session start that shouts about it trains the
 reader to skim the marker that matters. Everything undetermined is `[INFO]` for the same reason --
 *"cannot determine"* reports this machine's bookkeeping, not a defect in the plugin.
+
+**Unreleased clone commits are `[INFO]` by that same rule, and they are the case it was written for
+without knowing it** (#1772). There is no command to close that gap, so an `[ERROR]` there had nothing
+for the reader to do -- and because it is the ordinary state between two releases, it was the loudest
+marker this tool has, fired at every session start of every checkout, prescribing a no-op.
 
 **A plugin that is up to date emits nothing**, and the `[SUMMARY]` line is what keeps that from being
 ambiguous: it carries the count, so per-plugin silence reads as *up to date* rather than as *not

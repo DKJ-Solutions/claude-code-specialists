@@ -17,8 +17,16 @@
 
     The verdict paths covered, one scenario each:
       1  install sha == clone HEAD, versions agree            -> "up to date", summary all-current
-      2  same version string, clone HEAD is a child of the    -> "clone is AHEAD", per-plugin update
-         installed sha
+      2  same version string, clone HEAD is a child of the    -> UNRELEASED work: its own verdict, its
+         installed sha                                           own summary bucket, and NO command --
+                                                                 `claude plugin update` is a measured
+                                                                 no-op across a same-version boundary
+                                                                 (#1772)
+      2b same shape, but the clone's version moved too       -> genuinely "clone is AHEAD (x -> y)",
+                                                                 per-plugin update
+      2c same shape, but the CLONE has no readable version   -> says the release boundary cannot be
+                                                                 read from here, never "same version
+                                                                 string"
       3  no sha on the install side, installed version <      -> "clone is AHEAD (x -> y)", update
          clone version
       4  installed sha is NOT in the clone's history          -> "refresh the clone" (marketplace update)
@@ -42,6 +50,8 @@
       16 asymmetric gap (b): install has a sha but no version, -> same regression, opposite side
          clone has a version but no HEAD/.gcs-sha
       17 -Brief on a 'behind' row                             -> one [ERROR] line, action appended
+      17b -Brief on an 'unreleased' row                       -> [INFO], NEVER [ERROR], and no command
+                                                                  reaches a session start (#1772)
       18 -Brief on a 'clone-behind' row                       -> [INFO], NEVER [ERROR] -- #1591's own
                                                                   rule: a stale clone is not an error
       19 -Brief on an 'indeterminate' row                     -> [INFO], never [ERROR]
@@ -240,7 +250,17 @@ function New-Clone {
 }
 
 function Add-CloneCommit {
-    param([string]$Dir)
+    # -Version REWRITES the named plugins' plugin.json in the same commit, which is what makes the two
+    # sha-ancestor cases (#1772) buildable: the ancestry alone says the clone is newer, and only the
+    # version strings say whether that newer commit crossed a RELEASE boundary. Omit it and the commit
+    # is a bare marker file, exactly as before -- every pre-#1772 call site keeps its old behaviour.
+    param([string]$Dir, [string]$Version = '', [string[]]$PluginNames = @('dkj-subagents-alpha'))
+    if ($Version) {
+        foreach ($pn in $PluginNames) {
+            $pj = Join-Path $Dir "plugins\$pn\.claude-plugin\plugin.json"
+            [System.IO.File]::WriteAllText($pj, (@{ name = $pn; version = $Version } | ConvertTo-Json -Depth 5), $Utf8)
+        }
+    }
     [System.IO.File]::WriteAllText((Join-Path $Dir 'marker.txt'), [guid]::NewGuid().ToString(), $Utf8)
     Git-X $Dir @('add', '-A') | Out-Null
     Git-X $Dir @('commit', '--quiet', '-m', 'clone c2') | Out-Null
@@ -338,8 +358,13 @@ try {
     Assert-Lacks $r 'cannot determine' '1: nothing is indeterminate'
     Assert-Lacks $r $UPD '1: no per-plugin update is advised'
 
-    # --- 2. Clone ahead by commit: same version string, HEAD is a child of the installed sha ----------
-    Write-Host "2. clone ahead by commit -> per-plugin update" -ForegroundColor Cyan
+    # --- 2. Clone ahead by commit ONLY: same version string on both sides -> unreleased, no command ---
+    # THE REGRESSION #1772 NAMES. This shape used to be reported as 'behind' with
+    # `claude plugin update` as its action, and that command is a measured no-op here: it arbitrates on
+    # the version string, finds both sides on 4.32.0, and exits successfully without moving the
+    # install. If this is ever counted as behind again, or ever hands over an update command, these are
+    # the asserts that must fail.
+    Write-Host "2. clone ahead by commit only, same version -> unreleased work, NO command (#1772)" -ForegroundColor Cyan
     $c = New-Case 'ahead-commit'
     $shaA = New-Clone -Dir $c.Clone -Version '4.32.0'
     $shaB = Add-CloneCommit -Dir $c.Clone
@@ -348,11 +373,44 @@ try {
     $r = Invoke-PV -Repo $c.Repo -UserHome $c.Home
     Assert-Equal 0 $r.Code '2: exit 0'
     Assert-True ($shaA -ne $shaB) '2: fixture sanity -- the clone really advanced a commit'
-    Assert-Has  $r 'the clone is AHEAD of your install' '2: verdict says the clone is ahead'
-    Assert-Has  $r 'same version string 4.32.0' '2: and that the version string is unchanged'
-    Assert-Has  $r $UPD '2: the action is the per-plugin update command'
-    Assert-Has  $r '1 of 1 plugin(s) behind' '2: the summary counts it as behind'
-    Assert-Lacks $r 'up to date' '2: it is not reported as current'
+    Assert-Has  $r 'your install is on the released version 4.32.0' '2: the verdict names the released version the install sits on'
+    Assert-Has  $r 'unreleased work, so there is no version gap for a plugin update to close' '2: and says why no update closes it'
+    Assert-Lacks $r $UPD '2: the per-plugin update command is NOT handed over -- it is a measured no-op here (#1772)'
+    Assert-Has  $r '1 plugin(s): 1 on the released version, with unreleased commits in the clone -- nothing to update' '2: the summary reports it as its own state'
+    Assert-Lacks $r 'plugin(s) behind' '2: and never as behind'
+
+    # --- 2b. Clone ahead by commit AND by version -> genuinely behind, the update command applies -----
+    # The sibling of 2, and the reason 2 is not simply "ancestry means do nothing": here the newer
+    # commit DID cross a release boundary, so `claude plugin update` has a version gap to close and is
+    # the right thing to print.
+    Write-Host "2b. clone ahead by commit and by version -> behind, per-plugin update" -ForegroundColor Cyan
+    $c = New-Case 'ahead-commit-and-version'
+    $shaA = New-Clone -Dir $c.Clone -Version '4.32.0'
+    $shaB = Add-CloneCommit -Dir $c.Clone -Version '4.33.0'
+    Set-Enabled -RepoDir $c.Repo -Ids @($ID)
+    Write-Admin -Path $c.Admin -Plugins @{ $ID = @( (New-Rec -ProjectPath $c.Repo -Version '4.32.0' -Sha $shaA) ) }
+    $r = Invoke-PV -Repo $c.Repo -UserHome $c.Home
+    Assert-Equal 0 $r.Code '2b: exit 0'
+    Assert-True ($shaA -ne $shaB) '2b: fixture sanity -- the clone really advanced a commit'
+    Assert-Has  $r 'the clone is AHEAD of your install (4.32.0 -> 4.33.0)' '2b: the verdict names both versions'
+    Assert-Has  $r $UPD '2b: the action is the per-plugin update command'
+    Assert-Has  $r '1 of 1 plugin(s) behind' '2b: the summary counts it as behind'
+
+    # --- 2c. Sha ancestor, but the CLONE has no readable version -> the honest "cannot read" wording --
+    # Pre-#1772 this printed "same version string 4.32.0, newer commit" whenever the INSTALL had a
+    # version, which was a wrong statement when the missing one was the clone's.
+    Write-Host "2c. sha ancestor with no clone version -> says the boundary cannot be read from here" -ForegroundColor Cyan
+    $c = New-Case 'ahead-commit-no-clone-version'
+    $shaA = New-Clone -Dir $c.Clone -Version ''
+    $shaB = Add-CloneCommit -Dir $c.Clone
+    Set-Enabled -RepoDir $c.Repo -Ids @($ID)
+    Write-Admin -Path $c.Admin -Plugins @{ $ID = @( (New-Rec -ProjectPath $c.Repo -Version '4.32.0' -Sha $shaA) ) }
+    $r = Invoke-PV -Repo $c.Repo -UserHome $c.Home
+    Assert-Equal 0 $r.Code '2c: exit 0'
+    Assert-True ($shaA -ne $shaB) '2c: fixture sanity -- the clone really advanced a commit'
+    Assert-Has  $r "no version in the clone's plugin.json, so whether that crosses a release boundary cannot be read from here" '2c: the verdict names the side that is missing'
+    Assert-Lacks $r 'same version string' '2c: and never claims the two version strings agree'
+    Assert-Has  $r $UPD '2c: an update is still advised, because the gap may be a real one'
 
     # --- 3. Clone ahead by version: no sha on the install side, installed version < clone version -----
     Write-Host "3. clone ahead by version -> per-plugin update" -ForegroundColor Cyan
@@ -596,15 +654,33 @@ try {
     Write-Host "17. -Brief: 'behind' -> [ERROR] with the action appended" -ForegroundColor Cyan
     $c = New-Case 'brief-behind'
     $shaA = New-Clone -Dir $c.Clone -Version '4.32.0'
-    $shaB = Add-CloneCommit -Dir $c.Clone
+    Add-CloneCommit -Dir $c.Clone -Version '4.33.0' | Out-Null
     Set-Enabled -RepoDir $c.Repo -Ids @($ID)
     Write-Admin -Path $c.Admin -Plugins @{ $ID = @( (New-Rec -ProjectPath $c.Repo -Version '4.32.0' -Sha $shaA) ) }
     $r = Invoke-PV -Repo $c.Repo -UserHome $c.Home -Brief
     Assert-Equal 0 $r.Code '17: exit 0'
     Assert-Equal (
-        "[ERROR] ${ID}: the clone is AHEAD of your install (same version string 4.32.0, newer commit) -- $UPD`n" +
+        "[ERROR] ${ID}: the clone is AHEAD of your install (4.32.0 -> 4.33.0) -- $UPD`n" +
         "[SUMMARY] 1 plugin(s) enabled here: 1 behind, 0 up to date."
     ) $r.Text.Trim() '17: the whole run is the marker line plus the summary, verbatim'
+
+    # --- 17b. -Brief: 'unreleased' -> [INFO], NEVER [ERROR] and never a command ----------------------
+    # THE SESSION-START HALF OF #1772. connector-sessioncheck forwards these lines into a session's
+    # context at every start; before the split this shape was an [ERROR] carrying a no-op command, in
+    # the most ordinary state a checkout can be in -- sitting between two releases. If it is ever
+    # promoted back to [ERROR], this is the assert that must fail.
+    Write-Host "17b. -Brief: 'unreleased' -> [INFO], never [ERROR] (#1772)" -ForegroundColor Cyan
+    $c = New-Case 'brief-unreleased'
+    $shaA = New-Clone -Dir $c.Clone -Version '4.32.0'
+    Add-CloneCommit -Dir $c.Clone | Out-Null
+    Set-Enabled -RepoDir $c.Repo -Ids @($ID)
+    Write-Admin -Path $c.Admin -Plugins @{ $ID = @( (New-Rec -ProjectPath $c.Repo -Version '4.32.0' -Sha $shaA) ) }
+    $r = Invoke-PV -Repo $c.Repo -UserHome $c.Home -Brief
+    Assert-Equal 0 $r.Code '17b: exit 0'
+    Assert-Has   $r "[INFO] $($ID): your install is on the released version 4.32.0" '17b: reported as [INFO]'
+    Assert-Lacks $r '[ERROR]' '17b: never promoted to [ERROR] -- the #1772 regression guard'
+    Assert-Lacks $r $UPD '17b: and the no-op update command never reaches a session start'
+    Assert-Has   $r '[SUMMARY] 1 plugin(s) enabled here: 0 behind, 1 on the released version with unreleased clone commits, 0 up to date.' '17b: the summary gives it its own bucket'
 
     # --- 18. -Brief: a 'clone-behind' verdict (stale clone) -> "[INFO]", NEVER "[ERROR]" -------------
     # THE REGRESSION #1591 NAMES EXPLICITLY: a stale clone is not an error. If this code is ever
@@ -666,11 +742,15 @@ try {
     # --- 22. -Brief: one run mixing every code -> exactly one [SUMMARY] line partitioning all rows ---
     Write-Host "22. -Brief: a mix of every code -> one [SUMMARY] line, correctly partitioned" -ForegroundColor Cyan
     $c = New-Case 'brief-mixed'
-    $mixNames = @('plug-behind', 'plug-clonebehind', 'plug-match', 'plug-vermatch')
+    $mixNames = @('plug-behind', 'plug-clonebehind', 'plug-match', 'plug-vermatch', 'plug-unreleased')
     $shaA = New-Clone -Dir $c.Clone -Version '4.32.0' -PluginNames $mixNames
-    $shaB = Add-CloneCommit -Dir $c.Clone
+    # ONLY plug-behind's version is bumped by the second commit, and that is what separates it from
+    # plug-unreleased: both records sit at $shaA, so the ancestry is identical and the version strings
+    # are the whole difference. plug-match is unaffected either way (its sha equality short-circuits
+    # first) and plug-vermatch MUST keep 4.32.0 on the clone side, which is why the bump is scoped.
+    $shaB = Add-CloneCommit -Dir $c.Clone -Version '4.33.0' -PluginNames @('plug-behind')
     $foreignMix = 'plug-foreign@ccs-fixture'
-    $ids = @('plug-behind@ccs-fixture', 'plug-clonebehind@ccs-fixture', $foreignMix, 'plug-match@ccs-fixture', 'plug-vermatch@ccs-fixture')
+    $ids = @('plug-behind@ccs-fixture', 'plug-clonebehind@ccs-fixture', $foreignMix, 'plug-match@ccs-fixture', 'plug-vermatch@ccs-fixture', 'plug-unreleased@ccs-fixture')
     Set-Enabled -RepoDir $c.Repo -Ids $ids
     Write-Admin -Path $c.Admin -Plugins @{
         'plug-behind@ccs-fixture'      = @( (New-Rec -ProjectPath $c.Repo -Version '4.32.0' -Sha $shaA) )
@@ -678,6 +758,7 @@ try {
         $foreignMix                    = @( (New-Rec -ProjectPath $c.Repo -Version '9.9.9' -Sha 'beefbeef') )
         'plug-match@ccs-fixture'       = @( (New-Rec -ProjectPath $c.Repo -Version '4.32.0' -Sha $shaB) )
         'plug-vermatch@ccs-fixture'    = @( (New-Rec -ProjectPath $c.Repo -Version '4.32.0') )
+        'plug-unreleased@ccs-fixture'  = @( (New-Rec -ProjectPath $c.Repo -Version '4.32.0' -Sha $shaA) )
     }
     $r = Invoke-PV -Repo $c.Repo -UserHome $c.Home -Brief
     Assert-Equal 0 $r.Code '22: exit 0'
@@ -687,11 +768,12 @@ try {
     $summaryLines = @($lines | Where-Object { $_ -match '^\[SUMMARY\]' })
     Assert-Equal 1 $errLines.Count '22: exactly one [ERROR] line (only the behind plugin)'
     Assert-True  ($errLines[0] -like "*plug-behind@ccs-fixture*") '22: the [ERROR] line names the behind plugin'
-    Assert-Equal 2 $infoLines.Count '22: exactly two [INFO] lines (the stale clone + the foreign plugin)'
+    Assert-Equal 3 $infoLines.Count '22: exactly three [INFO] lines (the stale clone, the foreign plugin, the unreleased one)'
     Assert-True  (($infoLines -join '|') -like '*plug-clonebehind@ccs-fixture*') '22: one [INFO] line is the stale-clone plugin'
-    Assert-True  (($infoLines -join '|') -like '*plug-foreign@ccs-fixture*') '22: the other [INFO] line is the foreign plugin'
+    Assert-True  (($infoLines -join '|') -like '*plug-foreign@ccs-fixture*') '22: another [INFO] line is the foreign plugin'
+    Assert-True  (($infoLines -join '|') -like '*plug-unreleased@ccs-fixture*') '22: and the third is the unreleased one, NOT an [ERROR]'
     Assert-Equal 1 $summaryLines.Count '22: exactly one [SUMMARY] line for the whole run'
-    Assert-Equal '[SUMMARY] 5 plugin(s) enabled here: 1 behind, 1 ahead of a stale clone, 1 undetermined, 2 up to date.' $summaryLines[0] '22: the summary partitions all five rows correctly'
+    Assert-Equal '[SUMMARY] 6 plugin(s) enabled here: 1 behind, 1 ahead of a stale clone, 1 on the released version with unreleased clone commits, 1 undetermined, 2 up to date.' $summaryLines[0] '22: the summary partitions all six rows correctly'
     Assert-Lacks $r 'plug-match@ccs-fixture:'    '22: the match plugin gets no marker line of its own'
     Assert-Lacks $r 'plug-vermatch@ccs-fixture:' '22: the ver-match plugin gets no marker line of its own'
 

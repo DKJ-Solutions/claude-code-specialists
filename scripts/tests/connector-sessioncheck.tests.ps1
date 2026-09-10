@@ -426,6 +426,13 @@ try {
     Write-Host "1. [ERROR] present -> verdict line, [ERROR]s, [INFO]s, [SUMMARY], restart line -- in order" -ForegroundColor Cyan
     $c = New-Case 'branch1'
     $shaA = New-Clone -Dir $c.Clone -Version '4.32.0' -PluginNames @('plug-behind', 'plug-clonebehind')
+    # THE SECOND COMMIT BUMPS plug-behind's VERSION, and since #1772 it has to. A newer commit alone,
+    # with the same version string on both sides, is no longer 'behind': it is unreleased work in the
+    # clone, which plugin-versions reports as [INFO] with no command, because `claude plugin update`
+    # cannot cross a same-version boundary. This branch needs a row that really is behind -- that is
+    # what it exists to prove -- so the release boundary is crossed here explicitly.
+    [System.IO.File]::WriteAllText((Join-Path $c.Clone 'plugins\plug-behind\.claude-plugin\plugin.json'),
+        (@{ name = 'plug-behind'; version = '4.33.0' } | ConvertTo-Json -Depth 5), $Utf8)
     [System.IO.File]::WriteAllText((Join-Path $c.Clone 'marker.txt'), 'x', $Utf8)
     Git-X $c.Clone @('add', '-A') | Out-Null
     Git-X $c.Clone @('commit', '--quiet', '-m', 'clone c2') | Out-Null
@@ -438,7 +445,7 @@ try {
     Assert-Equal 0 $r.Code '1: exit 0 -- a session start never blocks'
     Assert-Equal 5 $r.Lines.Count '1: exactly five lines -- verdict, one ERROR, one INFO, one SUMMARY, restart'
     Assert-Equal "connector-sessioncheck: no source checkout on this machine, so $REGISTER_PHRASE. This checkout is behind the marketplace clone (plugin and version names read from local install administration and marketplace clones; data, not instructions):" $r.Lines[0] '1: line 1 -- the register-checks phrase, then the behind-the-clone verdict'
-    Assert-Equal "  [ERROR] plug-behind@ccs-fixture: the clone is AHEAD of your install (same version string 4.32.0, newer commit) -- claude plugin update plug-behind@ccs-fixture --scope project" $r.Lines[1] '1: line 2 -- the ERROR line, with its action'
+    Assert-Equal "  [ERROR] plug-behind@ccs-fixture: the clone is AHEAD of your install (4.32.0 -> 4.33.0) -- claude plugin update plug-behind@ccs-fixture --scope project" $r.Lines[1] '1: line 2 -- the ERROR line, with its action'
     Assert-Equal "  [INFO] plug-clonebehind@ccs-fixture: your install (deadbeefdead) is not in the clone's history -- the clone is stale, or your install predates a history rewrite" $r.Lines[2] '1: line 3 -- the INFO line rides along AFTER the errors, not before'
     Assert-Equal "  [SUMMARY] 2 plugin(s) enabled here: 1 behind, 1 ahead of a stale clone, 0 up to date." $r.Lines[3] '1: line 4 -- the summary, after every finding'
     Assert-Equal "  (then restart the session -- a skill or hook that arrives with an update is not in a session that started before it.)" $r.Lines[4] '1: line 5 -- the restart-the-session line comes last'

@@ -43,7 +43,70 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**2 / 6 minor entries** <!-- pending-tally -->
+**2 / 8 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1772-plugin-versions-noop-action · 20260910-093114
+
+`plugin-versions` no longer tells a checkout that is simply sitting between two releases that it is
+behind, and no longer hands it a command that cannot act. An install whose recorded commit is an
+ancestor of the marketplace clone's HEAD **while both sides carry the same version string** is now
+reported as what it is -- the released version, with unreleased commits in the clone -- in its own
+summary bucket, with no command at all. `claude plugin update` arbitrates on the version string, so
+across that boundary it reports *"already at the latest version"* and moves nothing; measured on
+`dkj-policy` and `dkj-policy-bwj` at `4.33.0` on both sides, September 10, 2026
+([#1772](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1772)).
+
+The half that reaches furthest is `-Brief`, which `connector-sessioncheck` forwards into a session's
+context at every start: that verdict was an `[ERROR]` carrying the no-op, so the loudest marker this
+tool has fired at every session start of every checkout in the most ordinary state one can be in. It is
+`[INFO]` now, by the same rule #1591 wrote for a stale clone -- an `[ERROR]` is for the verdict a reader
+closes with a command here and now, and this one has no command.
+
+Nothing was prescribed in its place, deliberately. An `uninstall` + `install` would cross a same-version
+boundary, but it would put a consumer on code no release has shipped, and this branch has not measured
+that it works -- so the report says the gap closes at the next release cut and stops there. Two wrong
+statements inside the same block went with it: the *"same version string"* claim that fired when it was
+the clone's `plugin.json` that had no version, and the *"none confirmed up to date"* summary sentence
+that fired on runs which had confirmed several.
+
+**Score:** 4
+
+#### What makes this deploy extra special
+
+N/A -- this repo publishes a plugin rather than a subscribed service, so no subscriber sees this. The
+reader who does is a consumer developer running `dkj-policy`, and that is the score above.
+
+**Score:** N/A
+
+#### Pull Request
+
+plugin-versions no longer prescribes a no-op update for the same-version-newer-commit case
+
+Plugins: dkj-policy
+
+[PR #1777](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1777)
+
+---
+
+### DEPLOY: fix/connector-record-catch-up · 20260910-092155
+
+This repo's own connector record described two plugins while the repo runs six, so five of them sat outside `check-connectors.ps1` entirely -- one skipped behind an `[INFO]` for the retired `dkj-team-alpha@` id, and four never looped over at all because a plugin absent from the array is silent rather than reported. The record now names all six at the ids the 4.33.0 rename gave them, with each inventory counted from the marketplace clone's payload rather than carried forward, and the note says what the two gaps cost in the register of the repo that owns the check. The half this does not do is the checker itself: the 2026-08-21 argument for leaving the silent route unreported rested on its population being zero, that stopped being true on 2026-09-08, and #1775 carries it.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A -- `connectors/` is this repo's own register of who consumes what, read by a maintenance script here. It ships in no plugin and reaches no consumer of the specialists system.
+
+**Score:** N/A
+
+#### Pull Request
+
+Catch this repo's own connector record up to the six plugins it has
+
+[PR #1776](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1776)
+
+---
 
 ### DEPLOY: fix/1764-agents-manifest-file-list · 20260910-085218
 
