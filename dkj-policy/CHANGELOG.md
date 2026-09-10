@@ -43,7 +43,51 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**5 / 19 minor entries** <!-- pending-tally -->
+**5 / 20 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1792-fold-race-stand-down · 20260910-121848
+
+**A fold lost to `fold-on-merge.yml` no longer fails the ship.** `fold-changelog-entry.ps1` returns a new
+exit code **`3`** when it committed, its push was refused, and **every** entry that commit carries is
+already upstream with an identical body -- "the fold happened, somebody else made it". `ship-pr.ps1` reads
+that as a stood-down success and carries on through its remaining steps instead of reporting a hard failure,
+and its closing line names who folded. Every other non-zero code is the failure it always was, and an
+ordinary divergence keeps `1`, because that commit carries work. Fixes #1792.
+
+**A new step 5c says what the race actually cost, which is local only:** the redundant fold commit still
+sitting on this checkout's trunk. It prints a `backup/fold-<branch>` ref that preserves the commit, then the
+one realignment the tree it finds can run -- `reset --keep origin/main` where the trunk is checked out here,
+`branch -f main origin/main` where nothing holds it -- and **runs neither**. `--keep` is not `--hard`, but a
+script that moves a trunk pointer has taken a power nobody granted it, and the fold script declines the same
+thing one step below. What #1792 measured missing was never the authority; it was the sentence naming which
+two commands.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+Measured shipping PR #1789 on 2026-09-10: the two fold commits had **identical trees** and `origin/main` was
+correct, so nothing was at stake in the content -- and the shipping session was still told its ship had
+failed and left holding a state its own constitution forbade every obvious route out of. That asymmetry is
+the whole finding: a red CI job is read once and closed, while this ended a correct chain on a trunk the
+operator was not allowed to fix.
+
+**`2` and `3` are deliberately not one code.** After the pre-pass's `2` nothing was written and there is
+nothing to clean up; after `3` a commit is on the local trunk. Neither script repairs it, so a caller that
+conflated them would either invent a leftover that does not exist or stay silent about one that does -- and
+silence is the one outcome worse than the hard failure this removes.
+
+**Score:** N/A
+
+#### Pull Request
+
+The fold losing the race to fold-on-merge is a stood-down success, not a failed ship
+
+Plugins: dkj-policy
+
+[PR #1797](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1797)
+
+---
 
 ### DEPLOY: docs/1790-figure-gate-script-comments · 20260910-114054
 
