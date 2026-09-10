@@ -1702,6 +1702,73 @@ sidesteps the anchor question entirely, because a document knows where it sits �
 0 findings today, and verified against `33a41a2` to fire on the real defect. Not built, because four
 subjects is close to nothing to guard; worth revisiting when per-directory READMEs multiply.
 
+**Extending check 16 to LINE COUNTS was measured and declined** (September 10, 2026,
+[#1784](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1784)). It came out of
+[#1779](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1779), which found seven
+docstring sentences across five libs sizing `entry-scaffold-lib.ps1` at "three thousand lines" where
+it measured 8,289 — each in the sentence carrying a layer or dependency decision, so the stale figure
+argued for the decision at a third of its real strength. Check 16 misses that class twice over and
+both misses are structural: `lines` is not in its unit list (`$figurePattern`,
+[`check-plugin-integrity.ps1:2426`](../../../scripts/lint/check-plugin-integrity.ps1)), and a `.ps1`
+comment is not in its `$consumerDocs` file set. The proposal was a check of its own: a sentence naming
+a repo file and giving a line count for it, held against that file's actual length.
+
+**It is not born green, and the shape of the failure is the point.** Measured over every tracked `.md`
+and `.ps1` outside the archived release history, pairing each count with the nearest file token to its
+left and resolving by path then basename: **19 pairings on the wide pattern, 16 on a narrowed one that
+requires a word boundary before the digit — and under a ±5% tolerance band, every single one is a
+finding.** Exactly **one** is a real defect. The other fifteen fall into five classes no regex
+separates from it:
+
+| class | sites | why it is not a defect |
+|---|---|---|
+| a deliberate historical record | 6 | the figure **is** the past state and is the whole point — `CLAUDE.md` "328 → 282 lines", the July 28 measurement table, `cut-release.ps1` "was 284 lines" under a paragraph that says "the finding as it stood then" |
+| a delta, not a length | 4 | "`CLAUDE.md` +4 lines from a round trip that should have returned to zero" — the teardown round-trip assert, in three mirrored copies plus `teardown.ps1` |
+| a section, not the file | 1 | "the roster/routing table (53 lines)" inside `CLAUDE.md` |
+| another repo's file | 2 | `teardown.tests.ps1:574` records life-hub's `repo-config.ps1` (55 lines) and `branch-info.ps1` (88) — the same "whose repo is this line about" failure that sank the stale-path rule above |
+| a pairing failure | 1 (+2 wide-only) | see below |
+
+**The pairing failure is the one worth reading, because its victim is the best-behaved figure in the
+tree.** `check-connectors.ps1:119` reads *"release-lib dot-sources entry-scaffold-lib behind it
+(release-lib.ps1:113), and that file is 8,289 lines (measured: `wc -l scripts/lib/entry-scaffold-lib.ps1`)"*.
+The figure is accurate, present-tense, and states its own method — it is #1779's repair done right. Its
+subject is an antecedent two clauses back, so the nearest file token is `release-lib.ps1` at 1,776 lines
+and the check flags it 4.7× over. No resolver fixes this: the subject of an English sentence is not a
+token position. The wide pattern adds two more of the same kind from digits that were never counts —
+`entry-scaffold-lib.ps1 line by line` yields "1 line" off the `1` of `.ps1`, and `the pre-#1591 line`
+yields "1591 line".
+
+**And the tolerance band is not a tuning knob, it is mandatory — which is itself the argument.**
+`entry-scaffold-lib.ps1` went **8,289 → 8,290 during this branch's own `git pull`, eight commits**. So
+the tree's single self-citing, method-stating, correctly-measured line count went stale inside one
+fast-forward. Under an exact compare the check nags it; under a band it passes and every real finding
+smaller than 5% passes with it. A figure that decays that fast is one a reader must re-run, not one a
+gate can pin.
+
+**The remedy is the wrong shape too, and in the opposite direction from the one #1784 predicted.** The
+issue argued that check 16's binding would wrongly *pass* a stale line count. Measured, the reverse is
+what happens: the tree's bound figures are bound correctly — `README.md:1254`'s "101, across 492 lines"
+sits under *"measured against the `life-hub` consumer on July 29, 2026"* — so a re-measurement check
+flags **history that already did what it was asked**, while the one real defect
+(`06-25-extension.md:264`, "`CLAUDE.md` is 875 lines in 9 sections", against 526 in 3) is un-bound and
+present-tense. Adopting the check therefore means writing `<!-- unbound-figure: … -->` onto fifteen
+correct sites to catch one, which is the exemption list this repo has already been bitten by.
+
+**Check 16's own docstring is what decides it, and it was written a month earlier.** Its gateability
+argument is that *"there is no authored, non-measured reason to write '939,860 bytes' — so the haystack
+needs no heuristic to identify"*. A line count fails exactly that test: the same characters are a
+snapshot, a delta, a section size, another repo's file, or a historical record, and telling them apart
+is the heuristic the sentence rules out. The unit list is byte-shaped **deliberately**, and this
+measurement is why it stays that way.
+
+**What is not declined is the writing rule, which already exists and needs nothing added.** *"A
+re-derivable figure states its method, so the next reader re-runs it instead of trusting it"* is in
+[Tessa's portable manual](../../../plugins/dkj-subagents/dkj-subagents-alpha/manuals/06-16-manual.md)
+and covers #1779 exactly. #1779 is not a gap in the rules; it is seven sites that did not follow one —
+and `check-connectors.ps1:119` is the same rule followed, still readable after going stale. The
+prevention #1784 asked a gate for is a habit the manual already teaches, and the one thing a gate would
+have added is the thing it cannot do.
+
 **The PR template that caused the collision is itself the change** (Dave, August 9, 2026). It now carries
 one section — the changelog entry — because `open-pr.ps1` composes the body from
 the DEPLOY section of `dkj-policy/<branch>.md`, so everything else it asked was already answered four lines lower. Measured

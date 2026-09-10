@@ -53,6 +53,19 @@ the governance of the entire specialists system live here.
   ([#374](https://github.com/DaveKJohn/claude-code-specialists/issues/374) and its unfiled twin one section
   down). Both take a named opt-out (`<!-- unbound-sample: … -->`, `<!-- unbound-figure: … -->`) that has
   to state a reason. Everywhere else — other docs, other kinds of sample — it is hers to hold.
+  **Neither reaches a LINE count, and no third check will**: extending check 16 to them was measured and
+  declined on September 10, 2026 at 16 findings of which 1 was real
+  ([#1784](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1784), written up in
+  [Sylvester's lens](05-15-extension.md#how-the-gate-checks-got-their-shape-and-the-measurements-behind-them-august-15-2026)).
+  So a line count in prose is held by the *writing* rule and nothing else, and the measurement is the
+  cleanest confirmation of that rule this repo has taken: the one figure in the tree that states its
+  method — `check-connectors.ps1:119`, sizing `entry-scaffold-lib.ps1` and quoting the `wc -l` that
+  settles it — went stale by a line during a single eight-commit fast-forward, and is *still correct to
+  read*, because the sentence tells you how to re-derive it. The seven sites of
+  [#1779](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1779) that omitted the method
+  each argued a layer decision at a third of its real strength. Same class, same day, opposite outcome:
+  the method-statement is what survives staleness, which is why it is worth insisting on where a gate
+  cannot.
 - **Claims here come in pairs, and only one of them gets filed.** The portable rule is *repairing a
   claim means finding its other sites*; what this repo adds is how reliably that pays. All three of
   test round v12's core findings had a second, unreported site in the same document, and in two of

@@ -36,19 +36,65 @@
 
 ### PLAN
 
+#### What #1784 actually asked for
+
+The issue proposes a new lint check -- a sentence naming a repo file and giving a line count for it,
+held against that file's actual length -- and then names its own precondition under **Not measured**:
+*"it needs the count before it is worth building."* This repo's convention is that a candidate rule is
+measured against the tree before it is adopted, and several rules in this same gate were **declined** on
+exactly that evidence. So the assignment is the measurement first, and the check only if it survives.
+
+It did not survive. The deliverable is therefore the recorded decline plus the one real defect the
+measurement found -- not the check.
+
+#### One correction to the report, which does not change its subject
+
+#1784 calls the gate **check 13**. Check 13 is the changelog-entry check; the `[measured-figure]` gate it
+describes is **check 16**. Its line citation is exact -- `$figurePattern` is at
+`check-plugin-integrity.ps1:2426` -- so the subject exists and the report is routable; only the number is
+wrong.
+
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [x] Measured the candidate over every tracked `.md`/`.ps1` outside the archived release history, in two
+      variants (wide, and narrowed to require a word boundary before the digit), pairing each count with
+      the nearest file token to its left and resolving by path then basename, against a +/-5% band.
+- [x] Recorded the decline with the full measurement in Sylvester's lens, beside the stale-path rule it
+      had to be measured against -- the five false classes, the pairing failure, the mandatory tolerance
+      band, and check 16's own docstring argument that settles it.
+- [x] Recorded the confirming instance in Tessa's lens: her portable rule *"a re-derivable figure states
+      its method"* already covers #1779 and needs nothing added -- so the lens states that no gate backs
+      it for line counts, and why the measurement is the cleanest confirmation of the rule it has.
+- [x] Repaired the one real defect the measurement found -- `06-25-extension.md:264`, a present-tense
+      `CLAUDE.md` "is 875 lines in 9 sections" against 526 in 3 -- by tense plus the method to re-derive it.
+- [~] No check built and no test suite added. That IS the finding: 16 findings, 1 real. A suite would pin
+      a rule this branch declines.
 
 ### TEST
 
+- [x] The lint gate and all suites, via open-pr's own pre-flight.
+
 ### DEPLOY: docs/1784-measured-figure-gate-line-counts
 
-**Score:**
+The proposed line-count gate from #1784 is **declined on measurement**, and the measurement is recorded
+where the gate's other declined rules live. Extending check 16 (`[measured-figure]`) to line counts
+produces 16 findings tree-wide of which exactly **1** is a real defect: six sites are deliberate
+historical records where the figure is the point, four are deltas rather than lengths, one is a section
+rather than a file, two describe another repo's files, and one is a pairing failure whose victim is the
+best-behaved figure in the tree -- a comment that states its own `wc -l`. That figure also went stale by
+a line during this branch's own eight-commit fast-forward, which is why a tolerance band is mandatory and
+why a line count is something a reader re-runs rather than something a gate pins. Check 16's unit list
+stays byte-shaped, deliberately, and the writing rule that does hold this class already exists in Tessa's
+portable manual. The one real defect the measurement found is repaired.
+
+**Score:** 2
 
 #### What makes this deploy extra special
 
-**Score:**
+N/A -- nothing here reaches a consumer. The declined rule, its measurement and the repaired figure are all
+this repo's own maintenance prose; no plugin payload, script or manifest changes.
+
+**Score:** N/A
 
 #### Pull Request
 
