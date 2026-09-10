@@ -40,19 +40,42 @@ Recording the #1719 close-out measurement in ship-pr.ps1's step-3b block: the pe
 
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [x] Extend `ship-pr.ps1`'s step-3b comment block with the #1719 close-out measurement, beside the
+      predicate #1750 put there: the per-lap refusal tracks CONCURRENT CERTIFYING LAPS, not the
+      trunk's own rate, and shipping one branch at a time zeroes it.
+- [x] Correct the count while writing it -- the first draft said `0 of 15` serially shipped PRs; the
+      sample has 20 PRs, of which 10 sit in the 5 tight concurrent pairs, so it is `0 of 10`.
+- [x] Add the counter-reading that a `gh pr list` would suggest and the data refutes: #1733 overlapped
+      14 of the other 19 PRs for 285 minutes and voided none, because it was parked.
+- [x] Mirror to `plugins/dkj-policy/scripts/release/ship-pr.ps1` via `scripts/sync/build-shared-scripts.ps1`
+      rather than by hand -- the root copy is canonical and the drift lint gates the pair.
 
 ### TEST
 
+- [x] `build-shared-scripts.ps1` reports the mirror updated, then `-Check` clean.
+- [x] Lint gate + all suites via `open-pr.ps1` (comment-only change to a script, so the suites are
+      the regression proof that nothing executable moved).
+
 ### DEPLOY: docs/1719-concurrent-pair-voiding-rate
 
-**Score:**
+Anyone changing `ship-pr.ps1`'s staleness gate now reads why it refuses, not just how often. The
+block already carried the rate and (since #1750) its predicate; what it did not carry is the driver.
+Issue #1719 measured it while being closed: the refusal tracks two branches CERTIFYING at the same
+time -- 2 of 5 tight concurrent pairs lost a lap against 0 of 10 PRs outside such a pair -- and not
+the trunk's own commit rate, which the paragraph above it had reached for. The practical consequence
+is recorded with it: shipping one branch at a time drives the row to zero at no cost, which is why
+#1719 closed against its own ranked converger options instead of building one. The measurement's
+window, population and discount are stated, so the next reader can compare rather than re-argue.
+
+**Score:** 3
 
 #### What makes this deploy extra special
 
-**Score:**
+N/A -- a comment block inside a maintenance script. No consumer of this repo's plugins reads it and
+no released behaviour changes; the mirror moves only so the drift lint stays green.
+
+**Score:** N/A
 
 #### Pull Request
 
 Record the concurrent-pair voiding rate beside the step-3b predicate
-
