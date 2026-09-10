@@ -237,9 +237,9 @@ independently:
   `-SkipLint`/`-SkipTests`. A repo with no `origin/<trunk>` ref at all — no remote, or a clone that has
   never fetched — is *unmeasurable* rather than behind, and folds exactly as it always did.
 
-  **This one refusal exits `2` rather than `1`, and it is the only thing in the script that does**
-  (inbound #1586). It is still non-zero, so anything reading the run the way `ship-pr` does — `-ne 0` —
-  is unaffected, and a person sees the same refusal. The code exists for **one** caller: `fold-on-merge`,
+  **This refusal exits `2` rather than `1`, and it is one of exactly two places in the script that
+  return a code of their own** (inbound #1586; the other is the raced push below, `3`). It is still
+  non-zero, so a person sees the same refusal it always was. The code exists for **one** caller: `fold-on-merge`,
   the CI job re-triggered by *every* push to the trunk. There a trunk that moved between the job's
   checkout and this pre-pass means the push that moved it has its own run of the same job queued behind
   this one, reading a tip that includes it — so that run stands down green instead of leaving a red on
@@ -265,6 +265,23 @@ own fold time and no two stamps can match.
 Where every entry the commit carries is already upstream, the closing advice inverts to **"Do NOT push
 this commit by hand"**. Where any of them is not, the ordinary "push by hand" verdict stands — a genuine
 divergence must never be reported as a duplicate, or its author would strand the entry for good.
+
+**And that inverted verdict exits `3`, the script's second code of its own** (issue #1792). Every line of
+the diagnosis above has just established that the fold **happened** — the entry is upstream, present once,
+with a body identical to the one this run wrote — so the run did not fail at the thing it was asked to do;
+it lost a race to whoever folded first. The code exists for the caller standing on the far side of that
+race: `ship-pr`, which merged the PR seconds earlier and has no other way to tell "somebody else folded
+it" from "the fold refused or crashed". Reading it as an ordinary failure cost a **correct** ship —
+measured on PR #1789, 2026-09-10, where `fold-on-merge` folded first, the two commits had identical trees,
+`origin/<trunk>` was right, and the shipping session was nonetheless told the ship had failed and left
+holding a trunk diverged 1/1 that its own constitution reserves every obvious way out of to a person.
+
+**`2` and `3` are deliberately not one code.** After `2` nothing was written and there is nothing to clean
+up; after `3` a commit is sitting on the local trunk. A caller that conflated them would either invent a
+leftover that does not exist or stay silent about one that does — and since this script repairs neither,
+silence is the one outcome worse than the hard failure. It remains true that only a run whose **every**
+named entry is upstream reaches `3`; a fold-all where one entry is genuinely new keeps `1`, because that
+commit carries work.
 
 **It diagnoses and stops, repairing nothing, deliberately.** The fold commit is on the trunk by then, and
 every route off a trunk — a reset, a rebase, a merge commit — is a history operation a repo's safety rules

@@ -136,10 +136,16 @@ lands directly on the main branch under one of the two named exceptions to "neve
 an exception only stays safe while it stays the size it was granted at.
 
 EXIT CODES. 0 folded (or found nothing to fold, which is not an error); 1 refused or failed; 2 refused
-by the trunk-freshness pre-pass alone -- the checkout is behind origin/<trunk>, and NOTHING was written.
-2 is non-zero like every other refusal, so a caller testing `-ne 0` needs no change; it exists for the
-one caller that is re-triggered by the very push that made the checkout stale (fold-on-merge.yml), which
-can stand down on it instead of going red. See the pre-pass itself for why no other refusal may share it.
+by the trunk-freshness pre-pass alone -- the checkout is behind origin/<trunk>, and NOTHING was written;
+3 folded and committed, the push was refused, and EVERY entry the commit carries is already upstream with
+an identical body -- the fold happened, somebody else made it. Both are non-zero like every other
+refusal, so a caller testing `-ne 0` needs no change; each exists for the one caller that can act on it.
+2 is for the job re-triggered by the very push that made the checkout stale (fold-on-merge.yml), which
+can stand down on it instead of going red -- see the pre-pass itself for why no other refusal may share
+it. 3 is for the caller that has just merged the PR this fold belongs to (ship-pr.ps1): nothing is
+missing upstream, so the SHIP succeeded and only this checkout's own trunk is left holding a redundant
+commit. The two codes must not be confused: after 2 nothing was written, after 3 there is a commit on
+the local trunk that its caller has to tell the operator about.
 #>
 
 param(
@@ -1288,6 +1294,29 @@ if ($Commit) {
                 Write-Host "Committed locally but NOT pushed ($why). Do NOT push this commit by hand: every entry it carries is already on $($gap.Ref), so pushing it would fold the same branch twice." -ForegroundColor Red
                 Write-Host "  The local fold commit is redundant -- nothing in it is missing upstream, and discarding it loses no work." -ForegroundColor DarkGray
                 Write-Host "  What to do with a commit already sitting on the trunk is yours to decide: this script does not rewrite trunk history." -ForegroundColor DarkGray
+                # EXIT 3, NOT 1 -- THE SECOND REFUSAL IN THIS SCRIPT THAT CARRIES ITS OWN CODE (issue #1792).
+                #
+                # WHAT IT SAYS THAT 1 CANNOT. Every line above has just established that the fold HAPPENED:
+                # the entry is on the trunk, present once, with a body identical to the one this run wrote.
+                # That is not a failure, and the one caller standing on the far side of it -- ship-pr.ps1,
+                # which merged the PR seconds earlier -- has no other way to tell it apart from the fold
+                # having refused or crashed. Reading 1 there, it reports a hard failure over a ship that
+                # succeeded in every externally visible way, and ends with the operator holding a trunk they
+                # may not realign with the obvious command (CLAUDE.md reserves reset --hard and a rebase on a
+                # shared branch to a person). Measured shipping PR #1789 on 2026-09-10, where fold-on-merge.yml
+                # folded first and this script lost the push by seconds.
+                #
+                # IT IS NOT THE PRE-PASS'S 2 AND MUST NEVER BE MERGED WITH IT. After 2 nothing was written and
+                # there is nothing to clean up; here a commit is sitting on the local trunk. A caller that
+                # treated them as one code would either invent a leftover after 2 or stay silent about a real
+                # one after 3 -- and this script deliberately does not clean it up itself, so silence is the
+                # one outcome that leaves the operator worse off than the old hard failure did.
+                #
+                # AND IT IS THE NARROWEST ARM, BY THE SAME TEST THAT WROTE IT. Only a run whose EVERY named
+                # entry is already upstream with a matching body reaches this line; the else below -- a
+                # genuine divergence, or a fold-all where one entry is new -- keeps 1, because that commit
+                # carries work and its author has to push it.
+                exit 3
             } else {
                 Write-Host "Committed locally but NOT pushed ($why) -- the state this flag exists to avoid. Push by hand." -ForegroundColor Red
             }
