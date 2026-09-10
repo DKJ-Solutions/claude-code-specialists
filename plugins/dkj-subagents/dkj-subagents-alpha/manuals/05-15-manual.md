@@ -75,10 +75,11 @@ and safe hook construction.
   marketplace with it, including the records of other repos on the machine — which is invisible from the
   repo you ran it in, because nothing there changes and nothing is printed about the others. **What it
   costs is a procedure, not data**: a record is bookkeeping and installing writes it again, but any
-  sequence that pairs a per-checkout `uninstall` with a `marketplace remove` is only completable in the
-  first checkout, and the CLI's two failure messages in the rest name a missing plugin or the wrong
-  `--scope` rather than the cause. So when a marketplace has to be re-registered, do it **once** for the
-  machine and treat the remaining checkouts as fresh installs. Measured with record counts and both
+  sequence pairing a per-checkout `uninstall` with a `marketplace remove` is only completable in the
+  first checkout, and the CLI's failure messages in the rest name a missing plugin or the wrong
+  `--scope` rather than the cause. **`remove` and `add` do not share a reach, so do not treat the pair
+  as one step**: `remove` is per machine and belongs at the front, once, while `add --scope project`
+  writes into the repo it is run in and is owed to every checkout. Measured with record counts and both
   verbatim messages in the source repo's `INSTALL.md`, under
   *"If this machine has more than one checkout"*.
 - **Never add a permission or hook that undermines the safety rules.** The safety rules stand above

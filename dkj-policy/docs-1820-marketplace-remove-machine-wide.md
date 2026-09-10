@@ -50,7 +50,7 @@ reader's pasteable block.
 
 - [x] `INSTALL.md`: one new `## If this machine has more than one checkout` section above the three
       migration sections, carrying the record counts, both verbatim CLI failure messages, the
-      start-at-step-4 instruction, and the bounds of the measurement.
+      per-checkout sequence step 3 decomposes into, and the bounds of the measurement.
 - [x] `INSTALL.md`: a pointer in the step-3 comment block of all three migration sequences, saying the
       command is machine-wide and naming the section to read first. Placed inside the fence, which is
       where the reader is standing when it matters.
@@ -64,6 +64,14 @@ reader's pasteable block.
       [#1823](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1823) — `UNINSTALL.md`'s
       Step 5 carries the same machine-wide reach, and there nothing reinstalls afterwards. Its repair
       is a procedural decision of its own, not a sentence.
+- [x] Sharpened the instruction after Sebastian's review, which asked whether a checkout skipping
+      step 3 is left with a stale marketplace source key. It would have been: `marketplace remove` and
+      `marketplace add` do **not** share a reach, and the first draft treated step 3 as one step and
+      told later checkouts to start at step 4. `remove` is per machine; `add --scope project` writes
+      into the repo it is run in — which this page states about that flag two sections down — so it is
+      owed to every checkout. The section and all three fence notes now say skip the `remove`, run the
+      `add`. This is a better repair than the one #1820 proposed, and it came from the review rather
+      than from the report.
 
 ### TEST
 
@@ -76,12 +84,15 @@ reader's pasteable block.
 ### DEPLOY: docs/1820-marketplace-remove-machine-wide
 
 `INSTALL.md`'s three migration sequences now say that step 3's `claude plugin marketplace remove` is
-machine-wide over install records, and a new section states what that means for a machine with more
-than one checkout: the first checkout runs the whole sequence, every one after it starts at step 4.
-The section carries the measured record counts, both of the CLI's failure messages verbatim — the
-second reads as a `--scope` mistake by the operator and is not one — and the bounds of what was
-measured. The same mechanism is now a hard rule in the system administrator's portable manual, so it
-travels to every consumer rather than living only on this page.
+machine-wide over install records, and a new section states what that means for a machine with more than
+one checkout. It also splits step 3, which is two commands with two different reaches: `remove` drops the
+registration for the whole machine and is run once, while `marketplace add … --scope project` writes the
+source key into the repo it is run in and is owed to every checkout. So the first checkout runs the whole
+sequence and each one after it skips step 2 and the `remove`, then runs the `add` and step 4. The section
+carries the measured record counts, both of the CLI's failure messages verbatim — the second reads as a
+`--scope` mistake by the operator and is not one — and the bounds of what was measured. The same
+mechanism is now a hard rule in the system administrator's portable manual, so it travels to every
+consumer rather than living only on this page.
 
 Before this, a reader with three checkouts was told by the page's own per-checkout framing to run the
 sequence three times, and the first run silently made steps 2 and 3 impossible in the other two — with
