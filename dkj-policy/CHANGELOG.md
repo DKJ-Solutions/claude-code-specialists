@@ -43,7 +43,59 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**7 / 24 minor entries** <!-- pending-tally -->
+**8 / 25 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1805-consumer-gate-path-drift · 20260910-174142
+
+Three CI runners this workflow scaffolds do not vendor the script they run: they check this repository
+out beside the consumer's tree and run a path into it. The dependency therefore points the wrong way --
+a path INTO this tree, written into a file this tree cannot reach, by a scaffolder that runs once at
+adoption -- and when `plugins/workflows/contributing-davekjohn/` became `plugins/dkj-policy/`, two
+consumers went red on every pull request with nothing anywhere saying so.
+
+Both ends are now held. `check-connectors.ps1` reads the runners a registered consumer actually has and
+reports a path this tree no longer holds, naming where that script went; and the two scaffolder suites
+derive the emitted path from the emitted file instead of pinning it as a literal, so a move here goes
+red the day it lands rather than in somebody else's repository days later. The `ref: main` pin
+stays and its argument is completed: tracking the tip protects a consumer from a stale convention and
+exposes them to a moved script, and only the first half was ever written down.
+
+The detector reads a consumer's own file, so it is treated as untrusted throughout: a reference that
+does not stay under the checkout is reported as its own finding and never resolved against this disk,
+and every value printed -- the workflow filename included -- goes through `Format-SafePathToken`
+before it reaches a line the session hooks forward.
+
+**And the report's own figure was wrong, which is worth stating because the wrong one is the more
+quotable.** #1805 dates the break to August 3 and calls it five weeks; the gate script did not exist
+until August 20, the path those consumers name existed only from August 26, and it stopped resolving
+on September 5 -- five DAYS before the measurement. August 3 belongs to a different move of the same
+folder. The defect is unchanged; its duration is out by a factor of seven, and the corrected timeline
+sits with the `git log` it comes off in `consumer-runner-lib.ps1`'s header.
+
+**The detector reaches a consumer whose checkout is present on the machine running it, which is the
+register's standing limit rather than a new one** -- an absent checkout is `[SKIP]`, as it is for every
+other check there. Filed as #1808 rather than widened here, because reading a consumer's workflow over
+the network would put a `gh` call per connector into a script SessionStart runs.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+A consumer running these runners gets the failure class reported instead of discovered: either from
+the register, or -- if they pin a tag instead -- from a page that now states the trade honestly. Nothing
+changes for a consumer whose paths are current, which is most of them.
+
+**Score:** 3
+
+#### Pull Request
+
+A consumer's CI runners no longer break silently when a shared script moves here
+
+Plugins: dkj-policy
+
+[PR #1809](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1809)
+
+---
 
 ### DEPLOY: fix/1803-plugin-versions-paste-safe-id · 20260910-155349
 
