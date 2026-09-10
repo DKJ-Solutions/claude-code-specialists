@@ -53,19 +53,21 @@ the governance of the entire specialists system live here.
   ([#374](https://github.com/DaveKJohn/claude-code-specialists/issues/374) and its unfiled twin one section
   down). Both take a named opt-out (`<!-- unbound-sample: … -->`, `<!-- unbound-figure: … -->`) that has
   to state a reason. Everywhere else — other docs, other kinds of sample — it is hers to hold.
-  **Neither reaches a LINE count, and no third check will**: extending check 16 to them was measured and
-  declined on September 10, 2026 at 16 findings of which 1 was real
+  **Neither reaches a LINE count, and none will**: extending check 16 to them was measured and declined
+  on September 10, 2026 at 16 findings of which 1 was real
   ([#1784](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1784), written up in
-  [Sylvester's lens](05-15-extension.md#how-the-gate-checks-got-their-shape-and-the-measurements-behind-them-august-15-2026)).
-  So a line count in prose is held by the *writing* rule and nothing else, and the measurement is the
-  cleanest confirmation of that rule this repo has taken: the one figure in the tree that states its
-  method — `check-connectors.ps1:119`, sizing `entry-scaffold-lib.ps1` and quoting the `wc -l` that
-  settles it — went stale by a line during a single eight-commit fast-forward, and is *still correct to
-  read*, because the sentence tells you how to re-derive it. The seven sites of
-  [#1779](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1779) that omitted the method
-  each argued a layer decision at a third of its real strength. Same class, same day, opposite outcome:
-  the method-statement is what survives staleness, which is why it is worth insisting on where a gate
-  cannot.
+  [Sylvester's lens](05-15-extension.md#how-the-gate-checks-got-their-shape-and-the-measurements-behind-them-august-15-2026),
+  which also records the one narrow variant that *is* green and why it is left unbuilt). **The reason is
+  not tuning: the defect that prompted it carried no digit** — #1779's seven sites read "three thousand
+  lines" in words — so a line count in prose is held by the *writing* rule and nothing else, and it is
+  hers alone to hold.
+  **Be exact about what that rule buys, because it is legibility rather than prevention.** It already
+  existed when #1779's seven sites ignored it, so it is not shown to stop the next one. What it is shown
+  to do is keep a stale figure *readable*: `check-connectors.ps1:119` states its own `wc -l` and went
+  stale by a line inside one eight-commit fast-forward, and a reader can still act on it — while the
+  seven sites that omitted the method each argued a layer decision at a third of its real strength. So
+  press for the method on any figure a reader could re-derive, and expect that to be worth more after
+  the drift than before it.
 - **Claims here come in pairs, and only one of them gets filed.** The portable rule is *repairing a
   claim means finding its other sites*; what this repo adds is how reliably that pays. All three of
   test round v12's core findings had a second, unreported site in the same document, and in two of

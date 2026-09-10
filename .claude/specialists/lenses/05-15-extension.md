@@ -1706,37 +1706,68 @@ subjects is close to nothing to guard; worth revisiting when per-directory READM
 [#1784](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1784)). It came out of
 [#1779](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1779), which found seven
 docstring sentences across five libs sizing `entry-scaffold-lib.ps1` at "three thousand lines" where
-it measured 8,289 — each in the sentence carrying a layer or dependency decision, so the stale figure
-argued for the decision at a third of its real strength. Check 16 misses that class twice over and
+it measured 8,289 — and each figure sat in the sentence that carried a layer or dependency decision, so
+the stale number argued for that decision at a third of its real strength. Check 16 misses the class twice over and
 both misses are structural: `lines` is not in its unit list (`$figurePattern`,
 [`check-plugin-integrity.ps1:2426`](../../../scripts/lint/check-plugin-integrity.ps1)), and a `.ps1`
-comment is not in its `$consumerDocs` file set. The proposal was a check of its own: a sentence naming
-a repo file and giving a line count for it, held against that file's actual length.
+comment is not in its `$consumerDocs` file set — that second gap is real, is where both recorded
+instances of the class happened, and is filed on its own as
+[#1790](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1790) rather than answered here.
+The proposal was a check of its own: a sentence naming a repo file and giving a line count for it, held
+against that file's actual length.
 
-**It is not born green, and the shape of the failure is the point.** Measured over every tracked `.md`
-and `.ps1` outside the archived release history, pairing each count with the nearest file token to its
-left and resolving by path then basename: **19 pairings on the wide pattern, 16 on a narrowed one that
-requires a word boundary before the digit — and under a ±5% tolerance band, every single one is a
-finding.** Exactly **one** is a real defect. The other fifteen fall into five classes no regex
-separates from it:
+**THE REASON THAT SETTLES IT COMES FIRST, BECAUSE IT IS NOT THE ONE THE PROPOSAL ARGUES ABOUT: the
+reported defect carries no digit.** #1779's seven sites read **"three thousand lines"**, spelled out in
+words — `release-lib.ps1:706` records it in those terms (*"It read 'three thousand lines' from the day
+this function moved"*). Every candidate in this family is anchored on `\d`, check 16's own
+`$figurePattern` included, so **not one of them can see the defect that motivated the proposal**, however
+precisely it is tuned. That is the whole argument, and the measurement below is only about the figures a
+digit-anchored rule *can* see.
+
+**It is not born green, and the shape of the failure is the point.** Measured against `main` at
+`69264276`, over every tracked `.md` and `.ps1` outside the archived release history, pairing each count
+with the nearest file token to its left and resolving by path then basename: **19 pairings on the wide
+pattern, 16 on a narrowed one that requires a word boundary before the digit — and under a ±5% tolerance
+band, every single one is a finding.** Exactly **one** is a real defect. The other fifteen fall into six
+classes no regex separates from it:
 
 | class | sites | why it is not a defect |
 |---|---|---|
-| a deliberate historical record | 6 | the figure **is** the past state and is the whole point — `CLAUDE.md` "328 → 282 lines", the July 28 measurement table, `cut-release.ps1` "was 284 lines" under a paragraph that says "the finding as it stood then" |
+| a deliberate historical record | 6 | the figure **is** the past state and is the whole point — `CLAUDE.md` "328 → 282 lines", the July 28 measurement table, `cut-release.ps1` "was 284 lines" under a paragraph that says "the finding as it stood then", and `teardown.tests.ps1:469`'s "instead of 43 lines scattered through `CLAUDE.md`" (history *of* a section, which is why it counts here and not in the row below) |
 | a delta, not a length | 4 | "`CLAUDE.md` +4 lines from a round trip that should have returned to zero" — the teardown round-trip assert, in three mirrored copies plus `teardown.ps1` |
 | a section, not the file | 1 | "the roster/routing table (53 lines)" inside `CLAUDE.md` |
 | another repo's file | 2 | `teardown.tests.ps1:574` records life-hub's `repo-config.ps1` (55 lines) and `branch-info.ps1` (88) — the same "whose repo is this line about" failure that sank the stale-path rule above |
-| a pairing failure | 1 (+2 wide-only) | see below |
+| a **correctly bound** historical measurement | 1 | `README.md:1254`'s "101, across 492 lines" sits under *"measured against the `life-hub` consumer on July 29, 2026"* — it already does what check 16 asks, and a re-measurement check flags it anyway. This is the class that decides the remedy question below |
+| a pairing failure | 1 (+3 wide-only) | see below. The three are counted per **site**, as the delta row is: two kinds of artifact, one of which sits in two mirrored copies — which is also why wide − narrow is 3 |
 
 **The pairing failure is the one worth reading, because its victim is the best-behaved figure in the
 tree.** `check-connectors.ps1:119` reads *"release-lib dot-sources entry-scaffold-lib behind it
 (release-lib.ps1:113), and that file is 8,289 lines (measured: `wc -l scripts/lib/entry-scaffold-lib.ps1`)"*.
 The figure is accurate, present-tense, and states its own method — it is #1779's repair done right. Its
 subject is an antecedent two clauses back, so the nearest file token is `release-lib.ps1` at 1,776 lines
-and the check flags it 4.7× over. No resolver fixes this: the subject of an English sentence is not a
-token position. The wide pattern adds two more of the same kind from digits that were never counts —
-`entry-scaffold-lib.ps1 line by line` yields "1 line" off the `1` of `.ps1`, and `the pre-#1591 line`
-yields "1591 line".
+and the check flags it 4.7× over. The wide pattern adds three more sites of the same kind, from digits
+that were never counts — `entry-scaffold-lib.ps1 line by line` yields "1 line" off the `1` of `.ps1`
+(twice, once per mirrored copy), and `the pre-#1591 line` yields "1591 line" off an issue number.
+
+**A resolver DOES fix that one, and the honest record says so.** Requiring the filename to sit in
+backticks immediately before a present-tense copula — `` `<file>` is/are/measures/stood at N lines `` —
+never has to resolve an English subject at all, because it refuses to fire unless the two are adjacent.
+Measured against `main` at `69264276`: **1 finding, and it is the real one. Born green, 1 of 1.** So this
+family is not impossible to gate, and the claim that it was — which stood in this paragraph until Marlowe
+red-teamed it — was an overclaim. **It is left UNBUILT rather than declined**, which is the same verdict
+and the same shape as the title-path rule two paragraphs up, on three measured prices:
+
+1. **One subject tree-wide.** The same "close to nothing to guard" bar that left the title rule unbuilt.
+2. **Blind to the motivating defect**, per the digit argument above — so building it would answer #1779
+   with a check that could not have caught #1779.
+3. **It still penalises citation, just less.** On the branch that records this decline the same narrow
+   pattern goes from **1 finding to 3**, and both new ones are this write-up quoting the defect verbatim
+   — the repaired site's own history sentence, and the paragraph above. Two thirds of its findings are
+   then the documentation doing what this repo requires of it.
+
+**Revisit condition**, stated so this is a priced option rather than a closed door: if a present-tense
+`` `<file>` is N lines `` claim ever reaches three or four live subjects, the adjacency variant is
+buildable in an afternoon and is green today. What must not be revived is the wide form.
 
 **And the tolerance band is not a tuning knob, it is mandatory — which is itself the argument.**
 `entry-scaffold-lib.ps1` went **8,289 → 8,290 during this branch's own `git pull`, eight commits**. So
@@ -1750,24 +1781,38 @@ issue argued that check 16's binding would wrongly *pass* a stale line count. Me
 what happens: the tree's bound figures are bound correctly — `README.md:1254`'s "101, across 492 lines"
 sits under *"measured against the `life-hub` consumer on July 29, 2026"* — so a re-measurement check
 flags **history that already did what it was asked**, while the one real defect
-(`06-25-extension.md:264`, "`CLAUDE.md` is 875 lines in 9 sections", against 526 in 3) is un-bound and
+(`06-25-extension.md:264`, "`CLAUDE.md` is 875 lines in 9 sections", against 526 in 3) is unbound and
 present-tense. Adopting the check therefore means writing `<!-- unbound-figure: … -->` onto fifteen
 correct sites to catch one, which is the exemption list this repo has already been bitten by.
 
-**Check 16's own docstring is what decides it, and it was written a month earlier.** Its gateability
+**And the wide form has one more price, which is the one that generalises.** Recording this decline honestly — citing each instance
+verbatim, as this repo requires of a measurement — took the same rule from **16 findings to 26** on the
+branch that declines it. Ten fresh sites, every one a correctly-attributed count in a sentence that
+argues from it, several of them the figures in the table above. So the rule does not merely mis-fire on
+history: **it penalises the act of measuring and writing the result down**, which is the one habit this
+gate's other rules exist to encourage. A check whose findings grow fastest in the documents that do
+their job is aimed at the wrong thing, and the narrow variant inherits a third of that.
+
+**Check 16's own docstring reached the same place a month earlier, for the wide form.** Its gateability
 argument is that *"there is no authored, non-measured reason to write '939,860 bytes' — so the haystack
 needs no heuristic to identify"*. A line count fails exactly that test: the same characters are a
 snapshot, a delta, a section size, another repo's file, or a historical record, and telling them apart
 is the heuristic the sentence rules out. The unit list is byte-shaped **deliberately**, and this
 measurement is why it stays that way.
 
-**What is not declined is the writing rule, which already exists and needs nothing added.** *"A
-re-derivable figure states its method, so the next reader re-runs it instead of trusting it"* is in
+**What is left holding this class is the writing rule — and it is worth being exact about how strong
+that is, because it is weaker than "already covered".** *"A re-derivable figure states its method, so
+the next reader re-runs it instead of trusting it"* is in
 [Tessa's portable manual](../../../plugins/dkj-subagents/dkj-subagents-alpha/manuals/06-16-manual.md)
-and covers #1779 exactly. #1779 is not a gap in the rules; it is seven sites that did not follow one —
-and `check-connectors.ps1:119` is the same rule followed, still readable after going stale. The
-prevention #1784 asked a gate for is a habit the manual already teaches, and the one thing a gate would
-have added is the thing it cannot do.
+and describes #1779 exactly. But it **predates** #1779, and #1779 is seven sites that did not follow it
+— so it is a rule already measured failing, not one shown to suffice. Two things keep it as the answer
+anyway, and neither is that it works reliably: no digit-anchored gate can see the form the failure took,
+and the enforcement gap that *is* addressable — a figure gate reaching script docstrings at all — is a
+different subject with its own file set, now
+[#1790](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1790). What the rule
+demonstrably buys is legibility after the fact: `check-connectors.ps1:119` followed it, went stale by a
+line inside one fast-forward, and is **still correct to read**, because the sentence says how to
+re-derive it. That is the property worth insisting on, and it is not the same thing as prevention.
 
 **The PR template that caused the collision is itself the change** (Dave, August 9, 2026). It now carries
 one section — the changelog entry — because `open-pr.ps1` composes the body from
