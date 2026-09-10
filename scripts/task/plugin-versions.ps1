@@ -244,6 +244,31 @@ foreach ($id in $ids) {
     $mp = $parts[-1]
     $clone = $clones[$mp]
 
+    # IS THIS ID SAFE TO BUILD A PASTE-READY COMMAND OUT OF? (Sebastian, on this branch.) An
+    # 'enabledPlugins' key is an arbitrary JSON string from a settings file -- this file's own -Brief
+    # comment already names it as exactly that value class (inbound #309) -- and the $action strings
+    # below embed it raw into a `claude plugin ...` line. Format-SafeProseToken, applied at emission,
+    # deliberately does NOT restrict the charset: its whole reason for existing is that an id charset
+    # "deletes most of a sentence", so it keeps the punctuation a shell reads. A ';' or a backtick in
+    # an id therefore survives into a line shaped for pasting.
+    #
+    # THE DOCTRINE IS Get-PasteableRef's (#1594): where the value fails validation, the command is
+    # WITHHELD and the reason is said, because a guard whose own output is the injection surface is
+    # worse than no guard. Both halves are checked, since both become path segments and both are
+    # interpolated.
+    #
+    # SCOPED TO THE VERDICT THIS BRANCH MADE REACHABLE, deliberately and not for want of noticing the
+    # rest. Until this branch only the 'behind' code emitted an $action in -Brief; every "cannot
+    # determine" row printed its verdict alone, so promoting 'not-installed' to [ERROR] is what first
+    # puts a command built from this value in front of a reader for a state that needs no version
+    # mismatch to reach -- just an enable with no install record. The other eighteen $action sites and
+    # the default view's raw $row.Id carry the same untrusted value and are NOT repaired here: that is
+    # a standing defect wider than this branch, filed as
+    # https://github.com/DKJ-Solutions/claude-code-specialists/issues/1803 rather than folded in. That
+    # issue also carries the two decisions a full repair has to make -- withhold versus sanitize, and
+    # whether the default view is held to the same rule -- neither of which is settled from here.
+    $idIsCommandSafe = (Test-PluginNameSlug -Name $name) -and (Test-PluginMarketplaceSlug -Marketplace $mp)
+
     $recs = @()
     if ($install.RecordsById.ContainsKey($id)) { $recs = @($install.RecordsById[$id]) }
     $pathless = @()
@@ -311,6 +336,29 @@ foreach ($id in $ids) {
     } elseif ($recs.Count -eq 0) {
         if ($pathless.Count -ge 1) {
             $verdict = "cannot determine for this checkout -- only a path-less (machine-wide) record exists"
+            $action = "install here: claude plugin install $id --scope project"
+        } elseif (-not $install.Readable -and $install.Exists) {
+            # AN ADMINISTRATION THAT DOES NOT PARSE YIELDS NO RECORDS, WHICH IS NOT THE SAME FACT AS
+            # HOLDING NONE (Victor, on this branch; the doctrine is inbound #302's). Get-InstallRecord
+            # hands back empty RecordsById either way, so this branch is reachable with the file sitting
+            # right there unreadable -- and the row would then state, confidently, that the plugin is not
+            # installed and that installing it is the remedy. Neither is known. The $instText block above
+            # already draws this distinction correctly, so the two halves of one row contradicted each
+            # other.
+            #
+            # IT STAYS 'indeterminate', AND THAT IS THE POINT OF FIXING IT HERE. The row's code is what
+            # -Brief now reads for its [ERROR]/[INFO] split, so leaving this inside 'not-installed' would
+            # have promoted a wrong diagnosis to the loudest marker the tool has, carrying a command that
+            # does not address the actual fault -- exactly what that split's own rule forbids. An honest
+            # "I cannot tell" is worth more than a confident wrong answer, and unlike the wrong answer it
+            # is actionable.
+            #
+            # NO INSTALL COMMAND IS HANDED OVER, which is why the $action below is set per branch rather
+            # than once for all of them: the fault is the file, not a missing install, and
+            # check-claude-home.ps1 is what owns that file's health (it also keeps the snapshot this is
+            # restorable from, #1609).
+            $verdict = "cannot determine -- the install administration exists but could not be read ($($install.Error)), so no record for this checkout could be looked up either way"
+            $action = "repair the administration first, then re-run: scripts/lint/check-claude-home.ps1 reports on that file and keeps a snapshot beside it"
         } else {
             # ITS OWN CODE, BECAUSE IT IS THE ONE UNDETERMINED VERDICT THAT IS NOT BOOKKEEPING (#1802).
             # Every other 'cannot determine' on this page reports something about a cache or an
@@ -323,8 +371,16 @@ foreach ($id in $ids) {
             # that rule and this row's own contents disagreed.
             $code = 'not-installed'
             $verdict = "cannot determine -- not installed in this checkout (enabled declaratively only)"
+
+            # The install command is withheld for an id that is not a valid slug on both halves -- see
+            # $idIsCommandSafe above. The verdict still stands: whether the plugin is installed here is
+            # a separate question from whether its id can safely be pasted into a shell.
+            $action = if ($idIsCommandSafe) {
+                "install here: claude plugin install $id --scope project"
+            } else {
+                "no command is offered here: this plugin id is not a valid slug on both halves, so it is not pasted into one -- correct the 'enabledPlugins' key first"
+            }
         }
-        $action = "install here: claude plugin install $id --scope project"
     } elseif ($instSha -and $clone.Head) {
         if ($instSha -ieq $clone.Head) {
             $code = 'match'

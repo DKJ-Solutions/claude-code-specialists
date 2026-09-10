@@ -24,14 +24,6 @@
          -> [INFO] (inbound signal: update the register or bring the change back here), plus a
          non-counting [INVENTORY] line the session hook surfaces when that drifted register is
          the one describing the repo the session is in -- the only case a reader here can act on.
-      3b. Per plugin whose name the marketplace has RETIRED: the extension inventory and the version
-         comparison need that plugin's source folder, which a retired name has none of, so both are
-         skipped -- but the install-record question needs no source folder and is asked anyway (#1802).
-         Retired AND enabled there AND no record for that checkout -> [INFO], plus the same
-         [NOT-INSTALLED-HERE] promotion check 4 makes for the session's own repo. It is the one state
-         where 'claude plugin install <id>' is NOT the way out, because the catalogue no longer declares
-         that id, so the finding hands over the migration instead. Until #1802 a retired id skipped the
-         whole block and this fact went unsaid for exactly the consumers worst affected by it.
       4. Per plugin: machine record older than source -> [ERROR]; no record/no administration -> [INFO]
          (machine-specific, not a gate breach). The record comes from Get-InstallRecord
          (check-report-lib.ps1) -- the shared reader of ~/.claude/plugins/installed_plugins.json this
@@ -39,6 +31,16 @@
          while being ENABLED there, that [INFO] additionally states the consequence: a session in that
          checkout loads none of it, and that repo's own hooks cannot say so, because they are in the
          plugin that is not loading.
+      4b. THE SAME QUESTION AS 4, asked in a different place: on a plugin whose name the marketplace has
+         RETIRED (#1802). That id never reaches check 4 -- it is resolved before check 2 and its whole
+         block is skipped, correctly for the extension inventory and the version comparison, which read
+         a source folder a retired name has none of. The install-record question needs no source folder,
+         so it is asked inside that arm instead: retired AND enabled there AND no record for that
+         checkout -> [INFO], plus the same [NOT-INSTALLED-HERE] promotion check 4 makes for the
+         session's own repo. It is the one state where 'claude plugin install <id>' is NOT the way out,
+         because the catalogue no longer declares that id, so the finding hands over the migration.
+         It is numbered beside 4 rather than beside 3 because its SUBJECT is 4's, not because it runs
+         there -- it runs earliest of all of them.
       5. Per connector, once the plugin loop above has finished: is every plugin id enabled in the
          consumer's settings chain, for a marketplace THIS register describes, also named in this
          manifest's own 'plugins' list? One missing -> [INFO] naming the id (the loop above never even

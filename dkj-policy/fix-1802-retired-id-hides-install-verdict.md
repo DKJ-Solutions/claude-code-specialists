@@ -89,8 +89,13 @@ never ran, and the register reported them as *"correct as it stands"*.
       embedded an unvalidated `enabledPlugins` id in a line shaped for pasting (Sebastian). The second
       is fixed only for the row this branch made reachable; the other eighteen `$action` sites are
       #1803.
-- [ ] Coverage for those two fixes -- all 146 assertions passed without them, which is the point.
-- [ ] The full gate: `check-plugin-integrity.ps1` plus every suite.
+- [x] Coverage for those two fixes -- all 146 assertions passed without them, which is the point.
+      Scenarios 26-29: an unparseable administration stays `[INFO]`; a *missing* one still reads
+      `not-installed`, which is the accurate diagnosis and must not be swept up by the fix; and the
+      command is withheld for a bad name half and a bad marketplace half independently, while a
+      well-formed id in the same run still gets its own. 171 pass, 0 fail.
+- [x] `check-plugin-integrity.ps1` run by hand ahead of the push: 0 errors. `open-pr` runs it and
+      every suite again as the push gate, which is its work rather than a step here.
 
 ### DEPLOY: fix/1802-retired-id-hides-install-verdict
 
