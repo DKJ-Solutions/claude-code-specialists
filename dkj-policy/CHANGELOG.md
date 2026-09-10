@@ -43,7 +43,34 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**8 / 25 minor entries** <!-- pending-tally -->
+**8 / 26 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1807-bwj-connectors-davekokbwj-checkout · 20260910-174934
+
+`connectors/`: both BWJ manifests (`smartwatchbanden`, `xoxowildhearts`) now list
+`../../davekokbwj/<repo>` as a third `localCheckout` candidate, appended rather than replacing
+the `bwjecommerce/` ones. On the maintenance machine the checkouts live under `davekokbwj/`, so
+`check-connectors.ps1` was emitting a false `[SKIP] checkout ... not present` that exits 0 and
+suppresses the whole connector block for both consumers. #1524 made this field a candidate list
+so no machine's layout would be evicted; its fix then evicted `davekokbwj/`. The list is
+first-match and additive, so this restores the evicted layout without losing the ones that are
+true on other machines.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A -- register data internal to this repo; no subscriber of any service reaches it.
+
+**Score:** N/A
+
+#### Pull Request
+
+Append the davekokbwj/ layout to both BWJ connectors' localCheckout candidates
+
+[PR #1811](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1811)
+
+---
 
 ### DEPLOY: fix/1805-consumer-gate-path-drift · 20260910-174142
 
