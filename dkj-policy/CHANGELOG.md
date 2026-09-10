@@ -43,7 +43,42 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**1 / 2 minor entries** <!-- pending-tally -->
+**1 / 3 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1760-prune-merged-worktree-held-branch · 20260910-081941
+
+`prune-merged.ps1` no longer attempts a delete git is certain to refuse. A branch that is provably
+merged but checked out in another worktree is reported kept in the script's own vocabulary, naming
+the directory holding it and the `worktree-lane.ps1 -HandBack` command that frees it -- the sentence
+#1069 already gives for a lane holding the trunk. `-DryRun` answers the same question, so the
+look-first run no longer promises a delete the real run cannot perform.
+
+The seam this closes: `worktree-lane.ps1` states that branch cleanup is `prune-merged.ps1`'s, and
+`prune-merged.ps1` removes no worktree -- so a lane whose work had landed was owned by neither, and
+the hand-back was a manual act nothing prompted for.
+
+Small, and only visible to somebody running lanes: it prevents a confusing report rather than a loss.
+The failure it prevents, named because the tier asks for it -- a session reads `git branch -D
+refused: error: cannot delete branch 'x' used by worktree at '...'`, which is git's vocabulary rather
+than this script's proofs, and has to work out for itself that the way out is a hand-back.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+Nothing reaches a subscriber: this is a maintainer's tidy-up command in the workflow plugin.
+
+**Score:** N/A
+
+#### Pull Request
+
+prune-merged: a merged branch held by another worktree is kept with the hand-back, not handed git's refusal
+
+Plugins: dkj-policy
+
+[PR #1763](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1763)
+
+---
 
 ### DEPLOY: docs/release-title-convention · 20260910-080700
 
