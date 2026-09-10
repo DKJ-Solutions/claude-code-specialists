@@ -426,6 +426,33 @@ the trap is the shell's, not this repo's. What stays here is the local evidence:
   nothing about. Taking either side whole would have re-opened the other's gap silently, with a clean
   merge and a green gate to say so. **Two sides editing the same list usually both belong** — read what
   each was for before choosing, and keep both unless they actually contradict.
+  **And a rename-detected merge is silent about the retired names *inside* the lines the branch
+  adds.** A branch cut before a repo-wide rename and merged after it gets half the rename for free:
+  git's rename detection moves and merges the *files* cleanly — `git merge-tree` reports a clean merge
+  and the merged tree holds only new paths — while saying nothing about a plugin, path or `agent_type`
+  name that the branch's own **added** lines still spell the old way. **Measured landing PR #1733**
+  ([#1757](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1757)), whose merge base
+  predated the [#1698](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1698)
+  `dkj-team-*` → `dkj-subagents-*` rename by about four hours: six brand-new files it added still
+  named the retired plugins, in comments, docstrings and an `agent_type` test fixture. **No gate
+  catches it** — `check-plugin-integrity.ps1` reads links, manifests and frontmatter, not prose; the
+  suites only echo the fixture back into a refusal message; and a parked branch has no PR, so not even
+  the advisory CI runs against it. This is not the dead-name sweep two sections up in
+  [Tessa #16](06-16-extension.md#a-dated-measurement-keeps-the-name-it-was-written-with-and-a-rename-sweep-is-where-that-is-lost):
+  that one over-corrects an existing dated citation; this one under-corrects, carrying a
+  correct-on-the-day name onto a trunk that no longer has it. So when you take `main` into a branch
+  whose base predates a rename, read the lines the branch **adds**, not the whole file:
+  ```sh
+  git diff origin/main...origin/<branch> | grep '^+' | grep -v '^+++' | grep '<retired-name>'
+  ```
+  **The narrow reading is the whole point, and there is deliberately no gate.** Grepping every file a
+  branch touches over-counted pre-existing text more than fiftyfold on the two branches measured (47
+  and 6 hits against an honest signal of **1 line across 1053 commits of drift**) — a check built on
+  that reading is the stale-path check declined at 124 false findings, rebuilt. It stays a by-hand
+  one-liner at the one moment it matters. The one live instance at filing:
+  `feat/plugin-version-overview-review-b` carries `@('dkj-team-alpha')` as a parameter default —
+  whether that fails loudly or silently on resume was not verified, so verify it before repairing it
+  when that branch finally takes `main` in.
 
 ### Issue labels — every issue carries a priority
 
