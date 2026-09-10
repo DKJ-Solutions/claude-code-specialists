@@ -43,7 +43,35 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**7 / 23 minor entries** <!-- pending-tally -->
+**7 / 24 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1803-plugin-versions-paste-safe-id · 20260910-155349
+
+`plugin-versions.ps1` no longer builds a paste-ready `claude plugin ...` command out of an
+`enabledPlugins` id -- an arbitrary string from a settings file -- unless both halves of the id pass
+their slug check. Where they do not, the command is withheld and a one-line reason takes its place,
+following the `Get-PasteableRef` doctrine (#1594). The guard, which #1591 had scoped to a single
+install command, now covers all 19 command sites and both output modes; the default view additionally
+sanitizes every field it prints, the way `-Brief` already did.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+N/A -- an internal hardening of a diagnostic script's output. No subscriber of a service reaches this
+code path or its output.
+
+**Score:** N/A
+
+#### Pull Request
+
+Withhold the enabledPlugins id from every command plugin-versions.ps1 prints when it is not a valid slug
+
+Plugins: dkj-policy
+
+[PR #1806](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1806)
+
+---
 
 ### DEPLOY: fix/1802-retired-id-hides-install-verdict · 20260910-145059
 
