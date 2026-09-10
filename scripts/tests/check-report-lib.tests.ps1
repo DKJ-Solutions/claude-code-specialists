@@ -210,6 +210,18 @@ try {
         Assert-Equal 'before after' (Format-SafePathToken -Value "before$([char]$sep)after") "U+$('{0:X4}' -f $sep) is folded by the path form too"
     }
 
+    # AND A PLAIN NEWLINE, which is what the docstring used to claim could not reach this function at all
+    # -- "the caller has already split the document into lines" (#1813). Two callers never split: the
+    # measured one is check-claude-home.ps1, where ConvertFrom-Json's parse error embeds the offending
+    # document whole. So the guarantee is the code's and not the caller's, and it is pinned here rather
+    # than asserted in prose: multi-line in, one line out, for any caller.
+    foreach ($nl in @("`n", "`r`n", "`r")) {
+        Assert-Equal 'before after' (Format-SafeProseToken -Value "before${nl}after") 'a newline is folded to a space, so no caller can forge a line of ours'
+    }
+    $doc = Format-SafeProseToken -Value "Unexpected character`n  at line 3`n  in {`"plugins`": [ERROR]}"
+    Assert-True (-not ($doc -match "[`r`n]")) 'a whole embedded document leaves as a single line'
+    Assert-True (-not ($doc -match '\[')) 'and no marker can form out of it either'
+
     Assert-Equal 200 (Format-SafeProseToken -Value ('z' * 500)).Length 'an over-long line is capped at 200 -- the locator is the file:line above it, not this preview'
     Assert-True ((Format-SafeProseToken -Value ('z' * 500)) -match '\.\.\.$') 'and a capped line ends in an ellipsis rather than looking complete'
     Assert-Equal '' (Format-SafeProseToken -Value '') 'empty in, empty out -- no throw'
