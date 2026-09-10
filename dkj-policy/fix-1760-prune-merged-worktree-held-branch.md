@@ -89,18 +89,18 @@ The seam this closes: `worktree-lane.ps1` states that branch cleanup is `prune-m
 `prune-merged.ps1` removes no worktree -- so a lane whose work had landed was owned by neither, and
 the hand-back was a manual act nothing prompted for.
 
-**Score:** 2
-
-Small and only visible to somebody running lanes: it prevents a confusing report rather than a loss.
+Small, and only visible to somebody running lanes: it prevents a confusing report rather than a loss.
 The failure it prevents, named because the tier asks for it -- a session reads `git branch -D
 refused: error: cannot delete branch 'x' used by worktree at '...'`, which is git's vocabulary rather
 than this script's proofs, and has to work out for itself that the way out is a hand-back.
 
+**Score:** 2
+
 #### What makes this deploy extra special
 
-**Score:** N/A
-
 Nothing reaches a subscriber: this is a maintainer's tidy-up command in the workflow plugin.
+
+**Score:** N/A
 
 #### Pull Request
 
