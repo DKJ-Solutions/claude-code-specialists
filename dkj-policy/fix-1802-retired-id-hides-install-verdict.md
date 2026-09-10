@@ -83,7 +83,14 @@ never ran, and the register reported them as *"correct as it stands"*.
 - [x] `plugin-versions.tests.ps1`: `-Brief` reports the new code as `[ERROR]` with its own summary
       part; the path-less branch stays `[INFO]`; the default view and cases 5 and 19 are unchanged;
       case 22's "a mix of every code" covers the new code too.
-- [x] The full gate: `check-plugin-integrity.ps1` plus every suite.
+- [x] The review chain found two real defects in `plugin-versions.ps1`, both fixed on this branch:
+      an unreadable install administration was diagnosed as "not installed" and would have been
+      promoted to `[ERROR]` by this very change (Victor), and the `not-installed` row's install command
+      embedded an unvalidated `enabledPlugins` id in a line shaped for pasting (Sebastian). The second
+      is fixed only for the row this branch made reachable; the other eighteen `$action` sites are
+      #1803.
+- [ ] Coverage for those two fixes -- all 146 assertions passed without them, which is the point.
+- [ ] The full gate: `check-plugin-integrity.ps1` plus every suite.
 
 ### DEPLOY: fix/1802-retired-id-hides-install-verdict
 
@@ -96,6 +103,16 @@ migration rather than `claude plugin install`, which cannot repair an id the cat
 declares. Alongside it, `plugin-versions.ps1` stops filing "enabled here, installed nowhere" under the
 same quiet marker as a stale cache: it is the only undetermined verdict that closes with a command, so
 in `-Brief` it is now an `[ERROR]`.
+
+Promoting that verdict exposed two things the review chain caught and this branch also repairs. An
+install administration that exists but does not parse yields no records, which is not the same fact as
+holding none -- so a corrupt file was being diagnosed as "not installed" and offered an install as the
+remedy, and this change would have made that wrong answer the loudest marker the tool has. It now stays
+undetermined, names the unreadable file, and points at the check that owns it. And the install command
+that verdict hands over is withheld for an id that is not a valid slug on both halves: an
+`enabledPlugins` key is arbitrary text from a settings file, `Format-SafeProseToken` deliberately keeps
+the punctuation a shell reads, and until now only the far rarer `behind` verdict put such a line in
+front of a reader. The remaining eighteen sites that interpolate that same value are #1803.
 
 **Score:** 3
 
