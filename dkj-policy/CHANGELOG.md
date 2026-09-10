@@ -43,7 +43,43 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**5 / 17 minor entries** <!-- pending-tally -->
+**5 / 18 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1771-plugin-details-agent-count · 20260910-113257
+
+`measure-skill` no longer refuses a plugin that ships only subagents. `claude plugin details` prints no
+per-component table for a plugin whose inventory is all zeroes, and reading that as a CLI format change
+put an `[ERROR]` on two of this repo's six enabled plugins — `dkj-subagents-ecomm` and
+`dkj-subagents-lifehub` — over output that was entirely intact. The emptiness is now judged against the
+inventory's own counts, so nothing owed is an `[INFO]` naming why, something owed is still an `[ERROR]`,
+and an unreadable inventory stays the `[ERROR]` the check exists for.
+
+It also says what its figures do not cover. The inventory's `Agents (N)` counts only defs discovered by
+convention in a plugin's default `agents/` directory; a def named by the manifest's `agents` key loads in
+a session and is counted as 0. Every always-on figure for such a plugin is therefore skills only, which
+made the report read as *"the skill descriptions account for effectively ALL of this plugin's always-on
+cost"* over `dkj-subagents-alpha`, whose 15 uncounted agent descriptions are roughly three times the
+figure printed. Both readings are now stated in the output — including that `Agents (0)` means *not
+counted here*, never *ships none*, which is the misreading #1771 was filed on.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A — the tool measures what a plugin costs a session; it ships to no subscriber and changes nothing a
+consumer's own repo does.
+
+**Score:** N/A
+
+#### Pull Request
+
+measure-skill stops misreading an agents-only plugin as a CLI format change
+
+Plugins: dkj-policy
+
+[PR #1788](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1788)
+
+---
 
 ### DEPLOY: feat/1766-plugin-owned-region · 20260910-111206
 
