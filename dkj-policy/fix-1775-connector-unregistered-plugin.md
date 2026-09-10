@@ -76,12 +76,12 @@ is edited here.
 
 ### TEST
 
-- [x] `scripts/tests/connectors.tests.ps1`: eight script-level cases (unlisted id reported; the
-      `[UNLISTED]` line present only in the session repo and the run still exit 0; a different marketplace
-      and an id with no `@` silently excluded; a fully-listed manifest silent; a retired id still
-      reported; no settings file at all stays silent) plus three hook-level cases via the existing
-      `New-StubWorkshop` machinery.
-- [x] Suites green: `connectors.tests.ps1` 179 -> 215 assertions, `connector-sessioncheck.tests.ps1`
+- [x] `scripts/tests/connectors.tests.ps1`: nine script-level cases (unlisted id reported; the
+      `[UNLISTED]` line present only in the session repo and the run still exit 0; a different marketplace,
+      an id with no `@`, and an id whose `@` is its first character all silently excluded; a fully-listed
+      manifest silent; a retired id still reported; no settings file at all stays silent) plus three
+      hook-level cases via the existing `New-StubWorkshop` machinery.
+- [x] Suites green: `connectors.tests.ps1` 179 -> 218 assertions, `connector-sessioncheck.tests.ps1`
       47 unchanged.
 - [~] No cases added to `connector-sessioncheck.tests.ps1` -- dropped deliberately, not skipped. Every
       fixture in that file points `-WorkshopPathOverride` at a path that does not exist, forcing the
@@ -91,6 +91,14 @@ is edited here.
 - [x] `check-plugin-integrity.ps1`: 0 errors.
 - [x] Ran the check against this repo's real register and confirmed the finding by measurement rather
       than from the report: before the change exactly one of six enabled ids produced any line at all.
+- [x] Review chain on the diff -- Victor, Edith and Sebastian in parallel. Sebastian found nothing;
+      the eight findings from the other two are repaired, and the run against the real register is
+      byte-for-byte what it was before the repairs, as a comment-and-coupling pass should be.
+- [~] One review finding was NOT repaired here: `release-lib.ps1`'s own docstring sizes
+      `entry-scaffold-lib.ps1` at three thousand lines where it measures 8,289. It pre-dates this
+      branch and is the source the corrected citation was copied from, so it is filed as
+      [#1779](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1779) rather than swept
+      in here.
 
 ### DEPLOY: fix/1775-connector-unregistered-plugin
 

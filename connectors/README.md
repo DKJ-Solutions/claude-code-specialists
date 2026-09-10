@@ -301,6 +301,37 @@ the headline when it fires — a session running without the surface it thinks i
 finding about a repo that otherwise works — and the register notices are printed next to it rather than
 under it.
 
+**Fourth named exception, one level further OUT than `[INVENTORY]`: `[UNLISTED]`** (September 10, 2026,
+[#1775](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1775)). `[INVENTORY]` is about a
+lens the register's own plugin block forgot to list; this one is about a **whole plugin block** the
+register forgot — an id enabled in the consumer's settings chain that this manifest's `plugins` array
+does not name at all, so the per-plugin loop that checks 2-4 run under never even reaches it. Nothing
+about that plugin is checked: not the extension list, not the machine version, nothing — and the loop,
+by construction, cannot report an absence it was never handed.
+
+Measured against this repo's own register at the time: five of the six plugins `.claude/settings.json`
+enables sat outside that loop. One of the five happened to coincide with a manifest entry naming that
+plugin's *old*, retired id — which is reported as an `[INFO]` by the loop's own guard clause (the
+`if ($null -eq $pluginDir)` branch that runs BEFORE checks 2-4 and skips a plugin block entirely on a
+miss, `retired` being one of its three ways to miss) — so it read as covered while the *current*,
+enabled id itself was still never examined; the other four produced no line anywhere in the run. Filed
+as `[INFO]` at check 5 for the same reason `[INVENTORY]` is:
+a register that is merely behind is not a fault to interrupt a session over, and a deliberate run should
+still list every one. Same `Test-IsSessionRepo` scoping as `[INVENTORY]`/`[NOT-INSTALLED-HERE]`, for the
+same reason — every *other* connector's under-registration stays an `[INFO]` and stays silent, because
+that is genuinely the maintainer's business rather than this session's.
+
+**Scoped to this register's own marketplace, not to every id a consumer might enable.** An id naming a
+different, unrelated marketplace is not this register's business at all and is silently left out of the
+comparison — this register only ever describes what a consumer has of the plugins *this* repo publishes,
+and a third-party id is outside that scope by construction, not merely uninteresting.
+
+**A NEW TOKEN, DELIBERATELY, RATHER THAN A FOURTH MEANING FOR `[INVENTORY]`.** The two subjects are one
+level apart — an extension missing from a plugin block the register already lists, versus a plugin block
+missing outright — and folding them under one marker would make the hook's summary unable to say which
+of the two is true. `[UNLISTED]` says exactly what happened: present in the consumer, absent from the
+list.
+
 **A version verdict says which commit it was read at** (August 9, 2026,
 [#533](https://github.com/DaveKJohn/claude-code-specialists/issues/533)). Every `source on vX` in a run
 comes from a `plugin.json` in the workshop checkout, read at that moment — and the session hook forwards

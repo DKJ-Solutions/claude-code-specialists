@@ -31,6 +31,14 @@
          while being ENABLED there, that [INFO] additionally states the consequence: a session in that
          checkout loads none of it, and that repo's own hooks cannot say so, because they are in the
          plugin that is not loading.
+      5. Per connector, once the plugin loop above has finished: is every plugin id enabled in the
+         consumer's settings chain, for a marketplace THIS register describes, also named in this
+         manifest's own 'plugins' list? One missing -> [INFO] naming the id (the loop above never even
+         saw it, so nothing about it was checked at all: not an extension check, not a version check),
+         plus a non-counting [UNLISTED] line the session hook surfaces on the same terms as
+         [INVENTORY] -- only when the under-registered manifest is the one describing the repo the
+         session is in (#1775). An id naming a marketplace other than this one is silently out of scope:
+         this register has no way to judge a catalogue it does not own.
     The register no longer keeps a syncedVersion bookkeeping: the check reads the actual installed
     version from the machine record, and register administration that only duplicates numbers
     produced nothing but maintenance PRs (Dave's decision, July 20, 2026).
@@ -40,8 +48,8 @@
     Guardrail (Sean's advice): manifest fields are data from a public repo and are never blindly
     trusted -- absolute or out-of-scope localCheckout paths and invalid plugin ids are rejected.
 
-    Exit code: 0 = no errors (SKIP/INFO and the non-counting [UNREGISTERED]/[INVENTORY] markers do
-    not count), 1 = at least one error.
+    Exit code: 0 = no errors (SKIP/INFO and the non-counting [UNREGISTERED]/[INVENTORY]/
+    [NOT-INSTALLED-HERE]/[UNLISTED] markers do not count), 1 = at least one error.
 
 .PARAMETER Manifest
     (Optional) Path to a single manifest instead of all connectors manifests.
@@ -98,6 +106,37 @@ $script:infos  = 0
 # question start appearing in one run.
 . (Join-Path $PSScriptRoot '..\lib\plugin-tree-lib.ps1')
 $PluginRoots = @(Get-RepoPluginRoots -RepoRoot $RepoRoot)
+
+# THIS REPO'S OWN MARKETPLACE NAME, i.e. the segment after the '@' in an id like
+# 'dkj-policy@claude-code-specialists' (#1775). Needed by the per-connector [UNLISTED] check further
+# down, which has to tell "an id this register is responsible for" from "an id naming a marketplace
+# this register has never heard of and has no business reporting on".
+#
+# READ VIA Get-MarketplacePath (plugin-tree-lib.ps1, just dot-sourced above) RATHER THAN A NEW READER --
+# it is the same path $PluginRoots was built from a line above, so this does not add a second way to
+# find marketplace.json, only a second field read out of it. Get-MarketplaceName (release-lib.ps1)
+# already does this exact parse, but is not the source here: release-lib dot-sources entry-scaffold-lib
+# behind it (release-lib.ps1:113), and that file is 8,289 lines (measured: `wc -l
+# scripts/lib/entry-scaffold-lib.ps1`) -- and this script is the one SessionStart itself runs on every
+# session via connector-sessioncheck.ps1, a cost every session would pay for a field only the (rare)
+# [UNLISTED] finding ever uses.
+#
+# Degrades to '' on anything short of success (no marketplace.json, unparseable JSON, no/empty 'name'),
+# and the [UNLISTED] check below is switched off entirely rather than guessing when this is empty --
+# same doctrine as the source-stamp fallback just below: an omitted answer is honest, a fabricated one
+# would be exactly the defect this repo has scar tissue from.
+$ThisMarketplaceName = ''
+try {
+    $marketplacePath = Get-MarketplacePath -RepoRoot $RepoRoot
+    if (Test-Path -LiteralPath $marketplacePath -PathType Leaf) {
+        $marketplaceObj = Get-Content -LiteralPath $marketplacePath -Raw -Encoding UTF8 | ConvertFrom-Json
+        if (($marketplaceObj.PSObject.Properties.Name -contains 'name') -and $marketplaceObj.name) {
+            $ThisMarketplaceName = [string]$marketplaceObj.name
+        }
+    }
+} catch {
+    $ThisMarketplaceName = ''
+}
 
 # Plugin id (before the '@') -> that plugin's folder, or $null when this repo does not publish a plugin
 # by that name.
@@ -341,6 +380,14 @@ foreach ($mf in $manifestFiles) {
         Write-Failure "$badLayer does not parse as JSON in '$checkout' -- its enabledPlugins entries were not read."
     }
 
+    # Every id THIS manifest already lists, collected as the loop below visits each one anyway (#1775 /
+    # Victor's finding 3) -- check 5, after the loop, needs exactly this set to tell an unlisted id from a
+    # listed one, and the loop already touches every $p.id once, so a second walk over $m.plugins purely
+    # to rebuild it would re-read data already in hand for no reason beyond the check living further down
+    # the file. Ordinal, for the same reason every id comparison in this file is: an id is a comparison
+    # key, not prose (Get-PluginRootByName's own reasoning).
+    $listedPluginIds = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
+
     foreach ($p in @($m.plugins)) {
         # The DISPLAY form of this manifest's plugin id (inbound #309), bound once per block for the same
         # reason check-roster-sync binds $plugIdShown: $p.id stays raw because Get-PluginDir derives a path
@@ -350,6 +397,7 @@ foreach ($mf in $manifestFiles) {
         # and 'never blindly trusted' had a hole in it for display.
         $pluginIdShown = Format-SafeToken -Value ([string]$p.id)
         Write-Host "  -- plugin: $pluginIdShown" -ForegroundColor Cyan
+        if ($p.PSObject.Properties.Name -contains 'id' -and $p.id) { [void]$listedPluginIds.Add([string]$p.id) }
 
         # Narrow the label to this plugin block. A consumer can register SEVERAL plugins, and a shared
         # cause (one outdated install) then produces one finding per plugin -- word-for-word identical
@@ -545,6 +593,104 @@ foreach ($mf in $manifestFiles) {
     # Back to connector level: anything reported from here on belongs to the connector as a whole, not
     # to whichever plugin block the loop above happened to end on.
     Set-CheckScope $connectorLabel
+
+    # 5. Per plugin: enabled in the consumer's settings chain, but never named in THIS manifest's
+    # 'plugins' list at all -- so the foreach above never looped over it, and NOTHING was printed about
+    # it: not [ERROR], not [INFO], not [SKIP] (#1775). This sits deliberately outside and after that
+    # loop, because its subject is exactly what the loop cannot see: an id it was never handed.
+    #
+    # MEASURED (this branch, before this change): this repo's own connectors/claude-code-specialists.json
+    # lists two plugin blocks ('dkj-team-alpha@...', a name the marketplace no longer declares, and
+    # 'dkj-policy@...'), while .claude/settings.json enables six ids. Running the unmodified script
+    # against that manifest prints exactly one line about the whole six: '[OK] plugin is enabled' for
+    # dkj-policy@, the one id that happens to appear, verbatim, in the manifest's own list. The other
+    # five -- dkj-subagents-alpha@, dkj-subagents-ecomm@, dkj-subagents-lifehub@, dkj-subagents-shopify@
+    # and dkj-policy-bwj@ -- produce no line whatsoever from the loop above; #1775 describes four of
+    # those five as 'completely silent' and folds the fifth (dkj-subagents-alpha@) into 'one printed an
+    # [INFO] because it carries a retired id', on the reading that the manifest's 'dkj-team-alpha@' entry
+    # is that plugin's old name. That reading is about the underlying PLUGIN; this check compares ID
+    # STRINGS, and 'dkj-team-alpha@claude-code-specialists' is not
+    # 'dkj-subagents-alpha@claude-code-specialists' -- so, run today, this check reports dkj-subagents-alpha@
+    # as unlisted too, a fifth finding rather than folding into the retired-name one. That is not a
+    # contradiction of #1775's count, only a sharper reading of the same five ids: every one of them was
+    # unchecked, and this block is what makes each of the five say so on its own.
+    #
+    # SCOPE: only an id whose MARKETPLACE segment (the text after the last '@') names THIS repo's OWN
+    # marketplace ($ThisMarketplaceName, read once near the top of this file) is this register's
+    # business. This register exists to record what a consumer HAS of the plugins THIS repo publishes;
+    # an id enabling a plugin from an unrelated third-party marketplace is not something this repo's
+    # register was ever meant to track, and reporting on it here would be commenting on somebody else's
+    # catalogue from a register that has no way to judge it. An id with no '@' at all is left alone for
+    # the same reason -- it cannot even be attributed to a marketplace, so there is nothing to compare.
+    #
+    # A RETIRED id -- a name THIS marketplace no longer declares, but still carrying THIS marketplace's
+    # own segment -- still counts here, deliberately. The per-plugin loop above already treats that state
+    # as something the register should record (an [INFO] under the 'retired' branch, not silence), and
+    # this predicate has to agree with that rather than quietly re-excluding by segment what the loop
+    # above already includes by name.
+    #
+    # Matching is ORDINAL throughout (Get-PluginRootByName's own reasoning, restated for an id rather than
+    # a plugin name): an id is a comparison key, not prose, and PowerShell's default '-eq'/'-contains'
+    # collate culture-sensitively -- exactly the trap Test-TokenChanged in check-report-lib.ps1 was
+    # written to avoid for the sibling case.
+    if ($consumerEnabled.AnyFileExists -and $ThisMarketplaceName) {
+        # $consumerEnabled.Ids is already ordinally sorted and de-duplicated (Get-EnabledPlugins builds it
+        # from hashtable keys), so filtering it in place needs no re-sort -- the result stays in that
+        # order, exactly as the [INVENTORY] block above relies on for $unregistered. $listedPluginIds was
+        # built above, inside the per-plugin loop, rather than by re-walking $m.plugins here a second time.
+        $unlistedPlugins = @(
+            foreach ($id in @($consumerEnabled.Ids)) {
+                $at = $id.LastIndexOf('@')
+                # $at -eq -1: no '@' at all -- cannot be attributed to any marketplace, nothing to compare.
+                # $at -eq  0: '@' is the FIRST character, so the id carries an attributable marketplace
+                #             segment (everything after it) but an EMPTY plugin-name segment before it --
+                #             not a real plugin id at all (Test-PluginNameSlug rejects exactly this shape
+                #             elsewhere in this file as malformed). Both are excluded here, and for the
+                #             SAME underlying reason, not by coincidence of one comparison: what this
+                #             check tells a reader to do is 'add a plugins[] block for THIS id', and there
+                #             is no id to add a block for when nothing before the '@' names a plugin.
+                #             Reporting it as 'unlisted' would be actionable advice about a plugin that
+                #             does not exist. Covered by connectors.tests.ps1 scenario 11h.
+                if ($at -le 0) { continue }
+                if (-not [string]::Equals($id.Substring($at + 1), $ThisMarketplaceName, [System.StringComparison]::Ordinal)) { continue }
+                if ($listedPluginIds.Contains($id)) { continue }
+                $id
+            }
+        )
+        foreach ($id in $unlistedPlugins) {
+            # Counting [INFO], on the same terms as the neighbouring [INVENTORY] finding one level down
+            # (an extension present but not registered): a deliberate run always lists it, and the
+            # [INFO]-silence rule (Dave, July 20, 2026) keeps it out of an ordinary session start.
+            # $id is an 'enabledPlugins' KEY NAME out of a consumer's settings file, i.e. untrusted JSON
+            # content (inbound #309/#302's own reasoning) -- Format-SafeToken, not Format-SuspectToken:
+            # the id itself is not the complaint (it may well be a perfectly valid, correctly spelled
+            # id), only its absence from this manifest is.
+            Write-Info "plugin '$(Format-SafeToken -Value $id)' is enabled in $($consumerEnabled.LayerById[$id]) but this manifest's 'plugins' list does not name it -- it was never looped over above, so nothing about it was checked here (no extension check, no version check). Add a plugins[] block for it to $($mf.Name), in the same change that enabled it, or remove the enable if that was not intended."
+        }
+
+        # Non-counting marker the session hook surfaces -- but only when the drifted register is the one
+        # describing the repo this session is actually in, same carve-out and same reason as
+        # [INVENTORY]/[NOT-INSTALLED-HERE]/[UNREGISTERED] above: promoting it for every connector would
+        # reintroduce exactly the other-machine noise the [INFO]-silence rule removed (Dave, July 20,
+        # 2026), for a register that in every OTHER case is legitimately somebody else's business to fix.
+        #
+        # A NEW TOKEN, DELIBERATELY NOT A REUSE OF [INVENTORY]. That marker already has a subject: an
+        # EXTENSION present in the consumer that a plugin block IN the register does not list -- one
+        # level further IN, inside a block the loop above did reach. This finding is one level further
+        # OUT: a whole PLUGIN block the loop never reached at all, because no id in the manifest named
+        # it. Reusing one token for both would make two different subjects indistinguishable in the
+        # hook's summary, which is precisely what a dedicated token exists to prevent (the same
+        # discipline [NOT-INSTALLED-HERE] and [ORPHANS] already follow beside [INVENTORY]).
+        # [UNLISTED] was chosen over [UNREGISTERED] (already this register's word for "the whole
+        # CONNECTOR has no manifest at all") and over inventing a compound like [PLUGIN-INVENTORY] (which
+        # would visually read as a variant of [INVENTORY] while meaning something else): it says exactly
+        # what happened -- present in the consumer, absent from the list -- and collides with nothing
+        # else this file or connector-sessioncheck.ps1 already prints.
+        if ($unlistedPlugins.Count -gt 0 -and (Test-IsSessionRepo $checkout)) {
+            $shownIds = @($unlistedPlugins | ForEach-Object { Format-SafeToken -Value $_ })
+            Write-Host "  [UNLISTED] this repo has $($unlistedPlugins.Count) plugin(s) enabled that its own entry in the connector register does not list ($($shownIds -join ', ')) -- add a plugins[] block for each to $($mf.Name), in the same change that enabled it. Nothing is broken: the register's view of this repo is simply behind reality." -ForegroundColor Yellow
+        }
+    }
 
     if (-not $checkedConsumers.ContainsKey($checkout)) { $checkedConsumers[$checkout] = $m.repo }
 }
