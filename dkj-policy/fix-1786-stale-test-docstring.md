@@ -91,13 +91,19 @@ the mirror, and state the consequence the wrong name hid: after editing the sour
 the mirror before running this suite standalone, or it reports on the previous version and says
 nothing about having done so.
 
-**Score:** 2 -- a test suite's own account of what it measures was wrong, which cost one session a
-false all-clear (47/0 against an unrebuilt mirror, 41/6 after). Small because the gate was never
-exposed to it: the drift check errors on a stale mirror before the suites run.
+A test suite's own account of what it measures was wrong, and it cost one session a false all-clear
+(47/0 against an unrebuilt mirror, then 41/6 from the same suite once it was rebuilt). Small because
+the gate was never exposed to it -- the drift check errors on a stale mirror before the suites run,
+so only a standalone run could be fooled. Noticed the moment somebody edits `plugin-versions.ps1`
+and reaches for this suite.
+
+**Score:** 2
 
 #### What makes this deploy extra special
 
-**Score:** N/A -- a docstring inside this repo's own test suite. Nothing reaches a consumer.
+A docstring inside this repo's own test suite. Nothing here ships, and no consumer reads it.
+
+**Score:** N/A
 
 #### Pull Request
 
