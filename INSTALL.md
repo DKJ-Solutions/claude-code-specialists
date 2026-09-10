@@ -224,6 +224,59 @@ your own lenses, which do not travel with the plugin.
 
 ---
 
+## If this machine has more than one checkout
+
+> **Read this before step 3 of any of the three migration sequences below.** It changes nothing about
+> the commands. It changes how many times you run them, and where the second and third checkout start.
+
+An install record is keyed on the folder it was written for, so each of the migrations below is per
+machine **and** per checkout: three checkouts on this family means running the sequence three times.
+**`claude plugin marketplace remove` is the one command in it that is not per checkout.** It drops the
+marketplace registration machine-wide, and it takes every install record keyed on that marketplace with
+it — including the records of checkouts that have not migrated yet, and that no command in your run has
+named.
+
+Measured on the flag day, September 11, 2026, on one machine with three checkouts, read before and after
+from `~/.claude/plugins/installed_plugins.json`:
+
+| records on the machine | count |
+|---|---|
+| before starting | **16**, over three checkouts |
+| after step 2 in the first checkout only (six uninstalled) | 10 |
+| after that checkout's step 3 and step 4 | **6** — its own six under the new name, and nothing else |
+
+The ten records belonging to the other two checkouts were gone, silently, without either checkout being
+named by any command in the run and without either having been touched.
+
+**So the first checkout you migrate is the only one that runs the whole sequence. Every checkout after it
+starts at step 4.** Steps 2 and 3 have nothing left to act on there — the uninstalls have no record to
+find and the marketplace is already re-registered — so what remains for those checkouts is a plain
+install of the new ids, which reaches the same end state.
+
+**Run step 2 there anyway and it fails in two different ways, neither of which names the real cause.**
+Measured verbatim on the second checkout, September 11, 2026, on the single CLI version that run was
+made with — so expect the wording to move and the shape not to:
+
+```text
+Failed to uninstall plugin "dkj-team-alpha@claude-code-specialists": Plugin "dkj-team-alpha@claude-code-specialists" not found in installed plugins
+Failed to uninstall plugin "dkj-policy@claude-code-specialists": Plugin "dkj-policy@claude-code-specialists" is not installed in project scope. Use --scope to specify the correct scope.
+```
+
+**The second one is the actively misleading one:** it reads as a scope mistake of yours, and
+`--scope project` was correct. Nothing is wrong with your machine and there is nothing to repair — the
+record it is looking for was taken by a command you ran in a different folder. Carry on at step 4.
+
+**It is bookkeeping, not data loss.** An install record is what tells a session which plugins this folder
+has; installing writes it again, which is what step 4 does anyway. What the machine-wide removal costs is
+the **procedure**, not your repos.
+
+**Where this paragraph stops, so you can judge it:** one machine, one CLI version, three checkouts.
+Whether `marketplace remove` treats `user`-scope records the same way is untested, and `--scope` is a flag
+on `add` rather than on `remove`, so there is probably nothing to narrow it with
+([#1820](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1820)).
+
+---
+
 ## Migrating off the `dkj-team-*` ids (#1698, September 9, 2026)
 
 > **This section is for a repo that has this family's teams installed under the ids they used up to
@@ -264,6 +317,10 @@ claude plugin uninstall dkj-team-shopify@claude-code-specialists --scope project
 # 3. Re-register the marketplace under its new name -- the marketplace itself was
 #    renamed on the flag day, so your machine must drop the old registration and add
 #    the new one. A plain refresh cannot do this: the name is part of the id.
+#    MACHINE-WIDE, and this is the one command here that is: it also drops the install
+#    records of every OTHER checkout on this machine, ending their migration early. If
+#    you have more than one, read "If this machine has more than one checkout" above
+#    first -- those checkouts start at step 4, not at step 2.
 claude plugin marketplace remove claude-code-specialists
 claude plugin marketplace add DKJ-Solutions/dkj-claude-plugins --scope project
 
@@ -349,6 +406,10 @@ claude plugin uninstall bwj-codex@claude-code-specialists --scope project
 # 3. Re-register the marketplace under its new name -- the marketplace itself was
 #    renamed on the flag day, so your machine must drop the old registration and add
 #    the new one. A plain refresh cannot do this: the name is part of the id.
+#    MACHINE-WIDE, and this is the one command here that is: it also drops the install
+#    records of every OTHER checkout on this machine, ending their migration early. If
+#    you have more than one, read "If this machine has more than one checkout" above
+#    first -- those checkouts start at step 4, not at step 2.
 claude plugin marketplace remove claude-code-specialists
 claude plugin marketplace add DKJ-Solutions/dkj-claude-plugins --scope project
 
@@ -494,6 +555,10 @@ claude plugin uninstall specialists-workflow-davekjohn@claude-code-specialists -
 # 3. Re-register the marketplace under its new name -- the marketplace itself was
 #    renamed on the flag day, so your machine must drop the old registration and add
 #    the new one. A plain refresh cannot do this: the name is part of the id.
+#    MACHINE-WIDE, and this is the one command here that is: it also drops the install
+#    records of every OTHER checkout on this machine, ending their migration early. If
+#    you have more than one, read "If this machine has more than one checkout" above
+#    first -- those checkouts start at step 4, not at step 2.
 claude plugin marketplace remove claude-code-specialists
 claude plugin marketplace add DKJ-Solutions/dkj-claude-plugins --scope project
 

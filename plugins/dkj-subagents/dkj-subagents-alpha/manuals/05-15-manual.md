@@ -70,6 +70,17 @@ and safe hook construction.
   refuses a whitespace-only diff would be a rule written for one tool's serialiser, and dropping the
   grouping to make the file round-trip-stable pays for tidiness with the readability the grouping
   exists for. It is a property of the CLI, so the durable answer is knowing it.
+- **`claude plugin marketplace remove` is machine-wide over install records, so it reaches checkouts
+  the run never named.** Dropping a marketplace registration takes every install record keyed on that
+  marketplace with it, including the records of other repos on the machine — which is invisible from the
+  repo you ran it in, because nothing there changes and nothing is printed about the others. **What it
+  costs is a procedure, not data**: a record is bookkeeping and installing writes it again, but any
+  sequence that pairs a per-checkout `uninstall` with a `marketplace remove` is only completable in the
+  first checkout, and the CLI's two failure messages in the rest name a missing plugin or the wrong
+  `--scope` rather than the cause. So when a marketplace has to be re-registered, do it **once** for the
+  machine and treat the remaining checkouts as fresh installs. Measured with record counts and both
+  verbatim messages in the source repo's `INSTALL.md`, under
+  *"If this machine has more than one checkout"*.
 - **Never add a permission or hook that undermines the safety rules.** The safety rules stand above
   any config convenience: no allowlist rule that would blindly let a dangerous or irreversible action
   through. The concrete per-repo details live in the `## Specific to this repo` extension.
