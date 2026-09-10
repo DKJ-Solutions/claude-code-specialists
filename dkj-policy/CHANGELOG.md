@@ -43,7 +43,34 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**5 / 18 minor entries** <!-- pending-tally -->
+**5 / 19 minor entries** <!-- pending-tally -->
+
+### DEPLOY: docs/1790-figure-gate-script-comments · 20260910-114054
+
+The `[measured-figure]` gate stays byte-shaped and `$consumerDocs`-scoped. #1790 proposed pointing its
+existing pattern at `.ps1` comments; measured over `scripts/*.ps1` it flags 26 sites and zero real
+defects — encoding prose, ANSI escapes in test strings, authored design ceilings, code read as prose,
+and the check's own fixtures and docstring. Declined for the same reasons as #1784's line-count
+proposal, recorded in the system-administration lens.
+
+It prevents nothing that has failed; it closes a proposal so the next reader does not re-measure the
+same haystack.
+
+**Score:** 1
+
+#### What makes this deploy extra special
+
+A lens write-up about an internal lint gate; no consumer of the plugins notices.
+
+**Score:** N/A
+
+#### Pull Request
+
+Decline extending the measured-figure gate to .ps1 comments, and record the haystack
+
+[PR #1795](https://github.com/DKJ-Solutions/claude-code-specialists/pull/1795)
+
+---
 
 ### DEPLOY: fix/1771-plugin-details-agent-count · 20260910-113257
 
