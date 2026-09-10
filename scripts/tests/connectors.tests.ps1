@@ -892,6 +892,95 @@ try {
     Assert-Match '\[ERROR\]' $r.Out 'malformed id: still an error -- a register file defect is not a migration'
     Assert-Match 'invalid or unknown plugin field' $r.Out 'malformed id: and keeps its own wording'
 
+    # --- 10b. A RETIRED id that IS enabled and has NO install record (#1802) -----------------------
+    #      Until #1802 a retired id's 'continue' skipped the whole plugin block, check 4 among it -- so
+    #      the two consumers #1802 measured as worst, both enabling nothing but retired ids, were the
+    #      two this check could say least about. This is the one question that survives the
+    #      retirement: it needs no source folder, only the install administration.
+    Write-Host "retired id, ALSO enabled, ALSO recordless: the #1802 finding" -ForegroundColor Cyan
+    $oldProfileRetired = $env:USERPROFILE
+    try {
+        # 10b1. retired + enabled + NO install record -> the new [INFO] fires, states the consequence,
+        #       and does NOT hand over a bare install command as the fix -- that command cannot work
+        #       for an id the catalogue no longer declares.
+        New-FixtureConsumer -ExtensionIds @('06-16')
+        Set-FixtureEnabledPlugins -Ids @('specialists@claude-code-specialists')
+        $mfRetiredRec = New-FixtureManifest -Extensions @('06-16') -Plugin 'specialists@claude-code-specialists'
+        Set-FixtureAdmin '{ "version": 2, "plugins": { } }'
+        $env:USERPROFILE = $Fixture
+        $r = Invoke-Ps $Script @('-SkipDrift', '-Manifest', $mfRetiredRec, '-ConsumerPathOverride', $Fixture)
+        Assert-Equal 0 $r.Code 'retired+enabled+no record: exit code 0 (still non-error)'
+        Assert-NotMatch '\[ERROR\]' $r.Out 'retired+enabled+no record: still no error at all'
+        Assert-Match 'no machine record for it either' $r.Out 'retired+enabled+no record: the new #1802 finding fires'
+        Assert-Match 'loads none of this plugin' $r.Out 'retired+enabled+no record: states the consequence, same as the current-id sibling'
+        Assert-Match 'will NOT fix it' $r.Out 'retired+enabled+no record: says the install command will NOT fix it'
+        Assert-Match 'The way out is the migration' $r.Out 'retired+enabled+no record: hands over the migration instead of a bare install command'
+        Assert-NotMatch 'settles it' $r.Out 'retired+enabled+no record: not the current-id sibling wording (which ends on ''settles it'')'
+
+        # 10b2. retired + enabled + a record IS PRESENT -> the new line does NOT fire. This is the real
+        #       BWJ state (smartwatchbanden / xoxowildhearts hold records for their retired dkj-team-*
+        #       ids) -- a false positive here would be the worst possible outcome of this change.
+        $fixtureEscapedRetired = ($Fixture -replace '\\', '\\')
+        Set-FixtureAdmin ('{ "version": 2, "plugins": { "specialists@claude-code-specialists": [ { "scope": "project", "projectPath": "' + $fixtureEscapedRetired + '", "installPath": "x", "version": "1.0.0" } ] } }')
+        $r = Invoke-Ps $Script @('-SkipDrift', '-Manifest', $mfRetiredRec, '-ConsumerPathOverride', $Fixture)
+        Assert-Equal 0 $r.Code 'retired+enabled+record present: exit code 0'
+        Assert-Match 'is not a plugin this marketplace declares any more' $r.Out 'retired+enabled+record present: the base retired INFO still fires'
+        Assert-NotMatch 'no machine record for it either' $r.Out 'retired+enabled+record present: the new finding does NOT fire -- a record exists (the BWJ state)'
+
+        # 10b3. retired + NOT enabled in the consumer -> the new line does not fire either: the finding
+        #       is conditioned on the id being enabled, not merely on being retired and recordless.
+        Set-FixtureEnabledPlugins -Ids @('dkj-subagents-alpha@claude-code-specialists')
+        Set-FixtureAdmin '{ "version": 2, "plugins": { } }'
+        $r = Invoke-Ps $Script @('-SkipDrift', '-Manifest', $mfRetiredRec, '-ConsumerPathOverride', $Fixture)
+        Assert-Equal 0 $r.Code 'retired+not enabled: exit code 0'
+        Assert-Match 'is not a plugin this marketplace declares any more' $r.Out 'retired+not enabled: the base retired INFO still fires'
+        Assert-NotMatch 'no machine record for it either' $r.Out 'retired+not enabled: the new finding does NOT fire -- not enabled here'
+    } finally {
+        $env:USERPROFILE = $oldProfileRetired
+    }
+
+    # 10b4. -SkipVersions -> the install administration is not read at all in that mode, so the new
+    #       finding cannot fire regardless of what the (unread) administration would have said.
+    New-FixtureConsumer -ExtensionIds @('06-16')
+    Set-FixtureEnabledPlugins -Ids @('specialists@claude-code-specialists')
+    $mfRetiredSkip = New-FixtureManifest -Extensions @('06-16') -Plugin 'specialists@claude-code-specialists'
+    $r = Invoke-Ps $Script ($base + @('-Manifest', $mfRetiredSkip, '-ConsumerPathOverride', $Fixture))
+    Assert-Equal 0 $r.Code '-SkipVersions, retired+enabled: exit code 0'
+    Assert-Match 'is not a plugin this marketplace declares any more' $r.Out '-SkipVersions, retired+enabled: the base retired INFO still fires'
+    Assert-NotMatch 'no machine record for it either' $r.Out '-SkipVersions, retired+enabled: the new finding does NOT fire -- administration not read'
+
+    # 10b5. The retired INFO's trailing clause names what is skipped, and WHY, replacing the old
+    #       blanket "their plugin block is skipped, so nothing below is checked for it" wording.
+    Assert-Match "extension inventory and the version comparison need this plugin's source folder" $r.Out 'retired INFO: the trailing clause names what needs the source folder'
+    Assert-Match 'both are skipped for it' $r.Out 'retired INFO: and says both are skipped, replacing the old blanket wording'
+    Assert-NotMatch 'nothing below is checked for it' $r.Out 'retired INFO: the old blanket wording is gone'
+
+    # 10b6. [NOT-INSTALLED-HERE] promotion -- fires only when the connector being walked IS the
+    #       session's own repo (Test-IsSessionRepo), the same scoping check 4's own promotion uses.
+    $oldProfileNih = $env:USERPROFILE
+    try {
+        New-FixtureConsumer -ExtensionIds @('06-16')
+        Set-FixtureEnabledPlugins -Ids @('specialists@claude-code-specialists')
+        $mfRetiredNih = New-FixtureManifest -Extensions @('06-16') -Plugin 'specialists@claude-code-specialists'
+        Set-FixtureAdmin '{ "version": 2, "plugins": { } }'
+        $env:USERPROFILE = $Fixture
+
+        # Not the session repo (no -OnlyConsumer) -> the [INFO] fires, the marker must not: another
+        # machine could still hold the install, so the state is not conclusive from here.
+        $r = Invoke-Ps $Script @('-SkipDrift', '-Manifest', $mfRetiredNih, '-ConsumerPathOverride', $Fixture)
+        Assert-Match 'no machine record for it either' $r.Out 'retired+enabled+no record, NOT session repo: the [INFO] fires'
+        Assert-NotMatch '\[NOT-INSTALLED-HERE\]' $r.Out 'retired+enabled+no record, NOT session repo: no marker -- another machine could still hold the install'
+
+        # The session repo (-OnlyConsumer) -> the marker rides alongside the [INFO], non-counting.
+        $r = Invoke-Ps $Script @('-SkipDrift', '-Manifest', $mfRetiredNih, '-ConsumerPathOverride', $Fixture, '-OnlyConsumer', $Fixture)
+        Assert-Equal 0 $r.Code 'retired+enabled+no record, SESSION repo: exit 0 -- non-counting, nothing broken about the source'
+        Assert-Match '\[NOT-INSTALLED-HERE\]' $r.Out 'retired+enabled+no record, SESSION repo: the marker fires'
+        Assert-Match 'BOTH a retired plugin name and without an install record' $r.Out 'retired+enabled+no record, SESSION repo: the marker names both conditions'
+        Assert-Match 'no machine record for it either' $r.Out 'retired+enabled+no record, SESSION repo: the [INFO] is kept too -- a deliberate run should still list everything'
+    } finally {
+        $env:USERPROFILE = $oldProfileNih
+    }
+
     # --- 11. Check 5 / [UNLISTED]: a plugin enabled in the consumer's settings chain that this
     #      manifest's own 'plugins' list never names at all (#1775). $RepoRoot inside the SCRIPT UNDER
     #      TEST is always this real checkout (it is derived from $PSScriptRoot, not from the fixture), so

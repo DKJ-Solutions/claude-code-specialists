@@ -59,9 +59,29 @@
                                                                   alone: an up-to-date plugin is silent
       21 -Brief with no plugins enabled                       -> one [INFO] line and no [SUMMARY]
       22 -Brief on a mix of every code                        -> exactly one [SUMMARY], whose counts
-                                                                  partition all the rows
+                                                                  partition all the rows (now SEVEN codes,
+                                                                  including 'not-installed', #1802)
       23 -Brief suppresses the header, default view unchanged -> an absolute path stays out of a
                                                                   session start
+      24 -Brief, enabled here with NO install record AT ALL   -> the SECOND [ERROR] verdict (#1802):
+                                                                  'not-installed', its own summary bucket
+                                                                  ("N enabled but not installed here")
+      25 -Brief, only a path-less (machine-wide) record       -> deliberately STAYS 'indeterminate' /
+         exists for this id                                     [INFO] -- narrower than #1802's split,
+                                                                  and still counted as undetermined
+      26 an UNREADABLE install administration file (Fix 1,    -> stays 'indeterminate'/[INFO], names
+         Victor)                                                 the unreadable file, points at
+                                                                   check-claude-home.ps1, NEVER the
+                                                                   confident 'not installed' diagnosis
+      27 NO install administration on the machine at all     -> still 'not-installed' -- Fix 1's own
+                                                                   boundary, an accurate diagnosis that
+                                                                   must not be swept up by scenario 26
+      28 Fix 2 (Sebastian): id NAME half not a valid slug     -> the paste-ready install command is
+                                                                   WITHHELD for that row only; a
+                                                                   well-formed id in the same run still
+                                                                   gets its own command
+      29 Fix 2: id MARKETPLACE half not a valid slug          -> same withhold -- both halves are
+                                                                   checked
     Every scenario asserts exit code 0 explicitly (this is a report, not a gate).
 
     Scenarios 12/13 build the "reachable but not an ancestor" state the way a real marketplace clone
@@ -305,6 +325,16 @@ function Write-Admin {
     param([string]$Path, [hashtable]$Plugins)
     New-Item -ItemType Directory -Path (Split-Path -Parent $Path) -Force | Out-Null
     [System.IO.File]::WriteAllText($Path, (@{ version = 2; plugins = $Plugins } | ConvertTo-Json -Depth 12), $Utf8)
+}
+
+function Write-BadAdmin {
+    # A RAW writer, deliberately bypassing Write-Admin's ConvertTo-Json -- scenario 26 needs a file
+    # that EXISTS but does not PARSE, the shape Get-InstallRecord's own .Readable / .Error fields exist
+    # to report (Fix 1, Victor, #1802 follow-up). Any well-formed JSON producer can only ever write a
+    # file that parses; this one writes text that cannot.
+    param([string]$Path)
+    New-Item -ItemType Directory -Path (Split-Path -Parent $Path) -Force | Out-Null
+    [System.IO.File]::WriteAllText($Path, '{ "version": 2, "plugins": { this is not valid json !!', $Utf8)
 }
 
 function Invoke-PV {
@@ -740,9 +770,12 @@ try {
     Assert-Equal '[INFO] no plugins are enabled for this checkout -- nothing to compare.' $r.Text.Trim() '21: exactly one INFO line and nothing else -- no [SUMMARY] when there is nothing to summarize'
 
     # --- 22. -Brief: one run mixing every code -> exactly one [SUMMARY] line partitioning all rows ---
+    # SEVEN codes now, not six (#1802): 'plug-notinstalled' is enabled, its name IS in the clone's
+    # marketplace.json (so it does not fall into the foreign/indeterminate branch), and it carries NO
+    # install record at all -- the exact shape that produces 'not-installed', the second [ERROR] verdict.
     Write-Host "22. -Brief: a mix of every code -> one [SUMMARY] line, correctly partitioned" -ForegroundColor Cyan
     $c = New-Case 'brief-mixed'
-    $mixNames = @('plug-behind', 'plug-clonebehind', 'plug-match', 'plug-vermatch', 'plug-unreleased')
+    $mixNames = @('plug-behind', 'plug-clonebehind', 'plug-match', 'plug-vermatch', 'plug-unreleased', 'plug-notinstalled')
     $shaA = New-Clone -Dir $c.Clone -Version '4.32.0' -PluginNames $mixNames
     # ONLY plug-behind's version is bumped by the second commit, and that is what separates it from
     # plug-unreleased: both records sit at $shaA, so the ancestry is identical and the version strings
@@ -750,7 +783,7 @@ try {
     # first) and plug-vermatch MUST keep 4.32.0 on the clone side, which is why the bump is scoped.
     $shaB = Add-CloneCommit -Dir $c.Clone -Version '4.33.0' -PluginNames @('plug-behind')
     $foreignMix = 'plug-foreign@ccs-fixture'
-    $ids = @('plug-behind@ccs-fixture', 'plug-clonebehind@ccs-fixture', $foreignMix, 'plug-match@ccs-fixture', 'plug-vermatch@ccs-fixture', 'plug-unreleased@ccs-fixture')
+    $ids = @('plug-behind@ccs-fixture', 'plug-clonebehind@ccs-fixture', $foreignMix, 'plug-match@ccs-fixture', 'plug-vermatch@ccs-fixture', 'plug-unreleased@ccs-fixture', 'plug-notinstalled@ccs-fixture')
     Set-Enabled -RepoDir $c.Repo -Ids $ids
     Write-Admin -Path $c.Admin -Plugins @{
         'plug-behind@ccs-fixture'      = @( (New-Rec -ProjectPath $c.Repo -Version '4.32.0' -Sha $shaA) )
@@ -759,6 +792,8 @@ try {
         'plug-match@ccs-fixture'       = @( (New-Rec -ProjectPath $c.Repo -Version '4.32.0' -Sha $shaB) )
         'plug-vermatch@ccs-fixture'    = @( (New-Rec -ProjectPath $c.Repo -Version '4.32.0') )
         'plug-unreleased@ccs-fixture'  = @( (New-Rec -ProjectPath $c.Repo -Version '4.32.0' -Sha $shaA) )
+        # plug-notinstalled@ccs-fixture: DELIBERATELY no key at all -- enabled, in the clone's
+        # marketplace.json, and with no record of any shape (not even a path-less one).
     }
     $r = Invoke-PV -Repo $c.Repo -UserHome $c.Home -Brief
     Assert-Equal 0 $r.Code '22: exit 0'
@@ -766,14 +801,15 @@ try {
     $errLines = @($lines | Where-Object { $_ -match '^\[ERROR\]' })
     $infoLines = @($lines | Where-Object { $_ -match '^\[INFO\]' })
     $summaryLines = @($lines | Where-Object { $_ -match '^\[SUMMARY\]' })
-    Assert-Equal 1 $errLines.Count '22: exactly one [ERROR] line (only the behind plugin)'
-    Assert-True  ($errLines[0] -like "*plug-behind@ccs-fixture*") '22: the [ERROR] line names the behind plugin'
+    Assert-Equal 2 $errLines.Count '22: exactly two [ERROR] lines (the behind plugin AND the not-installed one, #1802)'
+    Assert-True  (($errLines -join '|') -like "*plug-behind@ccs-fixture*") '22: one [ERROR] line names the behind plugin'
+    Assert-True  (($errLines -join '|') -like "*plug-notinstalled@ccs-fixture*") '22: the other [ERROR] line names the not-installed plugin'
     Assert-Equal 3 $infoLines.Count '22: exactly three [INFO] lines (the stale clone, the foreign plugin, the unreleased one)'
     Assert-True  (($infoLines -join '|') -like '*plug-clonebehind@ccs-fixture*') '22: one [INFO] line is the stale-clone plugin'
     Assert-True  (($infoLines -join '|') -like '*plug-foreign@ccs-fixture*') '22: another [INFO] line is the foreign plugin'
     Assert-True  (($infoLines -join '|') -like '*plug-unreleased@ccs-fixture*') '22: and the third is the unreleased one, NOT an [ERROR]'
     Assert-Equal 1 $summaryLines.Count '22: exactly one [SUMMARY] line for the whole run'
-    Assert-Equal '[SUMMARY] 6 plugin(s) enabled here: 1 behind, 1 ahead of a stale clone, 1 on the released version with unreleased clone commits, 1 undetermined, 2 up to date.' $summaryLines[0] '22: the summary partitions all six rows correctly'
+    Assert-Equal '[SUMMARY] 7 plugin(s) enabled here: 1 behind, 1 enabled but not installed here, 1 ahead of a stale clone, 1 on the released version with unreleased clone commits, 1 undetermined, 2 up to date.' $summaryLines[0] '22: the summary partitions all seven rows correctly, with its own disjoint part for not-installed'
     Assert-Lacks $r 'plug-match@ccs-fixture:'    '22: the match plugin gets no marker line of its own'
     Assert-Lacks $r 'plug-vermatch@ccs-fixture:' '22: the ver-match plugin gets no marker line of its own'
 
@@ -791,6 +827,124 @@ try {
     Assert-Lacks $rDefault '[SUMMARY]' '23: the default view never emits the brief marker vocabulary'
     Assert-Lacks $rBrief   'plugin-versions--'  '23: -Brief never prints the header line (an absolute path stays out of a session start)'
     Assert-Has   $rBrief   '[SUMMARY]' '23: -Brief still emits its own summary'
+
+    # --- 24. -Brief: enabled here with NO install record at all -> the SECOND [ERROR] verdict (#1802) --
+    # 'not-installed' now carries its own row code rather than sharing 'indeterminate'. Before this
+    # split this exact state -- a plugin enabled here, loading NOTHING in this checkout right now --
+    # was reported at [INFO], the same quiet marker a stale clone or an unreleased-clone-commits row
+    # get. It is promoted here because, unlike those two, it names one command that repairs it, here
+    # and now -- exactly the #1591 rule that decided the FIRST [ERROR] verdict.
+    Write-Host "24. -Brief: enabled here with NO install record at all -> [ERROR] (#1802)" -ForegroundColor Cyan
+    $c = New-Case 'brief-not-installed'
+    New-Clone -Dir $c.Clone -Version '4.32.0' | Out-Null
+    Set-Enabled -RepoDir $c.Repo -Ids @($ID)
+    Write-Admin -Path $c.Admin -Plugins @{}
+    $r = Invoke-PV -Repo $c.Repo -UserHome $c.Home -Brief
+    Assert-Equal 0 $r.Code '24: exit 0 -- a report, not a gate'
+    Assert-Equal (
+        "[ERROR] ${ID}: cannot determine -- not installed in this checkout (enabled declaratively only) -- install here: claude plugin install $ID --scope project`n" +
+        "[SUMMARY] 1 plugin(s) enabled here: 0 behind, 1 enabled but not installed here, 0 up to date."
+    ) $r.Text.Trim() '24: exactly one [ERROR] naming the plugin, and the summary carries its own disjoint part'
+
+    # --- 25. -Brief: only a path-less (machine-wide) record exists -- deliberately STAYS 'indeterminate'
+    # / [INFO], narrower than the #1802 split. The record here carries no 'projectPath' at all, which is
+    # the shape Get-InstallRecord files under PathlessById rather than RecordsById.
+    Write-Host "25. -Brief: only a path-less (machine-wide) record -> still [INFO], still undetermined" -ForegroundColor Cyan
+    $c = New-Case 'brief-pathless'
+    New-Clone -Dir $c.Clone -Version '4.32.0' | Out-Null
+    Set-Enabled -RepoDir $c.Repo -Ids @($ID)
+    Write-Admin -Path $c.Admin -Plugins @{ $ID = @( @{ scope = 'user'; version = '4.32.0' } ) }
+    $r = Invoke-PV -Repo $c.Repo -UserHome $c.Home -Brief
+    Assert-Equal 0 $r.Code '25: exit 0'
+    Assert-Has   $r "[INFO] $($ID): cannot determine for this checkout -- only a path-less (machine-wide) record exists" '25: still reported as [INFO], not promoted to [ERROR]'
+    Assert-Lacks $r '[ERROR]' '25: never promoted to [ERROR] -- narrower than the #1802 split on purpose'
+    Assert-Has   $r '[SUMMARY] 1 plugin(s) enabled here: 0 behind, 1 undetermined, 0 up to date.' '25: counted as undetermined, not split into its own bucket'
+
+    # --- 26. Fix 1 (Victor): an UNREADABLE install administration -> stays 'indeterminate' / [INFO], --
+    # -- NEVER the confident 'not installed' diagnosis. Get-InstallRecord's empty RecordsById used to
+    # collapse "genuinely no record for this checkout" and "the file exists but will not parse" into
+    # the same branch, so a corrupt installed_plugins.json produced 'cannot determine -- not installed
+    # in this checkout (enabled declaratively only)' with an install command as its remedy -- a
+    # confident wrong diagnosis that this branch's own #1802 split would have promoted to [ERROR].
+    # There is now a branch ahead of it, gated on (-not $install.Readable -and $install.Exists), that
+    # keeps the row's code 'indeterminate', names the unreadable file, and points at
+    # check-claude-home.ps1 rather than an install command.
+    Write-Host "26. unreadable install administration -> stays indeterminate/[INFO], never 'not-installed'" -ForegroundColor Cyan
+    $c = New-Case 'admin-unreadable'
+    New-Clone -Dir $c.Clone -Version '4.32.0' | Out-Null
+    Set-Enabled -RepoDir $c.Repo -Ids @($ID)
+    Write-BadAdmin -Path $c.Admin
+    $rDefault = Invoke-PV -Repo $c.Repo -UserHome $c.Home
+    Assert-Equal 0 $rDefault.Code '26: exit 0 -- a report, not a gate'
+    Assert-Has   $rDefault 'install administration could not be read' '26: the installed-here line names the unreadable file'
+    Assert-Has   $rDefault 'the install administration exists but could not be read' '26: the verdict names it too -- the two lines no longer contradict each other'
+    Assert-Has   $rDefault 'check-claude-home.ps1' '26: the action points at the tool that owns that file''s health'
+    Assert-Lacks $rDefault 'claude plugin install' '26: no install command is offered -- the fault is the file, not a missing install'
+    Assert-Lacks $rDefault 'not installed in this checkout (enabled declaratively only)' '26: never the old, confident wrong diagnosis'
+
+    $rBrief = Invoke-PV -Repo $c.Repo -UserHome $c.Home -Brief
+    Assert-Equal 0 $rBrief.Code '26b: exit 0'
+    Assert-Has   $rBrief '[INFO]' '26b: reported at [INFO]'
+    Assert-Lacks $rBrief '[ERROR]' '26b: never promoted to [ERROR] -- an unreadable administration is not a confirmed absence'
+    Assert-Lacks $rBrief 'claude plugin install' '26b: still no install command in brief mode'
+    Assert-Has   $rBrief '[SUMMARY] 1 plugin(s) enabled here: 0 behind, 1 undetermined, 0 up to date.' '26b: counted as undetermined, NOT split into "enabled but not installed here"'
+
+    # --- 27. Fix 1's own boundary: NO install administration on the machine AT ALL -> still ------------
+    # -- 'not-installed', which IS an accurate diagnosis here and must not be swept up by the new
+    # branch. -not $install.Readable is true in this shape too (nothing parsed, because nothing exists
+    # to parse) but $install.Exists is false, so the gate '-not $install.Readable -and $install.Exists'
+    # does not fire and the row still reaches the ordinary 'not-installed' branch -- correctly, since
+    # nothing is installed anywhere on this machine.
+    Write-Host "27. no install administration at all -> still 'not-installed' (an accurate diagnosis)" -ForegroundColor Cyan
+    $c = New-Case 'admin-missing'
+    New-Clone -Dir $c.Clone -Version '4.32.0' | Out-Null
+    Set-Enabled -RepoDir $c.Repo -Ids @($ID)
+    # Deliberately no Write-Admin / Write-BadAdmin call at all -- installed_plugins.json never created.
+    Assert-True (-not (Test-Path -LiteralPath $c.Admin)) '27: fixture sanity -- the administration file does not exist'
+    $r = Invoke-PV -Repo $c.Repo -UserHome $c.Home -Brief
+    Assert-Equal 0 $r.Code '27: exit 0'
+    Assert-Equal (
+        "[ERROR] ${ID}: cannot determine -- not installed in this checkout (enabled declaratively only) -- install here: claude plugin install $ID --scope project`n" +
+        "[SUMMARY] 1 plugin(s) enabled here: 0 behind, 1 enabled but not installed here, 0 up to date."
+    ) $r.Text.Trim() '27: identical shape to scenario 24 -- a missing administration file is diagnosed the same as an empty-but-readable one, correctly'
+
+    # --- 28. Fix 2 (Sebastian): an id whose NAME half is not a valid slug -> the paste-ready install ---
+    # -- command is WITHHELD, not the verdict. $idIsCommandSafe = Test-PluginNameSlug(name) -and
+    # Test-PluginMarketplaceSlug(mp); a shell metacharacter in the name half fails the first half of
+    # that AND. A second, WELL-FORMED id rides in the SAME run to prove the guard is per-row: it must
+    # still get its own install command.
+    Write-Host "28. Fix 2: id NAME half not a valid slug -> install command withheld, row still reported" -ForegroundColor Cyan
+    $c = New-Case 'badslug-name'
+    $badName = 'plug;bad'
+    $badId = "$badName@ccs-fixture"
+    New-Clone -Dir $c.Clone -Version '4.32.0' -PluginNames @($badName, 'dkj-subagents-alpha') -NoGit | Out-Null
+    Set-Enabled -RepoDir $c.Repo -Ids @($badId, $ID)
+    Write-Admin -Path $c.Admin -Plugins @{}
+    $r = Invoke-PV -Repo $c.Repo -UserHome $c.Home -Brief
+    Assert-Equal 0 $r.Code '28: exit 0'
+    Assert-Has   $r 'plugbad@ccs-fixture' '28: fixture sanity -- the sanitized display of the bad id is present (row not suppressed)'
+    Assert-LacksBetween $r 'plugbad@ccs-fixture' '[SUMMARY]' 'claude plugin install' '28: no paste-ready install command is built out of the unsafe id, scoped to that row'
+    Assert-HasBetween   $r 'plugbad@ccs-fixture' '[SUMMARY]' 'no command is offered here: this plugin id is not a valid slug on both halves' '28: the withhold sentence is printed instead, scoped to that row'
+    Assert-Has  $r "claude plugin install $ID --scope project" '28: a normal well-formed id in the SAME run still gets its install command -- the guard is per-row, not global'
+    Assert-Has  $r '[SUMMARY] 2 plugin(s) enabled here: 0 behind, 2 enabled but not installed here, 0 up to date.' '28: both rows still counted in the "enabled but not installed here" bucket -- withholding the command does not suppress the finding'
+
+    # --- 29. Fix 2: an id whose MARKETPLACE half is not a valid slug -> the same withhold, because -----
+    # -- both halves are checked. The name half here ('plug-ok') is an ordinary slug; only the
+    # marketplace half fails Test-PluginMarketplaceSlug.
+    Write-Host "29. Fix 2: id MARKETPLACE half not a valid slug -> install command withheld too" -ForegroundColor Cyan
+    $c = New-Case 'badslug-marketplace'
+    $badMp = 'ccs`fixture'
+    $cloneDir = Join-Path $c.Home (Join-Path '.claude' (Join-Path 'plugins' (Join-Path 'marketplaces' $badMp)))
+    New-Clone -Dir $cloneDir -Version '4.32.0' -PluginNames @('plug-ok') -NoGit | Out-Null
+    $badId2 = "plug-ok@$badMp"
+    Set-Enabled -RepoDir $c.Repo -Ids @($badId2)
+    Write-Admin -Path $c.Admin -Plugins @{}
+    $r = Invoke-PV -Repo $c.Repo -UserHome $c.Home -Brief
+    Assert-Equal 0 $r.Code '29: exit 0'
+    Assert-Lacks $r 'claude plugin install' '29: no paste-ready install command is built out of the unsafe marketplace half'
+    Assert-Has  $r 'no command is offered here: this plugin id is not a valid slug on both halves' '29: the withhold sentence is printed'
+    Assert-Has  $r 'plug-ok@ccsfixture' '29: the row is still reported (sanitized display), not suppressed'
+    Assert-Has  $r '[SUMMARY] 1 plugin(s) enabled here: 0 behind, 1 enabled but not installed here, 0 up to date.' '29: still counted in the "enabled but not installed here" bucket'
 }
 finally {
     if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture -ErrorAction SilentlyContinue }

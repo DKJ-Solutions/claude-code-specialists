@@ -244,6 +244,31 @@ foreach ($id in $ids) {
     $mp = $parts[-1]
     $clone = $clones[$mp]
 
+    # IS THIS ID SAFE TO BUILD A PASTE-READY COMMAND OUT OF? (Sebastian, on this branch.) An
+    # 'enabledPlugins' key is an arbitrary JSON string from a settings file -- this file's own -Brief
+    # comment already names it as exactly that value class (inbound #309) -- and the $action strings
+    # below embed it raw into a `claude plugin ...` line. Format-SafeProseToken, applied at emission,
+    # deliberately does NOT restrict the charset: its whole reason for existing is that an id charset
+    # "deletes most of a sentence", so it keeps the punctuation a shell reads. A ';' or a backtick in
+    # an id therefore survives into a line shaped for pasting.
+    #
+    # THE DOCTRINE IS Get-PasteableRef's (#1594): where the value fails validation, the command is
+    # WITHHELD and the reason is said, because a guard whose own output is the injection surface is
+    # worse than no guard. Both halves are checked, since both become path segments and both are
+    # interpolated.
+    #
+    # SCOPED TO THE VERDICT THIS BRANCH MADE REACHABLE, deliberately and not for want of noticing the
+    # rest. Until this branch only the 'behind' code emitted an $action in -Brief; every "cannot
+    # determine" row printed its verdict alone, so promoting 'not-installed' to [ERROR] is what first
+    # puts a command built from this value in front of a reader for a state that needs no version
+    # mismatch to reach -- just an enable with no install record. The other eighteen $action sites and
+    # the default view's raw $row.Id carry the same untrusted value and are NOT repaired here: that is
+    # a standing defect wider than this branch, filed as
+    # https://github.com/DKJ-Solutions/claude-code-specialists/issues/1803 rather than folded in. That
+    # issue also carries the two decisions a full repair has to make -- withhold versus sanitize, and
+    # whether the default view is held to the same rule -- neither of which is settled from here.
+    $idIsCommandSafe = (Test-PluginNameSlug -Name $name) -and (Test-PluginMarketplaceSlug -Marketplace $mp)
+
     $recs = @()
     if ($install.RecordsById.ContainsKey($id)) { $recs = @($install.RecordsById[$id]) }
     $pathless = @()
@@ -311,10 +336,51 @@ foreach ($id in $ids) {
     } elseif ($recs.Count -eq 0) {
         if ($pathless.Count -ge 1) {
             $verdict = "cannot determine for this checkout -- only a path-less (machine-wide) record exists"
+            $action = "install here: claude plugin install $id --scope project"
+        } elseif (-not $install.Readable -and $install.Exists) {
+            # AN ADMINISTRATION THAT DOES NOT PARSE YIELDS NO RECORDS, WHICH IS NOT THE SAME FACT AS
+            # HOLDING NONE (Victor, on this branch; the doctrine is inbound #302's). Get-InstallRecord
+            # hands back empty RecordsById either way, so this branch is reachable with the file sitting
+            # right there unreadable -- and the row would then state, confidently, that the plugin is not
+            # installed and that installing it is the remedy. Neither is known. The $instText block above
+            # already draws this distinction correctly, so the two halves of one row contradicted each
+            # other.
+            #
+            # IT STAYS 'indeterminate', AND THAT IS THE POINT OF FIXING IT HERE. The row's code is what
+            # -Brief now reads for its [ERROR]/[INFO] split, so leaving this inside 'not-installed' would
+            # have promoted a wrong diagnosis to the loudest marker the tool has, carrying a command that
+            # does not address the actual fault -- exactly what that split's own rule forbids. An honest
+            # "I cannot tell" is worth more than a confident wrong answer, and unlike the wrong answer it
+            # is actionable.
+            #
+            # NO INSTALL COMMAND IS HANDED OVER, which is why the $action below is set per branch rather
+            # than once for all of them: the fault is the file, not a missing install, and
+            # check-claude-home.ps1 is what owns that file's health (it also keeps the snapshot this is
+            # restorable from, #1609).
+            $verdict = "cannot determine -- the install administration exists but could not be read ($($install.Error)), so no record for this checkout could be looked up either way"
+            $action = "repair the administration first, then re-run: scripts/lint/check-claude-home.ps1 reports on that file and keeps a snapshot beside it"
         } else {
+            # ITS OWN CODE, BECAUSE IT IS THE ONE UNDETERMINED VERDICT THAT IS NOT BOOKKEEPING (#1802).
+            # Every other 'cannot determine' on this page reports something about a cache or an
+            # administration this checkout does not own -- which is the stated ground for keeping them
+            # all quiet in -Brief. This one reports that the settings say to load a plugin and the
+            # machine has no record of it here: the session is loading none of it, right now, in the
+            # checkout the reader is standing in. The rule -Brief states for an [ERROR] is "the only
+            # verdict a reader closes with a command here and now", and this is the sole indeterminate
+            # branch that hands one over -- the $action two lines down. Sharing 'indeterminate' meant
+            # that rule and this row's own contents disagreed.
+            $code = 'not-installed'
             $verdict = "cannot determine -- not installed in this checkout (enabled declaratively only)"
+
+            # The install command is withheld for an id that is not a valid slug on both halves -- see
+            # $idIsCommandSafe above. The verdict still stands: whether the plugin is installed here is
+            # a separate question from whether its id can safely be pasted into a shell.
+            $action = if ($idIsCommandSafe) {
+                "install here: claude plugin install $id --scope project"
+            } else {
+                "no command is offered here: this plugin id is not a valid slug on both halves, so it is not pasted into one -- correct the 'enabledPlugins' key first"
+            }
         }
-        $action = "install here: claude plugin install $id --scope project"
     } elseif ($instSha -and $clone.Head) {
         if ($instSha -ieq $clone.Head) {
             $code = 'match'
@@ -466,7 +532,12 @@ $behind = @($rows | Where-Object { @('behind', 'clone-behind') -contains $_.Code
 # that does nothing. And it is not 'up to date' either: the clone genuinely holds newer commits, which
 # is the fact somebody reading this report came for.
 $unreleased = @($rows | Where-Object { $_.Code -eq 'unreleased' })
-$unknown = @($rows | Where-Object { $_.Code -eq 'indeterminate' })
+# 'not-installed' RIDES IN THIS BUCKET FOR THE DEFAULT VIEW, on purpose (#1802). It is still a
+# 'cannot determine' line to a person reading the full report, so every sentence below that counts
+# undetermined rows keeps counting it and none of them had to be re-derived. What changed is only its
+# MARKER in -Brief, which splits it back out -- the severity question and the bucket question have
+# different answers, and conflating them is what would have made this a wider change than it is.
+$unknown = @($rows | Where-Object { @('indeterminate', 'not-installed') -contains $_.Code })
 $total = $rows.Count
 
 # --- brief mode: marker lines a session start can carry, and nothing else -----------------------
@@ -496,6 +567,25 @@ if ($Brief) {
     #>
     $behindOnly = @($rows | Where-Object { $_.Code -eq 'behind' })
     $staleClone = @($rows | Where-Object { $_.Code -eq 'clone-behind' })
+    # THE SECOND [ERROR] VERDICT, AND THE ONLY ONE ADDED SINCE #1591 SET THE SPLIT (#1802). It passes
+    # that split's own test rather than widening it: a plugin enabled here with no install record for
+    # this checkout is loading nothing, in this checkout, and the row carries the one command that
+    # repairs it. Everything the split deliberately keeps quiet is unchanged -- a stale clone is still
+    # [INFO], unreleased clone commits are still [INFO], and every remaining 'cannot determine' is
+    # still [INFO], because each of those is a fact about a cache or an administration this checkout
+    # does not own. This one is a fact about this checkout.
+    #
+    # WHAT IT CANNOT REACH, said plainly so nobody reads more into it than it does: a checkout where NO
+    # enabled plugin has a record loads no hooks either, so nothing invokes this mode there and no
+    # marker of any severity appears. That is the #1802 life-hub state, and it is structurally out of
+    # reach from inside the affected checkout -- the vantage point that can see it is
+    # check-connectors.ps1 in the source repo, walking the register. What this marker fixes is the
+    # PARTIAL case: some plugins loaded, one enabled and never installed, and until now the reader was
+    # told so at the quietest marker the tool has.
+    $notInstalled = @($rows | Where-Object { $_.Code -eq 'not-installed' })
+    # Undetermined MINUS the row just split out, so the summary's own parts stay disjoint and the
+    # tally still adds up to $total. $unknown itself keeps both codes for the default view above.
+    $undetermined = @($unknown | Where-Object { $_.Code -eq 'indeterminate' })
     # 'unreleased' IS [INFO] BY THE SAME RULE AS A STALE CLONE, and it is the case that rule was
     # written for without knowing it: the only verdict worth an [ERROR] is the one a reader closes
     # with a command here and now, and this one has no command at all (#1772). Before the split it was
@@ -532,7 +622,7 @@ if ($Brief) {
         $safeId = Format-SuspectToken -Value ([string]$row.Id)
         $safeVerdict = Format-SafeProseToken -Value ([string]$row.Verdict) -MaxLength 400
         $safeAction = Format-SafeProseToken -Value ([string]$row.Action) -MaxLength 200
-        if ($row.Code -eq 'behind') {
+        if (@('behind', 'not-installed') -contains $row.Code) {
             $line = "[ERROR] ${safeId}: $safeVerdict"
             if ($safeAction) { $line += " -- $safeAction" }
             Write-Host $line
@@ -543,9 +633,10 @@ if ($Brief) {
     }
 
     $parts = @("$($behindOnly.Count) behind")
+    if ($notInstalled.Count -gt 0) { $parts += "$($notInstalled.Count) enabled but not installed here" }
     if ($staleClone.Count -gt 0) { $parts += "$($staleClone.Count) ahead of a stale clone" }
     if ($unreleased.Count -gt 0) { $parts += "$($unreleased.Count) on the released version with unreleased clone commits" }
-    if ($unknown.Count -gt 0)    { $parts += "$($unknown.Count) undetermined" }
+    if ($undetermined.Count -gt 0) { $parts += "$($undetermined.Count) undetermined" }
     $parts += "$($good.Count) up to date"
     Write-Host "[SUMMARY] $total plugin(s) enabled here: $($parts -join ', ')."
     exit 0
