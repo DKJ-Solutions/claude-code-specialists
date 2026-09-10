@@ -93,8 +93,20 @@ releases, prescribing a command that reports success and changes nothing.
       into a session start), and the every-code mix in 22 grown to six rows.
 - [x] `Add-CloneCommit` gained an optional `-Version`, which is what makes the two ancestor cases
       buildable at all; every existing call site keeps its old behaviour.
-- [x] 139 pass, 0 fail. `connectors.tests.ps1` (179) and `connector-sessioncheck.tests.ps1` (47) both
-      still green -- both assert on this script's output, and the #1772 scope note flagged one of them.
+- [x] 139 pass, 0 fail. `connectors.tests.ps1`: 179 pass, unaffected.
+- [x] `connector-sessioncheck.tests.ps1` branch 1 **did** have to change, and #1772's scope note said
+      the opposite. It reads *"asserts this same action text in an ERROR line, but for a **differing**-
+      version fixture (4.32.0 -> 4.33.0), where the command is correct. That assert is not wrong and
+      should not be swept along."* The fixture was a **same**-version one -- a clone at 4.32.0 plus a
+      bare marker commit, against a record at 4.32.0 -- and the assert read *"same version string
+      4.32.0, newer commit"*, which is exactly the shape this branch retires. Followed literally, the
+      note would have left the gate red. The fixture now bumps `plug-behind`'s `plugin.json` in that
+      second commit, so the branch keeps a row that genuinely IS behind, which is what it exists to
+      prove. 47 pass.
+- [x] One thing that run also settled, worth knowing for the next change here: the hook resolves
+      `plugin-versions.ps1` through the **plugin mirror** in this tree, not the root copy, so a suite
+      run between editing the source and running `build-shared-scripts.ps1` measures the old engine and
+      passes. That is what it did here, once.
 - [x] Run for real in this checkout: the two plugins #1772 measured now report their own verdict with
       no command, and the summary reads `6 plugin(s): 4 up to date, 2 on the released version, with
       unreleased commits in the clone -- nothing to update` where it used to read `2 of 6 plugin(s)
