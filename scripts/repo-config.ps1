@@ -100,11 +100,19 @@ function Get-RepoBlobUrl {
 # need the same migration, delivered through Claude Enterprise rather than a CLI, and the release
 # notes of the flag-day cut are where it reaches them (fase 5).
 #
-# FASE 1 IS BUILT, NOT MERGED. The source-side rename lives on feat/1769-marketplace-rename-source,
-# where .claude-plugin/marketplace.json and every '<plugin>@<marketplace>' literal in the tree already
-# read 'dkj-claude-plugins'. That branch is a staging area: it merges at the fase 3 flag day and not
-# before, in one movement with the slug rename, the major cut and the per-machine re-installs. So the
-# fase 0 sentence 'no name is changed anywhere' has expired -- it described fase 0 and nothing since.
+# WHERE TO READ THE STATE, rather than a claim about it. The source-side rename landed with the fase 3
+# flag day: .claude-plugin/marketplace.json and every '<plugin>@<marketplace>' literal in this tree
+# read 'dkj-claude-plugins', in one movement with the repository rename, the major cut and the
+# per-machine re-installs. #1769 carries the phase-by-phase record and the re-install ledger; the fase 0
+# sentence 'no name is changed anywhere' described fase 0 and nothing since.
+#
+# THIS PARAGRAPH IS DELIBERATELY WRITTEN TO BE TRUE ON BOTH SIDES OF THAT MERGE, and that is a lesson
+# rather than a style choice. It said 'FASE 1 IS BUILT, NOT MERGED' until September 10, 2026 -- an
+# honest sentence that goes false at the merge, so the branch carried a step to rewrite it on the day.
+# The trouble is WHERE that lands: open-pr refuses to push while a step above DEPLOY is unresolved, so
+# the edit could only be made after the last chance to make it, and the flag day would have opened with
+# a gate deadlock at the least convenient moment. A sentence that has to be corrected by the act it
+# describes is a sentence to reword, not a step to schedule.
 $script:BusinessMarketplaceRepo = 'BWJ-ecommerce/claude-plugins-bwj'
 
 function Get-BusinessMarketplaceRepo {

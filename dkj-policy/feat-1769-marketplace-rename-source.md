@@ -217,9 +217,14 @@ merge, and do not treat a green run from an earlier day as proof.
       retired name is data the tooling reads rather than only prose to correct, and states the test that
       separates the two: **something that RESOLVES the name may not lag, something that merely prints it
       may**
-- [ ] FLAG DAY, the remaining half: `scripts/repo-config.ps1`'s "FASE 1 IS BUILT, NOT MERGED" goes
-      false at the moment of the merge and says so in as many words, so it does not degrade quietly.
-      It is still true today -- the branch has not merged -- and this is the last edit before the cut
+- [x] FLAG DAY, the remaining half -- resolved by REWORDING rather than by scheduling.
+      `scripts/repo-config.ps1` said "FASE 1 IS BUILT, NOT MERGED", an honest sentence that goes false
+      at the merge, so this step was to correct it on the day. **That step could not have been run.**
+      `open-pr.ps1` refuses to push while a step above DEPLOY is unresolved, so the edit was only
+      reachable after the last moment it could be made, and the flag day would have opened with a gate
+      deadlock. The paragraph is now written to be true on both sides of its own merge, and it records
+      why: a sentence that has to be corrected by the act it describes is a sentence to reword, not a
+      step to schedule. Nothing on this branch now waits for the flag day
 - [x] Victor (scripts) + Edith (docs/links) review, September 10, 2026 -- four half-landed renames
       repaired (plus the same fault in `check-report-lib.ps1` and its two mirrors, which the review
       missed), one test gap closed by Tycho, and the sweep's own over-reach corrected by Tessa across
