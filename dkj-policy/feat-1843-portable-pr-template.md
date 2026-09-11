@@ -68,9 +68,10 @@ Verified against the tree before building, rather than taken from the report:
 
 ### TEST
 
-- [x] Five asserts added to `adopt-workflow-folder.tests.ps1`: the dry run lists it and writes nothing,
-      `-Apply` places it, what lands is byte-identical to the shipped reference, it carries a line
-      `open-pr` actually recognises, and a consumer's own template survives a re-run byte for byte.
+- [x] Nine asserts added to `adopt-workflow-folder.tests.ps1`, over five behaviours: the dry run lists
+      it and writes nothing, `-Apply` places it, what lands is byte-identical to the shipped reference,
+      it carries a line `open-pr` actually recognises, and a consumer's own template survives a re-run
+      byte for byte.
 - [x] **Neither content assert restates the template**, for the reason the gate asserts were rewritten
       in #1805: a literal would compare the scaffolder's output against the test file rather than
       against the thing it has to agree with, and stay green when that thing moves. One reads the
