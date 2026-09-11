@@ -10,27 +10,31 @@ and the connector register already flags them as the pair most at risk of quietl
 plugin is the thing that holds them together on the points that belong to exactly these two repos
 and to none of the others Dave runs.
 
-**It has two chapters, and each has its own page:**
+**It has three chapters, and each has its own page:**
 
 | chapter | the page | what it answers |
 |---|---|---|
 | **ticket handling** | [`WORKFLOW-portable.md`](WORKFLOW-portable.md) | what happens between spotting a problem and it being tracked where every BWJ colleague can see it |
 | **the sync log** | [`SYNC-LOG-portable.md`](SYNC-LOG-portable.md) | what a `sync/` branch owes -- a durable record of what a third party did on the live theme, in the tree rather than only in a merged PR body |
+| **the preview handover** | [`PREVIEW-HANDOVER-portable.md`](PREVIEW-HANDOVER-portable.md) | how a preview reaches the person who has to look at it -- one link to a published page, never a table of URLs in a terminal |
 
-The two are separate chapters rather than sections of one page because they answer different
-questions for different readers, and the second one was added later, on inbound
-[#1382](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1382). Shipping several portable
+They are separate chapters rather than sections of one page because they answer different questions
+for different readers, and each of the last two was added later, on inbound
+[#1382](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1382) and
+[#1873](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1873). Shipping several portable
 pages is the established form here -- `dkj-policy` carries three.
 
-**Both chapters are policy, never mechanism.** The Asana CI and the sync machinery both live
-elsewhere (`.github/` in each repo, and `dkj-subagents-shopify` respectively); what this plugin states is what
-the two repos *owe*, which is Dave's house rule for them rather than a fact about Asana or Shopify.
+**Every chapter is policy, never mechanism.** The Asana CI, the sync machinery and the preview push all
+live elsewhere (`.github/` in each repo, and `dkj-subagents-shopify` for the other two); what this
+plugin states is what the two repos *owe*, which is Dave's house rule for them rather than a fact about
+Asana or Shopify.
 
 ## It is an add-on, not a replacement
 
 `dkj-policy-bwj` **layers on top of `dkj-policy`** -- it does not stand in for it. It
-extends exactly two seams of that workflow: *ticket-work, the layer before the branch*, and *what a
-`sync/` branch owes*, which that workflow deliberately exempts and leaves to the repo. It says
+extends exactly three seams of that workflow: *ticket-work, the layer before the branch*, *what a
+`sync/` branch owes*, which that workflow deliberately exempts and leaves to the repo, and *how a
+preview is handed to a reviewer*, which that workflow does not speak to at all. It says
 **nothing** about how a branch is named, what a change owes before it can open a PR, or what a
 release is -- those are still `dkj-policy`'s answers, unchanged. So the two do not hand
 the specialists two contradicting answers to the same question; they answer different questions.
@@ -124,12 +128,28 @@ plugin's, and it is silent until a repo answers one seam -- `Get-ShopifySyncLogP
 the entry's shape, and why there is no gate are in
 [`SYNC-LOG-portable.md`](SYNC-LOG-portable.md).
 
+## Chapter three -- the preview handover, in one paragraph
+
+A Shopify change is judged by eye, on a phone, across five markets -- so it needs a link somebody can
+open, and `dkj-subagents-shopify`'s `push-preview` prints one URL per market to hand over. Until inbound
+[#1873](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1873) nothing said what to do with
+that list, so each session re-invented the carrier and landed on a markdown table: ten URLs of 70 to
+100 characters in two columns, which the terminal wraps into unreadability, which a phone cannot scan,
+and which carries none of what the reviewer needs to know. The rule is that **a preview is handed over
+as one link to a published page** -- carrying, per market, a QR code and the concretely changed pages,
+plus what the gates already proved and the one question being asked. The existing requirement is
+untouched (the changed pages, per market, unasked) and so is the safety rule it serves: no PR is opened
+before the preview is approved. What changes is only the carrier. The whole rule, why a QR per market
+rather than one, and the one constraint that makes a QR fail silently, are in
+[`PREVIEW-HANDOVER-portable.md`](PREVIEW-HANDOVER-portable.md).
+
 ## What is in this folder
 
 | what | what it holds |
 |---|---|
 | [`WORKFLOW-portable.md`](WORKFLOW-portable.md) | chapter one in prose -- ticket handling, read alongside your repo's own Asana config |
 | [`SYNC-LOG-portable.md`](SYNC-LOG-portable.md) | chapter two in prose -- what a `sync/` branch owes, where the record lands, and what it stays out of |
+| [`PREVIEW-HANDOVER-portable.md`](PREVIEW-HANDOVER-portable.md) | chapter three in prose -- what a reviewer is handed when a preview is ready, and why it is one link rather than a list |
 | [`skills/`](skills/) | the skills a specialist invokes |
 | [`templates/`](templates/) | the CI mechanism to **copy** into each repo's `.github/` -- GitHub only runs workflows from a repo's own `.github/`, so what ships here is the reference to copy and diff against, the same pattern as `dkj-policy/templates/pull_request_template.md` |
 
@@ -149,8 +169,8 @@ The hooks and blueprint a workflow carries "only where it needs them" -- this on
 
 ## What it expects from your repo -- the seam
 
-Both chapters answer themselves out of your repo-owned `scripts/repo-config.ps1` -- the same file
-`dkj-policy` already dot-sources.
+Two of the three chapters answer themselves out of your repo-owned `scripts/repo-config.ps1` -- the
+same file `dkj-policy` already dot-sources. The third, the preview handover, asks for nothing.
 
 **Chapter two needs exactly one function**, and it is the switch that turns the whole chapter on:
 
@@ -159,6 +179,10 @@ Both chapters answer themselves out of your repo-owned `scripts/repo-config.ps1`
   Shopify consumer gets. The machinery is `dkj-subagents-shopify`'s, so it is already present; this answer is
   what asks it to run. `adopt-shopify-floor` lists it among the optional Shopify seams it writes into
   that file as commented guidance.
+
+**Chapter three needs nothing at all** -- no function, no file, no CI. It is a writing rule and it is in
+force from the moment the plugin is enabled. Stated here because the other two chapters both open with
+a configuration step, so its absence reads as an omission unless it is named.
 
 **Chapter one needs the Asana answers**, a set of functions in that same file. The `report-issue`
 skill needs to know which workspace and project a mirrored task lands in, and the CI mechanism needs
@@ -214,7 +238,8 @@ it needs no workspace of its own.
 
 An ordinary plugin change: enable `dkj-policy-bwj` in `.claude/settings.json` alongside `dkj-subagents-alpha`
 and `dkj-policy`, then run [`adopt-dkj-policy-bwj`](skills/adopt-dkj-policy-bwj/SKILL.md) once for
-chapter one, and answer `Get-ShopifySyncLogPath` for chapter two.
+chapter one, and answer `Get-ShopifySyncLogPath` for chapter two. **Chapter three needs neither** -- it
+is in force as soon as the plugin is enabled.
 
 **Chapter two needs no skill of its own** -- its one adopt step, scaffolding `dkj-policy-bwj/SYNC-LOG.md`
 with its masthead, rides along inside `adopt-dkj-policy-bwj`'s run rather than getting a second skill for a

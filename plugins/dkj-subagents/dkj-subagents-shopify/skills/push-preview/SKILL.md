@@ -1,6 +1,6 @@
 ---
 name: push-preview
-description: Push the current branch to its own unpublished Shopify preview theme, creating that theme on the first push rather than at branch creation. Use it whenever a theme change has to be looked at -- it prints the preview URL(s) to hand over. It never publishes, never deletes, and refuses the live theme; the theme it creates is unpublished by definition. Lazy creation is the point: a branch that never needed a preview never leaves one behind on a store with a hard ceiling of 20 themes.
+description: Push the current branch to its own unpublished Shopify preview theme, creating that theme on the first push rather than at branch creation. Use it whenever a theme change has to be looked at -- it prints the preview URL(s), which are raw material for a handover rather than the handover itself. It never publishes, never deletes, and refuses the live theme; the theme it creates is unpublished by definition. Lazy creation is the point: a branch that never needed a preview never leaves one behind on a store with a hard ceiling of 20 themes.
 ---
 
 # push-preview -- the branch's own preview theme, created when it is first needed
@@ -50,7 +50,7 @@ turns ordinary progress into an error under PowerShell's `Stop` preference.
    `dkj-subagents-shopify`'s `PreToolUse` guard blocks a live-aimed push whatever shell wraps the command, whether
    or not this script recognised the target.
 4. **Remembers a newly created id** in the branch's git config, so the next push goes straight to step 2.2.
-5. **Prints the preview URL(s)** to hand over.
+5. **Prints the preview URL(s)** to hand over -- plus, from two of them upwards, a note that a list is raw material rather than the handover (see below).
 
 ## Parameters
 
@@ -96,6 +96,32 @@ itself hangs on a preview link, and without them the preview holds only through 
 the first internal click -- at which point you are looking at **live** while believing you are looking at
 the preview. A consumer lost a whole review to that. The built-in single URL carries them already; a seam
 answer has to carry them itself.
+
+## Handing it over -- the printed list is raw material, not the handover
+
+**Where this prints more than one URL, it also prints a note saying so**, because what happens next is
+where the failure actually lives (inbound
+[#1873](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1873), September 11, 2026). A
+multi-market store's list is five to ten URLs of 70 to 100 characters each -- a full domain, the theme
+id, and the three admin parameters -- and the reflex is to lay them out in a markdown table by market
+and page type. Measured on a handover of ten:
+
+- **The terminal wraps them**, and the column structure that was carrying *which market, which page* is
+  the first thing lost. The table's whole purpose goes before anything else does.
+- **The reviewer is on a phone**, because that is where storefront work is judged and sometimes the only
+  place the change exists at all. A URL in a desktop terminal is something they have to retype, once per
+  market, query string included.
+- **None of the surrounding state travels with it** -- what the gates proved, what is still open, what
+  is actually being asked sits in prose above and below the table and is gone an hour later.
+
+**What replaces it is your repo's to state, not this script's.** Where the workflow you run ships a
+handover rule, follow it; `dkj-policy-bwj` states one for BWJ's two store repos --
+[`PREVIEW-HANDOVER-portable.md`](https://github.com/DKJ-Solutions/dkj-claude-plugins/blob/main/plugins/dkj-policy/dkj-policy-bwj/PREVIEW-HANDOVER-portable.md),
+one link to a published page carrying a QR code per market. Where your workflow says nothing, the
+generic part still holds: hand over one link to something that renders, not a list.
+
+**One URL prints no note**, deliberately. A single line in a terminal genuinely is a usable handover,
+and the count is the honest trigger rather than a threshold chosen to keep the output quiet.
 
 ## Boundaries
 

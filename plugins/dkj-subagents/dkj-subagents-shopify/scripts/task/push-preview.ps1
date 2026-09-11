@@ -198,11 +198,23 @@ function Write-PreviewUrls {
         $named = @($urls | Where-Object { $_ })
         if ($named.Count -gt 0) {
             $named | ForEach-Object { Write-Host "  $_" -ForegroundColor Cyan }
+            Write-HandoverNote -Count $named.Count
             return
         }
         Write-Warning 'Get-ShopifyPreviewUrls answered nothing -- falling back to the single store URL.'
     }
     Write-Host ("  " + (Get-ThemePreviewUrl -Store $store -ThemeId $Id -Path $Path)) -ForegroundColor Cyan
+}
+
+function Write-HandoverNote {
+    <# A LIST OF URLS IS NOT A HANDOVER (inbound #1873). The note itself is composed in the lib, where it
+       can be tested without a store; this is only where it reaches the console. Silent below two URLs,
+       so a single-market repo sees nothing new. #>
+    param([Parameter(Mandatory = $true)][int]$Count)
+    $note = Get-PreviewHandoverNote -Count $Count
+    if (-not $note) { return }
+    Write-Host ""
+    $note | ForEach-Object { Write-Host $_ -ForegroundColor Yellow }
 }
 
 # --- Which theme? ----------------------------------------------------------------------------------

@@ -50,21 +50,39 @@ without that constraint produces a page of ten invisible boxes and no error.
 
 ### CREATE
 
-- [ ] `PREVIEW-HANDOVER-portable.md` -- chapter three of `dkj-policy-bwj`: one link to a published
+- [x] `PREVIEW-HANDOVER-portable.md` -- chapter three of `dkj-policy-bwj`: one link to a published
       page, what that page carries per market, and why a QR rather than a URL
-- [ ] The plugin `README.md` -- two chapters become three, in all four places it says so
-- [ ] The three overviews outside the plugin that state the chapter count: the root `README.md`,
-      `plugins/dkj-policy/README.md`, and both descriptions in `.claude-plugin/marketplace.json`
-- [ ] The mechanism side, so the rule is carried where the list is printed: a `Get-PreviewHandoverNote`
+- [x] The plugin `README.md` -- two chapters become three, in all five places it says so
+- [x] The four overviews outside the plugin that state the chapter count: the root `README.md`,
+      `plugins/dkj-policy/README.md`, `.claude-plugin/marketplace.json` (both descriptions) and the
+      plugin's own `plugin.json`, which the copy edit caught still saying two
+- [x] The mechanism side, so the rule is carried where the list is printed: a `Get-PreviewHandoverNote`
       in `scripts/lib/preview-theme.ps1`, printed by `push-preview.ps1` when it emits more than one URL,
       and a section in the `push-preview` skill page
-- [ ] Mirror the two shared scripts into the plugin (`scripts/sync/build-shared-scripts.ps1`)
+- [x] Mirror the two shared scripts into the plugin (`scripts/sync/build-shared-scripts.ps1`)
 
 ### TEST
 
-- [ ] `push-preview.tests.ps1` covers the new note -- silent on one URL, and carries what it has to
-- [ ] `dkj-policy-bwj.tests.ps1` asserts both portable pages ship and the chapter count is stated
-- [ ] The lint gate and all suites green
+- [x] `push-preview.tests.ps1` covers the new note -- silent on one URL, and carries what it has to
+- [x] `dkj-policy-bwj.tests.ps1` asserts both portable pages ship and the chapter count is stated
+- [x] The lint gate and all suites green
+
+
+#### What the review pass changed
+
+Three reviewers ran in parallel on the diff. The code review found nothing. The other two each moved
+the deliverable rather than only confirming it, so both are recorded here:
+
+- **Security.** The CSP note answered *rendering* and said nothing about *confidentiality*, which
+  reads as complete and is not: a preview URL is what lets a viewer see an unpublished theme, so a QR
+  generator that round-trips it to a third-party service is wrong whatever the CSP happens to permit
+  -- and the handover link itself now reaches every market's preview at once, where the terminal
+  printout reached whoever was at the terminal. Both are stated on the page now, on their own terms.
+- **Copy edit.** Two real defects and four stragglers. The skill page said the note fires *"above two"*
+  URLs while the code fires *at* two, and `plugin.json` still said "Two chapters" while the marketplace
+  entry beside it had been updated -- two hand-written copies of one blurb, drifting on this very
+  branch. Both are repaired, and both now have an assert: the boundary at exactly two, and the two
+  descriptions held to the chapter count the folder actually ships.
 
 ### DEPLOY: feat/1873-preview-handover-rule
 

@@ -57,11 +57,31 @@ Assert-True (Test-Path -LiteralPath $manifestPath) 'plugin.json is present'
 $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
 Assert-Equal 'dkj-policy-bwj' $manifest.name 'plugin.json name is dkj-policy-bwj'
 
-foreach ($rel in @('README.md', 'WORKFLOW-portable.md',
+foreach ($rel in @('README.md', 'WORKFLOW-portable.md', 'SYNC-LOG-portable.md',
+                   'PREVIEW-HANDOVER-portable.md',
                    'skills\report-issue\SKILL.md', 'skills\adopt-dkj-policy-bwj\SKILL.md',
                    'templates\asana-mirror.yml', 'templates\asana-mirror.ps1')) {
     Assert-True (Test-Path -LiteralPath (Join-Path $PluginRoot $rel)) "ships $rel"
 }
+
+# EVERY CHAPTER PAGE IS LINKED FROM THE README, and the README's own count agrees with how many there
+# are. The count is stated in five places across three files and each was edited by hand when chapter
+# two arrived (#1435, 'README overview tables say bwj-codex has one rule; it now has two chapters') and
+# again when chapter three did (#1873) -- so what is pinned is that the plugin's own README cannot
+# disagree with its own folder. The overviews outside the plugin are prose and stay the dead-link
+# gate's business.
+$readmeTxt   = Get-Content -LiteralPath (Join-Path $PluginRoot 'README.md') -Raw
+$chapterDocs = @(Get-ChildItem -LiteralPath $PluginRoot -Filter '*-portable.md' -File)
+Assert-Equal 3 $chapterDocs.Count 'the plugin ships three chapter pages'
+foreach ($doc in $chapterDocs) {
+    Assert-True ($readmeTxt -match [regex]::Escape("($($doc.Name))")) `
+        "README links $($doc.Name) -- a chapter page nothing links is a chapter nobody finds"
+}
+# The word, not the digit: the README says 'three chapters' in prose and a stale 'two' there is exactly
+# the drift #1435 was filed over.
+$countWord = @{ 1 = 'one'; 2 = 'two'; 3 = 'three'; 4 = 'four'; 5 = 'five' }[$chapterDocs.Count]
+Assert-True ($readmeTxt -match "(?i)\bIt has $countWord chapters\b") `
+    "README states '$countWord chapters', matching the $($chapterDocs.Count) pages it ships"
 
 Assert-True (-not (Test-Path -LiteralPath (Join-Path $PluginRoot 'agents'))) 'carries no agents/ (workflow rule)'
 Assert-True (-not (Test-Path -LiteralPath (Join-Path $PluginRoot 'manuals'))) 'carries no manuals/ (workflow rule)'
@@ -83,6 +103,20 @@ Assert-Equal './plugins/dkj-policy/dkj-policy-bwj' $entry.source 'marketplace so
 
 $alphaManifest = Get-Content -LiteralPath (Join-Path $RepoRoot 'plugins\dkj-subagents\dkj-subagents-alpha\.claude-plugin\plugin.json') -Raw | ConvertFrom-Json
 Assert-Equal $alphaManifest.version $manifest.version 'version is in lockstep with dkj-subagents-alpha'
+
+# BOTH DESCRIPTIONS STATE THE SAME CHAPTER COUNT as the folder ships ($countWord, from section 1).
+# plugin.json's and marketplace.json's descriptions are two hand-written copies of one blurb, and they
+# drifted on exactly the branch that added chapter three: the marketplace entry was updated while the
+# plugin's own manifest still said two. Only the COUNT is pinned, never the whole text -- the two are
+# deliberately worded for different readers (the installed plugin's own card, and the catalogue row),
+# so a byte compare would be a rule nobody wants.
+foreach ($blurb in @(
+    @{ What = 'plugin.json';      Text = [string]$manifest.description },
+    @{ What = 'marketplace.json'; Text = [string]$entry.description }
+)) {
+    Assert-True ($blurb.Text -match "(?i)\b$countWord chapters\b") `
+        "$($blurb.What) description states '$countWord chapters' -- the two blurbs cannot disagree on the count"
+}
 
 # --- 3. asana-mirror pure helpers ------------------------------------------------------------------
 Write-Host "`n-- asana-mirror helpers --" -ForegroundColor Cyan

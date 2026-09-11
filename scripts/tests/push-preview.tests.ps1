@@ -199,6 +199,32 @@ Assert-Match (Get-ThemePreviewUrl -Store 'https://a-store.myshopify.com/' -Theme
 Assert-Match (Get-ThemePreviewUrl -Store 'a-store.myshopify.com' -ThemeId '123' -Path 'products/x') '^https://a-store\.myshopify\.com/products/x\?' 'a path without its leading slash is still placed correctly'
 
 Write-Host ""
+Write-Host "Get-PreviewHandoverNote -- a list of URLs is not a handover (inbound #1873)" -ForegroundColor Cyan
+# THE COUNT IS THE TRIGGER, and the boundary is the whole assert: one URL in a terminal genuinely is a
+# usable handover, so a single-market repo must see nothing new at all. Two is where a reader has to
+# choose a layout, and choosing a table is what #1873 measured.
+Assert-Equal $null (Get-PreviewHandoverNote -Count 1) 'one URL prints no note'
+Assert-Equal $null (Get-PreviewHandoverNote -Count 0) 'and neither does none'
+# THE BOUNDARY ITSELF, because 1 and 5 leave it untested from both sides: 'more than one' and 'more
+# than two' read alike in prose and the whole rule turns on which it is. A copy-edit pass on this
+# branch caught exactly that drift in a skill page (one line said 'above two of them' while the code
+# fires at two), so the number this suite pins is the one a document can be held to.
+Assert-True (@(Get-PreviewHandoverNote -Count 2).Count -gt 0) 'and TWO is where it starts -- the boundary, not a round number'
+$note = @(Get-PreviewHandoverNote -Count 5)
+Assert-True ($note.Count -gt 0) 'five URLs do print a note'
+Assert-Match ($note -join ' ') '\b5 preview URLs\b' 'it names the count it actually saw, rather than "several"'
+# EACH OF THE THREE IS LOAD-BEARING and was measured: the terminal wraps them, the reviewer is on a
+# phone, and the repo's own workflow -- not this script -- states what the handover IS.
+Assert-Match ($note -join ' ') '(?i)\bONE link\b'  'it says what to hand over instead'
+Assert-Match ($note -join ' ') '(?i)\bphone\b'     'it names the device the reviewer is actually on'
+Assert-Match ($note -join ' ') '(?i)your workflow' 'it defers the carrier to the repo workflow'
+# IT NAMES NO REPO AND NO PLUGIN. This lib ships to every Shopify consumer; the handover rule it points
+# at is BWJ's house rule, and a generic script stating one repo's policy is the mechanism/policy split
+# inverted. If this assert ever fails, the text belongs on the policy page instead.
+Assert-True (($note -join ' ') -notmatch '(?i)bwj|smartwatchbanden|xoxowildhearts') `
+    'and it names no specific repo or plugin -- the rule is generic, the carrier is the repo''s'
+
+Write-Host ""
 if ($script:fail -gt 0) {
     Write-Host "FAILS: $($script:fail) failed, $($script:pass) passed." -ForegroundColor Red
     exit 1
