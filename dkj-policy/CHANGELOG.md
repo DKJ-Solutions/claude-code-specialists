@@ -43,7 +43,42 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**6 / 10 minor entries** <!-- pending-tally -->
+**7 / 11 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1841-reach-label-seam · 20260911-115239
+
+`dkj-policy-bwj` no longer writes the reach label's name as a literal. The string GitHub stores comes
+from `Get-ReachLabel` in the consumer's own `scripts/repo-config.ps1`, defaulting to `tier-1`, so
+every existing consumer is unchanged and silent; the reach axis itself keeps its own name in the prose
+that explains it, because what a consumer renames is a row in their label settings, not the model. The
+filing command, the decision table, both after-the-fact `gh issue edit` lines, the worklist query and
+`adopt-dkj-policy-bwj`'s existence check and `gh label create` all read the seam. Step 4 also stops
+before creating: a missing reach label means either that the repo never had one or that it renamed it,
+and only the first is safe to add -- creating it in the second case leaves two labels for one axis,
+one of them empty, with nothing reporting it. A guard in `dkj-policy-bwj.tests.ps1` refuses the
+literal in the command shapes if it is ever written back.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+`BWJ-Development/smartwatchbanden` renamed its reach label to `minor` on September 11, 2026 and
+`report-issue` has been failing outright there since -- `gh issue create` errors on a label the repo
+does not have. Answering `Get-ReachLabel` with `'minor'` is the whole fix on their side, and the next
+`adopt-dkj-policy-bwj` run no longer quietly re-creates `tier-1` beside the label their issues are
+actually on.
+
+**Score:** 4
+
+#### Pull Request
+
+A seam for the reach label's name, so a consumer that renames it keeps report-issue working
+
+Plugins: dkj-policy-bwj
+
+[PR #1845](https://github.com/DKJ-Solutions/dkj-claude-plugins/pull/1845)
+
+---
 
 ### DEPLOY: fix/1838-runid-repo-root-shape · 20260911-100046
 
