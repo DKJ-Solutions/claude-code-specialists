@@ -269,19 +269,37 @@ workspace.
 
 ## 4 -- make sure the classification labels exist
 
-[`report-issue`](../report-issue/SKILL.md) files every issue with an issue type and, where it reaches
-that far, the reach label. **`gh issue create` fails outright on a label the repo does not have**, so
-check for it and create it if it is missing. **Read `Get-ReachLabel` from `scripts/repo-config.ps1`
-first** and check for *that* name -- `tier-1` where the repo has never answered it:
+[`report-issue`](../report-issue/SKILL.md) files every issue with an issue type and, where they
+apply, the reach label and `documentation`. **`gh issue create` fails outright on a label the repo
+does not have**, so check for both and create whichever is missing. **Read `Get-ReachLabel` from
+`scripts/repo-config.ps1` first** and check for *that* name -- `tier-1` where the repo has never
+answered it:
 
 ```bash
 gh label list --repo <owner>/<repo> | grep -E '^(<reach label>|documentation)\b'
 gh label create "<reach label>" --repo <owner>/<repo> --color fbca04 \
   --description "Reaches the business: management and the commissioner notice it"
+gh label create documentation --repo <owner>/<repo> --color 0075ca \
+  --description "A doc finding, on top of whatever issue type it has"
 ```
 
+**Both names in that check now have a `create` line beside them, and until September 11, 2026 only
+one did.** The grep named two labels and the step created the reach label alone, so a repo missing
+`documentation` got a hit in the check and no instruction -- a check whose result nothing acts on
+([#1846](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1846)). It has never bitten,
+because `documentation` is one of GitHub's own default labels and both BWJ stores carry it; that is
+what kept the gap invisible, not what makes it safe. The label is load-bearing --
+[`WORKFLOW-portable.md`](../../WORKFLOW-portable.md#classify-it-as-you-file-it----three-fields-all-set-at-creation)
+records why Dave kept it where `bug` and `enhancement` were deleted, and 42 doc issues across the two
+stores sit on it -- so a filing that reaches for it in a repo without it fails at the `gh issue
+create`, exactly as a filing that reaches for the reach label does.
+
+**It gets no seam, and that is the same answer the reach label's own paragraph gives below**: a seam
+is written where a rename has actually been paid for. Nobody has renamed `documentation`, so what was
+missing here is a command, not a seam, and the two are not repaired the same way.
+
 **A missing reach label is two different situations and this step must not assume the harmless one.**
-Every other label below is missing because the repo never had it; this one can be missing because the
+Every other label in this step is missing because the repo never had it; this one can be missing because the
 repo **renamed** it and has not answered the seam. Creating it then leaves two labels for one axis, one
 of them empty, with every existing issue on the other -- and nothing reports it, because the run is
 doing exactly what it was written to do. That is the state `smartwatchbanden` was one re-adopt away

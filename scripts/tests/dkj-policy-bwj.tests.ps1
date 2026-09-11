@@ -602,6 +602,29 @@ $adoptTxt = Get-Content -LiteralPath (Join-Path $PluginRoot 'skills\adopt-dkj-po
 Assert-True ([regex]::IsMatch($adoptTxt, 'function\s+Get-ReachLabel\s*\{\s*(?:return\s+)?(["''])tier-1\1\s*;?\s*\}')) `
     'the proposed seam defaults to tier-1, so an unanswered repo is unchanged'
 
+# --- every label step 4 checks for is also created (issue #1846) ----------------------------------
+Write-Host "`n-- step 4's label-existence check --" -ForegroundColor Cyan
+
+# The check greps the repo's label list for the names report-issue files with, and a name it reports
+# missing is only useful if the step then says how to create it. It named two and created one until
+# September 11, 2026: 'documentation' was checked for and never created, so a repo without it got a
+# hit in the check and no instruction -- and report-issue's `--label documentation` then fails at the
+# gh issue create exactly as the reach label does. Both BWJ stores carry the label (it is one of
+# GitHub's defaults), which is what kept the gap invisible rather than what made it safe.
+#
+# THE ASSERT IS THE INVARIANT, NOT THE ONE NAME. A third name added to the grep without its own
+# create line reopens precisely this gap, and an assert pinned to 'documentation' would pass over it.
+# The seam's '<reach label>' placeholder is skipped: it is not a label name, and the create line it
+# stands for is guarded by the reach-label block above.
+$grepMatch = [regex]::Match($adoptTxt, "gh label list[^\r\n]*grep\s+-E\s+'\^\(([^)]*)\)")
+Assert-True $grepMatch.Success 'adopt-dkj-policy-bwj step 4 still carries a label-existence check'
+foreach ($labelName in ($grepMatch.Groups[1].Value -split '\|')) {
+    if ($labelName -match '^<.*>$') { continue }
+    $createPattern = 'gh\s+label\s+create\s+["'']?' + [regex]::Escape($labelName) + '\b'
+    Assert-True ([regex]::IsMatch($adoptTxt, $createPattern)) `
+        "step 4 creates the '$labelName' label its own check greps for"
+}
+
 # --- done ---------------------------------------------------------------------------------------
 Write-Host ""
 if ($script:fail -gt 0) {
