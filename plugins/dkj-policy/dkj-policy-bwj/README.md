@@ -24,9 +24,14 @@ questions for different readers, and each of the last two was added later -- the
 [#1874](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1874). Shipping several portable
 pages is the established form here -- `dkj-policy` carries three.
 
-**Both chapters are policy, never mechanism.** The Asana CI and the sync machinery both live
+**The chapters are policy, never mechanism.** The Asana CI and the sync machinery both live
 elsewhere (`.github/` in each repo, and `dkj-subagents-shopify` respectively); what this plugin states is what
 the two repos *owe*, which is Dave's house rule for them rather than a fact about Asana or Shopify.
+
+**Beside the chapters, it now also ships mechanism the two stores share** -- see
+[What this plugin owns](#what-this-plugin-owns) below. That is a deliberate widening
+of the line above rather than a contradiction of it: a chapter is policy, and what sits in
+[`scripts/`](scripts/) is the code both repos were writing twice.
 
 ## It is an add-on, not a replacement
 
@@ -159,11 +164,68 @@ all, and when the PR may open, both still the consumer's and `dkj-policy`'s.
 | [`WORKFLOW-portable.md`](WORKFLOW-portable.md) | chapter one in prose -- ticket handling, read alongside your repo's own Asana config |
 | [`SYNC-LOG-portable.md`](SYNC-LOG-portable.md) | chapter two in prose -- what a `sync/` branch owes, where the record lands, and what it stays out of |
 | [`PREVIEW-portable.md`](PREVIEW-portable.md) | chapter three in prose -- what a preview handover contains, why the control URL names the live theme id, and why the whole pair travels as one link rather than a table |
+| [`scripts/`](scripts/) | the mechanism both stores share, to **dot-source** from the plugin cache rather than copy -- see [What this plugin owns](#what-this-plugin-owns) |
 | [`skills/`](skills/) | the skills a specialist invokes |
 | [`templates/`](templates/) | the CI mechanism to **copy** into each repo's `.github/` -- GitHub only runs workflows from a repo's own `.github/`, so what ships here is the reference to copy and diff against, the same pattern as `dkj-policy/templates/pull_request_template.md` |
 
 **No `subagents/`, no `manuals/`, no `hooks/`, no `blueprint/`.** Agents and manuals belong to a team.
 The hooks and blueprint a workflow carries "only where it needs them" -- this one needs neither.
+
+## What this plugin owns
+
+**Anything the two stores share goes to `dkj-policy-bwj`, unless it is obviously universal**
+(Dave, September 11, 2026, on
+[#1881](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1881)). That is the whole ruling, and
+it decides where a mechanism lives the moment a second store turns out to need it.
+
+**What it is answering.** The sibling check
+([#1869](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1869)) compared the two stores for
+the first time and found 69 mechanisms only one of them has, 19 shared files that have grown apart, and
+5 pairs that are one capability under two filenames. The load-bearing instance is
+`prune-merged.ps1`: asked for centrally through the inbound route, shipped in `dkj-policy` 4.21.0,
+adopted by one store and still hand-carried in the other three weeks later. **The inbound route worked
+and nothing propagated the result to the second consumer.** Making that a rule needed one decision --
+*which plugin* -- and the answer above is it.
+
+**Why here and not in `dkj-policy`.** `dkj-policy` is enabled by every consumer of this marketplace,
+and a mechanism that reaches all of them for the benefit of two stores is the larger blast radius. The
+price is accepted and stated: `dkj-policy` stays thinner than it could be, and the two stores get a
+BWJ-only copy of things that are arguably universal -- a test harness is the standing example. *Obviously
+universal* is the exception rather than the default, and it means the mechanism has a demonstrated
+reader outside these two repos, not that one can be imagined.
+
+**Two homes this ruling does not touch:**
+
+- **`dkj-subagents-shopify`** already owns the theme mechanisms -- `push-preview.ps1`, `sync-main.ps1`,
+  `preview-theme.ps1`, `sync-rules.ps1`. A store still carrying its own copy of one of those is an
+  **adoption gap**, not an ownership question; the answer is to forward to the plugin, not to move
+  anything.
+- **Your own `scripts/repo-config.ps1`** keeps the *data*. Only the mechanism travels: the domain
+  table, the theme ids, the board gid and the workspace stay a seam answer in each store, which is what
+  lets one mechanism serve two brands.
+
+### The second question, before you build anything
+
+A store repo's own rule asks **"does the plugin provide this?"** -- and that is a one-repo question. With
+a structural N of two it answers *"no duplication"* right up until somebody opens the other repo, which
+is exactly how the divergence above accumulated. So it is joined by a second:
+
+> **"Is there a second store that needs this too?"**
+
+If the answer is yes, it belongs here, and the branch that builds it files the inbound issue that brings
+it here rather than landing a second local copy. The sibling check is the backstop, not the rule: it
+reports after the fact and refuses nothing.
+
+### What ships under it today
+
+| what | where | notes |
+|---|---|---|
+| the test harness | [`scripts/tests/test-lib.ps1`](scripts/tests/test-lib.ps1) | the assert helpers, `ConvertTo-CapturedText`, `Add-SuiteFault` and `Assert-PluginLoadedForProject` -- the superset of what the two stores each had, in English |
+
+**Adopting it** in a store repo: replace the local `scripts/tests/test-lib.ps1` with a forwarder that
+dot-sources this one out of the plugin cache, resolved through that repo's `scripts/lib/plugin-scripts.ps1`
+-- the shape `prune-merged.ps1` already uses there. Keep the file name, because every suite already
+dot-sources `test-lib.ps1` from its own folder: the forwarder costs one file and no suite changes.
 
 ## The skills
 
