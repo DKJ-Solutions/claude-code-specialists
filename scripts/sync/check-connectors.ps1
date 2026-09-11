@@ -92,6 +92,19 @@
          breach would be indistinguishable from an all-clear. Off at session start because a network
          call per absent connector does not belong on that path; the same shape -SkipDrift and
          -SkipVersions already establish here, inverted.
+      6c. AND THE QUESTION CHECK 6 CANNOT ASK: does this consumer reach into this tree AT ALL? (#1850)
+         Check 6 judges paths that are named, so a consumer running none of the three runners produces
+         no reference, no finding, and reads exactly like a fully adopted one -- adoption and
+         non-adoption were indistinguishable to the register. Measured September 11, 2026:
+         DaveKJohn/djcylow-react registers the full core-team adoption and names the workflow plugin,
+         and its entire .github/workflows/ is one ci.yml. Reported as an [INFO], not an [ERROR], on the
+         line the register already draws for an unmigrated plugin id: both halves of adopt-dkj-policy
+         that place these runners are optional, so their absence is a state and may be a decision --
+         which the finding says, pointing at the manifest's 'notes' for recording one. Gated on the
+         manifest naming the workflow plugin (under any of its names), since nothing else scaffolds
+         them; and the source repo is never asked, because it runs those scripts by local path and is
+         the one registered repo that can never produce a reference. Runs on both routes -- the disk
+         and, under -RemoteRunners, the network, where it replaces what used to be deliberate silence.
     The register no longer keeps a syncedVersion bookkeeping: the check reads the actual installed
     version from the machine record, and register administration that only duplicates numbers
     produced nothing but maintenance PRs (Dave's decision, July 20, 2026).
@@ -175,6 +188,15 @@ $PluginRoots = @(Get-RepoPluginRoots -RepoRoot $RepoRoot)
 # the whole measurement; what it needs from here is the name half of this repo's own slug, because a
 # scaffolded runner checks this repository out by name beside the consumer's tree.
 . (Join-Path $PSScriptRoot '..\lib\consumer-runner-lib.ps1')
+
+# The name half of the workflow plugin, under EVERY name it has carried -- the gate on check 6c (#1850).
+# That plugin is what scaffolds the three runners, so a manifest that does not name it describes a
+# consumer with no reason to hold them. The list is the same shape Get-MojibakePaths already keeps for
+# the folder that renamed alongside it ('workflow-davekjohn' -> 'contributing-davekjohn' -> 'dkj-policy'),
+# and it is kept here rather than in repo-config.ps1 on purpose: this is the REGISTER's knowledge about
+# manifests only this repo holds, not a seam a consumer configures. It only ever grows -- a name dropped
+# from it goes silent on precisely the consumer that has not migrated yet.
+$WorkflowPluginNames = @('dkj-policy', 'contributing-davekjohn', 'workflow-davekjohn')
 
 # The seam probe used just below. 87 lines, and it is the ONE definition of the question (#1729) --
 # the inline `Get-Command <name>` it replaced costs 32ms on a MISS, which is the case a seam probe is
@@ -440,6 +462,70 @@ function Write-RunnerPathFinding {
         }
         Write-Failure "$wfName line $($judged.Line) runs '$(Format-SafePathToken -Value $judged.Path)' out of a checkout of this repo, and that path does not exist here -- $where. That runner is red on every pull request in this consumer until the path is corrected there; nothing in this repo can correct it from here.$suffix"
     }
+}
+
+function Write-RunnerAdoptionFinding {
+    <#
+        Check 6c's verdict about a consumer's runners AS A SET (#1850) -- the question check 6 cannot
+        ask, because it judges paths that are named and a consumer running no runner names none.
+
+        [INFO], NOT [ERROR], and that is the register's own settled doctrine rather than a softening.
+        connectors/README.md already draws the line for the neighbouring case (a plugin id the
+        marketplace no longer declares): "this consumer has not migrated, which is a state rather than
+        a defect". The two halves of adopt-dkj-policy that place these runners are optional and
+        separate from enabling the plugin, so an absent runner may be a decision somebody made. That is
+        exactly why check 6 stays an [ERROR] and this does not: a runner naming a path this tree no
+        longer has is red on every pull request in that consumer, with nobody able to learn it from
+        their side; a runner nobody scaffolded is a repo working as its owner left it.
+
+        GATED ON THE MANIFEST LISTING THE WORKFLOW PLUGIN, because that plugin is what places these
+        runners. A consumer registered for the subagent teams alone has no reason to carry them, and an
+        [INFO] against it would be this register inventing an expectation the consumer never took on.
+        Every name that plugin has carried is matched, for the reason its rename history already forces
+        on $ThisRepoRetiredNames one axis over: this register records what a consumer HAS, so a manifest
+        still naming an old id is accurate until that consumer reinstalls, and a matcher knowing only
+        today's name would go quiet on exactly the repos furthest behind.
+
+        THE SOURCE REPO IS EXCLUDED BY ITS CALLER, NOT HERE, and the exclusion is a fact about the
+        mechanism rather than a courtesy to ourselves: this repo runs all three of those scripts by
+        LOCAL path, because it is the tree the others check out. It is the most adopted consumer in the
+        register and the only one that can never produce a reference.
+    #>
+    param(
+        [Parameter(Mandatory = $true)][AllowEmptyCollection()][AllowNull()][object[]]$Workflow,
+        [Parameter(Mandatory = $true)][string]$ManifestName,
+        [Parameter(Mandatory = $true)][AllowEmptyCollection()][string[]]$ListedPluginId,
+        [string]$Where = ''
+    )
+
+    $wantsRunners = $false
+    foreach ($id in @($ListedPluginId)) {
+        if (-not $id) { continue }
+        $name = ([string]$id).Split('@')[0]
+        if ($WorkflowPluginNames -contains $name) { $wantsRunners = $true; break }
+    }
+    if (-not $wantsRunners) { return }
+
+    $verdict = Test-ConsumerRunnerAdoption -Workflow $Workflow -RepositoryName (@($ThisRepoName) + $ThisRepoRetiredNames)
+    if ($verdict.Status -eq 'adopted') { return }
+
+    $suffix = if ($Where) { " ($Where)" } else { '' }
+
+    # 'unreadable' is NOT reported as a verdict about adoption -- nothing was judged, and a line saying
+    # otherwise would be the class of false all-clear (inverted) that this whole check exists to end.
+    if ($verdict.Status -eq 'unreadable') {
+        Write-Info "this consumer has $($verdict.Workflows) workflow file(s) and none of them came back with text, so whether any of them runs this workflow's CI runners was NOT established.$suffix"
+        return
+    }
+
+    $state = if ($verdict.Status -eq 'no-workflows') {
+        'has no .github/workflows at all'
+    } else {
+        "has $($verdict.Workflows) workflow file(s), and not one of them checks this repository out"
+    }
+    $partial = if ($verdict.Unreadable -gt 0) { " ($($verdict.Unreadable) of them could not be read and were not judged)" } else { '' }
+
+    Write-Info "this consumer names the workflow plugin in $ManifestName but $state$partial -- so none of the runners 'adopt-dkj-policy' places is running there: the branch-entry gate (part 1) fires on none of its pull requests, and the fold and the resolves verification (part 3) do not survive a merge no session observes. That may be deliberate -- both parts are optional and separate from enabling the plugin, and nothing here can tell a decision from an omission. If it is deliberate, say so in $ManifestName's 'notes'; if it is not, run the 'adopt-dkj-policy' skill in that repo. Only a checkout step naming this repository counts as a runner here, so this says nothing recognisable reaches into this tree rather than that nothing is there.$suffix"
 }
 
 function Test-GitHubOwnerNameSlug {
@@ -736,7 +822,7 @@ foreach ($mf in $manifestFiles) {
                         # command that shows gh's own message, which was discarded to keep the JSON
                         # parseable.
                         Write-Info "-RemoteRunners: this consumer's CI runners could not be read -- $($remote.Reason). Nothing about them was checked; 'gh api repos/$(Format-SafePathToken -Value $remoteRepo)' shows what gh itself says about the repository."
-                    } elseif ($remote.Status -eq 'read') {
+                    } elseif ($remote.Status -eq 'read' -or $remote.Status -eq 'no-workflows') {
                         $onBranch = if ($remote.Branch) { "read from $(Format-SafePathToken -Value $remote.Branch) over the API -- no checkout of this consumer is on this machine" } else { 'read over the API -- no checkout of this consumer is on this machine' }
                         foreach ($rf in @($remote.Files)) {
                             if ($null -eq $rf.Text) {
@@ -745,10 +831,22 @@ foreach ($mf in $manifestFiles) {
                             }
                             Write-RunnerPathFinding -WorkflowName $rf.Name -WorkflowText $rf.Text -Where $onBranch
                         }
+
+                        # --- 6c OVER THE NETWORK (#1850) ------------------------------------------
+                        # 'no-workflows' USED TO BE SILENCE ON PURPOSE here, on the reading that a
+                        # consumer running none of these runners had nothing for this check to say
+                        # about it. That reading was the blind spot itself: it made an unadopted repo
+                        # indistinguishable from a clean one, which is what #1850 measured. It reaches
+                        # this block rather than the one above because that status carries no files,
+                        # and the verdict function is what turns 'no files' into a sentence.
+                        $remotePluginIds = @()
+                        if ($m.PSObject.Properties.Name -contains 'plugins') {
+                            $remotePluginIds = @(@($m.plugins) |
+                                Where-Object { $null -ne $_ -and ($_.PSObject.Properties.Name -contains 'id') -and $_.id } |
+                                ForEach-Object { [string]$_.id })
+                        }
+                        Write-RunnerAdoptionFinding -Workflow @($remote.Files) -ManifestName $mf.Name -ListedPluginId $remotePluginIds -Where $onBranch
                     }
-                    # 'no-workflows' is silence on purpose: it is the same verdict the local half
-                    # reaches when .github/workflows is not there, and a consumer that runs none of
-                    # these runners has nothing for this check to say about it.
                 }
             }
         }
@@ -1372,12 +1470,27 @@ foreach ($mf in $manifestFiles) {
     # own rather than falling into either of the two here. Both are honoured there -- do not widen
     # this block itself to the network.
     if ($ThisRepoName) {
+        # The set is COLLECTED as it is judged, so check 6c below can ask its question about the whole
+        # of .github/workflows without reading it twice. Each file is still judged one at a time by
+        # exactly the call this block always made.
+        $localWorkflows = @()
         $workflowDir = Join-Path $checkout '.github\workflows'
         if (Test-Path -LiteralPath $workflowDir -PathType Container) {
             foreach ($wf in @(Get-ChildItem -LiteralPath $workflowDir -File -ErrorAction SilentlyContinue |
                               Where-Object { $_.Extension -in @('.yml', '.yaml') } | Sort-Object Name)) {
-                Write-RunnerPathFinding -WorkflowName $wf.Name -WorkflowText ([System.IO.File]::ReadAllText($wf.FullName))
+                $wfText = [System.IO.File]::ReadAllText($wf.FullName)
+                Write-RunnerPathFinding -WorkflowName $wf.Name -WorkflowText $wfText
+                $localWorkflows += [pscustomobject]@{ Name = $wf.Name; Text = $wfText }
             }
+        }
+
+        # --- 6c. DOES THIS CONSUMER RUN ANY OF THESE RUNNERS AT ALL? (#1850) ----------------------
+        # Check 6 above judges paths that ARE named, so a consumer naming none produces no finding and
+        # reads exactly like a fully adopted one. THE SOURCE REPO IS NOT ASKED: it runs all three of
+        # those scripts by local path, being the tree every consumer checks out, so it is the one
+        # registered repo that can never produce a reference and an [INFO] about it would be false.
+        if ($checkout -ne $RepoRoot) {
+            Write-RunnerAdoptionFinding -Workflow $localWorkflows -ManifestName $mf.Name -ListedPluginId @($listedPluginIds)
         }
     }
 

@@ -265,17 +265,20 @@ Assert-Equal 'BWJ-ecommerce/smartwatchbanden#42' (Get-IssueRefFromNotes -Notes '
 Assert-True  ($null -eq (Get-IssueRefFromNotes -Notes 'no link at all')) 'Get-IssueRefFromNotes returns null without a GitHub issue URL'
 
 # --- the prio label ------------------------------------------------------------------------------
-# Dave's mapping, September 2, 2026: 1.00-1.99 very low | 2.00-2.99 low | 3.00-3.99 high |
-# 4.00-5.00 very high. EVERY boundary is asserted from both sides, because an off-by-a-hundredth
+# Dave's mapping, September 2, 2026: 1.00-1.99 prio-1 | 2.00-2.99 prio-2 | 3.00-3.99 prio-3 |
+# 4.00-5.00 prio-4. EVERY boundary is asserted from both sides, because an off-by-a-hundredth
 # here mislabels real work and nothing downstream would notice it had happened.
-Assert-Equal 'very low'  (Get-PrioLabelForScore -Score 1)    'score 1.00 is very low -- the bottom of the scale'
-Assert-Equal 'very low'  (Get-PrioLabelForScore -Score 1.99) 'and 1.99 is still very low'
-Assert-Equal 'low'       (Get-PrioLabelForScore -Score 2)    '2.00 flips to low'
-Assert-Equal 'low'       (Get-PrioLabelForScore -Score 2.99) 'and 2.99 is still low'
-Assert-Equal 'high'      (Get-PrioLabelForScore -Score 3)    '3.00 flips to high'
-Assert-Equal 'high'      (Get-PrioLabelForScore -Score 3.99) 'and 3.99 is still high'
-Assert-Equal 'very high' (Get-PrioLabelForScore -Score 4)    '4.00 flips to very high'
-Assert-Equal 'very high' (Get-PrioLabelForScore -Score 5)    'and 5.00, the top of the scale, is very high'
+#
+# The NAMES are the family's shared ones since September 11, 2026 (#1842); the bands are Dave's
+# original four and did not move with them.
+Assert-Equal 'prio-1' (Get-PrioLabelForScore -Score 1)    'score 1.00 is prio-1 -- the bottom of the scale'
+Assert-Equal 'prio-1' (Get-PrioLabelForScore -Score 1.99) 'and 1.99 is still prio-1'
+Assert-Equal 'prio-2' (Get-PrioLabelForScore -Score 2)    '2.00 flips to prio-2'
+Assert-Equal 'prio-2' (Get-PrioLabelForScore -Score 2.99) 'and 2.99 is still prio-2'
+Assert-Equal 'prio-3' (Get-PrioLabelForScore -Score 3)    '3.00 flips to prio-3'
+Assert-Equal 'prio-3' (Get-PrioLabelForScore -Score 3.99) 'and 3.99 is still prio-3'
+Assert-Equal 'prio-4' (Get-PrioLabelForScore -Score 4)    '4.00 flips to prio-4'
+Assert-Equal 'prio-4' (Get-PrioLabelForScore -Score 5)    'and 5.00, the top of the scale, is prio-4'
 
 # no score and an out-of-range score give the same answer -- no label, never the nearest bucket
 Assert-True ($null -eq (Get-PrioLabelForScore -Score $null)) 'a task with no score gets no label at all'
@@ -285,7 +288,7 @@ Assert-True ($null -eq (Get-PrioLabelForScore -Score 5.01))  'and one above the 
 # THE MAPPING IS CULTURE-INVARIANT, which is not obvious and was measured rather than assumed: the
 # machine this repo is maintained on runs nl-NL, where the decimal separator is a comma. A score
 # arriving as a string must still read as three-and-a-half and not as thirty-five.
-Assert-Equal 'high' (Get-PrioLabelForScore -Score '3.5') "a score arriving as the string '3.5' still reads as 3.5"
+Assert-Equal 'prio-3' (Get-PrioLabelForScore -Score '3.5') "a score arriving as the string '3.5' still reads as 3.5"
 
 # every label the mapper can return is one the enforcer knows how to remove: if these two drift, a
 # rescored ticket keeps a stale label forever and the issue claims two priorities at once
@@ -293,6 +296,18 @@ foreach ($s in @(1.5, 2.5, 3.5, 4.5)) {
     Assert-True ($script:PrioLabels -contains (Get-PrioLabelForScore -Score $s)) "the label for score $s is one PrioLabels knows"
 }
 Assert-Equal 4 $script:PrioLabels.Count 'and PrioLabels holds exactly the four buckets -- there is no medium'
+
+# THE PRE-#1842 NAMES ARE REMOVED BUT NEVER WRITTEN, which is what keeps a half-migrated repo from
+# claiming two priorities at once: one that gained the new labels from adopt-dkj-policy-bwj's
+# ADDITIVE step, rather than from the rename, holds all eight with the old name still on every
+# issue. The two asserts below pin the removal half; the loop above already pins the other, since a
+# mapper that only ever returns a PrioLabels name cannot return a legacy one once the sets are
+# disjoint. That the removal itself FIRES is not asserted -- it is past the early return and would
+# need a gh call, so it is a known test gap rather than a covered path.
+Assert-Equal 4 $script:LegacyPrioLabels.Count 'the legacy set holds the same four buckets'
+foreach ($legacy in $script:LegacyPrioLabels) {
+    Assert-True ($script:PrioLabels -notcontains $legacy) "'$legacy' is legacy-only -- the two sets never overlap"
+}
 
 # reading the score off a task object, past the other custom fields Asana returns beside it
 $scoredTask = [pscustomobject]@{ custom_fields = @(
@@ -306,7 +321,7 @@ Assert-True ($null -eq (Get-PrioScoreFromTask -Task $emptyScore -FieldName 'Prio
 
 # an issue that already reads correctly is not written to -- what keeps the daily re-run quiet. This
 # path returns before any gh call, so it is safe to assert here with no network and no repo.
-Assert-True (-not (Set-IssuePrioLabel -Repo 'o/r' -Number 1 -Label 'high' -Current @('high', 'tier-1'))) 'an issue already carrying the right prio label is left alone'
+Assert-True (-not (Set-IssuePrioLabel -Repo 'o/r' -Number 1 -Label 'prio-3' -Current @('prio-3', 'tier-1'))) 'an issue already carrying the right prio label is left alone'
 
 # --- the stage sections --------------------------------------------------------------------------
 # The board's six sections are the cycle's stages, and a section is recognised by the NUMBER its name

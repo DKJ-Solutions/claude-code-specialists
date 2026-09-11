@@ -1,7 +1,8 @@
 <#
 .SYNOPSIS
     Which scripts of THIS tree a consumer's CI runners reach into, and whether those paths still
-    exist here. Issue #1805.
+    exist here (issue #1805) -- and, since #1850, whether that consumer reaches into this tree at
+    all, which is the question the first one cannot ask.
 
 .DESCRIPTION
     WHAT BROKE, AND WHY NOTHING SAID SO. Three runners this workflow scaffolds into a consumer --
@@ -87,6 +88,12 @@
     A finding here is therefore always about a path that IS named; the absence of one is never
     evidence that a consumer is clean. Adding a parser dependency to a lint that must run on a bare
     Windows PowerShell 5.1 in a consumer with no modules installed is the cost this declines to pay.
+
+    THAT LAST SENTENCE NAMED A BLIND SPOT AND LEFT IT OPEN, which #1850 measured from the outside: a
+    consumer running NO runner at all reads identically to a fully adopted one. Test-ConsumerRunnerAdoption
+    at the foot of this file asks that second question -- does anything here reach into this tree -- and
+    inherits the same bound rather than escaping it, which is why its 'no-reference' means "nothing
+    recognisable", never "nothing is there".
 #>
 
 Set-StrictMode -Version Latest
@@ -314,4 +321,104 @@ function Test-SharedScriptReference {
     }
 
     return @($results)
+}
+
+function Get-RunnerRecordField {
+    <#
+        One field of a workflow record, whichever of the two shapes its caller built (#1850) -- a
+        hashtable from the network read, a [pscustomobject] from the disk read. $null when the record
+        does not carry that field at all, which is the same answer as a field explicitly set to $null
+        and deliberately so: both mean "this run has no text for that file".
+    #>
+    param(
+        [Parameter(Mandatory)][AllowNull()]$Record,
+        [Parameter(Mandatory)][string]$Field
+    )
+
+    if ($null -eq $Record) { return $null }
+    if ($Record -is [System.Collections.IDictionary]) {
+        if ($Record.Contains($Field)) { return $Record[$Field] }
+        return $null
+    }
+    if ($Record.PSObject.Properties.Name -contains $Field) { return $Record.$Field }
+    return $null
+}
+
+function Test-ConsumerRunnerAdoption {
+    <#
+        Does this consumer run ANY runner that reaches into a checkout of $RepositoryName at all --
+        issue #1850.
+
+        THE BLIND SPOT THIS CLOSES IS THE ONE THIS FILE'S OWN HEADER DECLARES. Get-SharedScriptReference
+        answers "is the path this runner names still here?", and its bound is stated up there without
+        euphemism: a finding is always about a path that IS named, and the absence of one is never
+        evidence that a consumer is clean. So a consumer running NONE of the three runners produces no
+        reference, no finding, and reads exactly like a fully adopted one -- adoption and non-adoption
+        are indistinguishable to the register.
+
+        MEASURED SEPTEMBER 11, 2026 (#1850). connectors/djcylow-react.json registers the full 19-lens
+        core-team adoption and names the workflow plugin, and that repository's entire
+        .github/workflows/ is one ci.yml: no branch-entry.yml, no fold-on-merge.yml, no
+        verify-resolved.yml. check-connectors.ps1 reported it exactly as it reports a repo running all
+        three.
+
+        FOUR STATUSES, BECAUSE THE WAYS OF HAVING NO RUNNER ARE DIFFERENT CONVERSATIONS and a caller
+        that cannot tell them apart writes a sentence that is wrong in three of the four cases:
+
+          'no-workflows' -- no workflow files at all. Nothing was adopted and nothing was read.
+          'unreadable'   -- workflow files exist and NONE of them came with text (the remote read hits
+                            this on a binary or over-size file). Nothing was judged, so this is not a
+                            verdict about adoption and must not be printed as one.
+          'no-reference' -- workflow files were read, and not one of them checks $RepositoryName out.
+          'adopted'      -- at least one does.
+
+        AND 'no-reference' IS STILL BOUNDED BY THE PARSER ABOVE. This walks the same recogniser, so a
+        runner written in a shape that recogniser declines (a quoted multi-line scalar, a flow mapping)
+        yields nothing and lands here as 'no-reference'. That is honest for the finding it feeds --
+        "nothing recognisable reaches into this tree" -- and it is why the caller's wording says that
+        rather than "this consumer has not adopted". Readable and Unreadable come back alongside so a
+        partially-read set can say so.
+
+        WHETHER AN ABSENT RUNNER IS A DEFECT IS NOT THIS FUNCTION'S QUESTION, and deliberately so: the
+        two halves of adopt-dkj-policy that place these runners are optional and separate from enabling
+        the plugin, so a consumer may have decided against them. What was wrong was that nobody could
+        tell either way from here. This reports the state; the caller decides what to call it.
+    #>
+    param(
+        # One record per workflow file, carrying Name and Text, with Text $null where the bytes could
+        # not be obtained. EITHER A HASHTABLE OR AN OBJECT, because the two callers genuinely hold two
+        # shapes -- the network read builds @{ Name; Text } and the disk read builds a [pscustomobject]
+        # -- and reading only one of them is a silent miss, not an error: a hashtable's
+        # PSObject.Properties are Keys/Values/Count, so 'Text' is simply never found and every file
+        # reads as unreadable. Measured on the first run of this function against the real register.
+        [Parameter(Mandatory)][AllowEmptyCollection()][AllowNull()][object[]]$Workflow,
+        [Parameter(Mandatory)][string[]]$RepositoryName
+    )
+
+    $files       = @(@($Workflow) | Where-Object { $null -ne $_ })
+    $readable    = 0
+    $referencing = @()
+
+    foreach ($wf in $files) {
+        $text = Get-RunnerRecordField -Record $wf -Field 'Text'
+        if ($null -eq $text) { continue }
+        $readable++
+        if (@(Get-SharedScriptReference -WorkflowText ([string]$text) -RepositoryName $RepositoryName).Count -gt 0) {
+            $referencing += [string](Get-RunnerRecordField -Record $wf -Field 'Name')
+        }
+    }
+
+    $status =
+        if ($files.Count -eq 0)         { 'no-workflows' }
+        elseif ($readable -eq 0)        { 'unreadable'   }
+        elseif ($referencing.Count -gt 0) { 'adopted'    }
+        else                            { 'no-reference' }
+
+    return [pscustomobject]@{
+        Status      = $status
+        Workflows   = $files.Count
+        Readable    = $readable
+        Unreadable  = $files.Count - $readable
+        Referencing = @($referencing)
+    }
 }
