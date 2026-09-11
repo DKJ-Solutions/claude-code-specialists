@@ -236,6 +236,13 @@ marketplace registration machine-wide, and it takes every install record keyed o
 it — including the records of checkouts that have not migrated yet, and that no command in your run has
 named.
 
+**"Every record keyed on that marketplace" has a second axis, and it is the one that bites inside a
+single checkout.** Records are stored under `<plugin>@<marketplace>`, so retiring the marketplace half
+cannot be selective by plugin: the `remove` also takes **this** checkout's records for plugins your
+step 2 never mentioned. That is why each sequence below reinstalls more ids than it uninstalled, and it
+applies to a machine with exactly one checkout too
+([#1824](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1824)).
+
 Measured on September 11, 2026, on one machine with three checkouts, read before and after
 from `~/.claude/plugins/installed_plugins.json`:
 
@@ -292,8 +299,13 @@ on `add` rather than on `remove`, so there is probably nothing to narrow it with
 > **This section is for a repo that has this family's teams installed under the ids they used up to
 > September 9, 2026** — `dkj-team-alpha@claude-code-specialists` and the three add-on teams. Like the
 > section below it, this is a rename and nothing else: no team gained or lost a specialist, a manual, a
-> skill or a hook on the day it happened. The workflow ids (`dkj-policy`, `dkj-policy-bwj`) are
-> **unchanged** — do not touch them.
+> skill or a hook on the day it happened.
+>
+> **The workflow PLUGIN ids (`dkj-policy`, `dkj-policy-bwj`) are unchanged — but their INSTALL ids are
+> not, and step 3 below drops their records.** An installed id is `<plugin>@<marketplace>`, and step 3
+> retires the marketplace half for **everything** on this machine, not only for the four teams it names.
+> So if you have a workflow plugin installed, step 4 reinstalls it — the lines are there, and
+> [#1824](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1824) is why.
 
 | old plugin id | new plugin id |
 |---|---|
@@ -327,30 +339,43 @@ claude plugin uninstall dkj-team-shopify@claude-code-specialists --scope project
 # 3. Re-register the marketplace under its new name -- the marketplace itself was
 #    renamed on the flag day, so your machine must drop the old registration and add
 #    the new one. A plain refresh cannot do this: the name is part of the id.
-#    The `remove` is MACHINE-WIDE and is the only command here that is: it also drops
-#    the install records of every OTHER checkout on this machine, ending their
-#    migration early. The `add` is per checkout -- that is what --scope project means.
+#    The `remove` is MACHINE-WIDE and is the only command here that is. It drops EVERY
+#    install record keyed on the old marketplace -- every plugin and every checkout,
+#    not just the ids step 2 named. So it ends the migration of every OTHER checkout
+#    on this machine early, AND it takes this checkout's other plugins with it, which
+#    is why step 4 below puts back every plugin you had, not just the renamed ones.
+#    The `add` is per checkout -- that is what --scope project means.
 #    With more than one checkout, read "If this machine has more than one checkout"
 #    above first: there you skip the remove and start at the add.
 claude plugin marketplace remove claude-code-specialists
 claude plugin marketplace add DKJ-Solutions/dkj-claude-plugins --scope project
 
-# 4. Refresh the new marketplace, then install the new ids -- only the ones you had
+# 4a. Refresh the new marketplace, then install the new team ids -- only the ones you had
 claude plugin marketplace update dkj-claude-plugins
 claude plugin install dkj-subagents-alpha@dkj-claude-plugins --scope project
 claude plugin install dkj-subagents-ecomm@dkj-claude-plugins --scope project
 claude plugin install dkj-subagents-lifehub@dkj-claude-plugins --scope project
 claude plugin install dkj-subagents-shopify@dkj-claude-plugins --scope project
+
+# 4b. The workflow, if you had one -- its PLUGIN id did not change, which is exactly
+#     why this is easy to skip, but step 3 took its install record with the teams'.
+#     Still on `contributing-davekjohn`? Run the section below instead of these two.
+claude plugin install dkj-policy@dkj-claude-plugins --scope project
+# Only BWJ's two store repos need this one:
+claude plugin install dkj-policy-bwj@dkj-claude-plugins --scope project
 ```
 
 **5. Restart your Claude Code session.**
 
 `--scope project` is not optional here any more than it is anywhere else on this page. Expect the
 uninstalls, the `marketplace add`, and the installs to rewrite `.claude/settings.json` on the way, the
-same rewriting behaviour [documented above](#connecting--the-install-step): the four `dkj-team-*`
-`enabledPlugins` entries come out, the four `dkj-subagents-*` ones go in, the marketplace source key is
-repointed at `dkj-claude-plugins`, and any diff beyond that is formatting. **That file is the CLI's to
-edit, so it is not on the list below** — the list is what the CLI leaves for you.
+same rewriting behaviour [documented above](#connecting--the-install-step): the `dkj-team-*`
+`enabledPlugins` entries come out, the `dkj-subagents-*` ones go in, the marketplace source key is
+repointed at `dkj-claude-plugins`, and any diff beyond that is formatting. **A workflow entry you
+reinstalled at 4b is repointed at the new marketplace in the same pass** — it looks like a change to a
+plugin this section said it was not touching, and it is the marketplace half of its id moving, nothing
+more. **That file is the CLI's to edit, so it is not on the list below** — the list is what the CLI
+leaves for you.
 
 ### The two things inside your repo that the id swap does not fix
 
@@ -417,19 +442,30 @@ claude plugin uninstall bwj-codex@claude-code-specialists --scope project
 # 3. Re-register the marketplace under its new name -- the marketplace itself was
 #    renamed on the flag day, so your machine must drop the old registration and add
 #    the new one. A plain refresh cannot do this: the name is part of the id.
-#    The `remove` is MACHINE-WIDE and is the only command here that is: it also drops
-#    the install records of every OTHER checkout on this machine, ending their
-#    migration early. The `add` is per checkout -- that is what --scope project means.
+#    The `remove` is MACHINE-WIDE and is the only command here that is. It drops EVERY
+#    install record keyed on the old marketplace -- every plugin and every checkout,
+#    not just the ids step 2 named. So it ends the migration of every OTHER checkout
+#    on this machine early, AND it takes this checkout's other plugins with it, which
+#    is why step 4 below puts back every plugin you had, not just the renamed ones.
+#    The `add` is per checkout -- that is what --scope project means.
 #    With more than one checkout, read "If this machine has more than one checkout"
 #    above first: there you skip the remove and start at the add.
 claude plugin marketplace remove claude-code-specialists
 claude plugin marketplace add DKJ-Solutions/dkj-claude-plugins --scope project
 
-# 4. Refresh the new marketplace, then install the new ids
+# 4a. Refresh the new marketplace, then install the new workflow ids
 claude plugin marketplace update dkj-claude-plugins
 claude plugin install dkj-policy@dkj-claude-plugins --scope project
 # Only BWJ's two store repos need the second one:
 claude plugin install dkj-policy-bwj@dkj-claude-plugins --scope project
+
+# 4b. Your teams, if you have any -- this section renames nothing about them, so step
+#     2's short list reads as the whole reach; step 3 dropped their records anyway.
+#     Still on `dkj-team-*`? Run the section above instead: it uninstalls those first.
+claude plugin install dkj-subagents-alpha@dkj-claude-plugins --scope project
+claude plugin install dkj-subagents-ecomm@dkj-claude-plugins --scope project
+claude plugin install dkj-subagents-lifehub@dkj-claude-plugins --scope project
+claude plugin install dkj-subagents-shopify@dkj-claude-plugins --scope project
 ```
 
 **5. Restart your Claude Code session.**
@@ -567,9 +603,12 @@ claude plugin uninstall specialists-workflow-davekjohn@claude-code-specialists -
 # 3. Re-register the marketplace under its new name -- the marketplace itself was
 #    renamed on the flag day, so your machine must drop the old registration and add
 #    the new one. A plain refresh cannot do this: the name is part of the id.
-#    The `remove` is MACHINE-WIDE and is the only command here that is: it also drops
-#    the install records of every OTHER checkout on this machine, ending their
-#    migration early. The `add` is per checkout -- that is what --scope project means.
+#    The `remove` is MACHINE-WIDE and is the only command here that is. It drops EVERY
+#    install record keyed on the old marketplace -- every plugin and every checkout,
+#    not just the ids step 2 named. So it ends the migration of every OTHER checkout
+#    on this machine early, AND it takes this checkout's other plugins with it, which
+#    is why step 4 below puts back every plugin you had, not just the renamed ones.
+#    The `add` is per checkout -- that is what --scope project means.
 #    With more than one checkout, read "If this machine has more than one checkout"
 #    above first: there you skip the remove and start at the add.
 claude plugin marketplace remove claude-code-specialists
