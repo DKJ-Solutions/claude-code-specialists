@@ -43,7 +43,39 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**6 / 8 minor entries** <!-- pending-tally -->
+**6 / 9 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1831-connector-swb-candidate · 20260911-095211
+
+`connectors/smartwatchbanden.json` records a fourth `localCheckout` candidate,
+`../../bwj-development/smartwatchbanden`, so a machine laying the BWJ trees out that way checks that
+consumer instead of skipping it. Before this, `check-connectors.ps1` asserted the checkout was absent
+and exited 0, suppressing five plugin blocks, their extension inventories and their version drift --
+the silent class #1524 named and #1807 repeated, one machine further.
+
+The append is pure: `localCheckout` is first-match-wins and additive, so the three earlier candidates
+keep working on the machines they are true on. #1807's note had anticipated this entry, guessed it as
+`bwjdevelopment/` and deliberately declined to record an unobserved layout; the real folder is
+hyphenated, so that guess would have been wrong -- which is the argument for the rule rather than
+against it.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A -- the connector register is this repo's own maintenance bookkeeping. A consumer of the
+specialists system neither reads it nor is affected by it; what changes is what a maintainer's own
+`check-connectors` run can see on one machine.
+
+**Score:** N/A
+
+#### Pull Request
+
+Record the bwj-development/ layout as a smartwatchbanden connector candidate
+
+[PR #1836](https://github.com/DKJ-Solutions/dkj-claude-plugins/pull/1836)
+
+---
 
 ### DEPLOY: fix/1833-suite-durations-refresh · 20260911-093745
 
