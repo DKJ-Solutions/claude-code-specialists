@@ -40,17 +40,58 @@ Print the author and the age of every parked-fix commit, and say so as a refusal
 
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [x] `ConvertFrom-CommitScanLog` reads four fields (`%H%x1f%an%x1f%at%x1f%s`), with the epoch
+      validated as digits so a shifted line reports an age it declines to state rather than a wrong one.
+- [x] `Format-CommitAge` -- one coarse unit, `just now` at both ends of the range.
+- [x] `Test-SelfAuthored` -- the comparison is against the git AUTHOR name, with the claiming login
+      accepted as well; no names configured means no verdict.
+- [x] `Get-ForeignParkedCommit` -- the newest scanned commit this checkout did not write. Its own
+      function because two callers ask it, and scraping it back out of printed prose is how they drift.
+- [x] `Format-ParkedFixReport` prints sha, WHO, WHEN, then the subject, and closes with the
+      refusal-shaped `NOT YOURS` block when there is one.
+- [x] `claim-issue.ps1` asks git for the two fields, sanitises the author name like the other two
+      pushed fields, and its closing verdict no longer says "the work starts here" over the top of it --
+      on a fresh claim and on a resume.
+- [x] The skill page carries the new output, the comparison rule, and why the verdict refuses nothing.
+- [x] Plugin mirrors rebuilt (`build-shared-scripts.ps1`).
 
 ### TEST
 
+- [x] `claim-issue.tests.ps1` -- 193 passed, 0 failed. New coverage: the four-field parse and its
+      shifted-line case, every unit of `Format-CommitAge` including a commit dated in the future, the
+      display-name checkout that must recognise its own commits, the verdict and its absence, an
+      unreadable date, a pre-#1878 record, and the three script-shape properties that are otherwise a
+      silence (the log format, the self names, the closing line reading the flag).
+- [x] `check-plugin-integrity.ps1` -- 0 errors.
+- [x] Rendered against the real commit on this branch, with a foreign self name, to see the block a
+      reader actually gets.
+
 ### DEPLOY: fix/1878-parked-fix-attribution
 
-**Score:**
+The parked-fix scan now names WHO parked each commit and HOW LONG AGO, ahead of the subject, and says
+so as a verdict where the newest one is not this checkout's own.
+
+The scan landed on September 11, 2026 and was defeated the next day by the one commit shape a parked
+branch always has. A session claimed #1874, was told there was one commit on one branch off the trunk,
+read it exactly as the warning instructs, found a `park:` scaffold touching only the branch document,
+and carried on -- while its author was three minutes in and twenty minutes from opening their pull
+request. A park commit is empty by design, so content is the one thing that cannot report a collision.
+Both facts that would have stopped it were one git format field away and neither was asked for.
+
+The verdict is refusal-shaped and refuses nothing, which is the precision of the measurement rather
+than a hedge: the scan matches any commit *naming* the issue, and a colleague mentioning one is
+ordinary. What it does change is the closing line, because a run that says ASK THEM BEFORE YOU WRITE
+ANYTHING and then THE WORK STARTS HERE has settled nothing.
+
+**Score:** 4
 
 #### What makes this deploy extra special
 
-**Score:**
+The claim step ships in `dkj-policy`, so every consumer running this workflow gets the attribution and
+the verdict at the moment a session picks up an issue -- the one moment duplicate work can still be
+prevented for free. A reader who has ever dismissed a parked branch on its contents is the audience.
+
+**Score:** 3
 
 #### Pull Request
 
