@@ -139,6 +139,24 @@ be thorough about machines nobody uses.
   **The carve-out is the self-record and nothing else.** Every other consumer migrates its record on
   the day it reinstalls, exactly as the paragraph above says, and "we are doing a big rename" is not a
   second carve-out.
+- **`siblingGroup` is optional, and it is the one field that says two consumers are meant to run the
+  same floor.** Give two or more manifests the same value and
+  [`check-consumer-siblings.ps1`](#sibling-divergence-mechanisms-one-consumer-has-and-its-sibling-does-not)
+  compares their tooling layers; a manifest without the field is in no group and is never compared.
+  Today `bwj-store` names the two BWJ stores and nothing else does.
+
+  **It is DECLARED rather than inferred, and that is the whole design of the field**
+  ([#1869](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1869)). Inferring the grouping —
+  from a shared plugin set, say — is the obvious alternative and is wrong in a way no error message
+  would ever show: every consumer of this marketplace shares `dkj-policy`, so a plugin-set inference
+  puts `life-hub` in a group with a Shopify store and then reports a personal-life repo as missing a
+  theme-archive mechanism. The grouping is a statement about **intent** — *these two repos are meant to
+  run the same floor* — and intent is something somebody writes down.
+
+  **It says nothing about what a consumer HAS**, which is what keeps it outside the
+  "register what is, not what should be" discipline the `plugins[].id` rule above draws. A group label
+  is a statement about this repo's own intent for two consumers, so it can be written the day the
+  intent exists rather than the day either consumer changes.
 - `notes` is the human summary/explanation; updated when something changes substantively, not on
   every check.
 - **The manifest deliberately has no version bookkeeping (anymore)** (decision by Dave, July 20,
@@ -228,6 +246,67 @@ comparison is covered separately below, see [Persona drift](#persona-drift-how-t
 ./scripts/lint/check-consumer-drift.ps1 -ConsumerPath C:\path\to\life-hub
 ./scripts/lint/check-consumer-drift.ps1 -ConsumerPath C:\path\to\smartwatchbanden
 ```
+
+## Sibling divergence: mechanisms one consumer has and its sibling does not
+
+The drift lint above runs **source → consumer**, and so does every other check on this page. This one
+runs **consumer → consumer**:
+[`scripts/sync/check-consumer-siblings.ps1`](../scripts/sync/check-consumer-siblings.ps1) compares the
+tooling layers (`scripts/`, `.github/`, `.claude/`) of the consumers that share a `siblingGroup`.
+
+```powershell
+./scripts/sync/check-consumer-siblings.ps1
+./scripts/sync/check-consumer-siblings.ps1 -Group bwj-store -SkipAliasCheck
+```
+
+**Why it exists, measured September 11, 2026 in the two BWJ stores**
+([#1869](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1869)): of the 48 tooling paths
+they share, **47 have diverged, and the one that has not is a verbatim template this marketplace
+ships**. The load-bearing instance is `scripts/task/prune-merged.ps1` — inbound
+[#815](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/815) asked for it centrally,
+`dkj-policy` 4.21.0 shipped it, one store replaced its copy with a forwarder on August 28 and the other
+still carried its own 120-line version three weeks later. **The inbound route worked; nothing
+propagated the result to the second consumer.** So *"shipped centrally"* and *"used centrally"* are
+different facts, and until now nothing was watching the gap between them.
+
+**This register was asked for in order to make exactly that visible.**
+[`xoxowildhearts.json`](xoxowildhearts.json)'s own notes say so — *"the register is where the two
+Shopify consumers diverging can be seen"* — and it had never been given the check that reads it that
+way. This is that check.
+
+Three finding classes, answering different questions:
+
+| class | what it means |
+|---|---|
+| `ONLY-IN` | a comparable path present in exactly one member. The `prune-merged` case. |
+| `DRIFTED` | a comparable path present in every member, with differing content. The 47. |
+| `ALIASED` | one capability (an exported function name) at **different paths** in two members. |
+
+**`ALIASED` is the class no path comparison can make, and it is why the names having drifted apart
+matters.** `market-domains.ps1` here against `market-urls.ps1` there share no path, no filename and no
+line — and both export `Get-MarketPreviewUrls` and `Write-MarketPreviewUrls`. A path comparison reports
+two unrelated absences; this reports one duplicated mechanism, with the shared function names as the
+evidence, strongest pair first. It is computed over the `ONLY-IN` set alone, which is a scoping
+property rather than a shortcut: a path present in every member cannot be aliased, so the files whose
+content has to be read are exactly the ones already reported.
+
+**What is deliberately not compared.** The specialist lenses, `SPECIALISTS.md`, `scripts/repo-config.ps1`,
+`.claude/memory/` and the GitHub boilerplate are repo-specific **by design** — for each of them
+*agreement* would be the defect, not divergence. On the BWJ pair those exclusions remove 27 of the 48
+shared paths, so the report is 21 actionable findings rather than 48 with the real ones buried. The test
+suites are **not** excluded, and that is deliberate: two consumers testing the same shared lib twice is
+precisely the duplication being hunted.
+
+**It reports and refuses nothing** (Dave, September 11, 2026, choosing the detector-first shape over
+moving ownership immediately). A detector changes no ownership and needs no consumer to adopt anything,
+which is what lets it run today against repos whose convergence is still an open decision.
+`-FailOnFinding` exists for a repo that later wants a gate; nothing in this workflow passes it.
+
+**One read route per group, always.** Members are read over `gh` (one git-trees call each, blob shas,
+no content transferred) or off a resolved `localCheckout`, and a group whose members cannot all be read
+the same way is reported as unreadable rather than compared — a blob sha against a content hash would
+report every path in the group as drifted, a false alarm indistinguishable from the finding the check
+exists to make.
 
 ## Persona drift: how to read a DRIFTED report (doctrine)
 
