@@ -33,11 +33,12 @@ colleague-facing translation is a judgement call, not a transform. The full rule
   default to `$null` -- a board carrying neither the `Github Issue` nor the `Github Type` custom
   field leaves them unset, and step 2 skips whichever one is missing.
 - Read **`Get-ReachLabel`** from the same file -- **the name GitHub stores for the reach label**, which
-  every command below writes rather than a literal. Optional, and `minor` is the default, so a repo
-  that has never answered it behaves exactly as this page did before the seam existed. Where it is
-  answered, that answer is the name -- and reading it is not optional politeness: `gh issue create`
-  **fails outright** on a label the repo does not have, so typing the default in a repo that renamed
-  its label gets you an error instead of an issue
+  every command below writes rather than a literal. Optional, and `minor` is the default since
+  [#1870](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1870) -- which is a CHANGE of
+  default, not a restatement of one: it was `tier-1` until then, so a store that has renamed nothing
+  and answered nothing now types a label it does not have. Where the seam is answered, that answer is
+  the name -- and reading it is not optional politeness: `gh issue create` **fails outright** on a
+  label the repo does not have, atomically, so you get no issue at all rather than one without a label
   ([#1841](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1841)).
 - Confirm the Asana MCP tools are available in this session. If they are not, you still do step 1 and
   then stop with a clear note -- never skip the GitHub issue.

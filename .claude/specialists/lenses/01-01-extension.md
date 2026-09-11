@@ -94,8 +94,7 @@ product: agent defs, manuals, docs, and tooling.
 - **And it carries `minor` when its landing will be written at tier 1 or 2** — the reach label, which is
   the tier model read on an issue instead of on a changelog entry, prescribed for every repo running this
   workflow ([#1870](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1870), Dave,
-  September 11, 2026). Tier 0 carries nothing and doubt resolves there. It is a **second, independent
-  axis**: an issue may carry both labels, either, or neither. Detail in
+  September 11, 2026), and a **second axis** independent of priority. Detail in
   [Derek #05](05-05-extension.md#the-reach-label--minor-and-it-is-a-second-axis-not-a-fifth-rung).
 
 ### The gatekeepers, as implemented here

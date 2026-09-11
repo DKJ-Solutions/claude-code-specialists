@@ -110,6 +110,7 @@ names what the landing does to the release rather than a tier number. `xoxowildh
 leaving it at neither is not. So **read `Get-ReachLabel` from your own `scripts/repo-config.ps1`, never a
 literal**: `gh issue create` fails outright on a label the repo does not have, so a typed default gets you
 an error instead of an issue.
+
 ### 2. Then Asana -- a translation, not a copy
 
 Once the GitHub issue exists, mirror it to Asana in the project

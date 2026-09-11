@@ -679,11 +679,21 @@ nonetheless read about in a release note).
 entry, prescribed for every repo running this workflow
 ([#1870](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1870), Dave, September 11, 2026), and
 defined in [`RELEASES-portable.md`](../../../plugins/dkj-policy/RELEASES-portable.md#the-same-scale-on-an-issue--the-reach-label).
-That is the whole difference from the prio axis directly above, which
-[#1686](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1686) half 2 deliberately kept
-repo-local: *nothing in the workflow reads a priority*, while the reach scale is read on every entry this
-repo writes. Same shape of question, opposite answer, and the reason is the mechanism rather than the
-preference.
+**Why this and not the prio axis, stated carefully, because the obvious version of the argument is
+wrong.** [#1686](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1686) half 2 kept the prio
+axis repo-local on the ground that *nothing in the workflow reads a priority*. The tempting reply is
+*"but the reach scale IS read"* — and held against the LABEL, that reply does not survive: no gate, no
+script and no runner reads `minor` either. Two skills consult it, which is the same enforcement class as
+zero scripts consulting `prio-`, not a stronger one. Found by the conclusion red-team on the branch that
+wrote the rule, against that branch's own contract comment, which says in as many words that no script
+reads the seam.
+
+**The difference that does hold is one level up: the AXIS, not the label.** A prio axis exists nowhere in
+this workflow, so making it portable would have introduced a scale a consumer had never been asked about.
+The reach axis is already theirs — every changelog entry they write scores it, and `cut-release.ps1`
+refuses a minor that no tier-1-or-higher entry earned. The label adds no axis; it reads one the consumer
+already answers, one step earlier. That is a claim about what the repo already carries rather than about
+what enforces it, and it is the only version of this argument that is true.
 
 **Absence is the answer, not a missing field.** Tier 0 — only this repo's own developers notice — carries
 no label, and doubt resolves there. A filter that matches everything filters nothing, so the point of the
@@ -695,6 +705,7 @@ name with the management wording. The name is deliberately the same in both — 
 landing does to the release, which is the one thing true at either audience tier — and `Get-ReachLabel`
 states the string for a repo whose colleagues know the axis by another word. This repo does not answer it
 and does not need to: `minor` is the default.
+
 ### Tooling & account
 
 - **GitHub CLI (`gh`)** is used for PRs. This repo lives under the **`DKJ-Solutions`** org and is

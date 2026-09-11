@@ -143,8 +143,8 @@ Re-testing all 31 labelled issues on the sharper question moved a second. **The 
 build script no customer will ever load, whose breakage stops a release the business is waiting on, is
 not tier 0.
 
-**Doubt resolves to tier 0** — no label (Dave, September 1, 2026, on three borderline cases in that
-backfill). The point of the label is a short list somebody can work, and it is cheap to add later with
+**Doubt resolves to tier 0** — no label (Dave, September 1, 2026, on three borderline cases in the
+backfill that first applied this label to an existing tracker, in the same consuming store repo). The point of the label is a short list somebody can work, and it is cheap to add later with
 `gh issue edit <n> --repo <owner>/<repo> --add-label <reach label>`.
 
 ### What a release must earn

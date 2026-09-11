@@ -113,12 +113,38 @@ Write-Host "`n-- no stale default --" -ForegroundColor Cyan
 # as history, and a store that has not renamed its label answers the seam with exactly that string.
 # What must not survive is the claim that tier-1 is what an unanswered repo GETS, which is the sentence
 # a reader turns into a typed literal.
-$defaultClaim = 'default(?:ing to)?\s+`?tier-1'
+#
+# THREE PATTERNS, NOT ONE, AND THE FILE LIST IS SEVEN RATHER THAN SIX. Both widenings are repairs of
+# this suite's own first draft, found by the review on the branch that wrote it -- and the draft failed
+# in the two ways a one-pattern sweep over a hand-picked list always fails:
+#   * WORD ORDER. 'defaulting to tier-1' was the only shape matched, so 'tier-1 is the default' passed
+#     -- and that is not hypothetical phrasing: report-issue/SKILL.md carried exactly it until this
+#     branch happened to reword that line for an unrelated reason.
+#   * A SENTENCE THAT NEVER SAYS 'DEFAULT'. adopt-dkj-policy-bwj said "check for THAT name -- 'tier-1'
+#     where the repo has never answered it", which is the same claim with the word absent. That file
+#     was also missing from the list, so the drift survived in the one document #1841 had named as a
+#     call site, while the branch's own step list ticked the box.
+# The third pattern is deliberately about the SEAM's unanswered state rather than the word 'default',
+# because that is the claim a reader acts on.
+#
+# MEASURED AGAINST THE PRE-BRANCH TREE rather than asserted: run over 'main', the three patterns hit
+# 5 times across 4 of these 7 files -- and two of those hits are shapes the first draft could not see
+# (report-issue's 'tier-1 is the default' and adopt-dkj-policy-bwj's 'never answered'). A sweep that
+# is green on the tree it was written for proves nothing about the tree it was written against.
+$defaultClaims = @(
+    @{ Pattern = 'default(?:ing to)?\s+`?tier-1';                       What = "states tier-1 as the default" }
+    @{ Pattern = '`?tier-1`?\s+is\s+the\s+default';                     What = "states tier-1 is the default, in the other word order" }
+    @{ Pattern = '`?tier-1`?[^.\r\n]{0,80}never\s+answered';            What = "calls tier-1 what an unanswered repo gets" }
+)
 foreach ($rel in @('RELEASES-portable.md', 'CONTRIBUTING-portable.md', 'skills\adopt-dkj-policy\SKILL.md',
                    'dkj-policy-bwj\WORKFLOW-portable.md', 'dkj-policy-bwj\README.md',
-                   'dkj-policy-bwj\skills\report-issue\SKILL.md')) {
-    Assert-True (-not [regex]::IsMatch((Get-Text $rel), $defaultClaim)) `
-        "$rel no longer states tier-1 as the default"
+                   'dkj-policy-bwj\skills\report-issue\SKILL.md',
+                   'dkj-policy-bwj\skills\adopt-dkj-policy-bwj\SKILL.md')) {
+    $txt = Get-Text $rel
+    foreach ($claim in $defaultClaims) {
+        Assert-True (-not [regex]::IsMatch($txt, $claim.Pattern)) `
+            "$rel no longer $($claim.What)"
+    }
 }
 
 # --- done ---------------------------------------------------------------------------------------

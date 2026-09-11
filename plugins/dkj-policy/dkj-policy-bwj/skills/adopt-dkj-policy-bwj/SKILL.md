@@ -275,8 +275,12 @@ workspace.
 [`report-issue`](../report-issue/SKILL.md) files every issue with an issue type, and with the reach
 label and `documentation` where they apply. **`gh issue create` fails outright on a label the repo
 does not have**, so check for both and create whichever is missing. **Read `Get-ReachLabel` from
-`scripts/repo-config.ps1` first** and check for *that* name -- `tier-1` where the repo has never
-answered it:
+`scripts/repo-config.ps1` first** and check for *that* name -- `minor` where the repo has never
+answered it, which since [#1870](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1870) is
+the workflow's own default. **A store still carrying `tier-1` and answering nothing is the one state
+that now files against a label it does not have**, and `gh issue create` refuses the whole call over
+it -- no issue at all, not even one without the label. Repair it here rather than working around it:
+rename the label, or state `tier-1` in the seam.
 
 ```bash
 gh label list --repo <owner>/<repo> | grep -E '^(<reach label>|documentation)\b'

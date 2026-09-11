@@ -380,9 +380,18 @@ $script:ContractRecords = @(
     # Writing it asserts nothing about the consuming repo at all.
     #
     # OPTIONAL, AND THE DEFAULT IS THE ANSWER MOST REPOS WANT, so a consumer that never writes this
-    # function is already correct -- the same shape as every other Optional record here, and the reason
-    # this can be prescribed without turning a correct consumer's state into an open gap (#1540's lesson,
-    # which is exactly why the PRIORITY axis was NOT made portable in #1686).
+    # function is already correct -- the same shape as every other Optional record here.
+    #
+    # WHY THIS AXIS AND NOT THE PRIORITY ONE #1686 KEPT REPO-LOCAL, stated carefully because the obvious
+    # version of the argument is wrong and was caught being made on this record's own branch. #1686's
+    # ground was that nothing in the workflow reads a priority. The tempting reply -- "but the reach
+    # scale IS read" -- does not survive against the LABEL: no gate, no script and no runner reads
+    # 'minor' either, which is what the paragraph below says in as many words. The difference that does
+    # hold is one level up: a prio AXIS exists nowhere in this workflow, while the reach axis is already
+    # every consumer's -- they score it on every changelog entry, and cut-release refuses a minor no
+    # tier-1-or-higher entry earned. The label adds no axis; it reads one they already answer, a step
+    # earlier. #1540's lesson is satisfied separately, by the Default above: an unanswered consumer is
+    # correct rather than gapped.
     #
     # NO SCRIPT READS IT, A SKILL DOES, and that is not a reason to leave it a literal: `gh issue create`
     # fails outright on a label the repo does not have, so a typed literal in a repo that renamed its

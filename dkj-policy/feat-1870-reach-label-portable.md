@@ -50,13 +50,31 @@ and its default name was `tier-1`. `dkj-policy` prescribed no issue label at all
 said the opposite in as many words: *"your labels are your tracker's -- nothing in this plugin reads
 either"*.
 
-#### Why this is not #1686 half 2 reversed
+#### Why this is not #1686 half 2 reversed -- corrected after the red-team
 
-[#1686](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1686) kept the **prio** axis repo-local
-because *nothing in the workflow reads a priority*. That argument does not transfer: the reach scale IS
-read, by the release machinery, on every entry -- `cut-release.ps1` already refuses a minor that no
-tier-1-or-higher entry earned. Different axis, different answer, and the reason is the mechanism rather
-than the preference.
+The first draft of this branch argued: *#1686 kept the prio axis repo-local because nothing in the
+workflow reads a priority, and that does not transfer because the reach scale IS read.* **That argument
+does not survive and was withdrawn.** Held against the LABEL -- which is what goes portable here -- no
+gate, no script and no runner reads `minor` either; two skills consult it, which is the same enforcement
+class as zero scripts consulting `prio-`. This branch's own contract comment says so in as many words,
+one paragraph below where the claim sat.
+
+**The difference that does hold is one level up, and it is about the AXIS rather than the label.** A
+priority axis exists nowhere in this workflow, so making it portable would have handed a consumer a scale
+they had never been asked about. The reach axis is already theirs: every changelog entry they write scores
+it, and `cut-release.ps1` refuses a minor no tier-1-or-higher entry earned. The label adds no axis -- it
+reads one the consumer already answers, one step earlier. #1540's lesson is met separately, by the
+seam's default: an unanswered consumer is correct, not gapped.
+
+#### The one consumer this is NOT free for, and it is filed
+
+`BWJ-ecommerce/xoxowildhearts` carries `tier-1` and answers no seam, so once this reaches it through a
+release, `report-issue` types a label it does not have -- and `gh issue create` refuses the whole call
+atomically, producing no issue at all rather than one without a label. That is stronger than #1540's
+"correct repo reports a gap": it is a correct repo whose filing path stops. It cannot be repaired from
+this branch (another repo's tracker, and #1686 is explicit that a session does not rename labels on live
+trackers on its own), so it is filed rather than absorbed, and both ways out are written into
+`adopt-dkj-policy` Part 4 and the BWJ adopt step.
 
 ### CREATE
 
