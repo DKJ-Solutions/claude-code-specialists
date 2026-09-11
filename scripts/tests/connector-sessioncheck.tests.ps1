@@ -589,11 +589,13 @@ try {
     #     The bound the four blocks above now RAISE, asserted from the other side. The fake engine sleeps
     #     five seconds and the bound is one, so the BOUND fires on any machine at any load.
     #
-    #     THAT IS NOT THE SAME AS THE OUTPUT BEING EMPTY, and this comment claimed it was until #1852.
-    #     It read "forced rather than raced ... the timeout fires on any machine at any load -- which is
-    #     the property block 1 lacked", and the 5:1 ratio does buy exactly that much and no more. What
-    #     this block actually asserts is the line the hook prints AFTER the timeout, and that used to
-    #     depend on a second race the ratio says nothing about: Invoke-NativeCapture kills the tree and
+    #     A BOUND THAT FIRES IS NOT THE SAME AS A CAPTURE THAT IS EMPTY, and until #1852 this comment
+    #     read as though it were. It said "forced rather than raced ... the timeout fires on any machine
+    #     at any load -- which is the property block 1 lacked", which is TRUE, and about the bound. The
+    #     asserts below are about the LINE THE HOOK PRINTS after that timeout, and the 5:1 ratio buys
+    #     nothing there -- so the claim was carried across a gap it does not cover, from a step that is
+    #     load-proof to a step that was not. What the verdict used to depend on is a second race the
+    #     ratio says nothing about: Invoke-NativeCapture kills the tree and
     #     then waits five more seconds to reap it, so a kill that is merely SLOW -- taskkill.exe paying
     #     its own cold startup under the gate's sixteen lanes -- lets the 5s child finish inside that
     #     window and hands its full output back. That is how this block failed in CI on a branch that

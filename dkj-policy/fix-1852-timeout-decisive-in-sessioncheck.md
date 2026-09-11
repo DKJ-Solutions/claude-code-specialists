@@ -38,7 +38,7 @@
 
 #### What #1852 reported, and why both of its candidate causes are wrong
 
-The report is exact about the symptom and wrong about the mechanism -- the fifth of the six ways an
+The report is exact about the symptom and wrong about the mechanism -- the second of the six ways an
 item fails on pickup. It offered two candidates, the fake engine's sleep not lasting five seconds or
 `-VersionTimeoutSeconds` not being passed through on that path, and read the failure as "evidence
 against the fix #1701 made". Measured here on the same commit: neither holds, and #1701 is untouched.
@@ -116,8 +116,8 @@ assertions CI saw when the repair is removed.
 
 #### What makes this deploy extra special
 
-N/A -- this repo's audience is its own maintainers, and both changed files ship inside plugins rather
-than to a subscriber of a service.
+N/A -- this repo's audience is its own maintainers. The two changed sources ship inside plugins, to a
+consumer who runs this workflow, rather than to a subscriber of a service.
 
 **Score:** N/A
 

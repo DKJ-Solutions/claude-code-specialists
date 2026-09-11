@@ -391,8 +391,9 @@ try {
                 # reads the files anyway, so whatever the engine had already flushed comes back WITH
                 # TimedOut = $true. Every branch below picks its verdict from the CONTENT of $vout, so a
                 # partial capture carrying a [SUMMARY] was reported as an ordinary clean version check --
-                # exit 124 and all. That is the [UNREGISTERED] lesson again: an all-clear for a run that
-                # did not finish. Measured September 11, 2026, in CI under the gate's own sixteen lanes,
+                # the 124 sitting unread in $vcode, on the one branch that never prints it. That is the
+                # [UNREGISTERED] lesson again: an all-clear for a run that did not finish, and nothing in
+                # the line said so. Measured September 11, 2026, in CI under the gate's own sixteen lanes,
                 # where taskkill.exe's OWN cold startup let a killed 5s engine finish inside the post-kill
                 # grace window; reproduced deterministically by an engine that prints before it sleeps.
                 #
