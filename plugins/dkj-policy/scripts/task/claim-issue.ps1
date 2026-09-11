@@ -96,6 +96,9 @@ $repoRoot = if ($RootOverride) { $RootOverride } elseif ($env:CLAUDE_PROJECT_DIR
 . (Join-Path $PSScriptRoot '..\lib\native-capture-lib.ps1')
 . (Join-Path $PSScriptRoot '..\lib\git-identity-lib.ps1')
 . (Join-Path $PSScriptRoot '..\lib\claim-issue-lib.ps1')
+# THE FETCH-ATTEMPT RECORD (issue #1860) -- the parked-fix scan's fetch runs through it, so an
+# unreachable remote is not waited out again by new-branch.ps1 seconds later.
+. (Join-Path $PSScriptRoot '..\lib\fetch-attempt-lib.ps1')
 
 # --- WHICH ISSUE ----------------------------------------------------------------------------------
 #
@@ -272,6 +275,21 @@ if ($verdict.Action -eq 'claim' -or $verdict.Action -eq 'skip') {
         # leaves the already-fetched refs in place, which is a smaller answer rather than a wrong one,
         # and the note below says so instead of letting it read as a clean scan.
         #
+        # AND A FAILURE OF IT IS NOT PAID FOR TWICE (issue #1860). Invoke-RecordedRemoteFetch is the seam
+        # new-branch.ps1 also fetches through, and the two land seconds apart by design: the claim is the
+        # OPENING of the work (#1485), so new-branch follows in the same turn. Against an unreachable
+        # remote that used to mean two full two-minute bounds back to back, at the one moment a session
+        # has nothing on screen yet to explain the wait; now the second call reports the first's failure.
+        #
+        # THE ORDINARY ~700ms IS STILL PAID TWICE, DELIBERATELY. A seam that also skipped on a recent
+        # SUCCESS would remove it, and new-branch.tests.ps1 cases (v) and (y1) refuse that: the probes it
+        # would let stand on a cached fetch are the ones that exist to see a push another session made
+        # seconds ago (#1139, #1439). A failed attempt refreshed nothing, so reporting it blinds nothing.
+        #
+        # THE ARGUMENT-LESS FORM IS KEPT, AND THE SEAM RESOLVES THE NAME ONLY FOR ITS RECORD. #1853's
+        # choice was git's default remote, not 'origin' by name, and a checkout whose default is
+        # something else must therefore match nothing rather than be assumed into this one's premise.
+        #
         # NO -DiscardStderr, AND THAT IS THE CONVENTION RATHER THAN AN OVERSIGHT (#1313). A git call that
         # talks to a remote writes ALL of its output to stderr, and git redacts the credential out of
         # that line itself (transport_anonymize_url -- measured on 2.55.0). Nothing here parses the
@@ -279,20 +297,11 @@ if ($verdict.Action -eq 'claim' -or $verdict.Action -eq 'skip') {
         # #1313 declined for ship-pr's fetch, worktree-lane and prune-merged. The lines are printed under
         # the note below, because keeping stderr and then never showing it is the same loss one step
         # later. The two reads further down DO parse, so they keep the flag.
-        $staleNote = ''
-        $staleDetail = @()
-        $fetch = Invoke-NativeCapture -FilePath 'git' -Arguments @('-C', $repoRoot, 'fetch', '--quiet') `
-                                      -TimeoutSeconds $NativeCaptureNetworkTimeoutSeconds
-        if (-not $fetch -or $fetch.ExitCode -ne 0 -or $fetch.TimedOut) {
-            $staleNote = if ($fetch -and $fetch.TimedOut) {
-                "git fetch did not answer within $NativeCaptureNetworkTimeoutSeconds seconds"
-            } elseif ($fetch) {
-                "git fetch exited $($fetch.ExitCode)"
-            } else {
-                'git fetch could not be run at all'
-            }
-            if ($fetch) { $staleDetail = @(@($fetch.Output) | Where-Object { $_ -and ([string]$_).Trim() }) }
-        }
+        $fetch = Invoke-RecordedRemoteFetch -RepoRoot $repoRoot -RecentFailureSeconds $RemoteFetchRecentFailureSeconds `
+                                         -TimeoutSeconds $NativeCaptureNetworkTimeoutSeconds
+        $staleNote = "$($fetch.Note)"
+        $staleDetail = @(@($fetch.Output) | Where-Object { $_ -and ([string]$_).Trim() })
+        if (-not $staleNote) { $staleDetail = @() }
 
         $logArgs = @('-C', $repoRoot, 'log', '--all', '-E', "--grep=$scanPattern", '--format=%H%x1f%s', '--not') + $trunkRefs
         $scanLog = Invoke-NativeCapture -FilePath 'git' -Arguments $logArgs -Utf8 -DiscardStderr
