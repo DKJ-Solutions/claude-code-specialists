@@ -19,7 +19,7 @@ and to none of the others Dave runs.
 
 The two are separate chapters rather than sections of one page because they answer different
 questions for different readers, and the second one was added later, on inbound
-[#1382](https://github.com/DaveKJohn/claude-code-specialists/issues/1382). Shipping several portable
+[#1382](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1382). Shipping several portable
 pages is the established form here -- `dkj-policy` carries three.
 
 **Both chapters are policy, never mechanism.** The Asana CI and the sync machinery both live
@@ -36,9 +36,9 @@ release is -- those are still `dkj-policy`'s answers, unchanged. So the two do n
 the specialists two contradicting answers to the same question; they answer different questions.
 
 That is the deliberate reading of the "second workflow" note left in
-[the `dkj-policy` README](https://github.com/DaveKJohn/claude-code-specialists/blob/main/plugins/dkj-policy/README.md)
+[the `dkj-policy` README](https://github.com/DKJ-Solutions/dkj-claude-plugins/blob/main/plugins/dkj-policy/README.md)
 and the root README after
-[#886](https://github.com/DaveKJohn/claude-code-specialists/issues/886): a second workflow plugin is
+[#886](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/886): a second workflow plugin is
 safe here **because it is additive and non-overlapping**, not because the old guard was wrong.
 
 **It carries no specialists.** A workflow changes how the existing ones work, not who they are.
@@ -99,9 +99,9 @@ task off"* in the board's own currency. **And the last two sections are terminal
 *ready to test* or `Completed`, nothing here takes it back out, not even a reopen. Moves are otherwise
 forward, with exactly two exceptions that are both a person saying something: the `needs-info` label,
 which blocks a card whatever the board is doing, and an issue being reopened. Dave, September 2, 2026, closing
-[#1222](https://github.com/DaveKJohn/claude-code-specialists/issues/1222); **there is exactly one such
+[#1222](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1222); **there is exactly one such
 board**, which is what makes the *"which board?"* question inbound
-[#1217](https://github.com/DaveKJohn/claude-code-specialists/issues/1217) ran into moot.
+[#1217](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1217) ran into moot.
 
 The whole rule, with the field-by-field shape of the Asana variant and the cross-link markers, is in
 [`WORKFLOW-portable.md`](WORKFLOW-portable.md) -- that is the page to read, and the page to point BWJ
@@ -111,7 +111,7 @@ colleagues at.
 
 A `sync/` branch mirrors what a **third party** changed on the live Shopify theme. It is deliberately
 exempt from the changelog -- that is somebody else's change, not this repo's -- which until inbound
-[#1382](https://github.com/DaveKJohn/claude-code-specialists/issues/1382) left it the only branch in
+[#1382](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1382) left it the only branch in
 the workflow owing **nothing durable at all**: the sole account of what was taken and what was held
 back was the PR body on GitHub, in two repos whose standing rule is that a sync PR does *not* wait
 for review. So a sync now owes a **sync-log entry** where an ordinary branch owes a changelog entry:

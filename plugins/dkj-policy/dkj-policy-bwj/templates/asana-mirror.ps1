@@ -203,6 +203,14 @@ $script:PrioLabels = @('prio-1', 'prio-2', 'prio-3', 'prio-4')
 # up holding all eight, with the old name still sitting on every issue. Without this list the sweep
 # would then add 'prio-4' beside a standing 'very high' -- an issue claiming two priorities at once,
 # which is the exact failure Set-IssuePrioLabel exists to prevent.
+#
+# THE COST, AND WHY IT IS BOUNDED RATHER THAN PERMANENT (#1848): these four are generic English
+# words. While they WERE the prio labels nobody would reuse them, but once both stores are
+# migrated the names are free again -- and an unrelated label somebody later creates named e.g.
+# low is then stripped by a daily job holding issues: write, with nothing reporting it. Not new
+# behaviour: the same four strings sat in PrioLabels before the rename and were swept the same
+# way. Only the likelihood changes, and only upward. Retire this array once neither store
+# carries a legacy name -- #1848 holds the check and the removal.
 $script:LegacyPrioLabels = @('very low', 'low', 'high', 'very high')
 
 # The stage map, resolved once per run from the repo's own seam -- see Resolve-AsanaStageMap.
@@ -1638,7 +1646,7 @@ function Set-IssuePrioLabel {
         from 2.5 to 4.2 must lose 'prio-2' as it gains 'prio-4', or the issue ends up claiming two
         priorities at once.
 
-        Seven, not three, since #1842: the four PRE-RENAME names are swept off too. Only ones the
+        Seven, not three, since #1842: the four PRE-RENAME names are swept off too. Only the ones the
         issue actually carries are ever passed to `gh`, so on a migrated repo that half is free.
 
         Returns $true when it changed something, $false when the issue already read correctly or the

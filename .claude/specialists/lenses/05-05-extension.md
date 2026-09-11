@@ -110,15 +110,15 @@ through the checklist. The script also automatically sets the right GitHub label
 table above).
 
 **The title is no longer typed here — it is composed** (Dave, August 7, 2026;
-[#506](https://github.com/DaveKJohn/claude-code-specialists/issues/506) +
-[#505](https://github.com/DaveKJohn/claude-code-specialists/issues/505)). The PR is called
+[#506](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/506) +
+[#505](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/505)). The PR is called
 `<branch-type>: <the entry's Branch title>`, so the prefix mirrors the branch type by construction and the
 words are the ones already in the DEPLOY section of `dkj-policy/<branch>.md`. `-Title` is still accepted and ignored, with a
 warning naming the title the entry gives.
 
 **That rule used to live in this very paragraph, and was violated five PRs in a row.** It read "the title
-prefix mirrors the branch type" and nothing measured it: [#499](https://github.com/DaveKJohn/claude-code-specialists/pull/499)
-through [#503](https://github.com/DaveKJohn/claude-code-specialists/pull/503) all merged without one, while
+prefix mirrors the branch type" and nothing measured it: [#499](https://github.com/DKJ-Solutions/dkj-claude-plugins/pull/499)
+through [#503](https://github.com/DKJ-Solutions/dkj-claude-plugins/pull/503) all merged without one, while
 every commit and every merge line in the graph carried its type. Same shape as `chore/` and the `final`
 rule — a rule that lives in a document, is never measured, and is therefore silently broken. The repair was
 to stop asking for the title twice rather than to add a third check on the second answer.
@@ -139,9 +139,9 @@ naming what it saw.
 
 **Why this is a gate and not a habit (lesson of August 1, 2026).** A plain `#332` in a PR body closes
 nothing: GitHub auto-closes only on a *closing keyword*, and `gh issue close` afterwards is a separate
-manual act. PRs [#341](https://github.com/DaveKJohn/claude-code-specialists/pull/341),
-[#342](https://github.com/DaveKJohn/claude-code-specialists/pull/342) and
-[#343](https://github.com/DaveKJohn/claude-code-specialists/pull/343) each repaired real findings, each
+manual act. PRs [#341](https://github.com/DKJ-Solutions/dkj-claude-plugins/pull/341),
+[#342](https://github.com/DKJ-Solutions/dkj-claude-plugins/pull/342) and
+[#343](https://github.com/DKJ-Solutions/dkj-claude-plugins/pull/343) each repaired real findings, each
 referenced them as plain mentions, and the manual close was skipped **three times running** — leaving
 **eight** repaired issues open while `CHANGELOG.md` reported them done. Dave spotted it from the
 outside ("a lot of new things in the changelog but all 20 issues are still open"), which is the tell
@@ -187,7 +187,7 @@ a second time for no added coverage, on top of what CI spends on the same commit
 a bare `gh pr merge` and never named `ship-pr`, which is what led into that route.
 
 **That waste is now a fraction of what it was, and the advice is unchanged.** Later the same day the gate
-started running its suites in parallel ([#512](https://github.com/DaveKJohn/claude-code-specialists/issues/512)),
+started running its suites in parallel ([#512](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/512)),
 taking it from **510s sequential to 128–263s** over six runs on the same machine in the same session — so a
 duplicate run costs two to four minutes rather than thirteen. Worth knowing for a second reason: a gate
 that is cheap is a gate nobody has an excuse to `-SkipTests`.
@@ -216,7 +216,7 @@ what stays here is where they were measured.** The skill carries the reasoning a
 lens carries the local evidence and the two names that are only true here.
 
 - **`git merge --ff-only origin/main`, never a bare `git pull --ff-only`.** Measured July 29, 2026 on
-  [PR #257](https://github.com/DaveKJohn/claude-code-specialists/pull/257): the bare pull failed with
+  [PR #257](https://github.com/DKJ-Solutions/dkj-claude-plugins/pull/257): the bare pull failed with
   `fatal: Cannot fast-forward to multiple branches` on a clean `main` right after
   `gh pr merge --delete-branch` plus a `git fetch --prune` that removed two remote refs. **Why the pull
   got more than one ref was never established** and is deliberately not recorded as a mechanism note —
@@ -229,10 +229,10 @@ lens carries the local evidence and the two names that are only true here.
   local to the shell rather than the repo: **PowerShell 5.1 has no `&&`**, so a chain here is `;` or
   `if ($?) { ... }` — both of which happily run the merge regardless of what the watch concluded.
 - **When the required check never appears, close and reopen the PR — after confirming no run exists.**
-  Measured July 23, 2026 on [PR #152](https://github.com/DaveKJohn/claude-code-specialists/pull/152)
+  Measured July 23, 2026 on [PR #152](https://github.com/DKJ-Solutions/dkj-claude-plugins/pull/152)
   (`mergeStateStatus` at `UNKNOWN`, no rollup at all, a prior PR having triggered normally moments
   before) and sharpened the same day on
-  [PR #155](https://github.com/DaveKJohn/claude-code-specialists/pull/155), which is where the two
+  [PR #155](https://github.com/DKJ-Solutions/dkj-claude-plugins/pull/155), which is where the two
   concurrent runs and the `BLOCKED` window were seen. The unrelated check suite that can fool the
   head-SHA count was `netlify`. And the reason `gh` phrases its refusal as a *base branch policy* and
   offers `--admin`: `main` here is guarded by a **ruleset**, not classic branch protection — that
@@ -300,7 +300,7 @@ the trap is the shell's, not this repo's. What stays here is the local evidence:
   plain `gh pr merge --merge` (no `--delete-branch`), so the setting is the *only* thing doing this
   work: turn it off and cleanup stops silently all over again. **Since August 21, 2026 `ship-pr.ps1`
   reads that setting after the merge and says so when it is off**, with the `gh api` command — inbound
-  [#815](https://github.com/DaveKJohn/claude-code-specialists/issues/815), whose reason turned out to be
+  [#815](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/815), whose reason turned out to be
   the interesting half: it reported the setting as undocumented, and it is named in **three** places in
   the plugins, one with a paste-ready command. All three are setup checklists read once at init. The gap
   was reach, not documentation, so the repair is a read at the moment it is true rather than a fourth
@@ -327,7 +327,7 @@ the trap is the shell's, not this repo's. What stays here is the local evidence:
   requires positive proof of a merge, so the set it can reach is exactly the set the permission could
   *not* have reached safely.
   **Since August 28, 2026 that script also *composes* the paste-ready command, under `-IncludeRemote`**
-  ([#1042](https://github.com/DaveKJohn/claude-code-specialists/issues/1042)) — which is this bullet
+  ([#1042](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1042)) — which is this bullet
   being carried out rather than worked around, since handing the command over is what the decision says
   should happen. It reads `git ls-remote --heads`, puts every head that is not the trunk through the
   same two proofs, prints `git push <remote> --delete <branch>` for one it can prove and
@@ -350,17 +350,17 @@ the trap is the shell's, not this repo's. What stays here is the local evidence:
   every automatic park stamps a `Backing:` line saying how many steps are resolved, how much is committed
   on the branch besides the document, and how much is uncommitted in the working copy the park came from
   -- plus an explicit alarm where the plan reads as finished with nothing behind it. Repo-specific half:
-  this is the shape [#960](https://github.com/DaveKJohn/claude-code-specialists/issues/960) was measured
+  this is the shape [#960](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/960) was measured
   on here, `feat/adopt-act-on-this-skills-v1` (August 27, 2026) -- three `park:` commits, eight resolved
   CREATE steps naming edits to three agent defs, three manuals and two lenses, and a diff against `main`
   consisting of the cycle document alone. The work was uncommitted on the other device; every commit on
   the branch was `davekokbwj` while this checkout is `DaveKJohn`, which is the tell to look for when the
   numbers and the ticks disagree. Read the note with `git log -1 --pretty=%B origin/<branch>`: the reporter
   that used to print it under each parked branch went with `/lock` and `/handover` on August 27, 2026
-  ([#957](https://github.com/DaveKJohn/claude-code-specialists/issues/957)).
+  ([#957](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/957)).
 
   **THAT TELL HAS A PRECONDITION, AND THE MACHINE IT WAS MEASURED ON DOES NOT MEET IT**
-  ([#1315](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1315), September 3, 2026). It
+  ([#1315](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1315), September 3, 2026). It
   reads a difference between the commits' account and "this checkout" as evidence of a *second device* --
   which holds only where this checkout's own two identities agree. On DAVE-KOK-BWJ they do not: `gh` is
   authenticated as `DaveKJohn` while `git config user.name` reads `davekokbwj`, so a branch built there --
@@ -431,8 +431,8 @@ the trap is the shell's, not this repo's. What stays here is the local evidence:
   git's rename detection moves and merges the *files* cleanly — `git merge-tree` reports a clean merge
   and the merged tree holds only new paths — while saying nothing about a plugin, path or `agent_type`
   name that the branch's own **added** lines still spell the old way. **Measured landing PR #1733**
-  ([#1757](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1757)), whose merge base
-  predated the [#1698](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1698)
+  ([#1757](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1757)), whose merge base
+  predated the [#1698](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1698)
   `dkj-team-*` → `dkj-subagents-*` rename by about four hours: six brand-new files it added still
   named the retired plugins, in comments, docstrings and an `agent_type` test fixture. **No gate
   catches it** — `check-plugin-integrity.ps1` reads links, manifests and frontmatter, not prose; the
@@ -457,7 +457,7 @@ the trap is the shell's, not this repo's. What stays here is the local evidence:
 ### Issue labels — every issue carries a priority
 
 **Every issue in this tracker carries exactly one of `prio-1` … `prio-4`, and 4 is the highest**
-(Dave, September 9, 2026, [#1685](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1685)).
+(Dave, September 9, 2026, [#1685](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1685)).
 The four exist in the repo since that day:
 
 | Label | Colour | What the rung means |
@@ -494,7 +494,7 @@ one place a badge still says which motor set it, and it is why the BWJ side's de
 score-shaped.
 
 **This reverses half 1 of
-[#1686](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1686)**, which had held the two
+[#1686](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1686)**, which had held the two
 sets deliberately disjoint two days earlier. Two of that decision's three grounds survive intact and
 are still worth knowing:
 
@@ -532,10 +532,10 @@ second half). **Nothing in the workflow reads a priority**: searched across `scr
 `.github/` on the day of the decision, `prio-` appears in no gate, no script and no runner here — only
 on the BWJ side, where a shipped script owns it. A portable version would therefore prescribe to every
 consumer a convention no gate enforces and nothing reads, which is the enforced-by-memory shape
-[#1665](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1665) was filed against, and it
+[#1665](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1665) was filed against, and it
 would owe `adopt-dkj-policy` a label-creation step for four labels the consumer never asked for. That
 is worse than the prescription-a-consumer-cannot-follow trap of
-[#1540](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1540): here they *could* follow
+[#1540](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1540): here they *could* follow
 it and would gain nothing for it.
 
 **The seam is the shape if that ever changes.** The day something needs to read the axis, the portable
@@ -544,7 +544,7 @@ exactly like `Get-ReleaseAudienceTier` and `Get-ShopifyRepoHasNoStore`. Nothing 
 nothing is built today.
 
 **THE COLOURS DISAGREED ON THE BOTTOM HALF UNTIL SEPTEMBER 9, 2026, AND THE FIX CAME FROM THIS SIDE**
-([#1691](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1691)). Raised by the
+([#1691](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1691)). Raised by the
 conclusion red-team on the deciding branch, and measured with `gh label list --json name,color` on all
 three trackers rather than read off the table above — then re-measured on pickup, where it held exactly
 and turned out to be one label worse than filed:
@@ -570,7 +570,7 @@ different rungs in two repos of one family. And in **one** of the two BWJ repos 
 `smartwatchbanden` that same label is grey (`6e7781`), so the doubling is that one store's alone.
 **Nothing refuses a colour**: `gh` judges a label's NAME, and a badge is read by a person scanning an
 issue list with no command in it to fail. That is
-[#1686](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1686)'s own
+[#1686](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1686)'s own
 *goes-wrong-silently* shape, moved onto an axis its reasoning does not reach.
 
 **Why the repair came from this side in September, and why #1842 then did the other half anyway.**
@@ -707,7 +707,7 @@ Derek prefers not to touch the git commands by hand. His toolbox:
   entry-filename conversion (`/` → `-`). Changing the mapping? Here, nowhere else.
 
 `new-branch.ps1` is mechanism-owned by [Rendall #06](05-06-extension.md); it is now shared
-(mirrored to the plugin, [issue #81](https://github.com/DaveKJohn/claude-code-specialists/issues/81))
+(mirrored to the plugin, [issue #81](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/81))
 and normally reached indirectly, via Derek's `new-branch.ps1` above. `fold-changelog-entry.ps1`
 remains [Rendall #06](05-06-extension.md)'s tool, run on `main` after the merge. A new recurring
 GitHub chore? Derek builds a script for it.

@@ -61,18 +61,38 @@ contradiction. It is in scope.
   never rewrites an existing label** -- so a repo brought over by re-running that step holds all
   eight, with the old name still sitting on every issue, and the sweep would add `prio-4` beside a
   standing `very high`. The four old names therefore stay on the **removal** side of
-  `Set-IssuePrioLabel`, never on the write side. That is permanent hygiene, not a shim, and it does
-  not need removing later.
+  `Set-IssuePrioLabel`, never on the write side. **Bounded rather than permanent**: the four are
+  generic English words, and once both stores are migrated the names are free again, so an unrelated
+  label named `low` would be stripped by a daily job holding `issues: write`. Not new behaviour --
+  the same strings sat in `$script:PrioLabels` before the rename and were swept the same way -- but
+  the likelihood only rises. Raised by the security review, recorded beside the array, and given a
+  number so the removal is tracked rather than remembered:
+  [#1848](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1848).
 
 #### What was found and filed rather than fixed here
 
 #1842's mapping puts BWJ's `prio-2` on `FBCA04`, which is the hex `tier-1` has carried in those same
 repos since `adopt-dkj-policy-bwj` shipped. Before this change that clash was *across* the family
-and [#1691](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1691) weighed it and left
+and [#1691](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1691) weighed it and left
 it; now the two are the same yellow **inside one repo**, on one issue, on two different axes.
 Implemented as #1842 specifies and filed as
 [#1844](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1844) -- moving either hex is an
 edit to live labels in two repos this one does not own.
+
+#### The parallel review, and what it changed
+
+Victor, Edith and Sebastian ran on the diff at once. Sebastian: no blockers, one advisory that became
+[#1848](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1848) above. Victor: no bugs, and he
+verified the 5.1 array concatenation and `$null -contains` against a real `powershell.exe` rather than
+reasoning about them; his one finding was a worked example in `SKILL.md` still naming the retired
+labels two paragraphs past the block that renamed them, filed as
+[#1847](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1847) and **fixed on this branch**,
+since it is inside this branch's own scope rather than outside it. Edith found the same sentence plus
+four more: the new #1686/#1691 citations carried the retired repo name, the hex casing in `SKILL.md`
+broke that file's own lowercase convention on the very line arguing about `fbca04`, the one-line rename
+example in `WORKFLOW-portable.md` omitted `--color` where two of the four rungs change colour, and a
+missing article in the template docstring. All five applied, and the URL correct-on-edit was applied
+to the four files this branch edits and to no others.
 
 ### CREATE
 
@@ -104,7 +124,7 @@ edit to live labels in two repos this one does not own.
 The BWJ store repos rank their issues on the same four labels as every other repo in the family:
 `prio-1` to `prio-4`, on the same four colours, replacing `very low` / `low` / `high` / `very high`.
 One vocabulary across the family, reversing half 1 of
-[#1686](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1686) on Dave's instruction.
+[#1686](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1686) on Dave's instruction.
 The score bands behind them are untouched -- the same mapping, said in the other repos' words -- and
 what now says which motor set a rung is the label's **description**, which a rename leaves alone:
 `Asana Prio-Score 2.00-2.99` over there against `Priority 2 of 4` here. The sweep sheds the four old
