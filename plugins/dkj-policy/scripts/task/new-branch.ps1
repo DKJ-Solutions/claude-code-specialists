@@ -247,6 +247,14 @@ if (-not (Test-Path -LiteralPath $branchInfoPath)) {
 # why this moved out of here rather than being copied a second time.
 . (Join-Path $PSScriptRoot '..\lib\remote-ahead-lib.ps1')
 
+# THE COMMIT-ABILITY PROBE (inbound #1867), for the refusal below the branch-name validation. Dot-sourced
+# GUARDED, unlike the four above: this file is the workflow's most-mirrored script, and a plugin payload
+# built before this lib existed must degrade to the old behaviour rather than fail to load at all. The
+# refusal itself is additionally gated on Test-FunctionDefined, which covers the narrower case of a lib
+# that is present but predates Test-GitCanCommit.
+$identityLib = Join-Path $PSScriptRoot '..\lib\git-identity-lib.ps1'
+if (Test-Path -LiteralPath $identityLib -PathType Leaf) { . $identityLib }
+
 # The repo-owned fallback type (#410) -- OPTIONAL, unlike branch-info.ps1 above. repo-config.ps1 may
 # be absent (a repo that never needed it) or may fail to load (a syntax error in someone's edit);
 # neither is a reason to stop, because every string it supplies has a working default. So: Test-Path,
@@ -306,6 +314,37 @@ $trunk = Get-BranchTrunkName
 if ($Name -eq $trunk) {
     Write-Host "'$Name' is the trunk - create a branch instead." -ForegroundColor Red
     exit 1
+}
+
+# --- CAN THIS CHECKOUT COMMIT AT ALL? REFUSED BEFORE ANYTHING IS TOUCHED (inbound #1867) ------------
+#
+# THE FAILURE THIS REPLACES. On a machine with no usable git author identity every commit fails with
+# exit 128, and the first one to do so is this script's own park, several hundred lines below -- after
+# the branch has been checked out, HEAD has moved and the branch document has been written. The run
+# dies mid-way and leaves a local branch with an uncommitted document sitting on it: a half-state a
+# later session has to unpick, for a condition that was knowable before a single ref was created.
+#
+# WHY HERE, beside the trunk refusal, and not at the park. Same reasoning that block gives for itself:
+# a guard that can only fire after HEAD has moved is not a guard. This costs one local `git var` and
+# runs while nothing has been touched -- no fetch, no checkout, no file.
+#
+# WHY IT REFUSES WHERE check-git-identity.ps1 ONLY WARNS. That script reports a fact about the machine
+# and is invoked by a SessionStart hook, which must never block a session; this one is about to create
+# things. The session check speaks first and this is the backstop for a session that never saw it -- a
+# consumer whose plugin is not installed, a script run outside a session, a machine repaired halfway.
+#
+# NOT -SkipStaleBase-style OPTIONAL, deliberately: there is no legitimate run on the far side of it.
+# Every path through this script commits, so a valve would only let a caller choose the exit 128.
+if (Test-FunctionDefined 'Test-GitCanCommit') {
+    if (-not (Test-GitCanCommit -RepoRoot $repoRoot)) {
+        Write-Host 'new-branch: this checkout has no usable git author identity -- it cannot commit.' -ForegroundColor Red
+        Write-Host '  `git var GIT_AUTHOR_IDENT` exits 128 here, which is exactly the state `git commit` refuses' -ForegroundColor Red
+        Write-Host '  in. Nothing was created: no branch, no document, nothing on origin. Set both and re-run:' -ForegroundColor Red
+        Write-Host '    git config --global user.name  "<your GitHub login>"' -ForegroundColor Red
+        Write-Host '    git config --global user.email "<the address on that account>"' -ForegroundColor Red
+        Write-Host '  (Drop --global to set it for this checkout only.)' -ForegroundColor Red
+        exit 1
+    }
 }
 
 # --- THE VERSION SUFFIX IS NOT COMPLETED HERE, AND THAT IS DELIBERATE (Dave, September 3, 2026) -----
