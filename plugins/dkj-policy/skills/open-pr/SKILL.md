@@ -299,8 +299,11 @@ description in the entry, or a body that already matches, in which case nothing 
 is the **last heading above the placeholder**, at any level (`#` through `######`); every heading **below**
 the placeholder belongs to the form and is a boundary the description stops at. Where the placeholder comes
 before any heading — the shipped reference's own shape — there is no description heading at all: the
-description is the body's **leading section**, and every heading in the template is a boundary. Only a
-**missing** template warns and changes nothing; a heading-less one is a supported shape.
+description is the body's **leading section**, and every heading in the template is a boundary. A
+heading-less template is a supported shape, not a broken one. **A missing one is the failure — and it
+is the silent one**: the script builds no body at all and says nothing, which is why the adopter places
+the file rather than telling you to. The warning further down fires on a placeholder that does not
+*match*, which is the other failure.
 
 **That rule arrived in two steps, and both are worth knowing if your own template's shape has moved.** The
 match was `## ` exactly until August 9, 2026, which meant a template promoted to `#` silently lost the

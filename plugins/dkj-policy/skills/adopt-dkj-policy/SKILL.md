@@ -38,7 +38,7 @@ dkj-policy/
 ```
 
 **And two files outside it**, since August 20, 2026 (inbound
-[#789](https://github.com/DaveKJohn/claude-code-specialists/issues/789)) and September 11, 2026
+[#789](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/789)) and September 11, 2026
 ([#1843](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1843)):
 
 ```text

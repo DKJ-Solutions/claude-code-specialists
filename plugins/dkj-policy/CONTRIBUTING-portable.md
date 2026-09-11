@@ -246,7 +246,9 @@ inserted. Break it and nothing errors; you get PRs whose body has no description
 **And having no file at all is quieter still, which is why the adoption places it rather than advising it.**
 `open-pr` builds its body only when that path exists, so a repo without one gets a PR with **no body at
 all** — no description, no form — and no warning to say why. The warning that block does carry fires on a
-placeholder that does not *match*, which is a different state and the only one anybody had been told about. **The shipped reference is that one line and
+placeholder that does not *match*, which is a different state and the only one anybody had been told about.
+
+**The shipped reference is that one line and
 no heading at all, which is the normal shape rather than a broken one** — `-RefreshBody` reads where the
 placeholder sits, so with nothing above it the description is the body's leading section. Everything you
 add below it is the form's, and every heading there is a boundary the refresh will not cross. The

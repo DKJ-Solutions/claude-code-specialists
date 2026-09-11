@@ -591,10 +591,11 @@ $changelogIntro = @(
 # THE SECOND FILE THIS COMMAND PLACES OUTSIDE THE FOLDER, and unlike the gate above it is a COPY rather
 # than six lines calling a shipped script (issue #1843). GitHub reads a PR template only from
 # .github/pull_request_template.md in the consumer's own repo, so this is the one file in the whole cycle
-# that cannot be imported -- CONTRIBUTING-portable.md says exactly that, and then leaves the copying to a
-# person. Nothing anywhere states a reason for leaving it manual, and that is what separates it from every
-# genuine 'decide' seam in this workflow: those are answered by hand because only the repo knows the
-# answer, and here the plugin already ships the answer.
+# that cannot be imported -- CONTRIBUTING-portable.md said exactly that, and then left the copying to a
+# person, which this change ends and that page now records. Nothing anywhere had stated a reason for
+# leaving it manual, and that is what separated it from every genuine 'decide' seam in this workflow:
+# those are answered by hand because only the repo knows the answer, and here the plugin already ships
+# the answer.
 #
 # WHY A MISSING ONE COSTS MORE THAN A MISSING FILE USUALLY DOES: open-pr wraps its whole body-building
 # block in 'if (Test-Path $templatePath)' with no else, so a consumer without the file gets a PR with no
@@ -632,8 +633,11 @@ if ($prTemplateRef) {
         @{ Rel = '.github/pull_request_template.md'; Content = ([System.IO.File]::ReadAllText($prTemplateRef)) }
     )
 } else {
+    # BOTH candidates are named, not just the first. This branch only fires on a checkout that is
+    # already broken, which is exactly the reader who cannot afford to be told half of what was tried.
     Write-Warning ("The shipped PR template reference could not be found -- .github/pull_request_template.md is not placed by this run.`n" +
-        "  Looked under: $(Join-Path $PSScriptRoot '..\..\templates')`n" +
+        "  Looked for: $(Join-Path $PSScriptRoot '..\..\templates\pull_request_template.md')`n" +
+        "         and: $(Join-Path $PSScriptRoot '..\..\plugins\dkj-policy\templates\pull_request_template.md')`n" +
         '  Everything else below is unaffected. Copy it by hand from the plugin''s templates/ folder, or open-pr builds PR bodies with no description at all.')
 }
 
