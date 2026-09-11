@@ -43,7 +43,41 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**3 / 3 minor entries** <!-- pending-tally -->
+**3 / 4 minor entries** <!-- pending-tally -->
+
+### DEPLOY: docs/1824-install-cross-plugin-reinstall · 20260911-070940
+
+`INSTALL.md`'s migration sequences each uninstall one family of ids, then run
+`claude plugin marketplace remove claude-code-specialists`, then reinstall what they uninstalled. That
+middle command is not selective by plugin: install records are keyed `<plugin>@<marketplace>`, so
+retiring the marketplace half takes **every** plugin's record with it -- including the ones the section
+never named. Both partial sections ended with a plugin silently uninstalled and `enabledPlugins` still
+naming it under a marketplace that no longer exists. Nothing errored and nothing printed.
+
+The `dkj-team-*` section was the worse of the two, because its blockquote told the reader in so many
+words that the workflow ids were **unchanged -- do not touch them**, which is exactly what stopped them
+looking. Both sections now reinstall what step 3 takes, as a `4b`, and the step-3 comment in all three
+states both axes of the command's reach instead of only the cross-checkout one.
+
+**Score:** 4 -- a consumer following either section loses a working plugin and gets no signal at all;
+the page is the only thing that can tell them, since a session that loads no plugin has no hooks left
+to complain.
+
+#### What makes this deploy extra special
+
+The report named one section; the defect was symmetric and the neighbouring section had the mirror of
+it, which verification found rather than the report. Repaired together, because half of this repair
+would have left the page saying two different things about the same command.
+
+**Score:** N/A
+
+#### Pull Request
+
+INSTALL.md: marketplace remove drops every plugin's record, so each migration section must reinstall what it dropped
+
+[PR #1827](https://github.com/DKJ-Solutions/dkj-claude-plugins/pull/1827)
+
+---
 
 ### DEPLOY: fix/1821-connector-origin-mismatch · 20260911-005322
 
