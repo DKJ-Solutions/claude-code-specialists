@@ -106,3 +106,48 @@ function Get-GitUserName {
     if (-not $value) { return '' }
     return ([string]$value).Trim()
 }
+
+function Test-GitCanCommit {
+    <#
+        CAN THIS CHECKOUT COMMIT AT ALL? (inbound #1867) -- a different question from the two reads
+        above, and the only one of the three whose answer is a blocker rather than an advisory.
+
+        WHY `git var GIT_AUTHOR_IDENT` AND NOT `git config user.name`. The three functions above ask
+        who this checkout ACTS and COMMITS as, for a comparison. This asks whether git will accept a
+        commit at all, and user.name is the wrong reading for it in BOTH directions:
+
+          - user.name set, user.email unset -> a name is there to compare, and git still refuses.
+          - user.name unset, but the hostname carries a domain part or GIT_AUTHOR_NAME /
+            GIT_AUTHOR_EMAIL are in the environment -> git commits fine, so there is nothing to say.
+
+        `git var GIT_AUTHOR_IDENT` collapses both into the question actually being asked. It applies
+        git's own resolution order -- environment, then local, global and system config, then the
+        auto-guess from username@hostname -- and exits 128 with "Author identity unknown" exactly when
+        a commit would. Measured September 11, 2026 on DAVE-KOK-BWJ: exit 0 with the ident on a healthy
+        checkout, exit 128 under GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1, and a `git commit`
+        in that same state refused with the identical message.
+
+        NO NETWORK, like everything else in this lib: git reads config files and the environment. That
+        property is load-bearing -- the SessionStart hook behind check-git-identity.ps1 pays one more
+        local process launch and nothing more.
+
+        UNKNOWN IS TREATED AS CAN-COMMIT, deliberately. git absent, or a tree that is not a checkout,
+        returns $true: this function's one job is to refuse a state it has PROVEN broken, and a
+        refusal built on a failure to measure would wedge a run for the wrong reason. Every caller
+        already fails honestly on a git that is not there.
+
+        Returns $true when a commit would be accepted, $false only on a measured refusal.
+    #>
+    param([string]$RepoRoot)
+    $gitArgs = @()
+    if ($RepoRoot) { $gitArgs += @('-C', $RepoRoot) }
+    $gitArgs += @('var', 'GIT_AUTHOR_IDENT')
+    $res = $null
+    try {
+        $res = Invoke-NativeCapture -FilePath 'git' -Arguments $gitArgs -Utf8 -DiscardStderr
+    } catch {
+        return $true
+    }
+    if (-not $res) { return $true }
+    return ($res.ExitCode -eq 0)
+}
