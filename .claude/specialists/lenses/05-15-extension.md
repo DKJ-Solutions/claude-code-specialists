@@ -1290,6 +1290,45 @@ converging — which of `dkj-policy` and `dkj-policy-bwj` should own `test-lib.p
 market/theme mechanisms — is the follow-up, and it is an ownership decision rather than a repair a script
 can make.
 
+#### The ruling that followed, and the first thing moved under it (September 11, 2026, #1881)
+
+**Anything the two stores share goes to `dkj-policy-bwj`, unless it is obviously universal** (Dave, on
+[#1881](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1881)). The portable statement, the
+price it accepts and the second question a store has to ask before building anything are in
+[that plugin's own README](../../../plugins/dkj-policy/dkj-policy-bwj/README.md#what-this-plugin-owns),
+because they are read in a store repo rather than here. What belongs in this lens is the part that is
+this repo's:
+
+- **The ruling widened a plugin that said it carried no mechanism.** `dkj-policy-bwj`'s README opened with
+  *"policy, never mechanism"*, written when its only non-prose payload was `templates/`, which a consumer
+  **copies**. A lib a consumer **dot-sources** is a second kind of payload, so the line was widened rather
+  than quietly broken — the distinction that survives is copy-vs-dot-source, not prose-vs-code.
+- **The first increment is [`scripts/tests/test-lib.ps1`](../../../plugins/dkj-policy/dkj-policy-bwj/scripts/tests/test-lib.ps1)**,
+  and it was chosen because it is the case where merging is a *decision* rather than a diff: each store's
+  copy was ahead of the other. One had `ConvertTo-CapturedText` and `Add-SuiteFault`, both born from a
+  **false green in the gate these suites are read by**; the other had `Assert-PluginLoadedForProject`, born
+  from a plugin administration pointing at a folder that no longer existed; and the second was still in the
+  language the first had been translated out of a month earlier. What ships is the superset, in English.
+- **It has a suite here even though nothing here uses it** —
+  [`bwj-test-lib.tests.ps1`](../../../scripts/tests/bwj-test-lib.tests.ps1). Shipping it without one would
+  put the file straight back in the position #1881 was filed about: a mechanism with no owner watching it,
+  one edit away from drifting again, this time *inside* the plugin where no consumer-to-consumer check can
+  see it. The suite holds three things, each a way the convergence comes undone: the superset, the
+  behaviour of the two false-green mechanisms, and the language.
+- **The suite runs the lib in a CHILD PROCESS, and that is load-bearing rather than stylistic.** The lib
+  sets `$script:Pass`/`$script:Fail` and defines `Assert-True` in the scope of whoever dot-sources it, and
+  PowerShell names are case-insensitive — so dot-sourcing it into a suite here would silently replace that
+  suite's own counters and its own `Assert-True` with the ones under test, and a broken lib could report
+  itself green.
+- **One class the ruling does not cover, found while reading for it:** `dkj-subagents-shopify` already ships
+  `push-preview.ps1`, `sync-main.ps1`, `preview-theme.ps1` and `sync-rules.ps1`, and one store still carries
+  its own full copy of three of them. That is an **adoption gap**, not an ownership question — and no check
+  here reports it, because `check-consumer-drift.ps1` compares agent defs and personas only, while the
+  sibling check compares consumer to consumer and never against what the marketplace already ships. Filed
+  as [#1885](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1885); the remaining convergence
+  candidates, each with its verdict under the ruling, are
+  [#1886](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1886).
+
 ### Repo-specific rules
 
 - **NEVER ROUND-TRIP A MARKDOWN FILE THROUGH POWERSHELL TO EDIT IT — USE THE EDITOR'S OWN EDIT.**
