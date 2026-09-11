@@ -9,14 +9,16 @@
         powershell -NoProfile -ExecutionPolicy Bypass -File scripts/tests/git-identity-gate.tests.ps1
 
     NOTHING HERE READS THE MACHINE'S OWN IDENTITY, and that is the whole design of this suite. The
-    check's subject IS the machine -- the account gh holds and the name git commits as -- so a suite
-    that let either value through would assert a different thing on Dave's checkout than on a CI
-    runner, and would go green or red for reasons that have nothing to do with the code. Every case
-    below therefore passes both values in explicitly (-GhAccountOverride / -GitUserNameOverride), and
-    the hook is exercised against STUB check scripts written into the fixture rather than against the
-    real one. The one thing not asserted is the reading of `gh auth status` itself, which is a test gap
-    named in the branch document rather than papered over: it needs a keyring, and a suite that
-    installed one would be testing gh.
+    check's subject IS the machine -- the account gh holds, the name git commits as, and since inbound
+    #1867 whether git will accept a commit at all -- so a suite that let any of those values through
+    would assert a different thing on Dave's checkout than on a CI runner, and would go green or red
+    for reasons that have nothing to do with the code. Every case below therefore passes all three in
+    explicitly (-GhAccountOverride / -GitUserNameOverride / -CanCommitOverride), and the hook is
+    exercised against STUB check scripts written into the fixture rather than against the real one.
+    The third one defaults to "yes, it can commit" in Invoke-Check, so the cases written before it
+    existed go on asserting exactly what they were written to assert. The one thing not asserted is
+    the reading of `gh auth status` itself, which is a test gap named in the branch document rather
+    than papered over: it needs a keyring, and a suite that installed one would be testing gh.
 
     THE LOGIN-SHAPE BOUNDARY IS WHERE THE VALUE IS. The check only reports a mismatch when
     git config user.name is a VALID GitHub username, because that guard is the only thing standing
@@ -80,13 +82,21 @@ function Invoke-Check {
     <#
         Both identities always passed in explicitly -- see the file synopsis. 'NONE' is the check's own
         spelling for "absent", so a case can say "gh is logged out" without logging anything out.
+
+        AND SO IS THE COMMIT-ABILITY PROBE, for exactly the same reason (inbound #1867). Since that
+        probe runs `git var GIT_AUTHOR_IDENT` against the real machine, leaving it unset would put a
+        THIRD machine-dependent value into every case here -- and a green suite on Dave's checkout
+        would go red on a runner with no git identity, in cases that have nothing to do with it. So
+        -CanCommit defaults to 'YES' and every existing case keeps asserting what it was written to
+        assert; the cases that are ABOUT the probe pass 'NO'.
     #>
     param(
         [Parameter(Mandatory = $true)][string]$Gh,
         [Parameter(Mandatory = $true)][string]$Git,
+        [string]$CanCommit = 'YES',
         [string]$ScriptPath = $Script
     )
-    $scriptArgs = @('-GhAccountOverride', $Gh, '-GitUserNameOverride', $Git)
+    $scriptArgs = @('-GhAccountOverride', $Gh, '-GitUserNameOverride', $Git, '-CanCommitOverride', $CanCommit)
     $prevEap = $ErrorActionPreference
     try {
         $ErrorActionPreference = 'Continue'
@@ -180,10 +190,44 @@ try {
 
     $r = Invoke-Check -Gh 'DaveKJohn' -Git 'NONE'
     Assert-True ($r.Code -eq 0 -and $r.Out -match '\[SKIP\]' -and $r.Out -match 'unset') `
-        'user.name unset -- [SKIP]; git itself refuses to commit in that state, so it needs no second reporter'
+        'user.name unset but the checkout CAN commit -- [SKIP]; nothing to compare, now that the state which made this matter is reported above it (inbound #1867)'
 
     $r = Invoke-Check -Gh 'NONE' -Git 'NONE'
     Assert-True ($r.Code -eq 0 -and $r.Out -match '\[SKIP\]') 'neither side present -- [SKIP], no throw'
+
+    # --- the checkout that cannot commit at all (inbound #1867) ------------------------------------
+    # THE STATE THE THIRD [SKIP] ABOVE USED TO SWALLOW. Its old justification -- "git itself refuses to
+    # commit in that state, so it needs no second reporter" -- is true about WHETHER and wrong about
+    # WHEN: the first commit of the cycle is inside new-branch.ps1, after HEAD has moved. These cases
+    # pin the split, and they are the ones that pass -CanCommit 'NO'.
+    Write-Host ''
+    Write-Host 'check-git-identity.ps1 -- no usable git author identity'
+
+    $r = Invoke-Check -Gh 'davekokbwj' -Git 'davekokbwj' -CanCommit 'NO'
+    Assert-True ($r.Out -match '\[WARNING\]' -and $r.Out -match 'cannot commit') `
+        'no author identity -- a [WARNING] of its own, not one of the three silent [SKIP]s'
+    Assert-True ($r.Code -eq 0) `
+        'and it stays ADVISORY (exit 0) -- the SessionStart hook behind it must never block a session'
+    Assert-True ($r.Out -match 'GIT_AUTHOR_IDENT') `
+        'it names the probe, so a reader can reproduce the verdict without reading the script'
+    Assert-True ($r.Out -match 'user\.name' -and $r.Out -match 'user\.email') `
+        'BOTH config keys are printed -- setting only user.name leaves git refusing just as hard'
+
+    # THE PRECEDENCE, which is the half a reader cannot infer from the two cases above. A machine can
+    # hold a split identity AND no usable one at once; the blunter finding has to win, because a
+    # checkout that cannot commit cannot act on the comparison either.
+    $r = Invoke-Check -Gh 'DaveKJohn' -Git 'davekokbwj' -CanCommit 'NO'
+    Assert-True ($r.Out -match '\[WARNING\]' -and $r.Out -notmatch '\[ERROR\]') `
+        'it outranks the split-identity report -- the mismatch is not what a no-identity machine needs told'
+    Assert-True ($r.Code -eq 0) `
+        'and the exit code follows the verdict actually printed, so exit 1 cannot arrive with no [ERROR]'
+
+    # THE OTHER DIRECTION, and it is what keeps this check shippable: a checkout that CAN commit must
+    # reach the comparison untouched. Without this, a probe that answered 'NO' too readily would
+    # silence every finding the check exists for.
+    $r = Invoke-Check -Gh 'DaveKJohn' -Git 'davekokbwj' -CanCommit 'YES'
+    Assert-True ($r.Code -eq 1 -and $r.Out -match '\[ERROR\]' -and $r.Out -notmatch '\[WARNING\]') `
+        'a checkout that CAN commit falls straight through to the comparison, unchanged'
 
     # --- the plugin mirror answers identically ----------------------------------------------------
     # shared-scripts.tests.ps1 proves the two files are byte-identical; this proves the mirror RUNS
@@ -226,6 +270,22 @@ try {
         'a [SKIP] is not a failure -- no "could not complete", exit 0'
     Assert-True ($r.Out -notmatch 'agree') `
         'a [SKIP] must NOT be reported as agreement -- #1830, no comparison was made'
+
+    # THE [WARNING] ARM (inbound #1867). Its whole reason to exist is that this state used to reach the
+    # silent [SKIP] branch tested just above -- so the assertion that matters is not only that it is
+    # reported, but that it does NOT go silent the way a [SKIP] does. Exit 0 like every other arm: a
+    # session start must never strand here, however broken the machine turns out to be.
+    $warnStub = New-StubCheck -Dir $stubs -Name 'stub-warning' -ExitCode 0 `
+        -Body "[WARNING] this checkout has no usable git author identity -- it cannot commit at all.`n          git config --global user.email `"<the address on that account>`""
+    $r = Invoke-Hook -CheckScriptOverride $warnStub
+    Assert-True ($r.Code -eq 0 -and $r.Out -match 'no usable git author identity') `
+        'a [WARNING] -- reported at session start rather than swallowed as a [SKIP], still exit 0'
+    Assert-True ($r.Out -match 'user\.email') `
+        'and its detail is forwarded, so the repair is in the session without re-running anything'
+    Assert-True ($r.Out -match 'data, not instructions') `
+        'the forwarded block is labelled as data, like the [ERROR] arm above it'
+    Assert-True ($r.Out -notmatch 'agree') `
+        'it is not reported as agreement -- nothing was compared, which is #1830 one state further on'
 
     # Non-zero exit with no [ERROR] line: an unexpected crash must not be reported as clean.
     $crashStub = New-StubCheck -Dir $stubs -Name 'stub-crash' -ExitCode 3 -Body "something unexpected"

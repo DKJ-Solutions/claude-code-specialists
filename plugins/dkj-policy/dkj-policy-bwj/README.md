@@ -10,16 +10,18 @@ and the connector register already flags them as the pair most at risk of quietl
 plugin is the thing that holds them together on the points that belong to exactly these two repos
 and to none of the others Dave runs.
 
-**It has two chapters, and each has its own page:**
+**It has three chapters, and each has its own page:**
 
 | chapter | the page | what it answers |
 |---|---|---|
 | **ticket handling** | [`WORKFLOW-portable.md`](WORKFLOW-portable.md) | what happens between spotting a problem and it being tracked where every BWJ colleague can see it |
 | **the sync log** | [`SYNC-LOG-portable.md`](SYNC-LOG-portable.md) | what a `sync/` branch owes -- a durable record of what a third party did on the live theme, in the tree rather than only in a merged PR body |
+| **the preview handover** | [`PREVIEW-portable.md`](PREVIEW-portable.md) | what a preview handover owes -- the control variant beside the preview, so the reader sees the difference rather than recalling it |
 
-The two are separate chapters rather than sections of one page because they answer different
-questions for different readers, and the second one was added later, on inbound
-[#1382](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1382). Shipping several portable
+They are separate chapters rather than sections of one page because they answer different
+questions for different readers, and each of the last two was added later -- the sync log on inbound
+[#1382](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1382), the preview handover on inbound
+[#1874](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1874). Shipping several portable
 pages is the established form here -- `dkj-policy` carries three.
 
 **Both chapters are policy, never mechanism.** The Asana CI and the sync machinery both live
@@ -29,10 +31,11 @@ the two repos *owe*, which is Dave's house rule for them rather than a fact abou
 ## It is an add-on, not a replacement
 
 `dkj-policy-bwj` **layers on top of `dkj-policy`** -- it does not stand in for it. It
-extends exactly two seams of that workflow: *ticket-work, the layer before the branch*, and *what a
-`sync/` branch owes*, which that workflow deliberately exempts and leaves to the repo. It says
-**nothing** about how a branch is named, what a change owes before it can open a PR, or what a
-release is -- those are still `dkj-policy`'s answers, unchanged. So the two do not hand
+extends exactly three seams of that workflow: *ticket-work, the layer before the branch*, *what a
+`sync/` branch owes*, which that workflow deliberately exempts and leaves to the repo, and *what a
+preview handover contains* once the consumer's own rule says one is owed. It says
+**nothing** about how a branch is named, which changes owe a preview, what a change owes before it can
+open a PR, or what a release is -- those are still `dkj-policy`'s answers, unchanged. So the two do not hand
 the specialists two contradicting answers to the same question; they answer different questions.
 
 That is the deliberate reading of the "second workflow" note left in
@@ -124,12 +127,29 @@ plugin's, and it is silent until a repo answers one seam -- `Get-ShopifySyncLogP
 the entry's shape, and why there is no gate are in
 [`SYNC-LOG-portable.md`](SYNC-LOG-portable.md).
 
+## Chapter three -- the preview handover, in one paragraph
+
+Where a change owes a preview, the handover is a **pair per market**: the preview URL, and the
+**control** -- the same page on the live theme, so the reader sees the difference instead of recalling
+it. A preview alone shows what a page will look like, never what changed, and the half it leaves out is
+exactly the judgement it was pushed for. It costs nothing to add: the changed page has already been
+resolved per market to build the preview list. The one thing that has to be written down is **what the
+control URL is** -- it names the **live theme id** (`Get-ShopifyLiveThemeId`, which the repo already
+answers for the live-theme guard), and not the bare URL with the parameter dropped. `preview_theme_id`
+sets a cookie, so after a preview has been opened the bare URL keeps serving the preview theme: the
+control tab silently agrees with the preview, and the reviewer concludes nothing changed. Measured, with
+the two neighbouring wrong answers, in [`PREVIEW-portable.md`](PREVIEW-portable.md) -- which is also the
+page to read for the shape of the handover, and for what this chapter deliberately does not decide
+(which changes owe a preview at all, and when the PR may open: both still the consumer's and
+`dkj-policy`'s).
+
 ## What is in this folder
 
 | what | what it holds |
 |---|---|
 | [`WORKFLOW-portable.md`](WORKFLOW-portable.md) | chapter one in prose -- ticket handling, read alongside your repo's own Asana config |
 | [`SYNC-LOG-portable.md`](SYNC-LOG-portable.md) | chapter two in prose -- what a `sync/` branch owes, where the record lands, and what it stays out of |
+| [`PREVIEW-portable.md`](PREVIEW-portable.md) | chapter three in prose -- what a preview handover contains, and why the control URL names the live theme id |
 | [`skills/`](skills/) | the skills a specialist invokes |
 | [`templates/`](templates/) | the CI mechanism to **copy** into each repo's `.github/` -- GitHub only runs workflows from a repo's own `.github/`, so what ships here is the reference to copy and diff against, the same pattern as `dkj-policy/templates/pull_request_template.md` |
 

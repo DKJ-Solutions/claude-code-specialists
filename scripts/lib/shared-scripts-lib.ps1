@@ -1152,6 +1152,11 @@ function Get-SharedScriptPairs {
             # ADVISORY, AND DELIBERATELY IN NO GATE: it reports a fact about the MACHINE rather than
             # about the diff, and a CI runner acts and commits as a bot -- a mismatch by design.
             #
+            #
+            # AND SINCE INBOUND #1867 IT ANSWERS A BLUNTER QUESTION FIRST: can this checkout commit at
+            # all? That state used to reach the silent "user.name unset" skip, on the ground that git
+            # refuses such a commit itself -- true about whether, wrong about when, since the cycle's
+            # first commit is inside new-branch.ps1 after HEAD has moved.
             # NO SKILL, on the same reasoning check-unfolded-entry gives above: the caller is automatic
             # and nobody invokes it as a procedure. One command in its .SYNOPSIS answers it early.
             Name   = 'check-git-identity'
@@ -1237,6 +1242,9 @@ function Get-SharedScriptPairs {
             # runs its comparison and exits on load. Extracting beat a second copy of
             # Get-ActiveGhAccount's multi-account parse -- the subtle one, and the one a repo whose
             # branch-prefix table says "do it here -- and nowhere else" does not get to keep two of.
+            # Test-GitCanCommit joined them for inbound #1867 -- a third question, and a blocker rather
+            # than an advisory read: whether git will accept a commit here at all. Two callers on day
+            # one, check-git-identity.ps1 reporting it and new-branch.ps1 refusing on it.
             Name    = 'git-identity-lib'
             Source  = 'scripts\lib\git-identity-lib.ps1'
             Plugin = 'dkj-policy'

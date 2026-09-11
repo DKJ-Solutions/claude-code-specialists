@@ -57,7 +57,7 @@ Assert-True (Test-Path -LiteralPath $manifestPath) 'plugin.json is present'
 $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
 Assert-Equal 'dkj-policy-bwj' $manifest.name 'plugin.json name is dkj-policy-bwj'
 
-foreach ($rel in @('README.md', 'WORKFLOW-portable.md',
+foreach ($rel in @('README.md', 'WORKFLOW-portable.md', 'SYNC-LOG-portable.md', 'PREVIEW-portable.md',
                    'skills\report-issue\SKILL.md', 'skills\adopt-dkj-policy-bwj\SKILL.md',
                    'templates\asana-mirror.yml', 'templates\asana-mirror.ps1')) {
     Assert-True (Test-Path -LiteralPath (Join-Path $PluginRoot $rel)) "ships $rel"

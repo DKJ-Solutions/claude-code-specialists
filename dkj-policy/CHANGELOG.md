@@ -43,7 +43,87 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**9 / 23 minor entries** <!-- pending-tally -->
+**9 / 25 minor entries** <!-- pending-tally -->
+
+### DEPLOY: docs/1874-preview-control-variant · 20260911-185450
+
+`dkj-policy-bwj` gains a third chapter, [`PREVIEW-portable.md`](../plugins/dkj-policy/dkj-policy-bwj/PREVIEW-portable.md):
+**a preview handover is a pair per market -- the preview, and the live control variant.**
+
+A preview alone shows what a page will look like; it never shows what *changed*. The reader supplies the
+other half from memory while looking at something else, which is the exact judgement the preview was
+pushed for. The rule comes from a five-market handover in `smartwatchbanden` that was complete by the
+letter of the rule then in force and still left that half undone.
+
+**The part that had to be measured is what the control URL is.** It names the **live theme id**, and not
+the same URL with the parameter dropped -- `preview_theme_id` sets a cookie, so once a market's preview
+has been opened the bare URL keeps serving the preview theme. The control tab then agrees with the preview
+and the reviewer concludes nothing changed: a false negative that looks like a clean result. Measured on a
+live store, with both neighbouring wrong answers recorded on the page -- including `preview_theme_id=0`,
+which renders the "missing one of these required files" error rather than resetting anything, and reads
+like a broken preview theme.
+
+The live id needs no seam of its own: `Get-ShopifyLiveThemeId` already states it for
+`dkj-subagents-shopify`'s live-theme guard, and the page points there rather than at a pasted number.
+Nothing here decides which changes owe a preview, or when a PR may open -- both stay the consumer's and
+`dkj-policy`'s, unchanged. No new seam, no adopt step, no CI.
+
+The ships-assert in `dkj-policy-bwj.tests.ps1` now covers the portable pages it had never guarded --
+the new one and `SYNC-LOG-portable.md` beside it.
+
+Resolves [#1874](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1874).
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A -- a workflow plugin's house rule for two store repos. It changes what one colleague hands another
+before a merge; no subscriber of any service reaches it.
+
+#### Pull Request
+
+A preview handover owes the control variant, not only the preview
+
+Plugins: dkj-policy-bwj
+
+[PR #1877](https://github.com/DKJ-Solutions/dkj-claude-plugins/pull/1877)
+
+---
+
+### DEPLOY: fix/1867-git-author-identity-probe · 20260911-181859
+
+A machine with no usable git author identity is now reported at session start and refused by
+`new-branch` before a branch is cut, instead of failing at exit 128 once HEAD has already moved.
+`git var GIT_AUTHOR_IDENT` replaces `user.name` as the reading, because `user.name` disagrees with
+git in both directions: set-but-no-email still refuses, and unset-but-auto-guessable commits fine.
+The three silent `[SKIP]`s keep their silence; only the one that was never "nothing to compare" is
+split out of them.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A -- developer tooling in a workflow plugin. It reports a git configuration state to whoever is
+running the cycle; no subscriber of any service reaches it.
+
+Worth recording for the next reader of this tree, though: it repairs a gap a previous fix
+deliberately left. [#1830](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1830) removed a
+false claim of agreement by routing every `[SKIP]` to silence -- correct for two of the three, and for
+the third it replaced a wrong statement with no statement, on the one machine state where silence
+costs a branch. The lesson is in the split rather than in a revert: three conditions sharing an exit
+code are not thereby the same finding.
+
+**Score:** N/A
+
+#### Pull Request
+
+Report a checkout that cannot commit at all, before a branch is cut
+
+Plugins: dkj-policy
+
+[PR #1871](https://github.com/DKJ-Solutions/dkj-claude-plugins/pull/1871)
+
+---
 
 ### DEPLOY: fix/1865-fixture-dep-scan-set · 20260911-165129
 

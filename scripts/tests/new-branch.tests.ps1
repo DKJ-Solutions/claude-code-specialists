@@ -232,6 +232,11 @@ function New-Fixture {
     # fetch-attempt-lib.ps1 likewise (#1860): entry-scaffold-lib.ps1 dot-sources it for
     # Invoke-RecordedRemoteFetch, which Get-TrunkGap's fetch runs through -- so the fixture owes it too.
     Copy-Item -LiteralPath (Join-Path $RepoRoot 'scripts\lib\fetch-attempt-lib.ps1') -Destination (Join-Path $dir 'scripts\lib\fetch-attempt-lib.ps1') -Force
+    # git-identity-lib.ps1 likewise (inbound #1867): new-branch.ps1 dot-sources it for Test-GitCanCommit,
+    # the probe behind its "this checkout cannot commit" refusal -- so the fixture owes it too. That
+    # dot-source is GUARDED, which is exactly why the fixture has to carry it: without the file the
+    # refusal degrades to silence and the (y) case would pass for the wrong reason, saying nothing.
+    Copy-Item -LiteralPath (Join-Path $RepoRoot 'scripts\lib\git-identity-lib.ps1') -Destination (Join-Path $dir 'scripts\lib\git-identity-lib.ps1') -Force
     Copy-Item -LiteralPath $PrIssuesLibSrc   -Destination (Join-Path $dir 'scripts\lib\pr-issues-lib.ps1')           -Force
     Copy-Item -LiteralPath $RemoteAheadLibSrc -Destination (Join-Path $dir 'scripts\lib\remote-ahead-lib.ps1')       -Force
     Copy-Item -LiteralPath $RefPrintLibSrc    -Destination (Join-Path $dir 'scripts\lib\ref-print-lib.ps1')          -Force
@@ -1841,6 +1846,75 @@ exit 1
         Remove-Item -Path $xBin -Recurse -Force -ErrorAction SilentlyContinue
         Remove-Item -Path $xCallLog -Force -ErrorAction SilentlyContinue
     }
+
+    # --- (y) NO USABLE GIT AUTHOR IDENTITY: REFUSED BEFORE ANYTHING IS CREATED (inbound #1867) --------
+    # THE FAILURE THIS REPLACES. On a machine with nothing in system, global or local config, and a
+    # hostname with no domain part for git's auto-guess to work from, every commit dies with exit 128 --
+    # and the first one to do so was this script's own park, several hundred lines after the checkout.
+    # The run left a local branch with an uncommitted document standing on it, for a condition that was
+    # knowable before a single ref existed. Reported from a consumer that measured the machine state.
+    #
+    # THE SAME TWO-HALF SHAPE AS (s) ABOVE, and for the same reason: naming the repair is what the
+    # message has to do, and NOTHING HAPPENED is what makes refusing cheaper than failing late. A
+    # refusal that left half a branch behind would be strictly worse than the exit 128 it replaces.
+    Write-Host "new-branch.ps1 -- a checkout that cannot commit is REFUSED (inbound #1867)" -ForegroundColor Cyan
+    # THE FIXTURE'S IDENTITY IS REMOVED IN ALL THREE PLACES GIT READS, not just the local config that
+    # New-Fixture wrote: git falls back to global, then system, then an auto-guess from
+    # username@hostname -- and on a developer machine the global config alone would keep the probe
+    # green and assert nothing. GIT_CONFIG_GLOBAL / GIT_CONFIG_NOSYSTEM are git's own documented way to
+    # suppress the outer two, and they are inherited by the child process Invoke-NewBranch starts.
+    # GIT_AUTHOR_* / GIT_COMMITTER_* are cleared too, because the environment outranks all of it and a
+    # runner that exports them (some CI images do) would otherwise make this case silently vacuous.
+    $fixIdent = New-Fixture -Label 'y'
+    Invoke-FixtureGitIn $fixIdent config --unset user.name
+    Invoke-FixtureGitIn $fixIdent config --unset user.email
+    $identEnvNames = @('GIT_CONFIG_GLOBAL', 'GIT_CONFIG_NOSYSTEM', 'GIT_AUTHOR_NAME', 'GIT_AUTHOR_EMAIL', 'GIT_COMMITTER_NAME', 'GIT_COMMITTER_EMAIL')
+    $identEnvPrev = @{}
+    foreach ($n in $identEnvNames) { $identEnvPrev[$n] = (Get-Item "Env:\$n" -ErrorAction SilentlyContinue).Value }
+    try {
+        foreach ($n in $identEnvNames) { Remove-Item "Env:\$n" -ErrorAction SilentlyContinue }
+        # NUL, not /dev/null: this suite runs on Windows, where /dev/null is an ordinary relative path
+        # and git would read it as an empty config rather than failing to find one. Either spelling
+        # happens to produce "no global config" here, but only one of them says so honestly.
+        $env:GIT_CONFIG_GLOBAL = 'NUL'
+        $env:GIT_CONFIG_NOSYSTEM = '1'
+
+        # FIXTURE SANITY FIRST, because every assert below is vacuous if the identity is still readable
+        # -- and it would be vacuous SILENTLY, passing for the wrong reason on a machine where the
+        # suppression did not take. Asserted against git's own probe, which is the one this script reads.
+        $identProbe = Invoke-CapturedChild -WorkDir $fixIdent -ChildArgs @('-NoProfile', '-Command', "git -C '$fixIdent' var GIT_AUTHOR_IDENT; exit `$LASTEXITCODE")
+        Assert-Equal 128 $identProbe.Code 'no identity: fixture sanity -- git itself refuses to name an author here'
+
+        $rY = Invoke-NewBranch -Dir $fixIdent -Name 'fix/1867-cannot-commit-v1' -Title 'Cannot commit'
+        Assert-Equal 1 $rY.Code 'no identity: new-branch exits 1 rather than dying at exit 128 in the park'
+        Assert-True (Test-Phrase -Text $rY.Out -Phrase 'no usable git author identity') 'no identity: and says which state it is in, in words'
+        # THE REPAIR, both keys. Setting only user.name leaves git refusing exactly as hard, which is the
+        # whole reason user.name was the wrong thing to read for this question in the first place.
+        Assert-True (Test-Phrase -Text $rY.Out -Phrase 'user.name') 'no identity: names user.name as part of the repair'
+        Assert-True (Test-Phrase -Text $rY.Out -Phrase 'user.email') 'no identity: and user.email, which is the half a user.name-only check misses'
+
+        # AND NOTHING WAS TOUCHED -- the same three reads as (s), for the same reason.
+        $branchesY = ((& git -C $fixIdent branch --list 'fix/1867-cannot-commit-v1') -join '').Trim()
+        Assert-True (-not [bool]$branchesY) 'no identity: and NO branch was created -- the refusal is before the checkout'
+        $docY = Join-Path $fixIdent (Join-Path 'dkj-policy' 'fix-1867-cannot-commit-v1.md')
+        Assert-True (-not (Test-Path -LiteralPath $docY)) 'no identity: and no branch document was scaffolded either'
+        $headY = ((& git -C $fixIdent rev-parse --abbrev-ref HEAD) -join '').Trim()
+        Assert-Equal 'main' $headY 'no identity: and HEAD is left exactly where the operator was standing'
+    } finally {
+        foreach ($n in $identEnvNames) {
+            if ($null -eq $identEnvPrev[$n]) { Remove-Item "Env:\$n" -ErrorAction SilentlyContinue }
+            else { Set-Item "Env:\$n" -Value $identEnvPrev[$n] }
+        }
+    }
+
+    # --- (y2) AND A HEALTHY CHECKOUT IS UNTOUCHED BY THE PROBE ---------------------------------------
+    # The other direction, and it is what keeps the guard shippable: every fixture above already proves
+    # it in passing, but none of them SAYS so, and a probe that answered 'no' too readily would refuse
+    # every branch in the workflow. One explicit case, so the regression has a name.
+    $fixIdentOk = New-Fixture -Label 'y2'
+    $rY2 = Invoke-NewBranch -Dir $fixIdentOk -Name 'fix/1867-can-commit-v1' -Title 'Can commit' -NoPush
+    Assert-Equal 0 $rY2.Code 'healthy identity: new-branch runs exactly as before -- the guard costs one local git var'
+    Assert-True (-not (Test-Phrase -Text $rY2.Out -Phrase 'no usable git author identity')) 'healthy identity: and says nothing about identity at all'
 } finally {
     foreach ($f in $script:fixtures) {
         if (Test-Path -LiteralPath $f) { Remove-Item -Recurse -Force -LiteralPath $f -ErrorAction SilentlyContinue }
