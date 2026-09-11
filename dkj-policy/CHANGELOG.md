@@ -43,7 +43,64 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**10 / 27 minor entries** <!-- pending-tally -->
+**11 / 28 minor entries** <!-- pending-tally -->
+
+### DEPLOY: feat/1873-preview-handover-rule · 20260911-192647
+
+`dkj-policy-bwj`'s chapter three gains its second half: **the preview handover is one link to a
+published page, never a table of URLs.** The page carries one card per market -- a QR code to the
+preview, the preview and live-control pair as text beneath it -- plus what a URL cannot say: how to see
+the change, what the gates already proved, and the one question being asked. Nothing about which
+changes owe a preview, or about no PR opening before one is approved, changes.
+
+**It lands in `PREVIEW-portable.md` rather than beside it.** That page arrived on the trunk from
+[#1874](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1874) while this branch was
+building -- the same day, the same handover, the other half of one complaint -- and it prescribed a
+markdown table of URLs while recording, a paragraph later, that a terminal table could not even be
+selected. Two chapter threes would have shipped a plugin that tells a session to build the table and
+forbids it. So the rule is now stated in two halves on one page, and this branch's own page is deleted.
+
+The carrier half is carried where the failure happens, not only where it is stated. `push-preview`
+printed a bare list and its own page called that list "the preview URL(s) to hand over", so a policy
+page nothing loads at push time would have lost to it every time. `Get-PreviewHandoverNote` in
+`preview-theme.ps1` now prints a closing note whenever more than one URL is emitted; the `push-preview`
+page says the same in prose. Both stay generic, naming no repo: what is true everywhere is that a
+wrapped column of 90-character URLs is not a handover and the reviewer is on a phone -- what the
+handover IS stays BWJ's house rule. One URL prints nothing, because a single line in a terminal
+genuinely is a handover.
+
+Two things neither report stated are written down, because without them the rule is unfollowable: a
+published Artifact's CSP blocks images from every host, so a QR pulled from a QR-image API renders as a
+blank square and says nothing; and the preview URL is what grants access to an unpublished theme, so it
+must never be round-tripped to a third-party generator, and the handover link is as sensitive as the
+URLs on it.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+Both BWJ store repos stop handing their reviewer something they cannot use. The measured handover was
+ten URLs of 70 to 100 characters in a two-column table: the terminal wrapped it until the columns
+saying *which market, which page* were gone, it could not be selected to copy, the reviewer was on the
+phone the change only existed on, and everything about what was proven and what was being asked stayed
+in the transcript. A QR per market is the difference between reviewing the change and retyping a query
+string ten times -- twenty, now that the control variant doubles the pairs.
+
+Every other Shopify consumer gets the generic half -- the note under a multi-URL list -- and nothing
+else changes for them: no seam to answer, no file to scaffold, and a single-market repo sees no new
+output at all.
+
+**Score:** 4
+
+#### Pull Request
+
+A preview is handed over as one link to a published page, not as a table of URLs
+
+Plugins: dkj-policy, dkj-policy-bwj, dkj-subagents-shopify
+
+[PR #1882](https://github.com/DKJ-Solutions/dkj-claude-plugins/pull/1882)
+
+---
 
 ### DEPLOY: feat/1870-reach-label-portable · 20260911-191808
 
