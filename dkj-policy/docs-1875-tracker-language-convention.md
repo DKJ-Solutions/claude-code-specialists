@@ -36,23 +36,85 @@
 
 ### PLAN
 
-Issue #1875: a GitHub issue Claude files in a consuming repo must be written in English, like every other artefact this workflow produces. The convention is stated today only for repo content and the script layer (Tessa's portable manual), so nothing tells a session that the tracker is in scope -- and smartwatchbanden accordingly carries Dutch issue titles. State it in the portable layers where a filing session actually reads: Tessa's manual, dkj-policy's CONTRIBUTING-portable step 1, and dkj-policy-bwj's WORKFLOW-portable + report-issue, where the Asana half is the deliberate exception (a ticket a person wrote, and the reply going back to them, follow that person).
+Issue #1875: a GitHub issue Claude files in a consuming repo must be written in English, like every
+other artefact this workflow produces. Dave's one carve-out is an Asana ticket a person wrote
+themselves, because nobody controls how a colleague phrases their own request.
+
+**The gap is real and the rule was never stated anywhere a filing session reads.** The language
+convention lives in the technical writer's portable manual, and every layer it names is a *file in the
+tree* -- a manual, a persona body, the script layer, a script-generated document. A session filing a
+finding is writing somewhere else entirely, so it can follow that rule to the letter and still leave a
+Dutch tracker behind. `dkj-policy`'s step 1 states the whole filing bar without naming a language, and
+`dkj-policy-bwj` names the two audiences -- the GitHub issue and the Asana card -- without saying which
+language either takes.
+
+**Symptom verified before anything was written.** Of the fifteen most recent issues in
+`bwj-development/smartwatchbanden`, three carry Dutch titles: `559`, `554` and `547`. The issue's own
+title says "still in English" where the tree says Dutch; the body is unambiguous about which way round
+it is, so the title is read as the slip.
+
+#### Where it lands, and why four places rather than one
+
+- the **portable manual** is the canonical home of the convention -- `CLAUDE.md` names it as such -- so
+  the scope correction belongs there and travels to every consumer through a release;
+- **`dkj-policy`'s step 1** is where a session filing an issue actually reads, and that plugin does not
+  depend on `dkj-subagents-alpha`, so a consumer can run this cycle with the manual nowhere in context;
+- **`dkj-policy-bwj`** is where the two audiences sit side by side, and therefore the only place the
+  carve-out can be stated as the boundary it is rather than as an aside;
+- **`report-issue`** is the procedure a BWJ session executes, one line per step, pointing at both.
+
+#### What is deliberately NOT done here
+
+- **No backfill.** The three Dutch issues are not retitled. An issue records what was reported and
+  when; rewriting the backlog buys a tidy list and loses that, and the rule is about what is filed from
+  here on. Written into the BWJ page so the next reader does not take it as an oversight.
+- **No gate.** Nothing checks the language of an issue title, and nothing here proposes one -- a
+  language check is a guess about prose, and this repo has declined checks on weaker grounds.
+- **Not in `CLAUDE.md`.** Its language section already delegates to the manual for the system-wide
+  norm, so the correction arrives there without an always-on edit.
 
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [x] Verify the symptom in the consuming tracker, and the gap in all three portable layers
+- [x] Portable manual: the tracker is in scope, and a person's own words are not a fourth exception
+- [x] `dkj-policy` step 1: one answer per repo, English in this family, with the row in the answers table
+- [x] `dkj-policy-bwj` step 1: English, title as much as body, and no backfill
+- [x] `dkj-policy-bwj` step 2: the one place the language turns over, and the Asana carve-out
+- [x] `report-issue`: one line in step 1 and one in step 2, pointing at the rule rather than restating it
 
 ### TEST
 
+- [x] `check-plugin-integrity.ps1` -- frontmatter, manifests and every new anchor (four added links)
+- [x] The full suite set, exactly as CI runs it
+- [x] Both BWJ pages verified still pure ASCII, which is their convention
+
 ### DEPLOY: docs/1875-tracker-language-convention
 
-**Score:**
+A GitHub issue a session files is now stated to be English -- title as much as body -- in the four
+portable places a filing session reads: the technical writer's manual, which is the canonical home of
+the language convention and until now named only files in the tree; `dkj-policy`'s step 1, which states
+the filing bar for every consumer whether or not the specialists plugin is installed; and
+`dkj-policy-bwj`'s workflow page plus its `report-issue` steps, where the GitHub issue and the Asana
+card sit side by side. The carve-out is a person's own words: a ticket a colleague wrote, and the
+message going back to them, stay in their language and are quoted rather than translated -- so one
+finding legitimately reads English on GitHub and the colleague's language on the board, which is the
+translation step 2 is named for rather than drift. The session-reply language is untouched.
+
+**Score:** 3
 
 #### What makes this deploy extra special
 
-**Score:**
+N/A -- a writing convention for the two plugins' own tracker artefacts. No subscriber of any service
+reaches it; the readers are the sessions filing issues in the consuming repos and the colleagues who
+later search that tracker.
+
+Worth recording for the next reader: the rule that failed here was not being broken. It was written for
+a scope -- files in the tree -- that a tracker is not in, so every session following it exactly still
+produced the state Dave reported. A convention stated by enumerating layers goes stale the moment the
+system writes somewhere the enumeration never named.
+
+**Score:** N/A
 
 #### Pull Request
 
 State the tracker language convention: an issue a session files is English
-

@@ -46,6 +46,22 @@ via a PR.
   - a repo's own narrow **history exception** (e.g. already-folded changelog entries, an archived
     release-notes folder) may remain in its original language.
 
+  **The tracker is in scope too, and the list above does not say so by itself** (the owner,
+  September 11, 2026): the issue titles and bodies a session writes, and the pull-request bodies and
+  commit messages that travel with them, are this system speaking about the repo, so they are English
+  wherever it runs — in a consuming repo exactly as in the source. Nothing above reaches them, because
+  every layer named there is a *file in the tree* and a session filing a finding is writing somewhere
+  else; a session can therefore follow this rule to the letter and still leave a tracker nobody can
+  search. Measured in a consuming store repo on the day this was written: of the fifteen most recent
+  issues, three carried titles in the session-reply language rather than in English.
+
+  **A person's own words are not a fourth exception — they were never this system's to write.** The
+  three above are places where content *this system authors* may stand in another language; a request
+  quoted from somebody's ticket, and the reply that goes back to them, belong to that person. Quote
+  them as written, and put your own analysis around them in English. One finding can therefore read
+  English on the tracker and the reader's own language on the board it is mirrored to; that is the
+  boundary holding, not drift.
+
   This is separate from the **session-reply language**, which stays free per session: a specialist
   replies in whichever language the user addresses it in, regardless of what language the docs (or
   the scripts) are written in.
