@@ -1,7 +1,9 @@
 <#
 .SYNOPSIS
     The 'shopify theme push' argument lists push-preview.ps1 hands to the CLI, the flag whitelist in
-    front of them, and the two pure readers of the CLI's own output.
+    front of them, the two pure readers of the CLI's own output, and the two composers that turn a theme
+    id into what the operator actually reads -- the preview URL and the handover note under a list of
+    them.
 
 .DESCRIPTION
     WHY THIS LIB EXISTS AT ALL. A consumer's push-preview built its create call inline as
@@ -202,4 +204,31 @@ function Get-ThemePreviewUrl {
     # Built by concatenation rather than interpolation: '$Path?' reads badly next to PowerShell's own '$?'
     # and the query is assembled from three parts anyway.
     return 'https://' + $domain + $Path + '?preview_theme_id=' + $ThemeId + '&' + $script:ThemePreviewQuery
+}
+
+function Get-PreviewHandoverNote {
+    <# The closing note a MULTI-URL preview push prints under its list -- inbound #1873.
+
+       WHY THE SCRIPT SAYS THIS AT ALL, rather than a policy page saying it somewhere. Both BWJ store
+       repos handed a reviewer a markdown table of ten preview URLs (five markets by two page types) that
+       the terminal wrapped into unreadability and a phone could not scan. A rule written on a page that
+       nothing loads at the moment a preview is pushed loses to this printed list every time, because the
+       list is what a session has in front of it when it composes the handover.
+
+       AND IT STAYS GENERIC, naming no repo and no workflow. What is true in every multi-market Shopify
+       repo is that a wrapped column of 90-character URLs is not a handover and that the reviewer is on a
+       phone. What the handover IS instead is a house rule -- BWJ states it in dkj-policy-bwj's
+       PREVIEW-HANDOVER-portable.md -- so this points at whatever the repo's own workflow says rather than
+       at a page most consumers do not have.
+
+       SILENT ON ONE URL, and the count is the honest trigger rather than a threshold picked for quiet: a
+       single line in a terminal genuinely is a usable handover, and there is nothing to carry. #>
+    param([Parameter(Mandatory = $true)][int]$Count)
+    if ($Count -lt 2) { return $null }
+    return @(
+        "$Count preview URLs -- this list is raw material, not the handover.",
+        "  A reviewer gets ONE link to a page carrying these, never a table: a terminal wraps URLs this",
+        "  long and a phone cannot scan them, and storefront work is judged on a phone.",
+        "  Where your workflow states how a preview is handed over, that page is the rule."
+    )
 }

@@ -3,12 +3,20 @@
 **This page applies in exactly two repos, named by store rather than by org: `smartwatchbanden` and
 `xoxowildhearts`** -- see [`WORKFLOW-portable.md`](WORKFLOW-portable.md) for why the org is left out.
 It is chapter three of this plugin, beside [`WORKFLOW-portable.md`](WORKFLOW-portable.md) and
-[`SYNC-LOG-portable.md`](SYNC-LOG-portable.md), and it answers one question neither of those does:
-**what a preview handover owes.**
+[`SYNC-LOG-portable.md`](SYNC-LOG-portable.md), and it answers two questions neither of those does:
+**what a preview handover owes, and how it reaches the reviewer.**
 
 It is a layer on top of `dkj-policy` in the same way the other two chapters are. It changes nothing
 about **which** changes need a preview before they may open a PR -- that reach is the consumer's own
-rule and `dkj-policy`'s, unchanged. It states only what the handover itself contains once one is owed.
+rule and `dkj-policy`'s, unchanged. It states only what the handover itself contains once one is owed,
+and what carries it.
+
+**The two halves arrived on the same day, from the same handover, as two separate reports** -- inbound
+[#1874](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1874) for the content and
+[#1873](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1873) for the carrier -- and each was
+built as its own chapter three before either saw the other. They are one chapter, because they are one
+question: a control variant nobody can open is not a control variant, and a carrier with nothing to
+compare against carries half a handover.
 
 **How to read this page.** It travels with the plugin, so a link that walks out of this plugin's own
 folder is written as an absolute URL. Measurements and issue numbers are the **source repo's**; they
@@ -23,11 +31,17 @@ one of them gets the machinery through a plugin update whether or not it ever re
 This page is the **policy** -- *what the person receiving a preview is handed*. That is BWJ's house
 rule for two repos, not a Shopify fact.
 
-## The rule
+## The rule, in two halves
 
-**A preview handover is a PAIR per market: the preview, and the control.** The control variant is the
-same page on the **live** theme -- what the visitor sees right now -- so the difference is one
+**One: a preview handover is a PAIR per market -- the preview, and the control.** The control variant
+is the same page on the **live** theme -- what the visitor sees right now -- so the difference is one
 tab-switch rather than a recollection.
+
+**Two: the handover is ONE LINK to a published page, and the terminal never gets the URLs.** Not a
+markdown table, not a bulleted list, not "here are the five markets" followed by ten lines. One link,
+and the page behind it is the handover.
+
+The second half is what makes the first half reachable, which is why they are one rule and not two.
 
 **A preview alone shows what a page will look like. It never shows what changed.** Only the reader
 knows the current state, from memory, while looking at something else -- and that is precisely the
@@ -43,6 +57,31 @@ rule then in force:
 The change under review was one colour on a product-page notice. Described in prose it was *"a
 lighter, more yellow amber"*; held against the live tab it is obvious in a second. Prose is not a
 control variant.
+
+### Why the carrier is a page and not a table
+
+**Pairing the URLs doubles them, which is exactly what a terminal cannot take.** Five markets by two
+variants is ten URLs of 70 to 100 characters each -- a full domain, a theme id, and the three admin
+parameters. Three things are wrong with laying those out in a table, and only the first is cosmetic
+([#1873](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1873), September 11, 2026, measured
+on exactly that handover):
+
+1. **The terminal cannot render it.** Ten URLs that long in two columns wrap, and the column structure
+   that was carrying *which market, preview or control* wraps with them. The layout that was the whole
+   point of the table is the first thing it loses -- and in the same session the reply was also
+   *"het selecteren is ook onmogelijk"*: a wrapped URL cannot even be copied out by hand.
+2. **The reader is on the wrong device.** Storefront work is judged on a phone, and some of it exists
+   *only* there -- one change that produced this rule lived inside a lazily-fetched mobile menu drawer
+   and was invisible on a desktop at any width. A URL in a desktop terminal is something the reviewer
+   has to retype on a phone, twice per market, query string included.
+3. **The handover carries no state.** What the gates already proved, what is still open, and what the
+   reviewer is actually being asked all sit in prose above and below the table -- so none of it travels
+   with the link when they come back to it an hour later.
+
+Dave, the same day, on the table:
+
+> we moeten even stoppen met het tonen van preview urls in tabellen, want in de terminal werkt dit
+> gewoon niet. [...] Ik denk dat een link naar een artefact pagina het beste werkt
 
 **It costs the producing side nothing.** The session has already resolved the changed page per market
 in order to build the preview list at all; the control URL is that same URL with one parameter
@@ -90,28 +129,85 @@ Three consequences, in descending order of how easily they are missed:
 
 ## The shape of the handover
 
-Name the page once, then one row per market with both URLs. What the reader is being asked to compare
-goes above the table, in the smallest number of words that will do.
+Three blocks on the page, and each is there because the other two cannot supply it:
 
-```
-Product: <handle> (carries the tag/condition the change depends on)
+| block | what it holds |
+|---|---|
+| **how to see the change** | the page under review named once -- with the tag or condition the change depends on -- and the steps a reviewer has to take before the change is even visible: which device, which viewport, which menu to open. No URL can say this, and a change that is invisible without it reads as *not shipped* |
+| **one card per market** | the market code and its domain, a **QR code to the preview**, the preview and control links as text beneath it, and the expected copy in that market's language where the change has copy in it |
+| **what is proven, and what is asked** | which gates ran and what they verified mechanically, then the one question the reviewer is being asked. This is the half that makes the link a self-contained handover rather than a bookmark needing the transcript beside it |
 
-| market | preview | live (control) |
-|---|---|---|
-| NL | <preview URL> | <control URL> |
-| ...
-```
-
-Two things this inherits from the consumer's own preview rule rather than restating:
+Two things the cards inherit from the consumer's own preview rule rather than restating:
 
 - **Per market**, because these stores serve several and a change can land differently in each.
-- **Of the concretely changed page** -- a table of homepages is already refused there, and a control
-  that is not the changed page controls nothing.
+- **Of the concretely changed page** -- a set of homepages is already refused there, and a control that
+  is not the changed page controls nothing.
 
-**And hand the URLs over in a form that can be opened, not only read.** A long URL in a terminal wraps,
-truncates and cannot be selected; the reader then cannot reach the preview that was built for them. Open
-the pair per market directly, or write them somewhere clickable. Same day, same handover: the first
-attempt was a terminal table, and the reply was *"het selecteren is ook onmogelijk"*.
+### Why a QR code, and one per market
+
+**Because a QR is what makes the phone the reviewing device rather than a second one.** The reviewer
+scans instead of retyping a 90-character URL with a query string, which is the difference between
+reviewing the change and not reviewing it.
+
+**One per market, because the preview is per domain.** A scan puts the preview on the domain it opens,
+and that is the domain the code encoded -- a market's card cannot borrow the scan from the card above
+it. Five markets is five codes.
+
+**The code encodes the PREVIEW, and the control stays a text link.** Both belong on the card, but only
+one of them can be the thing a phone lands on: scanning the control would set the live theme on that
+domain as the reviewer's starting point, which is the opposite of what they came for. And the code has
+to carry `_ab=0&_fd=0&_sc=1`, exactly as `push-preview`'s own page requires of every URL that seam
+produces -- without them the preview holds only through the cookie and is lost at the first internal
+click, and the reviewer is then on live believing they are on the preview. That matters more on a QR
+than anywhere else, because the scan is their only entry point.
+
+### The one mechanism note, and why a policy page carries it
+
+**A QR served as an image from a QR-image API does not render, and says nothing when it fails.** A
+published Artifact runs under a content-security policy that permits external **scripts** from a short
+list of CDNs and blocks everything else -- images included, from every host. So an
+`<img src="https://some-qr-api/...">` is silently empty, and a page of five markets is a page of five
+blank squares with no error anywhere. The two shapes that do work: render the code **client-side** from
+a QR library loaded as a script from an allowlisted CDN, or embed it as a `data:` URI in the page.
+
+This is mechanism on a policy page, deliberately and once. A rule that prescribes a carrier and omits
+the single constraint that makes the carrier fail *silently* is not a rule anybody can follow, and this
+is the worst kind to leave out: the page looks published, and the reviewer is the one who finds out.
+
+### And the link is as sensitive as the URLs it encodes
+
+**The CSP is not the reason to keep the QR local, it is only the reason the remote one does not
+render.** A preview URL carries `preview_theme_id` plus the three admin parameters, which is exactly
+what lets a viewer see an unpublished theme -- so a QR generator that round-trips that URL to a
+third-party service hands the store's unreleased work to somebody who was never asked. Rule it out on
+its own terms: **the preview URL never leaves the page**, whatever the CSP happens to permit that
+month.
+
+**And the page inherits that.** The whole point of the handover is that the link is easy to open, which
+means it is also easy to forward -- and one link now reaches every market's preview at once, where the
+terminal printout reached whoever was looking at the terminal. The page is private until its link is
+shared, so treat the link the way you would treat the URLs on it: to the reviewer, and not onward.
+
+This paragraph exists because the section above it reads as complete without it. *"Render it
+client-side"* is a full answer to a rendering problem, and a later editor taking the CSP as the whole
+reason picks whichever library renders -- including one that phones home.
+
+## Where the rule is carried
+
+A policy page that nothing loads at the moment a preview is pushed loses to the printed list every
+time, because that list is what a session has in front of it. So the carrier half is carried at the
+print site too, in the generic plugin and in generic terms:
+
+- `push-preview` prints a closing note whenever it emits **more than one** URL, saying the list is raw
+  material rather than the handover and pointing at whatever handover rule the repo's workflow states.
+  One URL is left alone -- a single line in a terminal genuinely is a usable handover, and the count is
+  the honest trigger.
+- [`push-preview`'s own page](https://github.com/DKJ-Solutions/dkj-claude-plugins/blob/main/plugins/dkj-subagents/dkj-subagents-shopify/skills/push-preview/SKILL.md)
+  carries the same thing in prose, under its own heading.
+
+**Neither of those names BWJ or this page**, and that is the mechanism/policy split holding rather than
+an omission: the generic plugin states that a list of URLs is not a handover, which is true of any
+multi-market Shopify repo, and *this* page states what BWJ's handover actually is.
 
 ## What this page does not decide
 
