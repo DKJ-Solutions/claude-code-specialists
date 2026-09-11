@@ -43,7 +43,52 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**7 / 11 minor entries** <!-- pending-tally -->
+**7 / 12 minor entries** <!-- pending-tally -->
+
+### DEPLOY: feat/1832-shared-document-newline · 20260911-120331
+
+`Get-DocumentNewline` is now the one place this workflow reads a document's own newline style, in
+`scripts/lib/document-newline-lib.ps1`. It was hand-typed at nine call sites across six files -- six
+carrying the one-liner verbatim and three spelling the same answer over two statements, which is why a
+grep for the one-liner undercounted it. Nothing about the answer changed: every caller reads the same
+whole-file question it read before, and the six files' behaviour is identical.
+
+What the absence cost is inbound #1829, one merge earlier: `adopt-workflow-folder.ps1` composed its one
+rewritten block with a hardcoded LF while comparing it against a page read byte-exact, so the verdict
+read `drifted` on every CRLF checkout. Four scripts in this tree already knew the answer to that exact
+question; the fifth did not, and nothing connected them. A named helper is what the sixth one finds.
+
+Inside this repo the gain is the guard rather than the tidy-up. The suite carries a tree-wide AST gate,
+so a tenth hand-typed reading cannot land quietly -- and it pins the whole-file limit that #1829
+accepted deliberately, which was previously a comment beside one of the nine sites and is now the
+banner of the answer itself. That matters because the limit is the kind of thing a later reader
+"improves" in one caller, and a local answer in one file would break the argument the other eight rest
+on. A second thing surfaced on the way, from the gate built for exactly it: giving
+`entry-scaffold-lib.ps1` a second unconditional leaf means every fixture that hand-copies its
+dependencies owes the new file, so `fixture-lib-deps.tests.ps1` went red and eight fixtures were
+repaired on `ref-print-lib`'s own #1650 precedent.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+Nothing a consumer runs behaves differently -- the mirror carries one more dot-sourced lib and every
+command gives the same answers it gave before -- so the reach here is genuinely nil rather than small.
+Worth saying because the change is adjacent to a v5.0.0 consumer-facing repair and could be mistaken for
+part of it: #1829 fixed the drifting verdict, and this one only makes sure the next document-editing
+script cannot reintroduce it.
+
+**Score:** N/A
+
+#### Pull Request
+
+one helper for reading a document's own newline style
+
+Plugins: dkj-policy
+
+[PR #1840](https://github.com/DKJ-Solutions/dkj-claude-plugins/pull/1840)
+
+---
 
 ### DEPLOY: fix/1841-reach-label-seam · 20260911-115239
 
