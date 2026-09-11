@@ -195,6 +195,7 @@ scripts named below the table, which nothing in this table reaches at all.
 | [`release/publish-to-business.ps1`](release/publish-to-business.ps1) | publishes the marketplace subset to the business repo Claude Enterprise syncs from — a separate, deliberate step after a cut | `cut-release` (Block 3) |
 | [`lint/check-plugin-integrity.ps1`](lint/check-plugin-integrity.ps1) | the lint gate — the manifests, the frontmatter, dead links, and the two dozen checks named in its own docstring | — |
 | [`sync/check-connectors.ps1`](sync/check-connectors.ps1) | the two-way registry check across every connected repo | — |
+| [`sync/check-consumer-siblings.ps1`](sync/check-consumer-siblings.ps1) | mechanisms one consumer has and its declared sibling does not — the only check here that runs consumer→consumer rather than source→consumer | — |
 | [`sync/find-specialist-mentions.ps1`](sync/find-specialist-mentions.ps1) | every live mention of a specialist's **name**, grouped by layer — the tool you run *at* a rename | — |
 | [`sync/build-shared-scripts.ps1`](sync/build-shared-scripts.ps1) | regenerates the plugin mirrors from this directory | — |
 | [`agents/build-agent-defs.ps1`](agents/build-agent-defs.ps1) | writes the shared blocks from `plugins/dkj-subagents/subagent-shared/` into the agent defs and personas | — |

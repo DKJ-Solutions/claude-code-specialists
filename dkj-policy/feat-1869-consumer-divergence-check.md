@@ -36,23 +36,79 @@
 
 ### PLAN
 
-Issue #1869 triaged and verified (96/73/48/1 reproduces exactly). Dave chose the detector-first shape: land the sibling-divergence check now, converge the clear non-Shopify cases in follow-ups.
+#### What this branch is
+
+Issue #1869 (inbound, from smartwatchbanden) reports that the two BWJ store repos maintain the same
+mechanism layer twice. Triaged and verified before routing: the headline reproduces exactly from the
+source repo (96 / 73 tooling files, 48 shared paths, 1 byte-identical, and that one is the plugin's own
+`asana-mirror.ps1` template). Three per-file rows of its table were mis-sized and are corrected in a
+comment on the issue; nothing that changes the verdict.
+
+The report offers three repair shapes and says explicitly that the choice is the decision. Put to Dave
+on 2026-09-11; he chose **detector first, converge afterwards**. This branch is the detector. Moving
+ownership -- which of `dkj-policy` and `dkj-policy-bwj` should own `test-lib.ps1`, `lint-brain.ps1` and
+the market/theme mechanisms -- is the follow-up and is deliberately not in scope here.
 
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [x] `scripts/lib/sibling-divergence-lib.ps1` -- the comparison as pure functions over inventories:
+      path normalization, the comparable-root and by-design-exclusion rules, the ONLY-IN / PARTIAL /
+      DRIFTED classification, and the capability-aliasing pass that finds one mechanism under two
+      filenames.
+- [x] `scripts/sync/check-consumer-siblings.ps1` -- the entry point: reads the register, groups by the
+      declared `siblingGroup`, reads each member's tooling tree over `gh` or off a resolved
+      `localCheckout`, and reports. Refuses nothing unless `-FailOnFinding`.
+- [x] `connectors/smartwatchbanden.json` + `connectors/xoxowildhearts.json` -- `"siblingGroup": "bwj-store"`,
+      the one piece of data the check reads. No other field touched, and nothing claimed about what
+      either consumer HAS.
+- [x] `Test-GitHubOwnerNameSlug` promoted from inside `check-connectors.ps1` into
+      `scripts/lib/check-report-lib.ps1`, rather than copied into the second caller -- the case its own
+      docstring already made. Plugin mirrors regenerated.
+- [x] Docs: the register's page (the new field, the check, the three finding classes, what is excluded
+      and why), `scripts/README.md`, and Sylvester's lens for the reasoning and the three decisions not
+      to re-litigate.
 
 ### TEST
 
+- [x] `scripts/tests/sibling-divergence.tests.ps1` -- 47 asserts over 10 cases. The ones that matter:
+      case 3 holds the by-design exclusions (a false positive trains people to ignore the report), case 4
+      holds the grouping being declared rather than inferred (the change somebody will reach for first,
+      and wrong in a way no error would show), case 7 holds the PARTIAL class (the finding a binary
+      vocabulary would drop silently), cases 9-10 hold the aliasing. No network and no fixture repos --
+      the reading needs a network, the deciding does not, which is why the comparison lives in a lib.
+- [x] Fixtures are synthetic: this repo is public and the consumers are private, so a fixture carrying
+      real consumer content would publish it permanently to make an assert a made-up filename makes just
+      as well.
+- [x] Run against the live register: reports 93 findings across the declared `bwj-store` group, and the
+      alias pass finds both pairs #1869 named by hand -- `market-domains.ps1` <-> `market-urls.ps1` on two
+      shared function names, and `archive-and-remove-theme.ps1` <-> `archive-theme.ps1` on one.
+- [x] Lint gate + full suite green.
+
 ### DEPLOY: feat/1869-consumer-divergence-check
 
-**Score:**
+The connector register can now answer the question it was asked for. `check-consumer-siblings.ps1`
+compares the tooling layers of consumers that declare a shared `siblingGroup` and reports three classes:
+`ONLY-IN` (a mechanism one has and the other does not), `DRIFTED` (two copies of one mechanism that have
+grown apart) and `ALIASED` (one capability under two filenames -- the class no path comparison can make).
+
+Every other check here runs source-to-consumer. This is the first that runs consumer-to-consumer, and
+#1869 measured what that axis was hiding: of the 48 tooling paths the two BWJ stores share, 47 have
+diverged, and the only one that has not is a template this marketplace ships. `prune-merged.ps1` is the
+argument in one file -- shipped centrally in `dkj-policy` 4.21.0, adopted by one store and not the other
+three weeks later, with nothing watching the gap.
+
+It reports and refuses nothing. Converging is an ownership decision, not a repair a script can make.
+
+**Score:** 4
 
 #### What makes this deploy extra special
 
-**Score:**
+N/A -- nothing here reaches a subscriber of a service. The register, the check and the group label are
+internal maintenance machinery of this marketplace, and the two consumers it compares are private repos
+whose own tooling is unchanged by this branch.
+
+**Score:** N/A
 
 #### Pull Request
 
 Report mechanisms a sibling consumer has and this one does not
-

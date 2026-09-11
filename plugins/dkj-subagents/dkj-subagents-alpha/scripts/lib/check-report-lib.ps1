@@ -448,6 +448,36 @@ function Write-CheckScope {
     Write-Host "  [SCOPE] $who$($Scope.Path) ($($Scope.Note))" -ForegroundColor Cyan
 }
 
+function Test-GitHubOwnerNameSlug {
+    <#
+        Is $Slug ('owner/name') held to GitHub's own shape -- an owner is alphanumeric with hyphens, a
+        name adds '.' and '_' -- rather than merely escaped?
+
+        PROMOTED HERE FROM check-connectors.ps1 (#1869), where its own docstring already argued the
+        case: it was factored out inside that script so two call sites could hold ONE field to ONE
+        bound rather than keep "a second, silently drifting copy of the regexes". A third caller
+        outside that file -- check-consumer-siblings.ps1, which turns the same 'repo' field into the
+        same kind of API call -- is that argument one step further on, so the function moved to the lib
+        both scripts already dot-source instead of being copied into the second one.
+
+        Returns @{ Ok; Reason } -- Reason is empty on success and is the caller's own failure sentence
+        otherwise (the two distinct reasons Get-RemoteConsumerWorkflow already printed: no slash at all,
+        or a slash with characters GitHub's own naming rules do not allow), so every existing call site
+        keeps the exact wording it always had.
+    #>
+    param([Parameter(Mandatory = $true)][string]$Slug)
+    $slash = $Slug.IndexOf('/')
+    if ($slash -le 0 -or $slash -eq $Slug.Length - 1) {
+        return @{ Ok = $false; Reason = "not an 'owner/name' slug" }
+    }
+    $owner = $Slug.Substring(0, $slash)
+    $name  = $Slug.Substring($slash + 1)
+    if ($owner -notmatch '^[A-Za-z0-9][A-Za-z0-9-]*$' -or $name -notmatch '^[A-Za-z0-9][A-Za-z0-9._-]*$') {
+        return @{ Ok = $false; Reason = 'not a valid GitHub owner/name slug -- rejected before it became an API call' }
+    }
+    return @{ Ok = $true; Reason = '' }
+}
+
 function Test-PluginNameSlug {
     <# The plugin-name part of a plugin id (before '@') must be a simple lowercase slug before it
        becomes a path segment. #>

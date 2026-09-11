@@ -1,6 +1,7 @@
 {
   "repo": "BWJ-Development/smartwatchbanden",
   "visibility": "private",
+  "siblingGroup": "bwj-store",
   "localCheckout": [
     "../../bwjecommerce/smartwatchbanden",
     "../../GitHub/bwjecommerce/smartwatchbanden",
