@@ -355,26 +355,91 @@ $US = [string][char]0x1F
 Assert-True (@(ConvertFrom-CommitScanLog -Text '').Count -eq 0) 'empty input is an empty array, not a crash'
 Assert-True (@(ConvertFrom-CommitScanLog -Text "   `n  ").Count -eq 0) 'whitespace-only input yields nothing'
 
-$twoLines = "abc1234${US}fix(1853): repair it`ndef5678${US}park: fix/1853-x (the branch files only)"
+$twoLines = "abc1234${US}davekokbwj${US}1757620000${US}fix(1853): repair it`ndef5678${US}maikel-bwj${US}1757620100${US}park: fix/1853-x (the branch files only)"
 $parsedTwo = @(ConvertFrom-CommitScanLog -Text $twoLines)
 Assert-True ($parsedTwo.Count -eq 2) 'two log lines become two records'
-Assert-True ($parsedTwo[0].Sha -eq 'abc1234') 'the sha is the field before the separator'
-Assert-True ($parsedTwo[0].Subject -eq 'fix(1853): repair it') 'the subject is the field after it'
+Assert-True ($parsedTwo[0].Sha -eq 'abc1234') 'the sha is the first field'
+Assert-True ($parsedTwo[0].Subject -eq 'fix(1853): repair it') 'the subject is the last one'
+# THE TWO FIELDS #1878 ADDED, and the whole reason the format string grew: they are what the reader's
+# decision turns on, and neither is derivable from the two that were already there.
+Assert-True ($parsedTwo[1].Author -eq 'maikel-bwj') 'the author name is read'
+Assert-True ($parsedTwo[1].AuthorEpoch -eq 1757620100) 'and so is the author date, as seconds'
 
-# A LINE WITH NO SEPARATOR IS SKIPPED rather than becoming a commit with no sha -- git writes progress
+# A LINE WITH TOO FEW FIELDS IS SKIPPED rather than becoming a commit with no sha -- git writes progress
 # and hints that a caller not discarding stderr would otherwise hand in here.
-$withNoise = "warning: some git hint`nabc1234${US}fix(1853): repair it"
+$withNoise = "warning: some git hint`nabc1234${US}davekokbwj${US}1757620000${US}fix(1853): repair it"
 Assert-True (@(ConvertFrom-CommitScanLog -Text $withNoise).Count -eq 1) 'a line carrying no separator is skipped'
-Assert-True (@(ConvertFrom-CommitScanLog -Text "${US}subject with no sha").Count -eq 0) 'a record with an empty sha is skipped too'
+Assert-True (@(ConvertFrom-CommitScanLog -Text "abc1234${US}subject only").Count -eq 0) 'and so is a line carrying the OLD two-field shape, rather than parsing as a wrong record'
+Assert-True (@(ConvertFrom-CommitScanLog -Text "${US}a${US}1757620000${US}subject with no sha").Count -eq 0) 'a record with an empty sha is skipped too'
 
-# THE COUNT ON THE SPLIT IS LOAD-BEARING: a subject may contain anything, and without the 2 the tail
-# after a second separator would be silently dropped.
-$oddSubject = "abc1234${US}fix: a | b`tc: d${US}tail"
+# THE COUNT ON THE SPLIT IS LOAD-BEARING: a subject may contain anything, and without the 4 the tail
+# after a further separator would be silently dropped.
+$oddSubject = "abc1234${US}davekokbwj${US}1757620000${US}fix: a | b`tc: d${US}tail"
 $parsedOdd = @(ConvertFrom-CommitScanLog -Text $oddSubject)
 Assert-True ($parsedOdd.Count -eq 1) 'a subject containing pipes, tabs and colons is one record'
-Assert-True ($parsedOdd[0].Subject -eq "fix: a | b`tc: d${US}tail") 'and everything after the FIRST separator is kept, tail included'
+Assert-True ($parsedOdd[0].Subject -eq "fix: a | b`tc: d${US}tail") 'and everything after the THIRD separator is kept, tail included'
 
-Assert-True (@(ConvertFrom-CommitScanLog -Text "abc1234${US}one`r`ndef5678${US}two").Count -eq 2) 'CRLF captures parse the same as LF ones'
+# THE EPOCH IS DIGITS OR NOTHING. An author name holding a separator is the one shape that shifts the
+# fields, and an age printed off a shifted field would be a confident wrong fact -- exactly the class
+# #1878 was filed about. 0 is the report's signal to say it does not know.
+$shifted = "abc1234${US}od${US}d name${US}1757620000${US}fix: x"
+$parsedShift = @(ConvertFrom-CommitScanLog -Text $shifted)
+Assert-True ($parsedShift.Count -eq 1) 'a shifted line still yields a record -- the sha is unaffected'
+Assert-True ($parsedShift[0].Sha -eq 'abc1234') 'and the sha is still right'
+Assert-True ($parsedShift[0].AuthorEpoch -eq 0) 'while the unreadable epoch reads as unknown rather than as a date'
+
+Assert-True (@(ConvertFrom-CommitScanLog -Text "abc1234${US}a${US}1757620000${US}one`r`ndef5678${US}b${US}1757620001${US}two").Count -eq 2) 'CRLF captures parse the same as LF ones'
+
+Write-Host ''
+Write-Host 'Format-CommitAge -- how long ago, coarsely (#1878)' -ForegroundColor Cyan
+
+Assert-True ((Format-CommitAge -Seconds 0) -eq 'just now') 'zero seconds is just now'
+Assert-True ((Format-CommitAge -Seconds 59) -eq 'just now') 'and so is anything under a minute'
+Assert-True ((Format-CommitAge -Seconds 180) -eq '3 minutes ago') 'minutes are the first unit -- the measured collision was three of them'
+Assert-True ((Format-CommitAge -Seconds 60) -eq '1 minute ago') 'one of a unit is singular'
+Assert-True ((Format-CommitAge -Seconds 7200) -eq '2 hours ago') 'hours come next'
+Assert-True ((Format-CommitAge -Seconds 172800) -eq '2 days ago') 'then days'
+Assert-True ((Format-CommitAge -Seconds 7776000) -eq '3 months ago') 'then months, so a stale branch does not print as ninety days'
+Assert-True ((Format-CommitAge -Seconds 63072000) -eq '2 years ago') 'and years at the top'
+# A CLOCK RUNNING AHEAD IS A FACT ABOUT CLOCKS, not about the commit -- and reading it as ancient is
+# the one direction that would hide a live collision.
+Assert-True ((Format-CommitAge -Seconds -30) -eq 'just now') 'a commit dated in the future reads as just now, not as an error'
+
+Write-Host ''
+Write-Host 'Test-SelfAuthored -- whose commit is this (#1878)' -ForegroundColor Cyan
+
+Assert-True (Test-SelfAuthored -Author 'davekokbwj' -SelfNames @('davekokbwj', 'davekokbwj')) 'the checkout recognises its own name'
+Assert-True (-not (Test-SelfAuthored -Author 'maikel-bwj' -SelfNames @('davekokbwj', 'davekokbwj'))) 'and does not recognise somebody else'
+# THE COMPARISON IS AGAINST THE GIT AUTHOR NAME. A repo whose user.name is a display name never
+# matches its own login, so comparing against the login alone would report every one of that person's
+# own parked commits as a stranger's.
+Assert-True (Test-SelfAuthored -Author 'Ada Lovelace' -SelfNames @('Ada Lovelace', 'ada')) 'a display-name checkout recognises its own commits'
+Assert-True (Test-SelfAuthored -Author 'ADA' -SelfNames @('Ada Lovelace', 'ada')) 'either name matches, case-insensitively, as GitHub logins are'
+# NO NAMES IS NO VERDICT, never 'somebody else': a check that cannot measure must not print one.
+Assert-True (Test-SelfAuthored -Author 'maikel-bwj' -SelfNames @()) 'with nothing to compare against, nothing is claimed'
+Assert-True (Test-SelfAuthored -Author 'maikel-bwj' -SelfNames @('', '  ')) 'and blank names are the same as none'
+Assert-True (Test-SelfAuthored -Author '' -SelfNames @('davekokbwj')) 'an unreadable author name is not asserted to be somebody else either'
+
+Write-Host ''
+Write-Host 'Get-ForeignParkedCommit -- the locked-door half of the scan (#1878)' -ForegroundColor Cyan
+
+$mineOnly = @([pscustomobject]@{ Sha = 'aaa'; Author = 'davekokbwj'; AuthorEpoch = 1757620000; Subject = 'x'; Branches = @('origin/fix/1853-x') })
+Assert-True ($null -eq (Get-ForeignParkedCommit -Findings $mineOnly -SelfNames @('davekokbwj'))) 'a branch carrying only commits by this checkout is no verdict'
+Assert-True ($null -eq (Get-ForeignParkedCommit -Findings @() -SelfNames @('davekokbwj'))) 'and neither is nothing at all'
+
+$mixed = @(
+    [pscustomobject]@{ Sha = 'newest'; Author = 'maikel-bwj'; AuthorEpoch = 1757620100; Subject = 'park: docs/1874-x'; Branches = @('origin/docs/1874-x') },
+    [pscustomobject]@{ Sha = 'older'; Author = 'someone-else'; AuthorEpoch = 1757000000; Subject = 'fix(1874): older'; Branches = @('origin/other') }
+)
+$found = Get-ForeignParkedCommit -Findings $mixed -SelfNames @('davekokbwj')
+Assert-True ($null -ne $found) 'a commit by another account is found'
+Assert-True ($found.Sha -eq 'newest') 'and it is the NEWEST such commit -- the caller hands them in git log order'
+Assert-True ($found.Branch -eq 'origin/docs/1874-x') 'the branch it names is the one the reader has to go and look at'
+
+# A FINDING WHOSE BRANCHES WERE ALL EXCLUDED IS NOT IN THE REPORT, so it must not produce a verdict
+# either -- the two have to agree about which commits are even being discussed.
+$excluded = @([pscustomobject]@{ Sha = 'aaa'; Author = 'maikel-bwj'; AuthorEpoch = 1757620100; Subject = 'x'; Branches = @() })
+Assert-True ($null -eq (Get-ForeignParkedCommit -Findings $excluded -SelfNames @('davekokbwj'))) 'a commit with no surviving branch is out of scope for the verdict too'
 
 Write-Host ''
 Write-Host 'Get-ContainingBranchNames -- cleaning git branch -a --contains (#1853)' -ForegroundColor Cyan
@@ -433,13 +498,48 @@ Assert-True (@(Format-ParkedFixReport -Issue 1853 -Findings @()).Count -eq 0) 'n
 $noBranches = @([pscustomobject]@{ Sha = 'abc'; Subject = 'x'; Branches = @() })
 Assert-True (@(Format-ParkedFixReport -Issue 1853 -Findings $noBranches).Count -eq 0) 'a finding whose branches were all excluded is dropped, not printed as a commit in no branch'
 
-$oneFinding = @([pscustomobject]@{ Sha = 'f686b0af3fda'; Subject = 'fix(1842): apply the parallel review findings'; Branches = @('origin/feat/1842-unify-prio-labels-bwj') })
-$oneReport = @(Format-ParkedFixReport -Issue 1847 -Findings $oneFinding)
+# NOW is pinned on every call below, so the ages in these lines are reproducible rather than a
+# function of when the suite happens to run.
+$Now = 1757620300
+$oneFinding = @([pscustomobject]@{ Sha = 'f686b0af3fda'; Author = 'davekokbwj'; AuthorEpoch = 1757620120; Subject = 'fix(1842): apply the parallel review findings'; Branches = @('origin/feat/1842-unify-prio-labels-bwj') })
+$oneReport = @(Format-ParkedFixReport -Issue 1847 -Findings $oneFinding -SelfNames @('davekokbwj') -NowEpoch $Now)
 Assert-True ($oneReport.Count -gt 0) 'a real finding produces a report'
 Assert-True ($oneReport[0] -match '1 commit on 1 branch') 'the lead line counts in the singular for one of each'
 Assert-True (@($oneReport | Where-Object { $_ -match 'origin/feat/1842-unify-prio-labels-bwj' }).Count -eq 1) 'the branch is named once, as its own line'
-Assert-True (@($oneReport | Where-Object { $_ -match 'f686b0af  fix\(1842\)' }).Count -eq 1) 'the commit is abbreviated to 8 characters and keeps its subject'
+Assert-True (@($oneReport | Where-Object { $_ -match 'f686b0af  davekokbwj, 3 minutes ago -- fix\(1842\)' }).Count -eq 1) 'the commit line is sha, WHO, WHEN, then the subject (#1878)'
 Assert-True (@($oneReport | Where-Object { $_ -match 'cannot tell a fix from a mention' }).Count -eq 1) 'the report says what it does not know, so it cannot be read as a verdict'
+# The commit above is this checkout own, so no verdict block belongs under it.
+Assert-True (@($oneReport | Where-Object { $_ -match 'NOT YOURS' }).Count -eq 0) 'and a branch of your own draws no verdict at all'
+
+# THE VERDICT, which is the whole of #1878: the two facts printed above decide it, and leaving the
+# reader to assemble them is what the measured session did -- correctly, by content, and wrongly.
+$foreignFinding = @(
+    [pscustomobject]@{ Sha = 'afb52d0bcc'; Author = 'maikel-bwj'; AuthorEpoch = 1757620120; Subject = 'park: docs/1874-preview-control-variant (the branch files only)'; Branches = @('origin/docs/1874-preview-control-variant') }
+)
+$foreignReport = @(Format-ParkedFixReport -Issue 1874 -Findings $foreignFinding -SelfNames @('davekokbwj') -NowEpoch $Now)
+Assert-True (@($foreignReport | Where-Object { $_ -match 'NOT YOURS' }).Count -eq 1) 'a commit by another account draws a refusal-shaped verdict'
+Assert-True (@($foreignReport | Where-Object { $_ -match "'maikel-bwj', 3 minutes ago" }).Count -eq 1) 'which names the account and the age -- the two facts the judgement turns on'
+Assert-True (@($foreignReport | Where-Object { $_ -match 'origin/docs/1874-preview-control-variant' }).Count -eq 2) 'and the branch, in the listing and again in the verdict'
+Assert-True (@($foreignReport | Where-Object { $_ -match 'ASK THEM BEFORE YOU WRITE ANYTHING' }).Count -eq 1) 'it says what to do instead of describing the state'
+Assert-True (@($foreignReport | Where-Object { $_ -match 'empty by design' }).Count -eq 1) 'and it names the trap: the park commit content is exactly what cannot answer this'
+Assert-True ($foreignReport[$foreignReport.Count - 1] -match 'mid-flight') 'the verdict is last, where the reader stops'
+# REFUSAL-SHAPED, NOT A REFUSAL. The scan matches any commit NAMING the issue, and a colleague
+# mentioning one in a commit of their own is ordinary -- so the closing caveat stays put.
+Assert-True (@($foreignReport | Where-Object { $_ -match 'the claim stands either way' }).Count -eq 1) 'the claim still stands -- this scan cannot tell a fix from a mention'
+
+# NO SELF NAMES, NO VERDICT. On a checkout with no user.name there is nothing to compare against, and
+# a check that cannot measure must not print one.
+$blindReport = @(Format-ParkedFixReport -Issue 1874 -Findings $foreignFinding -SelfNames @() -NowEpoch $Now)
+Assert-True (@($blindReport | Where-Object { $_ -match 'NOT YOURS' }).Count -eq 0) 'with no name to compare against, no verdict is printed'
+Assert-True (@($blindReport | Where-Object { $_ -match 'maikel-bwj, 3 minutes ago' }).Count -eq 1) 'but the author and the age are still printed -- they are facts, not a judgement'
+
+# AN AGE THIS RUN COULD NOT READ IS SAID, not guessed at.
+$noEpoch = @([pscustomobject]@{ Sha = 'abc12345'; Author = 'maikel-bwj'; AuthorEpoch = 0; Subject = 'x'; Branches = @('origin/feat/y') })
+Assert-True (@(Format-ParkedFixReport -Issue 1 -Findings $noEpoch -SelfNames @('davekokbwj') -NowEpoch $Now | Where-Object { $_ -match 'abc12345  maikel-bwj, at an unknown time' }).Count -eq 1) 'an unreadable author date prints as unknown rather than as 1970'
+
+# A RECORD FROM BEFORE #1878 -- no Author, no AuthorEpoch -- still prints rather than throwing.
+$legacy = @([pscustomobject]@{ Sha = 'abc12345'; Subject = 'x'; Branches = @('origin/feat/y') })
+Assert-True (@(Format-ParkedFixReport -Issue 1 -Findings $legacy -SelfNames @('davekokbwj') -NowEpoch $Now | Where-Object { $_ -match 'author unknown' }).Count -eq 1) 'a record missing the new fields prints what it has'
 
 # GROUPED BY BRANCH, which is the unit the reader acts on. A commit on two branches belongs under both:
 # that is the answer to "which of these do I look at", not duplication.
@@ -523,6 +623,26 @@ Assert-True ($scan -match 'were resolved to a branch') 'a truncation says so -- 
 # $matches is a PowerShell automatic variable; assigning to it inside a script that also uses -match
 # is the kind of collision that produces a wrong answer rather than an error.
 Assert-True ($scan -notmatch '\$matches\s*=') 'the match list does not shadow the automatic $Matches'
+
+# THE TWO FIELDS #1878 ADDED ARE ASKED FOR IN THE LOG CALL, and nothing downstream can recover them if
+# they are not: the report would print the same sha and subject it always did, and the session that
+# read them would reach the same wrong conclusion for the same reason.
+Assert-True ($scan -match '%H%x1f%an%x1f%at%x1f%s') 'the log call asks git for the author and the author date'
+Assert-True ($scan -match '(?s)Author\s*=\s*\(Format-ForConsole') 'the author name is stripped before printing -- it is pushed text like the other two'
+# WHOSE COMMITS COUNT AS THIS CHECKOUT'S OWN. The GIT name first, because %an is what the scan read;
+# the login as well, so a split checkout (#1315) recognises itself under either.
+Assert-True ($scan -match '\$identity\.GitUserName') 'the self test compares against the git name, not the login alone'
+Assert-True ($scan -match 'Format-ParkedFixReport[^\r\n]*-SelfNames') 'and the report is told which names are its own'
+
+# THE CLOSING VERDICT MAY NOT CONTRADICT THE BLOCK. A run that prints 'ASK THEM BEFORE YOU WRITE
+# ANYTHING' and closes with 'the work starts here' has told the reader both and settled neither -- and
+# the closing line is the one a session acts on. Held here because it is a SILENCE otherwise: every
+# behavioural property of the scan passes with the old headline still in place.
+Assert-True ($scan -match 'Get-ForeignParkedCommit') 'the script asks the lib for the verdict rather than scraping it back out of the printed lines'
+Assert-True ($body -match '\$foreignParked\s*=\s*\$false') 'the flag has a default, so a scan that never ran cannot leave it undefined'
+Assert-True ($body -match '\$opening\s*=\s*if\s*\(\$foreignParked\)') 'the closing headline reads the flag'
+Assert-True ($body -match 'read the parked-fix verdict above before you start') 'and says so rather than asserting the work starts here'
+Assert-True ($body -match 'BUT NOT THAT BRANCH') 'the resume verdict carries it too -- where the other session branch is already in the working copy'
 
 foreach ($path in @($Script, $Lib, $IdLib)) {
     $errors = $null

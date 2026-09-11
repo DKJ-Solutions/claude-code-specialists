@@ -322,8 +322,9 @@ function Get-IssueMentionPattern {
 function ConvertFrom-CommitScanLog {
     <#
         .SYNOPSIS
-            The commits in a 'git log --format=%H%x1f%s' capture, as records with Sha and Subject. An
-            EMPTY array for empty input or a capture carrying no readable line.
+            The commits in a 'git log --format=%H%x1f%an%x1f%at%x1f%s' capture, as records with Sha,
+            Author, AuthorEpoch and Subject. An EMPTY array for empty input or a capture carrying no
+            readable line.
 
         .DESCRIPTION
             THE UNIT SEPARATOR (0x1F) IS THE FIELD DELIMITER, and that is the whole reason the format
@@ -332,13 +333,28 @@ function ConvertFrom-CommitScanLog {
             real subjects in this repo. 0x1F cannot, because git strips control characters out of the
             subject line it produces.
 
-            A LINE WITHOUT A SEPARATOR IS SKIPPED rather than guessed at. git writes progress and hints
-            to stderr, and a caller that did not discard it would otherwise turn one of those lines into
-            a commit with no sha. Same treatment Get-AssigneeLogins gives a record with no login, and for
-            the same reason: this runs inside the step that OPENS an assignment, where an unhandled parse
-            is a session that never starts.
+            FOUR FIELDS SINCE #1878, AND THE TWO NEW ONES CARRY THE JUDGEMENT. The report used to print
+            a sha and a subject and leave the reader to decide; the two facts that decision actually
+            turns on -- WHO pushed it and HOW LONG AGO -- were one git format field away and neither was
+            asked for. Measured September 11, 2026: a 'park:' commit by another account, three minutes
+            old, was read for its content, found empty, and dismissed, while its author was mid-flight
+            on the same issue. A park commit is empty BY DESIGN, so content is the one thing that cannot
+            report that collision.
 
-            THE SUBJECT IS NOT STRIPPED HERE. The caller prints it and the caller runs it through
+            A LINE WITHOUT ALL FOUR FIELDS IS SKIPPED rather than guessed at. git writes progress and
+            hints to stderr, and a caller that did not discard it would otherwise turn one of those lines
+            into a commit with no sha. Same treatment Get-AssigneeLogins gives a record with no login,
+            and for the same reason: this runs inside the step that OPENS an assignment, where an
+            unhandled parse is a session that never starts.
+
+            THE SUBJECT IS LAST, AND THE EPOCH IS VALIDATED, because two of these four fields are free
+            text. The count on the split keeps everything after the third separator in the subject, so a
+            subject may hold anything at all. An author NAME may in principle hold a separator too, and
+            that is the one shape that would shift the fields -- so the epoch is read only when it is
+            digits, and a shifted line therefore reports an age this function declines to state (0)
+            rather than a wrong one. The sha is unaffected either way.
+
+            NEITHER FREE FIELD IS STRIPPED HERE. The caller prints them and the caller runs them through
             Format-ForConsole, which keeps the one control-character policy in one place instead of two.
 
         .PARAMETER Text
@@ -352,8 +368,8 @@ function ConvertFrom-CommitScanLog {
     # Split(String[], Int32, StringSplitOptions), and PowerShell's @() builds an Object[] -- which binds
     # to no overload at all. It does not fail at this line either: 5.1 reports it as an ArgumentException
     # at the `return` below, which sends a reader looking at the wrong statement entirely. The [char]
-    # overload is not the way out: it takes no count, so a subject containing a second separator would
-    # split into three fields and lose its tail.
+    # overload is not the way out: it takes no count, so a subject containing a further separator would
+    # split into an extra field and lose its tail.
     $sep = [string[]]@([string][char]0x1F)
     # List[psobject] AND NOT List[object], WHICH IS A 5.1 TRAP RATHER THAN A PREFERENCE. Windows
     # PowerShell 5.1 throws ArgumentException ("argument types do not match") when the array
@@ -364,13 +380,108 @@ function ConvertFrom-CommitScanLog {
     $records = New-Object 'System.Collections.Generic.List[psobject]'
     foreach ($line in ($Text -split "`r?`n")) {
         if (-not $line -or -not $line.Trim()) { continue }
-        $parts = $line.Split($sep, 2, [System.StringSplitOptions]::None)
-        if ($parts.Count -lt 2) { continue }
+        $parts = $line.Split($sep, 4, [System.StringSplitOptions]::None)
+        if ($parts.Count -lt 4) { continue }
         $sha = $parts[0].Trim()
         if (-not $sha) { continue }
-        $records.Add([pscustomobject]@{ Sha = $sha; Subject = $parts[1].Trim() }) | Out-Null
+        $epochText = $parts[2].Trim()
+        # DIGITS OR NOTHING. %at is git's own author date in seconds, so anything else arriving here is
+        # a line whose fields have shifted -- and an age printed off a shifted field is exactly the kind
+        # of confident wrong fact this report was repaired to stop producing. 0 is the caller's signal
+        # to say the age is unknown.
+        $epoch = 0L
+        if ($epochText -match '^\d+$') { $epoch = [long]$epochText }
+        $records.Add([pscustomobject]@{
+            Sha         = $sha
+            Author      = $parts[1].Trim()
+            AuthorEpoch = $epoch
+            Subject     = $parts[3].Trim()
+        }) | Out-Null
     }
     return @($records)
+}
+
+function Format-CommitAge {
+    <#
+        .SYNOPSIS
+            'three minutes ago' for a number of seconds. 'at an unknown time' for a non-positive or
+            unreadable one.
+
+        .DESCRIPTION
+            THE AGE IS HALF OF WHAT #1878 ADDED, and it is a separate function because it is the half
+            with no git in it. A reader deciding whether somebody is mid-flight on their issue reads
+            'three minutes ago' and 'four months ago' completely differently, and neither is derivable
+            from a sha.
+
+            COARSE ON PURPOSE. One unit, no decimals, largest that fits: the question this answers is
+            'is this live?', which nothing finer than a unit ever changes. Days stop at 60 rather than
+            running to 'ninety days ago', because past two months the exact count has stopped carrying
+            any decision.
+
+            A NEGATIVE AGE IS NOT AN ERROR, and it is the one case worth naming: a commit authored on a
+            machine whose clock runs ahead arrives in the future, which is a fact about clocks rather
+            than about the commit. It reads as 'just now' -- the honest end of the range, and the one
+            that keeps a live collision from printing as something ancient.
+
+        .PARAMETER Seconds
+            Seconds elapsed since the commit was authored.
+    #>
+    param([long]$Seconds = 0)
+
+    if ($Seconds -lt 0) { $Seconds = 0 }
+    $unit = $null
+    $count = 0
+    if ($Seconds -lt 60) { return 'just now' }
+    elseif ($Seconds -lt 3600) { $count = [long][math]::Floor($Seconds / 60); $unit = 'minute' }
+    elseif ($Seconds -lt 86400) { $count = [long][math]::Floor($Seconds / 3600); $unit = 'hour' }
+    elseif ($Seconds -lt 5184000) { $count = [long][math]::Floor($Seconds / 86400); $unit = 'day' }
+    elseif ($Seconds -lt 31536000) { $count = [long][math]::Floor($Seconds / 2592000); $unit = 'month' }
+    else { $count = [long][math]::Floor($Seconds / 31536000); $unit = 'year' }
+
+    $plural = if ($count -eq 1) { '' } else { 's' }
+    return "$count $unit$plural ago"
+}
+
+function Test-SelfAuthored {
+    <#
+        .SYNOPSIS
+            $true when a commit's author name is one of the names THIS checkout commits or claims under.
+
+        .DESCRIPTION
+            THE COMPARISON IS AGAINST THE GIT AUTHOR NAME, NOT THE GITHUB LOGIN, and that is the whole
+            reason this is not a one-line -eq at the call site. What the scan reads is '%an' -- what git
+            wrote into somebody's commit -- so the only apples-to-apples question is whether THIS
+            checkout would have written the same thing. A repo whose user.name is a display name ('Ada
+            Lovelace') never matches its own login, so comparing against the login alone would report
+            every one of that person's own parked commits as somebody else's.
+
+            BOTH NAMES ARE ACCEPTED for the same reason in the other direction: on a split checkout
+            (#1315) the claim is made under the git name, and on an ordinary one the two agree, so a
+            match on either is a match. GitHub logins are case-insensitive and a display name typed
+            twice is not reliably cased either, so the comparison is too.
+
+            AN EMPTY SELF IS NOT A MATCH, AND NOT A MISMATCH EITHER. With no name to compare against
+            there is no question to answer, so this returns $true -- which is the caller's 'say nothing'
+            rather than its 'somebody else'. A check that cannot measure must not print a verdict, which
+            is the same rule the scan's closing lines have carried since #1853.
+
+        .PARAMETER Author
+            The commit's author name, as git wrote it.
+
+        .PARAMETER SelfNames
+            The names this checkout answers to -- normally git config user.name and the claiming login.
+    #>
+    param(
+        [string]$Author = '',
+        [AllowNull()][string[]]$SelfNames = @()
+    )
+
+    $mine = @(@($SelfNames) | Where-Object { $_ -and ([string]$_).Trim() } | ForEach-Object { ([string]$_).Trim() })
+    if ($mine.Count -eq 0) { return $true }
+    $them = ([string]$Author).Trim()
+    if (-not $them) { return $true }
+    foreach ($name in $mine) { if ($them -ieq $name) { return $true } }
+    return $false
 }
 
 function Get-ContainingBranchNames {
@@ -450,6 +561,56 @@ function Get-ContainingBranchNames {
     return @($folded | Sort-Object)
 }
 
+function Get-ForeignParkedCommit {
+    <#
+        .SYNOPSIS
+            The NEWEST of the scanned commits that this checkout did not write, or $null when every one
+            of them is its own (or there is nothing to compare against).
+
+        .DESCRIPTION
+            THE VERDICT IS ITS OWN FUNCTION BECAUSE TWO CALLERS ASK IT. Format-ParkedFixReport prints
+            the block, and claim-issue.ps1 needs the same answer for its closing line -- a run that
+            prints 'ASK THEM BEFORE YOU WRITE ANYTHING' and then 'the work starts here' has told the
+            reader both things and settled nothing. Deriving it twice, or scraping it back out of the
+            printed lines, is how those two would drift apart.
+
+            NEWEST FIRST IS THE CALLER'S ORDER, NOT AN ASSUMPTION MADE HERE. The findings arrive in git
+            log's own order, so the first one that fails the self test is the newest that does. Nothing
+            is re-sorted: an epoch is a field this function is told, and a commit can carry any date its
+            author's machine claimed.
+
+            A FINDING WITH NO SURVIVING BRANCH IS SKIPPED, the same one Format-ParkedFixReport drops --
+            a commit whose every branch was excluded is the session's own work, and the verdict must
+            agree with the listing about which commits are even in the report.
+
+        .PARAMETER Findings
+            The scan's records, newest first.
+
+        .PARAMETER SelfNames
+            The names this checkout commits and claims under. Empty means no verdict -- see
+            Test-SelfAuthored.
+    #>
+    param(
+        [AllowNull()][object[]]$Findings = @(),
+        [AllowNull()][string[]]$SelfNames = @()
+    )
+
+    foreach ($f in @($Findings)) {
+        if (-not $f -or -not $f.PSObject.Properties['Branches']) { continue }
+        $branches = @(@($f.Branches) | Where-Object { $_ })
+        if ($branches.Count -eq 0) { continue }
+        $author = if ($f.PSObject.Properties['Author']) { ([string]$f.Author).Trim() } else { '' }
+        if (Test-SelfAuthored -Author $author -SelfNames $SelfNames) { continue }
+        return [pscustomobject]@{
+            Sha         = if ($f.PSObject.Properties['Sha']) { [string]$f.Sha } else { '' }
+            Author      = $author
+            AuthorEpoch = if ($f.PSObject.Properties['AuthorEpoch']) { [long]$f.AuthorEpoch } else { 0L }
+            Branch      = [string]$branches[0]
+        }
+    }
+    return $null
+}
+
 function Format-ParkedFixReport {
     <#
         .SYNOPSIS
@@ -473,6 +634,20 @@ function Format-ParkedFixReport {
             advice off the screen it was written for. The overflow line names the count, so nothing is
             silently hidden; the reader who wants all of them has the branch name and one git command.
 
+            EACH COMMIT CARRIES ITS AUTHOR AND ITS AGE, AHEAD OF ITS SUBJECT (#1878). The order is the
+            order the decision is made in: which commit, whose, how fresh, and only then what it says.
+            The subject comes last because it is the field that misled -- a 'park:' commit is empty by
+            design, so a reader told to judge by content reads a live collision as nothing at all.
+
+            AND WHERE THE NEWEST OF THEM IS NOT THIS CHECKOUT'S OWN, THAT IS SAID AS A VERDICT rather
+            than left in the listing for a reader to assemble. Chris's own test for a locked door is a
+            different account plus a branch that already exists; the second half is the premise of this
+            whole scan, so the first half decides it. The verdict is refusal-SHAPED and refuses nothing,
+            which is not a hedge but the precision of the measurement: this scan matches any commit
+            NAMING the issue, and a colleague mentioning #N in a commit of their own is both ordinary and
+            correct. A block there would be wrong far more often than right, and a claim that blocks
+            costs the whole assignment (#1485).
+
             IT SAYS WHAT IT DOES NOT KNOW, in the closing lines, because this check cannot tell a fix
             from a mention and must not sound as though it can. The reader's next act is to look at the
             branch; the warning's whole job is to make that cost one command instead of a whole
@@ -486,20 +661,33 @@ function Format-ParkedFixReport {
             The issue being claimed, for the lead line.
 
         .PARAMETER Findings
-            Records with Sha, Subject and Branches (a string array). Anything else is ignored.
+            Records with Sha, Subject, Branches (a string array) and -- since #1878 -- Author and
+            AuthorEpoch. Anything else is ignored, and a record missing the two new fields still prints:
+            an age this run could not read is stated as unknown rather than guessed at.
 
         .PARAMETER MaxCommitsPerBranch
             How many commits to list under one branch before the overflow line. Below 1 is treated as 1:
             a branch worth naming is worth one example, and a cap of zero would print a branch with
             nothing under it.
 
+        .PARAMETER SelfNames
+            The names this checkout commits and claims under. Empty means the verdict is not attempted,
+            because a comparison with nothing to compare against is not evidence of anything.
+
+        .PARAMETER NowEpoch
+            The moment to measure the ages against, in Unix seconds. Defaults to now; a caller passes it
+            only to make the output reproducible, which is what lets a suite hold these lines.
+
         .OUTPUTS
             String[] -- the lines in print order, with no colour and no prefix. The caller writes them.
+            The verdict block, when there is one, is the LAST thing in it.
     #>
     param(
         [int]$Issue = 0,
         [AllowNull()][object[]]$Findings = @(),
-        [int]$MaxCommitsPerBranch = 3
+        [int]$MaxCommitsPerBranch = 3,
+        [AllowNull()][string[]]$SelfNames = @(),
+        [long]$NowEpoch = 0
     )
 
     $real = @(@($Findings) | Where-Object {
@@ -507,19 +695,30 @@ function Format-ParkedFixReport {
     })
     if ($real.Count -eq 0) { return @() }
     $cap = if ($MaxCommitsPerBranch -lt 1) { 1 } else { $MaxCommitsPerBranch }
+    # THE CALLER'S CLOCK, NOT EACH LINE'S. One reading for the whole report, so two commits a second
+    # apart cannot print as two different ages, and so a suite can pin it.
+    $now = if ($NowEpoch -gt 0) { $NowEpoch } else { [long][System.DateTimeOffset]::UtcNow.ToUnixTimeSeconds() }
 
     # ORDERED, not a hashtable: PowerShell's plain @{} has no defined key order, so two runs over the
     # same repo would print the same branches in a different sequence and a reader could not diff one
     # warning against the last.
     $byBranch = [ordered]@{}
+    $foreign = Get-ForeignParkedCommit -Findings $real -SelfNames $SelfNames
     foreach ($f in $real) {
         $sha = ([string]$f.Sha)
         $short = if ($sha.Length -gt 8) { $sha.Substring(0, 8) } else { $sha }
         $subject = if ($f.PSObject.Properties['Subject']) { ([string]$f.Subject).Trim() } else { '' }
+        $author = if ($f.PSObject.Properties['Author']) { ([string]$f.Author).Trim() } else { '' }
+        $epoch = if ($f.PSObject.Properties['AuthorEpoch']) { [long]$f.AuthorEpoch } else { 0L }
+        $who = if ($author) { $author } else { 'author unknown' }
+        $when = if ($epoch -gt 0) { Format-CommitAge -Seconds ($now - $epoch) } else { 'at an unknown time' }
         foreach ($branch in @(@($f.Branches) | Where-Object { $_ })) {
             $key = [string]$branch
             if (-not $byBranch.Contains($key)) { $byBranch[$key] = (New-Object System.Collections.Generic.List[string]) }
-            $byBranch[$key].Add("$short  $subject".TrimEnd()) | Out-Null
+            # ATTRIBUTION AHEAD OF SUBJECT (#1878) -- see the description. Who and when decide what
+            # happens next; the subject is the field that read as empty while a colleague was mid-flight.
+            $tail = if ($subject) { " -- $subject" } else { '' }
+            $byBranch[$key].Add("$short  $who, $when$tail".TrimEnd()) | Out-Null
         }
     }
 
@@ -537,5 +736,16 @@ function Format-ParkedFixReport {
     $lines.Add('  A branch with no pull request is invisible to every other pickup check, so READ THOSE') | Out-Null
     $lines.Add('  COMMITS before you write anything. This cannot tell a fix from a mention and does not') | Out-Null
     $lines.Add('  claim to -- the claim stands either way.') | Out-Null
+    if ($foreign) {
+        $foreignWhen = if ($foreign.AuthorEpoch -gt 0) { Format-CommitAge -Seconds ($now - [long]$foreign.AuthorEpoch) } else { 'at an unknown time' }
+        $lines.Add('') | Out-Null
+        $lines.Add("  NOT YOURS: the newest of those commits was written by '$($foreign.Author)', $foreignWhen, on") | Out-Null
+        $lines.Add("  $($foreign.Branch)") | Out-Null
+        $lines.Add('  That is the locked-door shape -- a different account, and a branch that already exists --') | Out-Null
+        $lines.Add('  reaching you through the branch instead of through the assignee field, where nothing would') | Out-Null
+        $lines.Add('  have reported it. ASK THEM BEFORE YOU WRITE ANYTHING.') | Out-Null
+        $lines.Add('  Do NOT settle this by reading the commit: a park commit is empty by design, so its') | Out-Null
+        $lines.Add('  content is the one thing that cannot tell you whether somebody is mid-flight.') | Out-Null
+    }
     return @($lines)
 }

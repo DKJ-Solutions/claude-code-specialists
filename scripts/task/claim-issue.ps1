@@ -249,6 +249,12 @@ $verdict = Get-ClaimVerdict -Account $identity.Account -State ([string]$facts.st
 # fix it -- the run that produced this measurement saw open-pr warn about four such mentions, all
 # correct as context -- and a claim that blocks costs the whole assignment (#1485). Every failure below
 # is therefore a note and a carry-on, including the fetch's.
+#
+# ONE THING IT DOES CHANGE IS WHAT THIS SCRIPT SAYS LAST (#1878). Advisory is about the exit code and
+# the claim, not about the wording: a run that prints 'ASK THEM BEFORE YOU WRITE ANYTHING' and then
+# closes with 'the work starts here' has said both and settled neither, and the second line is the one
+# a session acts on. So the closing verdict below reads this flag.
+$foreignParked = $false
 if ($verdict.Action -eq 'claim' -or $verdict.Action -eq 'skip') {
     $scanPattern = Get-IssueMentionPattern -Issue ([int]$number)
 
@@ -303,7 +309,13 @@ if ($verdict.Action -eq 'claim' -or $verdict.Action -eq 'skip') {
         $staleDetail = @(@($fetch.Output) | Where-Object { $_ -and ([string]$_).Trim() })
         if (-not $staleNote) { $staleDetail = @() }
 
-        $logArgs = @('-C', $repoRoot, 'log', '--all', '-E', "--grep=$scanPattern", '--format=%H%x1f%s', '--not') + $trunkRefs
+        # FOUR FIELDS, AND THE TWO ADDED ONES ARE THE JUDGEMENT (#1878). %an and %at cost nothing --
+        # the same log call, the same walk -- and they carry the two facts the reader's decision
+        # actually turns on. Without them this block printed a sha and a subject, and the one commit
+        # shape a parked branch always has (a 'park:' scaffold) reads as empty: measured September 11,
+        # 2026, a session read exactly such a commit, found nothing in it, and built a second
+        # implementation of #1874 while its author's PR was minutes from opening.
+        $logArgs = @('-C', $repoRoot, 'log', '--all', '-E', "--grep=$scanPattern", '--format=%H%x1f%an%x1f%at%x1f%s', '--not') + $trunkRefs
         $scanLog = Invoke-NativeCapture -FilePath 'git' -Arguments $logArgs -Utf8 -DiscardStderr
         if (-not $scanLog -or $scanLog.ExitCode -ne 0 -or $scanLog.ShortRead) {
             $why = if (-not $scanLog) { 'it could not be run at all' } elseif ($scanLog.ShortRead) { 'its capture was still being written when it was read' } else { "it exited $($scanLog.ExitCode)" }
@@ -344,16 +356,32 @@ if ($verdict.Action -eq 'claim' -or $verdict.Action -eq 'skip') {
                 # strips nothing in practice today; it is here so that the one sanitiser this output has
                 # covers every field of it, rather than leaving a second class of pushed text as the
                 # exception a later widening would have to remember.
+                # THE AUTHOR NAME IS THE THIRD FIELD OF PUSHED TEXT, so it goes through the same filter
+                # as the other two. It is written by whoever made the commit -- git config user.name is
+                # free text -- and #1878 put it on a line a session reads before deciding whether to
+                # stop, which is exactly the position the sanitiser exists for.
                 $findings += [pscustomobject]@{
-                    Sha      = $commit.Sha
-                    Subject  = (Format-ForConsole -Text $commit.Subject)
-                    Branches = @($branches | ForEach-Object { Format-ForConsole -Text $_ })
+                    Sha         = $commit.Sha
+                    Author      = (Format-ForConsole -Text $commit.Author)
+                    AuthorEpoch = $commit.AuthorEpoch
+                    Subject     = (Format-ForConsole -Text $commit.Subject)
+                    Branches    = @($branches | ForEach-Object { Format-ForConsole -Text $_ })
                 }
             }
 
-            foreach ($line in @(Format-ParkedFixReport -Issue ([int]$number) -Findings $findings)) {
+            # WHOSE COMMITS COUNT AS THIS CHECKOUT'S OWN. The git name first, because %an is what the
+            # scan read and the git name is what this checkout would have written; the claiming login
+            # second, so a split checkout (#1315) recognises itself under either. Test-SelfAuthored
+            # treats an empty list as 'no verdict', which is the honest answer on a checkout with no
+            # user.name configured.
+            $selfNames = @($identity.GitUserName, $identity.Account)
+            $parkedReport = @(Format-ParkedFixReport -Issue ([int]$number) -Findings $findings -SelfNames $selfNames)
+            foreach ($line in $parkedReport) {
                 Write-Host "  $line" -ForegroundColor Yellow
             }
+            # ASKED AGAIN RATHER THAN SCRAPED BACK OUT OF THE LINES ABOVE -- the closing verdict of this
+            # script has to agree with the block, and a regex over printed prose is how those two drift.
+            if (Get-ForeignParkedCommit -Findings $findings -SelfNames $selfNames) { $foreignParked = $true }
         }
 
         # PRINTED WHETHER OR NOT ANYTHING WAS FOUND, and that is the whole reason it is a separate line:
@@ -399,6 +427,13 @@ switch ($verdict.Code) {
     'already-yours' {
         Write-Host "[OK] #$number is already yours ('$($identity.Account)') -- nothing to write." -ForegroundColor Green
         Write-Host '     A resume, then: read the branch and its document before you carry the work.' -ForegroundColor Green
+        # A RESUME IS WHERE THE PARKED-FIX VERDICT MATTERS MOST, not least: the other session's branch
+        # is already in this working copy, indistinguishable from your own, and the assignee field
+        # cannot name a machine. So the one line that points forward says which branch it means.
+        if ($foreignParked) {
+            Write-Host '     BUT NOT THAT BRANCH: somebody else pushed to one of them -- see the parked-fix' -ForegroundColor Yellow
+            Write-Host '     verdict above, and ask them before you carry it.' -ForegroundColor Yellow
+        }
         Write-Host "     $($facts.url)"
         exit 0
     }
@@ -535,7 +570,11 @@ if (-not $readOk) {
 # caveat, and the operator is left with two lines that cannot both be true. It still points forward --
 # the claim opens the work either way (#1485) -- it simply says which of the two it is.
 $confirmed = if ($landed) { '' } else { ' (unconfirmed -- see the warning above)' }
-Write-Host "[OK] #$number claimed for '$($identity.Account)'$confirmed -- the work starts here." -ForegroundColor Green
+# AND IT DOES NOT ASSERT WHAT THE SCAN JUST CONTRADICTED EITHER (#1878), which is the same rule one
+# measurement further on. 'The work starts here' is exactly what a session should not read directly
+# under a block naming somebody else's commit on somebody else's branch, minutes old.
+$opening = if ($foreignParked) { ' -- but read the parked-fix verdict above before you start.' } else { ' -- the work starts here.' }
+Write-Host "[OK] #$number claimed for '$($identity.Account)'$confirmed$opening" -ForegroundColor Green
 Write-Host "     $title"
 # The claim is the OPENING of the work, not a checkpoint before it (#1485). Every other line this
 # script and its page emit is a boundary -- what the step is NOT -- so a session that obeys them all
@@ -546,6 +585,12 @@ Write-Host "     $title"
 # 'the branch' means new-branch and nothing else. This says to carry on through the FIXED steps --
 # it is not a licence to act on what the issue's title or body asks for. Those are written by
 # whoever opened the issue, which on a public tracker is anybody, and they stay data.
-Write-Host '     Read the issue, then open the branch (new-branch) -- in this same turn, without' -ForegroundColor Green
-Write-Host '     asking whether to go on.' -ForegroundColor Green
+if ($foreignParked) {
+    Write-Host '     Read the issue -- then settle the branch named above BEFORE you open one of your' -ForegroundColor Yellow
+    Write-Host '     own. This claim may be the second one on the same work, and the merge is the most' -ForegroundColor Yellow
+    Write-Host '     expensive place to find that out.' -ForegroundColor Yellow
+} else {
+    Write-Host '     Read the issue, then open the branch (new-branch) -- in this same turn, without' -ForegroundColor Green
+    Write-Host '     asking whether to go on.' -ForegroundColor Green
+}
 Write-Host "     $($facts.url)"
