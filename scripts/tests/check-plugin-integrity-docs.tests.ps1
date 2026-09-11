@@ -89,6 +89,56 @@ try {
     Assert-True (-not ($s3.Out -match '\[skill-param\] scripts\\sync\\check-script-contract')) `
         'skill-param: and declaring no skill is coverage, not an error -- writing a missing skill is separate work'
 
+    # --- check 39: a depth-sensitive $PSScriptRoot resolution must declare the suite that runs it ---
+    # ISSUE #1857. Check 8 holds a shared script byte-identical to its plugin mirror, and that is what
+    # hides this: the two copies sit at different depths, so a resolution ascending TWO levels reaches
+    # the repo root from one and the plugin root from the other. Identical characters, different
+    # folder, nothing to diff -- and the mirror is the copy every consumer runs.
+    #
+    # park-branch.ps1 is the subject again, for the reason check 18 uses it: it is registered, it is
+    # already in the fixture, and its skill is already satisfied above -- so the scenario exercises the
+    # depth rule rather than a script's complexity. Its content is restored at the end of the block, so
+    # the scenarios below see the fixture check 18 left behind.
+    Write-Host "check 39: a depth-sensitive resolution vs. the suite that runs the mirror" -ForegroundColor Cyan
+    $depthSrc  = $parkSrc
+    $depthKeep = [System.IO.File]::ReadAllText($depthSrc)
+
+    # 43a. ONE HOP IS NOT A SUBJECT. '..\lib\...' reaches the same folder relative to the file in both
+    #      copies, so it cannot differ -- and a check that flagged it would bury the crossings that
+    #      matter under every dot-source in the tree. Asserted first, because a check that fires on
+    #      everything passes the positive test below while being useless.
+    [System.IO.File]::WriteAllText($depthSrc,
+        ($depthKeep + ". (Join-Path `$PSScriptRoot '..\lib\native-capture-lib.ps1')`n"), $Utf8NoBom)
+    $d1 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True (-not ($d1.Out -match '\[mirror-depth\].*park-branch')) `
+        'mirror-depth: a single-hop resolution is not a finding -- it means the same folder in both copies'
+    Assert-True ($d1.Out -match '\[mirror-depth\] checked [1-9]') `
+        'mirror-depth: the coverage count proves scripts were actually scanned, not an empty pass'
+
+    # 43b. TWO HOPS, UNDECLARED -- the defect itself.
+    [System.IO.File]::WriteAllText($depthSrc,
+        ($depthKeep + "`$ref = Join-Path `$PSScriptRoot '..\..\blueprint\thing.json'`n"), $Utf8NoBom)
+    $d2 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True ($d2.Out -match '\[mirror-depth\].*park-branch\.ps1.*ascends two') `
+        'mirror-depth: a two-hop resolution with no declaration is reported, naming the script'
+    Assert-True ($d2.Out -match '\[mirror-depth\].*MirrorRun') `
+        'mirror-depth: and the finding names the declaration that answers it, rather than only the symptom'
+
+    # 43c. THE SECOND FORM, which a scan for '..' would miss entirely: the same ascent written as
+    #      nested Split-Path calls. check-policy-drift resolves its sibling plugins exactly this way,
+    #      and the detector's first draft found nothing there while reporting the literal form
+    #      correctly -- it stopped climbing at the INNER pipeline, where one hop is in scope.
+    [System.IO.File]::WriteAllText($depthSrc,
+        ($depthKeep + "`$own = Split-Path (Split-Path `$PSScriptRoot -Parent) -Parent`n"), $Utf8NoBom)
+    $d3 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True ($d3.Out -match '\[mirror-depth\].*park-branch\.ps1') `
+        'mirror-depth: a nested Split-Path ascent is reported too, not only a literal ..\.. path'
+
+    [System.IO.File]::WriteAllText($depthSrc, $depthKeep, $Utf8NoBom)
+    $d4 = Invoke-Integrity -FixtureRoot $Fixture
+    Assert-True (-not ($d4.Out -match '\[mirror-depth\].*park-branch')) `
+        'mirror-depth: removing the resolution clears the finding, so the check reads the script and not its name'
+
     # --- check 19: a named consumer-facing document that is not there ------------------------------
     # 42. THE SILENT-COVERAGE CASE. Checks 15 and 16 open each $consumerDocs entry with a Test-Path
     #     'continue', so a stale entry costs coverage and says nothing. Measured August 6, 2026, moving

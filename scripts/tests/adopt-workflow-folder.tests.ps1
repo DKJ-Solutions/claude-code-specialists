@@ -105,11 +105,13 @@ function New-FixtureConsumer {
 }
 
 function Invoke-Adopt {
-    param([string]$Dir, [string[]]$ScriptArgs = @())
+    # -ScriptPath so the same scenario can be driven through the plugin mirror as well as the root
+    # copy (#1857). It defaults to the root copy, so every existing call is unchanged.
+    param([string]$Dir, [string[]]$ScriptArgs = @(), [string]$ScriptPath = $Script)
     $prevPd = $env:CLAUDE_PROJECT_DIR
     try {
         $env:CLAUDE_PROJECT_DIR = $Dir
-        $out = & powershell -NoProfile -ExecutionPolicy Bypass -File $Script @ScriptArgs
+        $out = & powershell -NoProfile -ExecutionPolicy Bypass -File $ScriptPath @ScriptArgs
         # Flat is FOR PHRASE ASSERTS ONLY: the child wraps its Write-Host lines at its own host width,
         # a point that moves with the console and with the fixture's temp path length, so a phrase
         # sitting mid-line arrives split MID-WORD across two records. Joined with '' rather than a
@@ -636,6 +638,39 @@ Assert-Match 'releases/history\.md' $relText '-Apply: it names where the list ac
     # thing missing was the CR count, which is an assert on bytes this suite already holds rather than a
     # reason to start a sixth process (Nolan, on this branch). A copy here would have been the same
     # fixture, in the same state, one process later.
+    # --- The plugin mirror, run from its OWN depth (issue #1857) -----------------------------------
+    # THE RESOLUTION THIS ISSUE WAS FILED ABOUT. The PR-template reference is read from
+    # '..\..\templates\pull_request_template.md', with a second candidate one level deeper for the
+    # source copy. Two levels up is the PLUGIN root from the mirror and a <repo>\templates that does
+    # not exist from here -- so every assert above proves candidate 2, and candidate 1 is the one that
+    # fires in every released install. The drift lint holds the two files byte-identical, which is
+    # exactly what makes the difference invisible: identical text, different folder, nothing to diff.
+    #
+    # AND THE FAILURE IS SILENT BY DESIGN. An absent reference places nothing and warns; it does not
+    # fall back to a literal. So a mirror that resolved neither candidate would simply omit the
+    # template, with every other assert in this suite still green -- which is why what is asserted
+    # below is that the file LANDS and matches the shipped reference, not merely that the run exits 0.
+    Write-Host ''
+    Write-Host 'The plugin mirror'
+
+    $mirrorScript = Join-Path $RepoRoot 'plugins\dkj-policy\scripts\task\adopt-workflow-folder.ps1'
+    Assert-True (Test-Path -LiteralPath $mirrorScript -PathType Leaf) 'mirror: it exists at the registered path'
+
+    $cMirror = New-FixtureConsumer -Label 'mirror'
+    $rMirror = Invoke-Adopt -Dir $cMirror -ScriptArgs @('-Apply') -ScriptPath $mirrorScript
+    Assert-Equal 0 $rMirror.Code 'mirror: exit 0'
+    $mirrorPlaced = Join-Path $cMirror $prtRel
+    Assert-True (Test-Path -LiteralPath $mirrorPlaced -PathType Leaf) `
+        'mirror: the PR template is placed -- candidate 1 resolved from the plugin root, which the root copy can never exercise'
+    if ((Test-Path -LiteralPath $mirrorPlaced) -and (Test-Path -LiteralPath $prtRefPath)) {
+        $mirrorText = [System.IO.File]::ReadAllText($mirrorPlaced, [System.Text.Encoding]::UTF8)
+        $refText    = [System.IO.File]::ReadAllText($prtRefPath, [System.Text.Encoding]::UTF8)
+        Assert-Equal ($refText -replace "`r`n", "`n") ($mirrorText -replace "`r`n", "`n") `
+            'mirror: and what it placed is the shipped reference, so it read the real artefact rather than any file that happened to be there'
+    }
+    Assert-True (-not ($rMirror.Flat -match 'could not be found')) `
+        'mirror: no "reference could not be found" warning -- the silent branch this resolution fails through did not fire'
+
 } finally {
     if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture -ErrorAction SilentlyContinue }
 }

@@ -2879,6 +2879,61 @@ it depend on the reason it does not" — the same shape as the mention-vs-use qu
 already ask of a printed command or a mirrored parameter, arriving here as a skipped branch instead of an
 unheld one.
 
+**Byte-equality is necessary and not sufficient for a mirrored script, and the gap is exactly one class
+wide** (September 11, 2026,
+[#1857](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1857)). Check 8 holds every shared
+script byte-identical to its plugin mirror, which proves the two copies are the same **text** and says
+nothing about them **behaving** the same — and the thing that makes the difference invisible is the
+equality itself: the characters are identical, so there is nothing to diff. What differs is where the
+two files sit. A shared entry point lives at `<x>\scripts\<area>\<name>.ps1` in both copies, where `<x>`
+is the repo root for the source and the **plugin root** for the mirror, so a `$PSScriptRoot` resolution
+ascending **two** levels lands on a different folder in each.
+
+**One hop cannot, and that bound is what makes a gate worth having here.** `..\lib\...` reaches
+`<x>\scripts\` — the same folder relative to the file in both copies — so the overwhelming majority of
+resolutions in the tree are depth-invariant by construction. Measured when check 39 was written: **3 of
+34** entry points cross the boundary — `adopt-config`'s `..\..\blueprint\config-blueprint.json`,
+`check-policy-drift`'s `Split-Path (Split-Path $PSScriptRoot -Parent) -Parent`, and
+`adopt-workflow-folder`'s `..\..\templates\pull_request_template.md` — and **all three were already
+correct**. A rule that flagged one hop would have buried those under the thirty-odd that cannot differ,
+which is the shape this section already records being declined at 124 findings.
+
+**The third one is the best argument for the check there is, and it is worth keeping for how it
+arrived.** The branch measured **two**; `adopt-workflow-folder`'s PR-template reference merged to `main`
+while the gate was being built, and check 39 caught it on its **first CI run** — because CI tests the
+branch merged with the trunk and the branch's own working copy cannot see what landed beside it. It is
+also the exact resolution #1857 was filed about, so the issue's subject was reachable by the gate and
+not by the session that wrote it. Two things follow. A count taken from a branch base is a **snapshot**,
+and this one went stale inside a day, which is why the live figures belong in the coverage line and the
+number in prose is dated. And a gate whose subject is *"what nobody has thought about yet"* is measured
+correctly only against the trunk — the local run said the tree was clean, and it was right about the
+tree it could see.
+
+**What was actually wrong was the proof, not the code.** Both crossings had been verified by hand, and
+hand verification is what this repo keeps replacing with gates. Worse, the copy that fires in **every
+released install** is the mirror — the source copy exists for this repo and its suites — so the
+candidate nobody executed was the only one a consumer ever reaches. One suite did run a mirror
+(`git-identity-gate.tests.ps1`, four weeks earlier, with a comment stating this reasoning in full), and
+it covered a script with no crossing at all.
+
+**The repair is split deliberately, and the split is the reusable part.** The gate refuses an
+**undeclared** crossing and holds the declaration to something real — the named suite must exist and
+must name the mirror — while whether that suite **asserts** anything is the suite's job. That is the
+same line check 18 draws between this gate and a skill page, and trying to prove assertion statically
+from the gate would only produce a check that is confidently wrong. The declaration lives in the
+registry beside `LibOnly`, `Skill` and `MeasureArgs`, for the reason all three moved there: a
+hand-written list somewhere else is one a newly shared script falls out of silently (#275/#331), and
+catching the script nobody has thought about yet is this check's whole job.
+
+**And the detector's own first draft is the cautionary half.** It climbed to the *nearest* enclosing
+statement, which is correct for a literal and silently halves the second form: a `PipelineAst` is itself
+a statement, so `Split-Path (Split-Path $PSScriptRoot -Parent) -Parent` stops the climb at the **inner**
+pipeline, where one hop is in scope and the ascent reads as one level. It reported `adopt-config`
+correctly and found nothing in `check-policy-drift` — a gate that looks green and covers half its
+subject, which is worse than one that covers none. Climbing to the statement that sits directly in a
+block fixes it, and both forms are pinned in `shared-scripts.tests.ps1` rather than only through the
+gate's fixture.
+
 In short: the **how** (managing the harness, scripts, config, safety guards) is portable; the **what**
 (the plugin lint + drift lint, `branch-info.ps1`, `.claude/settings.json` with the github source, and
 the marketplace/plugin manifests) belongs to this repo.
