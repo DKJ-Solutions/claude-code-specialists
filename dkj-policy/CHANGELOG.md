@@ -43,7 +43,42 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**9 / 17 minor entries** <!-- pending-tally -->
+**9 / 18 minor entries** <!-- pending-tally -->
+
+### DEPLOY: feat/1857-mirror-depth-gate · 20260911-132257
+
+A shared workflow script exists twice -- the workshop source and the plugin mirror a consumer runs --
+and check 8 holds the two byte-identical. That proves they are the same TEXT and says nothing about
+behaviour, and the equality is what hides the gap: the two copies sit at different depths, so a
+`$PSScriptRoot` resolution ascending two levels lands on the repo root from one and the plugin root
+from the other. Identical characters, different folder, nothing to diff.
+
+Check 39 refuses such a resolution while it is UNDECLARED: the pair must name the suite that runs its
+mirror, and that suite must exist and name the mirror, so a declaration cannot be fiction. Whether the
+run asserts anything stays the suite's job -- the same line check 18 draws between this gate and a
+skill page. One hop is deliberately not a subject, because `..\lib\...` is the same folder relative to
+the file in both copies; flagging it would bury the crossings under the thirty-odd that cannot differ.
+
+All three crossings were already correct. What was missing was the proof: they had been verified by
+hand, and the copy that fires in every released install is the one no suite executed. All three now do.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+Nothing here reaches a subscriber: it is a gate over this repo's own shared-script mechanics, and a
+consumer sees no behaviour change at all. What it protects is theirs, though -- the mirror is the copy
+they run, and it was the copy nothing exercised.
+
+**Score:** N/A
+
+#### Pull Request
+
+Gate the depth-sensitive resolutions in mirrored shared scripts
+
+[PR #1862](https://github.com/DKJ-Solutions/dkj-claude-plugins/pull/1862)
+
+---
 
 ### DEPLOY: feat/1843-portable-pr-template · 20260911-130430
 
