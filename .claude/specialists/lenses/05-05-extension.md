@@ -110,15 +110,15 @@ through the checklist. The script also automatically sets the right GitHub label
 table above).
 
 **The title is no longer typed here — it is composed** (Dave, August 7, 2026;
-[#506](https://github.com/DaveKJohn/claude-code-specialists/issues/506) +
-[#505](https://github.com/DaveKJohn/claude-code-specialists/issues/505)). The PR is called
+[#506](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/506) +
+[#505](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/505)). The PR is called
 `<branch-type>: <the entry's Branch title>`, so the prefix mirrors the branch type by construction and the
 words are the ones already in the DEPLOY section of `dkj-policy/<branch>.md`. `-Title` is still accepted and ignored, with a
 warning naming the title the entry gives.
 
 **That rule used to live in this very paragraph, and was violated five PRs in a row.** It read "the title
-prefix mirrors the branch type" and nothing measured it: [#499](https://github.com/DaveKJohn/claude-code-specialists/pull/499)
-through [#503](https://github.com/DaveKJohn/claude-code-specialists/pull/503) all merged without one, while
+prefix mirrors the branch type" and nothing measured it: [#499](https://github.com/DKJ-Solutions/dkj-claude-plugins/pull/499)
+through [#503](https://github.com/DKJ-Solutions/dkj-claude-plugins/pull/503) all merged without one, while
 every commit and every merge line in the graph carried its type. Same shape as `chore/` and the `final`
 rule — a rule that lives in a document, is never measured, and is therefore silently broken. The repair was
 to stop asking for the title twice rather than to add a third check on the second answer.
@@ -139,9 +139,9 @@ naming what it saw.
 
 **Why this is a gate and not a habit (lesson of August 1, 2026).** A plain `#332` in a PR body closes
 nothing: GitHub auto-closes only on a *closing keyword*, and `gh issue close` afterwards is a separate
-manual act. PRs [#341](https://github.com/DaveKJohn/claude-code-specialists/pull/341),
-[#342](https://github.com/DaveKJohn/claude-code-specialists/pull/342) and
-[#343](https://github.com/DaveKJohn/claude-code-specialists/pull/343) each repaired real findings, each
+manual act. PRs [#341](https://github.com/DKJ-Solutions/dkj-claude-plugins/pull/341),
+[#342](https://github.com/DKJ-Solutions/dkj-claude-plugins/pull/342) and
+[#343](https://github.com/DKJ-Solutions/dkj-claude-plugins/pull/343) each repaired real findings, each
 referenced them as plain mentions, and the manual close was skipped **three times running** — leaving
 **eight** repaired issues open while `CHANGELOG.md` reported them done. Dave spotted it from the
 outside ("a lot of new things in the changelog but all 20 issues are still open"), which is the tell
@@ -210,7 +210,7 @@ a second time for no added coverage, on top of what CI spends on the same commit
 a bare `gh pr merge` and never named `ship-pr`, which is what led into that route.
 
 **That waste is now a fraction of what it was, and the advice is unchanged.** Later the same day the gate
-started running its suites in parallel ([#512](https://github.com/DaveKJohn/claude-code-specialists/issues/512)),
+started running its suites in parallel ([#512](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/512)),
 taking it from **510s sequential to 128–263s** over six runs on the same machine in the same session — so a
 duplicate run costs two to four minutes rather than thirteen. Worth knowing for a second reason: a gate
 that is cheap is a gate nobody has an excuse to `-SkipTests`.
@@ -239,7 +239,7 @@ what stays here is where they were measured.** The skill carries the reasoning a
 lens carries the local evidence and the two names that are only true here.
 
 - **`git merge --ff-only origin/main`, never a bare `git pull --ff-only`.** Measured July 29, 2026 on
-  [PR #257](https://github.com/DaveKJohn/claude-code-specialists/pull/257): the bare pull failed with
+  [PR #257](https://github.com/DKJ-Solutions/dkj-claude-plugins/pull/257): the bare pull failed with
   `fatal: Cannot fast-forward to multiple branches` on a clean `main` right after
   `gh pr merge --delete-branch` plus a `git fetch --prune` that removed two remote refs. **Why the pull
   got more than one ref was never established** and is deliberately not recorded as a mechanism note —
@@ -252,10 +252,10 @@ lens carries the local evidence and the two names that are only true here.
   local to the shell rather than the repo: **PowerShell 5.1 has no `&&`**, so a chain here is `;` or
   `if ($?) { ... }` — both of which happily run the merge regardless of what the watch concluded.
 - **When the required check never appears, close and reopen the PR — after confirming no run exists.**
-  Measured July 23, 2026 on [PR #152](https://github.com/DaveKJohn/claude-code-specialists/pull/152)
+  Measured July 23, 2026 on [PR #152](https://github.com/DKJ-Solutions/dkj-claude-plugins/pull/152)
   (`mergeStateStatus` at `UNKNOWN`, no rollup at all, a prior PR having triggered normally moments
   before) and sharpened the same day on
-  [PR #155](https://github.com/DaveKJohn/claude-code-specialists/pull/155), which is where the two
+  [PR #155](https://github.com/DKJ-Solutions/dkj-claude-plugins/pull/155), which is where the two
   concurrent runs and the `BLOCKED` window were seen. The unrelated check suite that can fool the
   head-SHA count was `netlify`. And the reason `gh` phrases its refusal as a *base branch policy* and
   offers `--admin`: `main` here is guarded by a **ruleset**, not classic branch protection — that
@@ -323,7 +323,7 @@ the trap is the shell's, not this repo's. What stays here is the local evidence:
   plain `gh pr merge --merge` (no `--delete-branch`), so the setting is the *only* thing doing this
   work: turn it off and cleanup stops silently all over again. **Since August 21, 2026 `ship-pr.ps1`
   reads that setting after the merge and says so when it is off**, with the `gh api` command — inbound
-  [#815](https://github.com/DaveKJohn/claude-code-specialists/issues/815), whose reason turned out to be
+  [#815](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/815), whose reason turned out to be
   the interesting half: it reported the setting as undocumented, and it is named in **three** places in
   the plugins, one with a paste-ready command. All three are setup checklists read once at init. The gap
   was reach, not documentation, so the repair is a read at the moment it is true rather than a fourth
@@ -350,7 +350,7 @@ the trap is the shell's, not this repo's. What stays here is the local evidence:
   requires positive proof of a merge, so the set it can reach is exactly the set the permission could
   *not* have reached safely.
   **Since August 28, 2026 that script also *composes* the paste-ready command, under `-IncludeRemote`**
-  ([#1042](https://github.com/DaveKJohn/claude-code-specialists/issues/1042)) — which is this bullet
+  ([#1042](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1042)) — which is this bullet
   being carried out rather than worked around, since handing the command over is what the decision says
   should happen. It reads `git ls-remote --heads`, puts every head that is not the trunk through the
   same two proofs, prints `git push <remote> --delete <branch>` for one it can prove and
@@ -373,17 +373,17 @@ the trap is the shell's, not this repo's. What stays here is the local evidence:
   every automatic park stamps a `Backing:` line saying how many steps are resolved, how much is committed
   on the branch besides the document, and how much is uncommitted in the working copy the park came from
   -- plus an explicit alarm where the plan reads as finished with nothing behind it. Repo-specific half:
-  this is the shape [#960](https://github.com/DaveKJohn/claude-code-specialists/issues/960) was measured
+  this is the shape [#960](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/960) was measured
   on here, `feat/adopt-act-on-this-skills-v1` (August 27, 2026) -- three `park:` commits, eight resolved
   CREATE steps naming edits to three agent defs, three manuals and two lenses, and a diff against `main`
   consisting of the cycle document alone. The work was uncommitted on the other device; every commit on
   the branch was `davekokbwj` while this checkout is `DaveKJohn`, which is the tell to look for when the
   numbers and the ticks disagree. Read the note with `git log -1 --pretty=%B origin/<branch>`: the reporter
   that used to print it under each parked branch went with `/lock` and `/handover` on August 27, 2026
-  ([#957](https://github.com/DaveKJohn/claude-code-specialists/issues/957)).
+  ([#957](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/957)).
 
   **THAT TELL HAS A PRECONDITION, AND THE MACHINE IT WAS MEASURED ON DOES NOT MEET IT**
-  ([#1315](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1315), September 3, 2026). It
+  ([#1315](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1315), September 3, 2026). It
   reads a difference between the commits' account and "this checkout" as evidence of a *second device* --
   which holds only where this checkout's own two identities agree. On DAVE-KOK-BWJ they do not: `gh` is
   authenticated as `DaveKJohn` while `git config user.name` reads `davekokbwj`, so a branch built there --
@@ -454,8 +454,8 @@ the trap is the shell's, not this repo's. What stays here is the local evidence:
   git's rename detection moves and merges the *files* cleanly — `git merge-tree` reports a clean merge
   and the merged tree holds only new paths — while saying nothing about a plugin, path or `agent_type`
   name that the branch's own **added** lines still spell the old way. **Measured landing PR #1733**
-  ([#1757](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1757)), whose merge base
-  predated the [#1698](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1698)
+  ([#1757](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1757)), whose merge base
+  predated the [#1698](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1698)
   `dkj-team-*` → `dkj-subagents-*` rename by about four hours: six brand-new files it added still
   named the retired plugins, in comments, docstrings and an `agent_type` test fixture. **No gate
   catches it** — `check-plugin-integrity.ps1` reads links, manifests and frontmatter, not prose; the
@@ -480,7 +480,7 @@ the trap is the shell's, not this repo's. What stays here is the local evidence:
 ### Issue labels — every issue carries a priority
 
 **Every issue in this tracker carries exactly one of `prio-1` … `prio-4`, and 4 is the highest**
-(Dave, September 9, 2026, [#1685](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1685)).
+(Dave, September 9, 2026, [#1685](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1685)).
 The four exist in the repo since that day:
 
 | Label | Colour | What the rung means |
@@ -500,60 +500,65 @@ gh issue edit <n> --add-label prio-2                         # only for one that
 ```
 
 That is the same rule `dkj-policy-bwj` states for its own four buckets, where the Asana sweep removes
-the other three as it sets one — and it is worth knowing that set exists: `very low`/`low`/`high`/`very
-high`, on **two** of the same colour codes, in the BWJ store repos. It was three until
-[#1691](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1691) moved `prio-1` off the
-green the two families disagreed about; the two that remain are the two that agree on the rung, and the
-colour block further down is where that is settled. **Different vocabulary, different
-motor** — that one is derived from an Asana `Prio-Score`, this one is a judgement typed by whoever
-files — so a session moving between the two repo families reaches for a label the other does not have,
-and `gh` fails outright on a label that does not exist.
+the other three as it sets one — **and since September 11, 2026 it is the same four NAMES as well**
+(Dave, [#1842](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1842)), on the same four
+colour codes. `prio-1`…`prio-4` is one vocabulary across the whole family now.
 
-**The two stay apart, and the different names are load-bearing** (decided September 9, 2026,
-[#1686](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1686), by Dave's standing
-instruction to follow the specialist's advice on a question raised while he was away). Three things
-decided it, and the first two are measurements rather than preferences:
+**The two MOTORS are still two motors, and that is the part a shared vocabulary no longer says out
+loud.** A rung in a BWJ store repo is **derived** from the Asana `Prio-Score` the sweep reads, and is
+never typed; a rung here is **typed** by whoever files, because there is no board behind this tracker
+to derive one from. So a session moving between the two repo families now gets an accepted label where
+it used to get a refusal from `gh` — the axis is shared, the mechanism is not, and nothing mechanical
+separates them any more.
 
-1. **The BWJ names are not a convention, they are code.**
+**What separates them is the label's DESCRIPTION, which a rename leaves untouched.** `prio-4` here
+reads `Priority 4 of 4 (highest)`; in a BWJ repo it reads `Asana Prio-Score 4.00-5.00`. That is the
+one place a badge still says which motor set it, and it is why the BWJ side's descriptions stay
+score-shaped.
+
+**This reverses half 1 of
+[#1686](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1686)**, which had held the two
+sets deliberately disjoint two days earlier. Two of that decision's three grounds survive intact and
+are still worth knowing:
+
+1. **The BWJ names are not a convention, they are code** — which is exactly why the reversal arrived as
+   an inbound issue rather than as a label rename somebody typed.
    `plugins/dkj-policy/dkj-policy-bwj/templates/asana-mirror.ps1` holds them as a literal
-   (`$script:PrioLabels = @('very low', 'low', 'high', 'very high')`), `Get-PrioLabelForScore` returns
-   those exact strings from a score band, and `scripts/tests/dkj-policy-bwj.tests.ps1` asserts every
-   boundary from both sides. So unifying is not a rename: it is an edit to a shipped CI mechanism that
-   runs daily against two live stores, a re-pinning of its suite, and a label rename on two live
-   trackers — none of which this repo owns.
-2. **The collision cannot mis-file anything, because the two sets are disjoint in both directions.**
-   Measured on all three trackers in the family on the day of the decision, with `gh label list`: this
-   one carries `prio-1`…`prio-4` and **none** of the four words, while both
-   `BWJ-Development/smartwatchbanden` and `BWJ-ecommerce/xoxowildhearts` carry the four words and **no**
-   `prio-N` at all. A session that reaches for the wrong one is refused by `gh` rather than filing an
-   issue at the wrong rung — the same shape as the **label gate** in `scripts/release/open-pr.ps1`,
-   which exists because `gh` judges an unknown label at the create and refuses the whole command. That
-   gate is cited to the script rather than linked into this page on purpose: the behaviour is recorded
-   in its own comment block (inbound #1221), and the toolbox entry further down names `open-pr.ps1`
-   without describing the gate, so a link there would send a reader to verify a claim the destination
-   does not make. The whole symptom is one failed command that names the label it would not accept, and
-   one re-run.
-3. **And the names are the only thing that says which motor owns the rung.** A single vocabulary would
-   read as a single mechanism, which is the more expensive mistake: a rung typed by hand in a BWJ repo
-   is answering to a score nobody typed, and one derived from a score is meaningless here, where there
-   is no Asana to derive it from. Two names for two motors is information; one name for two motors is a
-   session assuming the sweep applies where it does not.
+   (`$script:PrioLabels`), `Get-PrioLabelForScore` returns those exact strings from a score band, and
+   `scripts/tests/dkj-policy-bwj.tests.ps1` asserts every boundary from both sides. Unifying was an
+   edit to a shipped CI mechanism that runs daily against two live stores, a re-pinning of its suite,
+   and a label rename on two live trackers.
+2. **The collision could never mis-file anything.** Measured on all three trackers with
+   `gh label list` on the day of #1686: this one carried `prio-1`…`prio-4` and **none** of the four
+   words, while both `BWJ-Development/smartwatchbanden` and `BWJ-ecommerce/xoxowildhearts` carried the
+   four words and **no** `prio-N`. So this was never a bug report and unification is not a fix for a
+   measured failure — it is one vocabulary because Dave wants one vocabulary. The
+   `gh`-refuses-an-unknown-label shape that ground relied on is the same one the **label gate** in
+   `scripts/release/open-pr.ps1` is built on; that gate is cited to the script rather than linked from
+   here on purpose, since its behaviour is recorded in its own comment block (inbound #1221) and the
+   toolbox entry further down names `open-pr.ps1` without describing the gate.
 
-**What was NOT weighed: how recently either set was created — and the gap is 32 MINUTES, not the day
-the first draft of this claimed.** `feat/1685-prio-labels` merged at 07:57 and this decision was
-committed at 08:29, the same morning; the BWJ set is a week old. Neither fact is an argument, and that
-matters more here than usual rather than less: half an hour is exactly the interval at which *"this was
-just settled"* feels like a reason. It is not one. The case above is the mechanism or it is nothing.
+**The third ground is the one Dave overrode**, and it was paid rather than argued away: *"the names are
+the only thing that says which motor owns the rung."* The description paragraph above is what replaces
+it. The residual risk is worth naming plainly — a single vocabulary reads as a single mechanism, so a
+session that assumes the Asana sweep applies here, or that a rung over there was typed by somebody, is
+making exactly the mistake #1686 predicted. **Read the description, not just the name**, wherever it
+matters which motor set the rung.
+
+**What was NOT weighed either time: how recently anything was created.** #1686 was committed 32 minutes
+after `feat/1685-prio-labels` merged, and #1842 reversed half of it two days after that. Neither
+interval is an argument — an owner changing their mind is a decision rather than a regression, and
+*"this was just settled"* states a fact about the calendar, not about the merits.
 
 **And the rule stays repo-local rather than moving into `dkj-policy`** (same decision, the issue's
 second half). **Nothing in the workflow reads a priority**: searched across `scripts/`, `plugins/` and
 `.github/` on the day of the decision, `prio-` appears in no gate, no script and no runner here — only
 on the BWJ side, where a shipped script owns it. A portable version would therefore prescribe to every
 consumer a convention no gate enforces and nothing reads, which is the enforced-by-memory shape
-[#1665](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1665) was filed against, and it
+[#1665](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1665) was filed against, and it
 would owe `adopt-dkj-policy` a label-creation step for four labels the consumer never asked for. That
 is worse than the prescription-a-consumer-cannot-follow trap of
-[#1540](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1540): here they *could* follow
+[#1540](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1540): here they *could* follow
 it and would gain nothing for it.
 
 **The seam is the shape if that ever changes.** The day something needs to read the axis, the portable
@@ -562,48 +567,56 @@ exactly like `Get-ReleaseAudienceTier` and `Get-ShopifyRepoHasNoStore`. Nothing 
 nothing is built today.
 
 **THE COLOURS DISAGREED ON THE BOTTOM HALF UNTIL SEPTEMBER 9, 2026, AND THE FIX CAME FROM THIS SIDE**
-([#1691](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1691)). Raised by the
+([#1691](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1691)). Raised by the
 conclusion red-team on the deciding branch, and measured with `gh label list --json name,color` on all
 three trackers rather than read off the table above — then re-measured on pickup, where it held exactly
 and turned out to be one label worse than filed:
 
 | Colour | Here | In a BWJ repo | Same rung? |
 |---|---|---|---|
-| `B60205` | `prio-4` — top of four | `very high` — top of four | yes, deliberately |
-| `D93F0B` | `prio-3` — third of four | `high` — third of four | yes, deliberately |
-| `FBCA04` | `prio-2` — second of four | `tier-1` — **a different axis entirely** | n/a — see below |
-| `006B75` | `prio-1` — the floor | *(unused in the family)* | — |
-| `0E8A16` | *(no counterpart any more)* | `low` — second of four; in xoxowildhearts **also `sync`** | — |
-| `c2e0c6` | *(no counterpart)* | `very low` — the floor | — |
+| `B60205` | `prio-4` — top of four | `prio-4` — top of four | yes, deliberately |
+| `D93F0B` | `prio-3` — third of four | `prio-3` — third of four | yes, deliberately |
+| `FBCA04` | `prio-2` — second of four | `prio-2` — second of four, **and `tier-1`** | yes — but see the collision below |
+| `006B75` | `prio-1` — the floor | `prio-1` — the floor | yes, deliberately |
+| `0E8A16` | *(no counterpart any more)* | *(no prio label any more; in xoxowildhearts still `sync`)* | — |
+| `c2e0c6` | *(no counterpart)* | *(no counterpart any more)* | — |
+
+**The whole column is now a mirror, and that is #1842 rather than #1691** — the rename carries the hex
+codes with it, so every rung agrees on both halves across the family. The rows still marked *yes,
+deliberately* are the two that already agreed; the other two agree because they were made to.
 
 **`prio-1` was `0E8A16` and is now `006B75`.** The green a reader trained here knew as *"nobody is
-waiting for it"* was one rung **above** the floor over there, where the floor wears a pale mint this
-repo does not use. And in **one** of the two BWJ repos — `xoxowildhearts` — `0E8A16` turned out to
-carry a second label as well, `sync`, which the filing had not caught; in `smartwatchbanden` that same
-label is grey (`6e7781`), so the doubling is that one store's alone. **Nothing refuses a colour**: the whole safety argument above is about a label's
-NAME, which `gh` judges, and a badge is read by a person scanning an issue list with no command in it to
-fail. That is [#1686](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1686)'s own
+waiting for it"* was, before the unification, one rung **above** the floor over there, where the floor
+wore a pale mint this repo does not use. Left as it was, that would have been a badge meaning two
+different rungs in two repos of one family. And in **one** of the two BWJ repos — `xoxowildhearts` —
+`0E8A16` carried a second label as well, `sync`, which the filing had not caught; in
+`smartwatchbanden` that same label is grey (`6e7781`), so the doubling is that one store's alone.
+**Nothing refuses a colour**: `gh` judges a label's NAME, and a badge is read by a person scanning an
+issue list with no command in it to fail. That is
+[#1686](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1686)'s own
 *goes-wrong-silently* shape, moved onto an axis its reasoning does not reach.
 
-**Why this side and not the BWJ side, which is what #1691 proposed.** Re-colouring BWJ's `low` is an
-edit to live labels in **two repos this one does not own**, and doing only the half that lives here —
-the hex codes `adopt-dkj-policy-bwj`'s step 4 prescribes — would leave the fleet in a third state,
-since that skill is additive and never rewrites an existing label. Both halves therefore belonged to one
-change and to Dave. Moving **`prio-1`** instead is one `gh label edit` in the repo in front of you: it
-needs no access outside, it leaves that skill's prescribed hexes untouched so no future adopter gets a
-third answer, and it keeps the two rows that agree on purpose. `006B75` was verified unused across all
-three trackers before it was taken.
+**Why the repair came from this side in September, and why #1842 then did the other half anyway.**
+Re-colouring BWJ's `low` was an edit to live labels in **two repos this one does not own**, and doing
+only the half that lives here — the hex codes `adopt-dkj-policy-bwj`'s step 4 prescribes — would have
+left the fleet in a third state, since that skill is additive and never rewrites an existing label.
+Both halves belonged to one change and to Dave; moving **`prio-1`** instead was one `gh label edit` in
+the repo in front of you, and `006B75` was verified unused across all three trackers before it was
+taken. #1842 is Dave taking the other half, which is why the whole column agrees now: the rename runs
+`gh label edit --name ... --color ...`, so it settles the name and the hex in the same command.
 
-**`FBCA04` is left alone, and the residual risk is named rather than dismissed** — the conclusion
-red-team on this branch is why that sentence is not the one first written. It is `prio-2` here and
-`tier-1` in a BWJ repo, a **reach** label rather than a rung, so the two are not answers to the same
-question. What that does **not** buy is safety by the argument used to repair the green: *"a badge is
-read by a person with no command in it to fail"* says nothing about axes, and a reader scanning yellow
-does not stop to check whether the label under it is a rung before reacting — `tier-1` sits on a BWJ
-issue independently of that issue's prio label, so both can be on one row. So the reason it is left is
-weaker than the reason the green was moved: the misread cannot make a *rung* wrong, only a *kind*, and
-changing it would break this repo's own readable ramp, which is now teal → yellow → orange → red. No
-instance of either misread has been observed.
+**`FBCA04` NOW CARRIES TWO LABELS INSIDE ONE BWJ REPO, AND THAT IS A NEW COLLISION RATHER THAN THE OLD
+ONE.** Before #1842 the clash was across the family — `prio-2` here, `tier-1` there — and the reason it
+was left alone was that the two are not answers to the same question: `tier-1` is a **reach** label,
+not a rung. That argument is untouched and is also no longer the whole story. `prio-2` is now `FBCA04`
+in a BWJ repo too, where `tier-1` has been `FBCA04` since it was created, so both can sit on **one row
+of one issue** as two identical yellow badges on two different axes. The misread still cannot make a
+*rung* wrong, only a *kind*, and nothing refuses it — so this is named here and filed rather than
+repaired on this branch: changing either hex is an edit to live labels, which is Dave's to take, and
+the mapping in [#1842](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1842) names `FBCA04`
+explicitly. Filed as
+[#1844](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1844). This repo's own ramp is
+unaffected and stays teal → yellow → orange → red. No instance of either misread has been observed.
 
 **And `006B75` was chosen on exact-hex uniqueness, which is not perceptual distinctness** — the same
 red-team's other catch. It sits 14 degrees of hue and 0.03 of lightness from `help wanted`'s `008672`,
@@ -717,7 +730,7 @@ Derek prefers not to touch the git commands by hand. His toolbox:
   entry-filename conversion (`/` → `-`). Changing the mapping? Here, nowhere else.
 
 `new-branch.ps1` is mechanism-owned by [Rendall #06](05-06-extension.md); it is now shared
-(mirrored to the plugin, [issue #81](https://github.com/DaveKJohn/claude-code-specialists/issues/81))
+(mirrored to the plugin, [issue #81](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/81))
 and normally reached indirectly, via Derek's `new-branch.ps1` above. `fold-changelog-entry.ps1`
 remains [Rendall #06](05-06-extension.md)'s tool, run on `main` after the merge. A new recurring
 GitHub chore? Derek builds a script for it.

@@ -265,17 +265,20 @@ Assert-Equal 'BWJ-ecommerce/smartwatchbanden#42' (Get-IssueRefFromNotes -Notes '
 Assert-True  ($null -eq (Get-IssueRefFromNotes -Notes 'no link at all')) 'Get-IssueRefFromNotes returns null without a GitHub issue URL'
 
 # --- the prio label ------------------------------------------------------------------------------
-# Dave's mapping, September 2, 2026: 1.00-1.99 very low | 2.00-2.99 low | 3.00-3.99 high |
-# 4.00-5.00 very high. EVERY boundary is asserted from both sides, because an off-by-a-hundredth
+# Dave's mapping, September 2, 2026: 1.00-1.99 prio-1 | 2.00-2.99 prio-2 | 3.00-3.99 prio-3 |
+# 4.00-5.00 prio-4. EVERY boundary is asserted from both sides, because an off-by-a-hundredth
 # here mislabels real work and nothing downstream would notice it had happened.
-Assert-Equal 'very low'  (Get-PrioLabelForScore -Score 1)    'score 1.00 is very low -- the bottom of the scale'
-Assert-Equal 'very low'  (Get-PrioLabelForScore -Score 1.99) 'and 1.99 is still very low'
-Assert-Equal 'low'       (Get-PrioLabelForScore -Score 2)    '2.00 flips to low'
-Assert-Equal 'low'       (Get-PrioLabelForScore -Score 2.99) 'and 2.99 is still low'
-Assert-Equal 'high'      (Get-PrioLabelForScore -Score 3)    '3.00 flips to high'
-Assert-Equal 'high'      (Get-PrioLabelForScore -Score 3.99) 'and 3.99 is still high'
-Assert-Equal 'very high' (Get-PrioLabelForScore -Score 4)    '4.00 flips to very high'
-Assert-Equal 'very high' (Get-PrioLabelForScore -Score 5)    'and 5.00, the top of the scale, is very high'
+#
+# The NAMES are the family's shared ones since September 11, 2026 (#1842); the bands are Dave's
+# original four and did not move with them.
+Assert-Equal 'prio-1' (Get-PrioLabelForScore -Score 1)    'score 1.00 is prio-1 -- the bottom of the scale'
+Assert-Equal 'prio-1' (Get-PrioLabelForScore -Score 1.99) 'and 1.99 is still prio-1'
+Assert-Equal 'prio-2' (Get-PrioLabelForScore -Score 2)    '2.00 flips to prio-2'
+Assert-Equal 'prio-2' (Get-PrioLabelForScore -Score 2.99) 'and 2.99 is still prio-2'
+Assert-Equal 'prio-3' (Get-PrioLabelForScore -Score 3)    '3.00 flips to prio-3'
+Assert-Equal 'prio-3' (Get-PrioLabelForScore -Score 3.99) 'and 3.99 is still prio-3'
+Assert-Equal 'prio-4' (Get-PrioLabelForScore -Score 4)    '4.00 flips to prio-4'
+Assert-Equal 'prio-4' (Get-PrioLabelForScore -Score 5)    'and 5.00, the top of the scale, is prio-4'
 
 # no score and an out-of-range score give the same answer -- no label, never the nearest bucket
 Assert-True ($null -eq (Get-PrioLabelForScore -Score $null)) 'a task with no score gets no label at all'
@@ -285,7 +288,7 @@ Assert-True ($null -eq (Get-PrioLabelForScore -Score 5.01))  'and one above the 
 # THE MAPPING IS CULTURE-INVARIANT, which is not obvious and was measured rather than assumed: the
 # machine this repo is maintained on runs nl-NL, where the decimal separator is a comma. A score
 # arriving as a string must still read as three-and-a-half and not as thirty-five.
-Assert-Equal 'high' (Get-PrioLabelForScore -Score '3.5') "a score arriving as the string '3.5' still reads as 3.5"
+Assert-Equal 'prio-3' (Get-PrioLabelForScore -Score '3.5') "a score arriving as the string '3.5' still reads as 3.5"
 
 # every label the mapper can return is one the enforcer knows how to remove: if these two drift, a
 # rescored ticket keeps a stale label forever and the issue claims two priorities at once
@@ -293,6 +296,18 @@ foreach ($s in @(1.5, 2.5, 3.5, 4.5)) {
     Assert-True ($script:PrioLabels -contains (Get-PrioLabelForScore -Score $s)) "the label for score $s is one PrioLabels knows"
 }
 Assert-Equal 4 $script:PrioLabels.Count 'and PrioLabels holds exactly the four buckets -- there is no medium'
+
+# THE PRE-#1842 NAMES ARE REMOVED BUT NEVER WRITTEN, which is what keeps a half-migrated repo from
+# claiming two priorities at once: one that gained the new labels from adopt-dkj-policy-bwj's
+# ADDITIVE step, rather than from the rename, holds all eight with the old name still on every
+# issue. The two asserts below pin the removal half; the loop above already pins the other, since a
+# mapper that only ever returns a PrioLabels name cannot return a legacy one once the sets are
+# disjoint. That the removal itself FIRES is not asserted -- it is past the early return and would
+# need a gh call, so it is a known test gap rather than a covered path.
+Assert-Equal 4 $script:LegacyPrioLabels.Count 'the legacy set holds the same four buckets'
+foreach ($legacy in $script:LegacyPrioLabels) {
+    Assert-True ($script:PrioLabels -notcontains $legacy) "'$legacy' is legacy-only -- the two sets never overlap"
+}
 
 # reading the score off a task object, past the other custom fields Asana returns beside it
 $scoredTask = [pscustomobject]@{ custom_fields = @(
@@ -306,7 +321,7 @@ Assert-True ($null -eq (Get-PrioScoreFromTask -Task $emptyScore -FieldName 'Prio
 
 # an issue that already reads correctly is not written to -- what keeps the daily re-run quiet. This
 # path returns before any gh call, so it is safe to assert here with no network and no repo.
-Assert-True (-not (Set-IssuePrioLabel -Repo 'o/r' -Number 1 -Label 'high' -Current @('high', 'tier-1'))) 'an issue already carrying the right prio label is left alone'
+Assert-True (-not (Set-IssuePrioLabel -Repo 'o/r' -Number 1 -Label 'prio-3' -Current @('prio-3', 'tier-1'))) 'an issue already carrying the right prio label is left alone'
 
 # --- the stage sections --------------------------------------------------------------------------
 # The board's six sections are the cycle's stages, and a section is recognised by the NUMBER its name
@@ -601,6 +616,41 @@ foreach ($rel in $reachDocs.Keys) {
 $adoptTxt = Get-Content -LiteralPath (Join-Path $PluginRoot 'skills\adopt-dkj-policy-bwj\SKILL.md') -Raw
 Assert-True ([regex]::IsMatch($adoptTxt, 'function\s+Get-ReachLabel\s*\{\s*(?:return\s+)?(["''])tier-1\1\s*;?\s*\}')) `
     'the proposed seam defaults to tier-1, so an unanswered repo is unchanged'
+
+# --- every label step 4 checks for is also created (issue #1846) ----------------------------------
+Write-Host "`n-- step 4's label-existence check --" -ForegroundColor Cyan
+
+# The check greps the repo's label list for the names report-issue files with, and a name it reports
+# missing is only useful if the step then says how to create it. It named two and created one until
+# September 11, 2026: 'documentation' was checked for and never created, so a repo without it got a
+# hit in the check and no instruction -- and report-issue's `--label documentation` then fails at the
+# gh issue create exactly as the reach label does. Both BWJ stores carry the label (it is one of
+# GitHub's defaults), which is what kept the gap invisible rather than what made it safe.
+#
+# THE ASSERT IS THE INVARIANT, NOT THE ONE NAME. A third name added to the grep without its own
+# create line reopens precisely this gap, and an assert pinned to 'documentation' would pass over it.
+# The seam's '<reach label>' placeholder is skipped, and that skip is load-bearing rather than tidy:
+# the line reads `gh label create "<reach label>"`, where \b cannot fire between '>' and '"' -- both
+# non-word -- so without it the placeholder would fail an assert the reach-label block above already
+# owns.
+#
+# EXACTLY ONE check line, not the first of several. Regex.Match returns the leftmost hit, so binding
+# to a stale or unrelated `gh label list ... grep -E '^(...)` further up would swap the subject of
+# every assert below without failing one. The file already mentions `gh label list` in prose, so the
+# count is asserted rather than the existence.
+$grepMatches = [regex]::Matches($adoptTxt, "gh label list[^\r\n]*grep\s+-E\s+'\^\(([^)]*)\)")
+Assert-Equal 1 $grepMatches.Count 'adopt-dkj-policy-bwj step 4 carries exactly one label-existence check'
+if ($grepMatches.Count -eq 1) {
+    foreach ($labelName in ($grepMatches[0].Groups[1].Value -split '\|')) {
+        if ($labelName -match '^<.*>$') { continue }
+        # The tail is anchored on what may legally follow a label name -- whitespace, a closing quote
+        # or end of line -- and NOT on \b, which also fires on a hyphen: a step that gained a
+        # 'documentation-only' label would then satisfy the assert for 'documentation'.
+        $createPattern = 'gh\s+label\s+create\s+(["''])?' + [regex]::Escape($labelName) + '(?=\s|["'']|$)'
+        Assert-True ([regex]::IsMatch($adoptTxt, $createPattern)) `
+            "step 4 creates the '$labelName' label its own check greps for"
+    }
+}
 
 # --- done ---------------------------------------------------------------------------------------
 Write-Host ""

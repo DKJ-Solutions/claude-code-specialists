@@ -43,7 +43,156 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**7 / 12 minor entries** <!-- pending-tally -->
+**8 / 16 minor entries** <!-- pending-tally -->
+
+### DEPLOY: docs/1846-adopt-step4-documentation-label · 20260911-125339
+
+`adopt-dkj-policy-bwj` step 4 now creates every label its own existence check greps for.
+`documentation` was checked for and never created, so a repo without it got a hit in the check and no
+instruction -- while `report-issue` files `--label documentation` on a doc finding and `gh issue
+create` fails outright on a label the repo does not have, exactly as it does for the reach label. The
+step gains the create line, a paragraph recording why the gap never bit (`documentation` is a GitHub
+default and both BWJ stores carry it) and why the label is load-bearing rather than decorative, and a
+second stating that it deliberately gets no seam: nobody has renamed it, so what was missing is a
+command and not a seam. A guard in `dkj-policy-bwj.tests.ps1` asserts the invariant rather than the
+one name -- every literal label in the grep has a create line -- so a third name added to the check
+without one is refused.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+The report behind it, [#1846](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1846), was
+right about the symptom and wrong about everything else, and its headline repair would have damaged
+the consumer it was filed from: `smartwatchbanden` did not lack `tier-1`, it **renamed** it to `minor`
+with all 24 issues intact, so creating it back is the empty-duplicate state
+[#1845](https://github.com/DKJ-Solutions/dkj-claude-plugins/pull/1845) had forbidden by name hours
+earlier. Verifying the reason rather than the symptom is what turned a harmful one-line fix into the
+one narrow thing that actually stood.
+
+**Score:** N/A
+
+#### Pull Request
+
+adopt-dkj-policy-bwj step 4 creates every label it checks for
+
+Plugins: dkj-policy-bwj
+
+[PR #1855](https://github.com/DKJ-Solutions/dkj-claude-plugins/pull/1855)
+
+---
+
+### DEPLOY: docs/1851-two-propagation-channels · 20260911-123849
+
+`CLAUDE.md`'s repo slot named one way a change reaches a consumer -- the plugin payload, gated by a
+release and a version bump, landing in a session after `plugin update`. There are two. The three
+runners `adopt-dkj-policy` scaffolds check this repository out at `ref: main` and run a path into
+it, so a change to `check-branch-entry.ps1`, `check-unfolded-entry.ps1`, `fold-changelog-entry.ps1`
+or `verify-resolved-issues.ps1` is live in every adopted consumer's next CI run: no tag, no bump, no
+refresh, no restart.
+
+Strictly the old sentence was never false -- CI is not a session. What made it worth repairing is
+that the paragraph reads as the whole propagation model, and it is the document every session loads,
+so a reader reasoning from it concludes that a shared gate script cannot reach a consumer before a
+cut. That is the opposite of what happens, and the layer it was silent about is the one that can
+change a consumer's required check with nobody bumping anything.
+
+Nothing about the runners changes. The `ref: main` pin is argued by name in `adopt-dkj-policy`'s
+skill page and #1805 already sharpened that argument; the addition points at it rather than
+restating it. What is new is the writing rule: name the two channels together or name neither.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+A consumer reading this repo's `CLAUDE.md` as the model for their own now sees that adopting these
+runners means tracking this trunk -- which is the one thing about the arrangement they cannot learn
+from their side, and the reason a tag they own the bump on is offered as a trade in the skill page.
+Nothing they run changes.
+
+**Score:** 1
+
+#### Pull Request
+
+CLAUDE.md names the consumers' CI second checkout as the second propagation channel
+
+[PR #1856](https://github.com/DKJ-Solutions/dkj-claude-plugins/pull/1856)
+
+---
+
+### DEPLOY: fix/1850-runner-adoption-visible · 20260911-123203
+
+The connector register can now tell an unadopted consumer from a clean one. Check 6 judges the paths
+a consumer's CI runners name, so a consumer running NONE of the three runners this workflow
+scaffolds named none, produced no finding, and read exactly like a fully adopted repo -- the limit
+`consumer-runner-lib.ps1` had written into its own docstring without closing. Check 6c asks the
+other question: does anything in that consumer reach into this tree at all.
+`DaveKJohn/djcylow-react` is the measured case -- full core-team adoption registered, workflow
+plugin listed, entire `.github/workflows/` one `ci.yml` -- and it reported green.
+
+It is an `[INFO]`, on the line this register already draws for an unmigrated plugin id: both halves
+of `adopt-dkj-policy` that place those runners are optional, so their absence is a state that may be
+a decision. The finding says so, and points at the manifest's `notes` for recording one. Two bounds
+are in the finding itself: only a manifest naming the workflow plugin is asked, and this repo's own
+record never is -- it runs those scripts by local path, being the tree every consumer checks out, so
+it is the one registered repo that can never produce a reference. It runs on the disk and, under
+`-RemoteRunners`, over the network, where `no-workflows` used to be deliberate silence.
+
+Worth keeping from the build: reading only one of the two record shapes the callers hold is a silent
+miss rather than an error -- a hashtable's `PSObject.Properties` are Keys/Values/Count, so `Text` is
+never found and every file reads as unreadable. That is what the first real run said, and
+`Get-RunnerRecordField` is the answer.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+Nothing a consumer runs behaves differently -- this check lives in the maintainer's register and
+reads consumers from the outside. What it changes is on the maintainer's side: a repo that never ran
+parts 1 and 3 of the adoption is now visible instead of reading as clean, which is the difference
+between knowing the gate is off and assuming it is on.
+
+**Score:** N/A
+
+#### Pull Request
+
+the connector register reports a consumer that runs none of the scaffolded runners
+
+[PR #1854](https://github.com/DKJ-Solutions/dkj-claude-plugins/pull/1854)
+
+---
+
+### DEPLOY: feat/1842-unify-prio-labels-bwj · 20260911-122226
+
+The BWJ store repos rank their issues on the same four labels as every other repo in the family:
+`prio-1` to `prio-4`, on the same four colours, replacing `very low` / `low` / `high` / `very high`.
+One vocabulary across the family, reversing half 1 of
+[#1686](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1686) on Dave's instruction.
+The score bands behind them are untouched -- the same mapping, said in the other repos' words -- and
+what now says which motor set a rung is the label's **description**, which a rename leaves alone:
+`Asana Prio-Score 2.00-2.99` over there against `Priority 2 of 4` here. The sweep sheds the four old
+names as it sets a new one without ever writing them, so a repo migrated with the additive create
+step instead of the rename is swept clean rather than left claiming two priorities at once.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A. This workflow's consumers are the BWJ store repos, whose *developers* read these labels; no
+customer of either store ever sees one. The migration itself is two `gh label edit` commands per
+store, documented in the skill.
+
+**Score:** N/A
+
+#### Pull Request
+
+Unify the BWJ priority labels on prio-1..prio-4
+
+Plugins: dkj-policy-bwj
+
+[PR #1849](https://github.com/DKJ-Solutions/dkj-claude-plugins/pull/1849)
+
+---
 
 ### DEPLOY: feat/1832-shared-document-newline · 20260911-120331
 
