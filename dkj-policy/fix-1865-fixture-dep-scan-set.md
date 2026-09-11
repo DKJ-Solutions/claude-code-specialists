@@ -36,21 +36,65 @@
 
 ### PLAN
 
+#### What #1865 reported, and what was verified before repairing it
+
+The report's symptom holds: `Get-FixtureDepReport` built its scan set with
+`Get-ChildItem -Filter '*.tests.ps1'`, and `scripts/tests/check-plugin-integrity-fixture.ps1` is not
+named that way. Two of its figures were re-measured rather than taken:
+
+- It says the builder copies **eight** libs. It copies **fourteen** -- so the blind spot is larger
+  than reported, not smaller. Nothing in the repair turns on the number.
+- It leaves as **not measured** whether the three `.measure.ps1` files in that directory copy a lib.
+  Measured here: none of them contains `Copy-Item` at all. That is what decides the repair, because
+  it means widening the filter is born green rather than born red -- the state this repo requires of
+  a new gate (the stale-path check, declined at 124 findings all false).
+
+#### Which of the three options, and why
+
+Option 1, widen the filter. Option 2 -- follow each suite's own dot-sources, so a builder is reached
+because a suite *loads* it -- is strictly more correct and strictly more code, and buys nothing this
+tree can measure today; it is recorded in the lib as the repair to reach for on the day a builder
+moves out of `scripts/tests`. Option 3, do nothing, is what #1860's branch already measured: the four
+lint suites do go red, in four unrelated files, with no line naming the cause.
+
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [x] `scripts/lib/fixture-dep-lib.ps1`: scan set widened from `*.tests.ps1` to `*.ps1`, with the
+      measurement and the declined option recorded on `Get-FixtureDepReport`.
+- [x] The vocabulary follows the scan set: `Suites` -> `Files` on the report, `-SuitePath` -> `-Path`
+      and the finding's `Suite` -> `File` on `Get-FixtureDepFinding`. A subject is a file that copies a
+      lib, of which a suite is the common case -- the shared builder is not one.
+- [x] `scripts/tests/fixture-lib-deps.tests.ps1`: call sites, header and section heading follow.
 
 ### TEST
 
+- [x] `fixture-lib-deps.tests.ps1` green: 26 asserts, 97 files read, 13 subjects (was 12), 0 findings.
+- [x] Three new asserts, because every existing figure is a threshold and a threshold cannot notice
+      the non-suite files leaving the scan set again: the report's file count is compared against what
+      the directory actually holds, that the directory still holds a non-suite `.ps1` at all, and the
+      builder by name.
+- [x] The gate proved to BITE for the builder, not merely to read it: with a temporary uncopied
+      sibling added to `seam-lib.ps1` (a lib the builder copies), the report went from 0 findings to 8,
+      three of them naming `check-plugin-integrity-fixture.ps1` and walking the closure -- exactly the
+      shape #1860's branch produced. Reverted; `git diff` on that lib is empty.
+- [x] The four `check-plugin-integrity-*` suites and the full lint + test gate.
+
 ### DEPLOY: fix/1865-fixture-dep-scan-set
 
-**Score:**
+The fixture dependency gate reads every `.ps1` under `scripts/tests` instead of only the files named
+`*.tests.ps1`, so the fixture builder that four lint suites share is now a subject rather than the one
+blind spot in a gate built to prevent exactly its failure mode. On #1860's branch that gate reported
+seven findings, was right about all seven, and the four lint suites died on lib load anyway.
+
+**Score:** 3
 
 #### What makes this deploy extra special
 
-**Score:**
+N/A -- a test gate in this repo's own tree. No subscriber of anything reaches it, and it ships in no
+plugin payload.
+
+**Score:** N/A
 
 #### Pull Request
 
 The fixture dependency gate reads every file under scripts/tests, not only the suites
-

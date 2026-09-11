@@ -1,7 +1,8 @@
 <#
 .SYNOPSIS
-    Regression tests for scripts/lib/fixture-dep-lib.ps1, and the gate itself: no test suite's
-    hand-listed fixture lib copies may go stale against what those libs dot-source (issue #1693).
+    Regression tests for scripts/lib/fixture-dep-lib.ps1, and the gate itself: no hand-listed fixture
+    lib copies under scripts/tests may go stale against what those libs dot-source (issue #1693), in a
+    suite or in a fixture builder the suites share (issue #1865).
 
 .DESCRIPTION
     Dependency-free: no Pester needed, only PowerShell.
@@ -21,6 +22,13 @@
 
       1. THE SCOPE IN #1693 IS SHORT. It names five suites; twelve copy a lib into a fixture. Its five
          counts are all exactly right (8/8/8/6/2) -- the list was incomplete, not wrong.
+         AND SO WAS THIS SUITE'S OWN SCOPE, one layer down and for the same reason (#1865, September 11,
+         2026): "twelve suites copy a lib" is a count of SUITES, and the reader was filtered to
+         '*.tests.ps1' to match it. check-plugin-integrity-fixture.ps1 copies fourteen libs, is shared by
+         four lint suites, and is not a suite by name -- so the one builder here that four suites depend
+         on was invisible to the gate, measured on #1860's branch where this suite reported seven correct
+         findings and the four lint suites then died on lib load anyway. Thirteen subjects now, and the
+         scan set is every .ps1 in this directory.
       2. THE REAL INSTANCE DOT-SOURCES THROUGH A VARIABLE. On origin/fix/1682-porcelain-line-parse,
          park-lib.ps1 reads
              $parkPorcelainLib = Join-Path $PSScriptRoot 'git-porcelain-lib.ps1'
@@ -223,7 +231,7 @@ if (Test-Path -LiteralPath $bDep -PathType Leaf) { . $bDep }
     $onlyA = Set-Suite -Name 'onlya.tests.ps1' -Body @'
 Copy-Item -LiteralPath $x -Destination (Join-Path $dir 'scripts\lib\a-lib.ps1') -Force
 '@
-    $f = @(Get-FixtureDepFinding -SuitePath $onlyA -LibDirectory $LibDir -RepoRoot $SandRoot)
+    $f = @(Get-FixtureDepFinding -Path $onlyA -LibDirectory $LibDir -RepoRoot $SandRoot)
     Assert-Equal 2 $f.Count 'the CLOSURE is walked in one pass: copying only a-lib reports b AND c, not b alone'
     # @() around each filter, not for tidiness: under Set-StrictMode a Where-Object that matches ONE
     # object hands back that object rather than a list, and reading .Count off it throws.
@@ -237,7 +245,7 @@ Copy-Item -LiteralPath $x -Destination (Join-Path $dir 'scripts\lib\a-lib.ps1') 
 Copy-Item -LiteralPath $x -Destination (Join-Path $dir 'scripts\lib\b-lib.ps1') -Force
 Copy-Item -LiteralPath $x -Destination (Join-Path $dir 'scripts\lib\c-lib.ps1') -Force
 '@
-    Assert-Equal 0 @(Get-FixtureDepFinding -SuitePath $allThree -LibDirectory $LibDir -RepoRoot $SandRoot).Count `
+    Assert-Equal 0 @(Get-FixtureDepFinding -Path $allThree -LibDirectory $LibDir -RepoRoot $SandRoot).Count `
         'a complete list is silent -- the assert that keeps this from being a check that always fires'
 
     # A DEPENDENCY THE TREE DOES NOT CARRY IS NOT A FINDING. The guarded dot-source exists precisely
@@ -250,7 +258,7 @@ if (Test-Path -LiteralPath $gDep -PathType Leaf) { . $gDep }
     $ghost = Set-Suite -Name 'ghost.tests.ps1' -Body @'
 Copy-Item -LiteralPath $x -Destination (Join-Path $dir 'scripts\lib\g-lib.ps1') -Force
 '@
-    Assert-Equal 0 @(Get-FixtureDepFinding -SuitePath $ghost -LibDirectory $LibDir -RepoRoot $SandRoot).Count `
+    Assert-Equal 0 @(Get-FixtureDepFinding -Path $ghost -LibDirectory $LibDir -RepoRoot $SandRoot).Count `
         'a dot-source of a lib the tree does not have is not a finding'
 
     # A CYCLE MUST NOT SPIN. Two libs dot-sourcing each other is not a shape in this tree, and the
@@ -266,7 +274,7 @@ if (Test-Path -LiteralPath $qDep -PathType Leaf) { . $qDep }
     $cycle = Set-Suite -Name 'cycle.tests.ps1' -Body @'
 Copy-Item -LiteralPath $x -Destination (Join-Path $dir 'scripts\lib\p-lib.ps1') -Force
 '@
-    $cf = @(Get-FixtureDepFinding -SuitePath $cycle -LibDirectory $LibDir -RepoRoot $SandRoot)
+    $cf = @(Get-FixtureDepFinding -Path $cycle -LibDirectory $LibDir -RepoRoot $SandRoot)
     Assert-Equal 1 $cf.Count 'a cycle terminates and reports once rather than spinning'
 
     # ---------------------------------------------------------------------------------------------
@@ -284,7 +292,7 @@ if (Test-Path -LiteralPath $rSeam -PathType Leaf) { . $rSeam }
     $seamSuite = Set-Suite -Name 'seam.tests.ps1' -Body @'
 Copy-Item -LiteralPath $x -Destination (Join-Path $dir 'scripts\lib\r-lib.ps1') -Force
 '@
-    Assert-Equal 0 @(Get-FixtureDepFinding -SuitePath $seamSuite -LibDirectory $LibDir -RepoRoot $SandRoot).Count `
+    Assert-Equal 0 @(Get-FixtureDepFinding -Path $seamSuite -LibDirectory $LibDir -RepoRoot $SandRoot).Count `
         'a repo-owned seam the caller supplies is not a debt the fixture owes -- internal-note.tests.ps1 is why'
 
     # And the exemption is narrow: the same shape with a non-seam lib IS reported, so the list is doing
@@ -296,7 +304,7 @@ if (Test-Path -LiteralPath $sDep -PathType Leaf) { . $sDep }
     $nonSeam = Set-Suite -Name 'nonseam.tests.ps1' -Body @'
 Copy-Item -LiteralPath $x -Destination (Join-Path $dir 'scripts\lib\s-lib.ps1') -Force
 '@
-    Assert-Equal 1 @(Get-FixtureDepFinding -SuitePath $nonSeam -LibDirectory $LibDir -RepoRoot $SandRoot).Count `
+    Assert-Equal 1 @(Get-FixtureDepFinding -Path $nonSeam -LibDirectory $LibDir -RepoRoot $SandRoot).Count `
         'while an ordinary sibling in the same position is still reported'
 
     # ---------------------------------------------------------------------------------------------
@@ -334,22 +342,42 @@ if (Test-Path -LiteralPath $cacheDep -PathType Leaf) { . $cacheDep }
 
     # ---------------------------------------------------------------------------------------------
     Write-Host ''
-    Write-Host 'THE GATE: this repo own suites, held against what their copied libs dot-source' -ForegroundColor Cyan
+    Write-Host 'THE GATE: this repo own fixtures, held against what their copied libs dot-source' -ForegroundColor Cyan
 
     $report = Get-FixtureDepReport -TestsDirectory (Join-Path $RepoRoot 'scripts\tests') `
                                    -LibDirectory   (Join-Path $RepoRoot 'scripts\lib') `
                                    -RepoRoot       $RepoRoot
 
     # BOTH FIGURES, BECAUSE A SILENT PASS NEEDS BOTH. Zero findings over zero subjects is a reader that
-    # found nothing to read; zero over twelve is the tree being clean. The two must never print the
+    # found nothing to read; zero over thirteen is the tree being clean. The two must never print the
     # same line -- the same reason check-plugin-integrity.ps1's span checks print both.
-    Assert-True ($report.Suites -gt 50) "the whole suite directory was read (found $($report.Suites) suites)"
+    Assert-True ($report.Files -gt 50) "the whole tests directory was read (found $($report.Files) files)"
     Assert-True ($report.Subjects -ge 10) `
         "and $($report.Subjects) of them copy a lib into a fixture -- so this gate has subjects rather than being vacuous"
 
+    # THE SCAN SET IS EVERY '.ps1', NOT ONLY THE SUITES (issue #1865). Both figures above are
+    # thresholds, deliberately -- a pinned count goes stale the day somebody adds a suite. But the whole
+    # repair here is that the non-suite files entered the scan set, and a threshold cannot notice them
+    # leaving again: check-plugin-integrity-fixture.ps1 is the fixture builder four lint suites share,
+    # is not named '*.tests.ps1', and a filter narrowed back to that pattern still passes both asserts.
+    # So this compares what was READ against what is THERE, which no later suite can blur.
+    $testDir = Join-Path $RepoRoot 'scripts\tests'
+    $allPs1 = @(Get-ChildItem -Path $testDir -Filter '*.ps1' -File).Count
+    $suiteNamed = @(Get-ChildItem -Path $testDir -Filter '*.tests.ps1' -File).Count
+    Assert-Equal $allPs1 $report.Files `
+        "every .ps1 in scripts/tests was read, not only the $suiteNamed named '*.tests.ps1' (#1865)"
+    Assert-True ($allPs1 -gt $suiteNamed) `
+        "and the tree still holds a non-suite .ps1 for that to be about ($($allPs1 - $suiteNamed) of them)"
+
+    # The builder itself is the reason, so it is named rather than left to the count. It copies its libs
+    # by -Destination like every suite does, so being in the scan set is the whole of what it needed.
+    $builderCopies = @(Get-FixtureCopiedLibName -Path (Join-Path $testDir 'check-plugin-integrity-fixture.ps1'))
+    Assert-True ($builderCopies.Count -ge 10) `
+        "the shared integrity fixture builder is a subject ($($builderCopies.Count) libs copied), though its name is not a suite's"
+
     if ($report.Findings.Count -gt 0) {
         foreach ($f in $report.Findings) {
-            Write-Host "         $($f.Suite): $($f.Lib) dot-sources $($f.Missing), which the fixture does not copy" -ForegroundColor Red
+            Write-Host "         $($f.File): $($f.Lib) dot-sources $($f.Missing), which the fixture does not copy" -ForegroundColor Red
         }
     }
     Assert-Equal 0 $report.Findings.Count `
