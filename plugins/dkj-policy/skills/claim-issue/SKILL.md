@@ -43,7 +43,9 @@ The script:
    `@me`.
 2. Reads the issue (`gh issue view --json number,title,state,url,assignees`).
 3. **Judges it** -- five verdicts, three of them refusals (below).
-4. Writes the assignee, then **reads the claim back** and fails if it did not land.
+4. On a claim or a resume, **scans the branches** for a fix that is already pushed (below). A warning,
+   never a refusal.
+5. Writes the assignee, then **reads the claim back** and fails if it did not land.
 
 ## Two parameters
 
@@ -131,6 +133,45 @@ treat the issue as unclaimed -- while a plain `gh issue view` on the same checko
 showed the claim sitting there. Followed literally by a second session, that inverts the very hazard
 this step exists to prevent.
 
+## The fourth signal: a fix already pushed on a branch with no pull request
+
+**The three signals above all read "untouched" in one shape.** The verdicts read the issue's *state*
+and its *assignees*; `Get-TargetIssueWarnings` -- which [`new-branch`](../new-branch/SKILL.md) and
+`open-pr` both run -- resolves an issue to a **pull request**. None of them can see a repair that is
+finished, committed and pushed on a **parked** branch.
+
+Measured, September 11, 2026
+([#1853](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1853)): a session claimed #1847 --
+open, unassigned, correctly -- read the code, wrote the one-line fix, ran the lint gate and committed,
+and only then did `open-pr`'s remote-ahead gate show that the identical repair was already sitting on
+`origin/feat/1842-unify-prio-labels-bwj` and said so in its own commit message. That branch has no
+pull request and never closed the issue, so every pickup check had nothing to find.
+
+**So the script reads the one place a parked fix announces itself: the commit messages off the
+trunk.** It fetches, greps the branches for the issue number in the three spellings this workflow
+writes -- `#1853`, the conventional-commit scope `fix(1853):`, and the branch name `/1853-` that a
+freshly parked branch carries in its creation commit -- and prints what it found, grouped by branch:
+
+```
+  parked-fix scan: #1852 is named by 2 commits on 1 branch off the trunk --
+    origin/fix/1852-timeout-decisive-in-sessioncheck
+        eb8d24a4  fix: a timed-out version check no longer reports its killed run as a clean verdict
+        99ad0ef8  park: fix/1852-timeout-decisive-in-sessioncheck (the branch files only)
+```
+
+**It warns and never refuses.** An issue can be legitimately named in a commit on a branch that does
+not fix it, and the run that produced the measurement above saw `open-pr` warn about four such
+mentions, all correct as context. The check cannot tell a fix from a mention and does not claim to;
+what it does is make looking cost one command instead of a whole assignment. The claim stands either
+way, because a claim that blocks costs the whole assignment
+([#1485](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1485)).
+
+**It runs on a resume as well as on a fresh claim, and it is silent about your own work.** The
+checked-out branch and the trunk are excluded, so a session resuming its own branch is not warned
+about itself. Where the fetch does not answer, the scan still runs on the refs already there and says
+that they may be behind -- *"I found nothing"* and *"I could not refresh what I looked at"* are
+different sentences, and a failed fetch must not be able to read as a clean scan.
+
 ## Every `gh` call is bounded, so a stall is reported rather than waited out
 
 All three network calls -- the read, the write, and the read-back -- pass the shared network bound
@@ -192,9 +233,16 @@ not be read as removing that one too.
 ## Requirements in the consumer
 
 `gh`, authenticated (`gh auth status`) with write access to the repo. `scripts/repo-config.ps1` is
-read **defensively**: `Get-RepoName` pins the tracker explicitly, which matters in a worktree or when
-the run starts outside the checkout, and without it `gh`'s own resolution stands and is said out
-loud. The repo root resolves dual-context via `${CLAUDE_PROJECT_DIR}` like every other shared script.
+read **defensively** for two optional seams: `Get-RepoName` pins the tracker explicitly, which matters
+in a worktree or when the run starts outside the checkout, and without it `gh`'s own resolution stands
+and is said out loud; `Get-TrunkBranchName` names the branch the parked-fix scan subtracts, defaulting
+to `main`. The repo root resolves dual-context via `${CLAUDE_PROJECT_DIR}` like every other shared
+script.
+
+`git` is needed only for the parked-fix scan, and only to read: a `fetch`, a `log` and a `branch
+--contains`. Nothing there moves `HEAD` or writes in the tree, and where no trunk ref can be verified
+-- a clone that has never fetched, say -- the scan is skipped rather than run without an exclusion,
+because `git log --all` with nothing subtracted reports the issue's own merged repair back at you.
 
 ## Important
 

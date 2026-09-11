@@ -231,12 +231,34 @@ Assert-True ($body -match [regex]::Escape('if ($view.ShortRead)')) `
 Write-Host ''
 Write-Host 'The network bound (#1639)' -ForegroundColor Cyan
 
-$ghCalls = ([regex]::Matches($body, [regex]::Escape("Invoke-NativeCapture -FilePath 'gh'"))).Count
-$bounds  = ([regex]::Matches($body, [regex]::Escape('-TimeoutSeconds $NativeCaptureNetworkTimeoutSeconds'))).Count
+# PER CALL, NOT PER FILE (#1853). This was a whole-file count of the bound compared with a whole-file
+# count of the gh calls, which was EXACT for as long as gh was the only thing in this script bounded --
+# and stopped being so the moment the parked-fix scan added a bounded `git fetch`. The old shape then
+# failed on a script where every gh call was in fact bounded, which is a test arguing against the rule
+# it exists to hold. The intent is unchanged and is now measured directly: each gh invocation is read on
+# its own, so a fourth one added later and left unbounded still fails, and a bounded call to something
+# else no longer can.
+$calls = [regex]::Matches($body, "Invoke-NativeCapture\s+(?:-Utf8\s+)?-FilePath\s+'(?<cmd>[a-z]+)'")
+$ghCalls = 0
+$unbounded = @()
+for ($i = 0; $i -lt $calls.Count; $i++) {
+    if ($calls[$i].Groups['cmd'].Value -ne 'gh') { continue }
+    $ghCalls++
+    # THE INVOCATION, NOT THE REST OF THE FILE: a PowerShell call ends at the first line that does not
+    # end in a backtick continuation, so reading to there is what keeps a neighbouring call's bound from
+    # being counted for this one.
+    $tail = $body.Substring($calls[$i].Index)
+    $statement = ''
+    foreach ($line in ($tail -split "`r?`n")) {
+        $statement += $line + "`n"
+        if ($line -notmatch '`\s*$') { break }
+    }
+    if ($statement -notmatch [regex]::Escape('-TimeoutSeconds $NativeCaptureNetworkTimeoutSeconds')) {
+        $unbounded += ($statement -split "`n")[0].Trim()
+    }
+}
 Assert-True ($ghCalls -ge 3) "the three gh calls are still here (found $ghCalls)"
-# AS AN EQUALITY RATHER THAN A COUNT OF THREE, which is the whole point: a fourth gh call added later
-# is the next instance of this defect, and a test pinned to 3 would pass while it went unbounded.
-Assert-True ($ghCalls -eq $bounds) "every gh call carries the shared bound -- $ghCalls call(s), $bounds bound(s)"
+Assert-True ($unbounded.Count -eq 0) "every gh call carries the shared bound -- $ghCalls call(s), $($unbounded.Count) unbounded"
 Assert-True ($body -match [regex]::Escape('$NativeCaptureNetworkTimeoutSeconds')) 'and it is the SHARED value, not a number typed in here'
 
 # THE READ AND THE READ-BACK REPORT A STALL AS A STALL. The pre-write read's failure branch offers a
@@ -269,6 +291,163 @@ Assert-True ($body -notmatch '\$\(\$facts\.title\)') 'the issue title is never p
 Assert-True ($body -match 'open the branch \(new-branch\)') 'the fresh-claim verdict says what follows a successful claim'
 Assert-True ($body -match 'read the branch and its document') 'the already-yours verdict still says what follows a resume'
 
+
+# --- THE FOURTH PICKUP SIGNAL: A FIX PARKED ON A BRANCH WITH NO PR (#1853) ------------------------
+#
+# The four functions below are the pure half of a check whose other half is git. Same split, and the
+# same reason, as everything above: the git calls need a checkout with a remote, other people's
+# branches on it and a fetch that reaches the network, so a suite can either assert nothing or assert
+# the wrong thing. The pattern, the two parses and the report are pure, and they carry every decision
+# the check makes about what is worth saying.
+
+Write-Host ''
+Write-Host 'Get-IssueMentionPattern -- the three spellings, and the one that must not match (#1853)' -ForegroundColor Cyan
+
+Assert-True ((Get-IssueMentionPattern -Issue 0) -eq '') 'issue 0 yields no pattern, so the caller scans nothing'
+Assert-True ((Get-IssueMentionPattern -Issue -3) -eq '') 'a negative number yields no pattern either'
+
+$pat1853 = Get-IssueMentionPattern -Issue 1853
+# .NET's regex is a superset of POSIX ERE for these constructs, so the pattern git will be handed can
+# be exercised here directly. THREE SPELLINGS, and each is a real shape this workflow writes.
+Assert-True ('fixed here rather than left filed (#1853, inside scope)' -cmatch $pat1853) 'a body reference (#1853) matches'
+Assert-True ('fix(1853): repair the pickup check' -cmatch $pat1853) 'the conventional-commit scope (1853) matches'
+Assert-True ('park: fix/1853-parked-fix-scan (the branch files only)' -cmatch $pat1853) 'a branch name in a subject (/1853-) matches -- the only shape a freshly parked branch has'
+Assert-True ('#1853' -cmatch $pat1853) 'a reference at the very end of the message matches'
+
+# THE NOISE THIS EXISTS TO KEEP OUT, and the assert that would fail if the trailing class were dropped.
+Assert-True (-not ('closes #18530 at last' -cmatch $pat1853)) 'a LONGER number starting with these digits does not match'
+Assert-True (-not ('fix(18530): something else' -cmatch $pat1853)) 'nor does it in the commit scope'
+Assert-True (-not ('release 1853 items shipped' -cmatch $pat1853)) 'a bare number with no #, ( or / is not a reference'
+Assert-True (-not ('fix(1852): the neighbour' -cmatch $pat1853)) 'a different issue does not match'
+
+Write-Host ''
+Write-Host 'ConvertFrom-CommitScanLog -- reading git log without trusting its shape (#1853)' -ForegroundColor Cyan
+
+$US = [string][char]0x1F
+Assert-True (@(ConvertFrom-CommitScanLog -Text '').Count -eq 0) 'empty input is an empty array, not a crash'
+Assert-True (@(ConvertFrom-CommitScanLog -Text "   `n  ").Count -eq 0) 'whitespace-only input yields nothing'
+
+$twoLines = "abc1234${US}fix(1853): repair it`ndef5678${US}park: fix/1853-x (the branch files only)"
+$parsedTwo = @(ConvertFrom-CommitScanLog -Text $twoLines)
+Assert-True ($parsedTwo.Count -eq 2) 'two log lines become two records'
+Assert-True ($parsedTwo[0].Sha -eq 'abc1234') 'the sha is the field before the separator'
+Assert-True ($parsedTwo[0].Subject -eq 'fix(1853): repair it') 'the subject is the field after it'
+
+# A LINE WITH NO SEPARATOR IS SKIPPED rather than becoming a commit with no sha -- git writes progress
+# and hints that a caller not discarding stderr would otherwise hand in here.
+$withNoise = "warning: some git hint`nabc1234${US}fix(1853): repair it"
+Assert-True (@(ConvertFrom-CommitScanLog -Text $withNoise).Count -eq 1) 'a line carrying no separator is skipped'
+Assert-True (@(ConvertFrom-CommitScanLog -Text "${US}subject with no sha").Count -eq 0) 'a record with an empty sha is skipped too'
+
+# THE COUNT ON THE SPLIT IS LOAD-BEARING: a subject may contain anything, and without the 2 the tail
+# after a second separator would be silently dropped.
+$oddSubject = "abc1234${US}fix: a | b`tc: d${US}tail"
+$parsedOdd = @(ConvertFrom-CommitScanLog -Text $oddSubject)
+Assert-True ($parsedOdd.Count -eq 1) 'a subject containing pipes, tabs and colons is one record'
+Assert-True ($parsedOdd[0].Subject -eq "fix: a | b`tc: d${US}tail") 'and everything after the FIRST separator is kept, tail included'
+
+Assert-True (@(ConvertFrom-CommitScanLog -Text "abc1234${US}one`r`ndef5678${US}two").Count -eq 2) 'CRLF captures parse the same as LF ones'
+
+Write-Host ''
+Write-Host 'Get-ContainingBranchNames -- cleaning git branch -a --contains (#1853)' -ForegroundColor Cyan
+
+$branchText = @(
+    '  fix/1853-parked-fix-scan',
+    '* main',
+    '+ feat/held-by-a-worktree',
+    '  remotes/origin/fix/1853-parked-fix-scan',
+    '  remotes/origin/feat/somebody-else',
+    '  remotes/origin/HEAD -> origin/main'
+) -join "`n"
+
+$cleaned = @(Get-ContainingBranchNames -Text $branchText -Exclude @('main', 'origin/main'))
+Assert-True ($cleaned -contains 'feat/held-by-a-worktree') "the '+' worktree marker is stripped, not treated as part of the name"
+Assert-True ($cleaned -contains 'origin/feat/somebody-else') "the 'remotes/' prefix is stripped to the spelling a reader can paste"
+Assert-True (-not ($cleaned -contains 'main')) 'an excluded branch is dropped'
+Assert-True (@($cleaned | Where-Object { $_ -match '->' }).Count -eq 0) 'the symbolic origin/HEAD line is dropped rather than named twice'
+Assert-True (@(Get-ContainingBranchNames -Text '  (HEAD detached at abc1234)').Count -eq 0) 'a detached HEAD is not a branch'
+Assert-True (@(Get-ContainingBranchNames -Text '').Count -eq 0) 'empty input is an empty array'
+
+# THE CURRENT BRANCH IS WHAT THE CALLER EXCLUDES ON A RESUME, and reporting a session's own commits
+# back to it as somebody else's parked work is the fastest way to teach it to skip this warning.
+$onlyMine = @(Get-ContainingBranchNames -Text $branchText -Exclude @('main', 'origin/main', 'fix/1853-parked-fix-scan', 'origin/fix/1853-parked-fix-scan'))
+Assert-True (-not ($onlyMine -contains 'fix/1853-parked-fix-scan')) 'the current branch is excludable in its local spelling'
+Assert-True (-not ($onlyMine -contains 'origin/fix/1853-parked-fix-scan')) 'and in its remote one'
+
+# CASE-SENSITIVELY, because git refs are: 'Main' and 'main' are two branches, and dropping the wrong
+# one would hide real parked work.
+Assert-True (@(Get-ContainingBranchNames -Text '  Main' -Exclude @('main')) -contains 'Main') "exclusion is case-sensitive, as git refs are"
+
+$dupText = "  feat/x`n  feat/x`n  remotes/origin/a"
+$deduped = @(Get-ContainingBranchNames -Text $dupText)
+Assert-True ($deduped.Count -eq 2) 'a name listed twice appears once'
+Assert-True ($deduped[0] -eq 'feat/x' -and $deduped[1] -eq 'origin/a') 'and the order is sorted, so two runs print the same line'
+
+Write-Host ''
+Write-Host 'Format-ParkedFixReport -- what is worth saying, and what is not (#1853)' -ForegroundColor Cyan
+
+Assert-True (@(Format-ParkedFixReport -Issue 1853 -Findings @()).Count -eq 0) 'no findings means no lines at all, not an empty header'
+
+$noBranches = @([pscustomobject]@{ Sha = 'abc'; Subject = 'x'; Branches = @() })
+Assert-True (@(Format-ParkedFixReport -Issue 1853 -Findings $noBranches).Count -eq 0) 'a finding whose branches were all excluded is dropped, not printed as a commit in no branch'
+
+$oneFinding = @([pscustomobject]@{ Sha = 'f686b0af3fda'; Subject = 'fix(1842): apply the parallel review findings'; Branches = @('origin/feat/1842-unify-prio-labels-bwj') })
+$oneReport = @(Format-ParkedFixReport -Issue 1847 -Findings $oneFinding)
+Assert-True ($oneReport.Count -gt 0) 'a real finding produces a report'
+Assert-True ($oneReport[0] -match '1 commit on 1 branch') 'the lead line counts in the singular for one of each'
+Assert-True (@($oneReport | Where-Object { $_ -match 'origin/feat/1842-unify-prio-labels-bwj' }).Count -eq 1) 'the branch is named once, as its own line'
+Assert-True (@($oneReport | Where-Object { $_ -match 'f686b0af  fix\(1842\)' }).Count -eq 1) 'the commit is abbreviated to 8 characters and keeps its subject'
+Assert-True (@($oneReport | Where-Object { $_ -match 'cannot tell a fix from a mention' }).Count -eq 1) 'the report says what it does not know, so it cannot be read as a verdict'
+
+# GROUPED BY BRANCH, which is the unit the reader acts on. A commit on two branches belongs under both:
+# that is the answer to "which of these do I look at", not duplication.
+$shared = @([pscustomobject]@{ Sha = 'aaaaaaaa11'; Subject = 'fix(1853): one'; Branches = @('origin/feat/b', 'origin/feat/a') })
+$sharedReport = @(Format-ParkedFixReport -Issue 1853 -Findings $shared)
+Assert-True ($sharedReport[0] -match '1 commit on 2 branches') 'the lead line counts commits and branches separately'
+$branchLines = @($sharedReport | Where-Object { $_ -match '^  origin/feat/' })
+Assert-True ($branchLines.Count -eq 2) 'a commit on two branches is listed under both'
+Assert-True ($branchLines[0] -match 'origin/feat/a') 'and the branches come out sorted'
+
+# THE CAP IS WHAT KEEPS THIS A WARNING RATHER THAN A WALL: a branch cut for this issue writes its
+# number into every commit subject, so a week-old one matches dozens of times.
+$many = @(1..5 | ForEach-Object { [pscustomobject]@{ Sha = "sha00000$_"; Subject = "fix(1853): step $_"; Branches = @('origin/fix/1853-x') } })
+$capped = @(Format-ParkedFixReport -Issue 1853 -Findings $many -MaxCommitsPerBranch 2)
+Assert-True (@($capped | Where-Object { $_ -match '^      sha00000' }).Count -eq 2) 'only the capped number of commits is listed'
+Assert-True (@($capped | Where-Object { $_ -match 'and 3 more naming #1853' }).Count -eq 1) 'the overflow is named rather than silently hidden'
+Assert-True ($capped[0] -match '5 commits on 1 branch') 'and the lead line still counts all of them'
+
+$capZero = @(Format-ParkedFixReport -Issue 1853 -Findings $many -MaxCommitsPerBranch 0)
+Assert-True (@($capZero | Where-Object { $_ -match '^      sha00000' }).Count -eq 1) 'a cap below 1 still shows one example -- a branch with nothing under it says nothing'
+
+Write-Host ''
+Write-Host 'The parked-fix scan inside claim-issue.ps1 (#1853)' -ForegroundColor Cyan
+
+# The block a suite can hold: everything between its own heading and the verdict switch it sits above.
+$scan = if ($body -match '(?s)# --- IS THE FIX ALREADY SITTING ON A BRANCH \(issue #1853\).*?\n(.*?)\nswitch \(\$verdict\.Code\)') { $Matches[1] } else { '' }
+Assert-True ($scan -ne '') 'the scan block is present, above the verdict switch'
+
+# IT RUNS ONLY WHERE THERE IS SOMETHING TO SAVE. Gated on the verdict, so a closed or taken issue --
+# both of which exit in the switch below -- pays nothing for an answer it would not use, while a RESUME
+# ('skip') gets it, which is the case Chris's own body calls picking up.
+Assert-True ($scan -match "\`$verdict\.Action\s+-eq\s+'claim'") 'the scan runs on a fresh claim'
+Assert-True ($scan -match "\`$verdict\.Action\s+-eq\s+'skip'") 'and on a resume, where the other session is the only trace there is'
+
+# ADVISORY, NEVER A REFUSAL (#1485): a claim that blocks costs the whole assignment, and this check
+# cannot tell a fix from a mention. An `exit` added here would be that rule broken in one line, on a
+# path no behavioural test can reach.
+Assert-True ($scan -notmatch '(?m)^\s*exit\s') 'nothing in the scan exits -- the claim stands whatever it finds'
+Assert-True ($scan -notmatch 'REFUSED') 'and it never speaks in the refusal vocabulary'
+
+# THE NETWORK CALL IS BOUNDED like every other one in this family (#1639): a stall here is a session
+# that never starts, which is precisely what the claim step exists to prevent.
+Assert-True ($scan -match "(?s)'fetch'.*?-TimeoutSeconds\s+\`$NativeCaptureNetworkTimeoutSeconds") 'the fetch is bounded'
+Assert-True ($scan -match '\$staleNote') 'a fetch that did not answer is reported rather than read as a clean scan'
+
+# WITHOUT A TRUNK REF TO SUBTRACT, `git log --all` reports the issue's own merged repair on the trunk --
+# the noise that teaches a reader to skip the warning. So: no trunk ref, no scan.
+Assert-True ($scan -match '\$trunkRefs\.Count\s+-gt\s+0') 'the scan is skipped where no trunk ref could be verified'
+Assert-True ($scan -match "'--not'") 'and the trunk is subtracted from the log it reads'
+Assert-True ($scan -match '\$currentBranch') "the session's own branch is excluded, so a resume is not warned about itself"
 foreach ($path in @($Script, $Lib, $IdLib)) {
     $errors = $null
     [void][System.Management.Automation.Language.Parser]::ParseFile($path, [ref]$null, [ref]$errors)
