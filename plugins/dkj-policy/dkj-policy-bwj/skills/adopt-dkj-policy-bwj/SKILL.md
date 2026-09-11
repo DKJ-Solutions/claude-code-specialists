@@ -127,7 +127,20 @@ function Get-AsanaIssueFieldGid { $null }
 # means the board carries no such field. The field's OPTION GIDs are not configured -- report-issue
 # resolves Bug/Feature/Task by name from the project itself.
 function Get-AsanaTypeFieldGid { $null }
+
+# The NAME GitHub stores for the reach label. The axis itself is fixed and WORKFLOW-portable.md
+# explains it as tier-1; only the string is this repo's to choose. Optional: 'tier-1' is the default,
+# so a repo that never answers it is unchanged.
+function Get-ReachLabel { 'tier-1' }
 ```
+
+**`Get-ReachLabel` is the one seam here that is NOT about Asana**, which is why it reads as the odd
+one out and belongs in the list anyway: every other value states something about a board, and this one
+states a string GitHub holds. It exists because a consumer renamed that label while the name was
+written as a literal in four places, two of which then pointed at a label the repo no longer had
+([#1841](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1841)). **Propose it only where
+the repo's label is not `tier-1`**: the default is what every existing consumer already has, and a
+function restating the default is a value somebody now has to maintain.
 
 **`SubmitterPattern` is the one value here that decides whether a whole column is used.** Stage 6 is
 entered only once the submitter has been told, so a repo that names no pattern never enters it: every
@@ -257,14 +270,35 @@ workspace.
 ## 4 -- make sure the classification labels exist
 
 [`report-issue`](../report-issue/SKILL.md) files every issue with an issue type and, where it reaches
-that far, the `tier-1` label. **`gh issue create` fails outright on a label the repo does not have**, so
-check for it and create it if it is missing:
+that far, the reach label. **`gh issue create` fails outright on a label the repo does not have**, so
+check for it and create it if it is missing. **Read `Get-ReachLabel` from `scripts/repo-config.ps1`
+first** and check for *that* name -- `tier-1` where the repo has never answered it:
 
 ```bash
-gh label list --repo <owner>/<repo> | grep -E '^(tier-1|documentation)\b'
-gh label create tier-1 --repo <owner>/<repo> --color fbca04 \
+gh label list --repo <owner>/<repo> | grep -E '^(<reach label>|documentation)\b'
+gh label create "<reach label>" --repo <owner>/<repo> --color fbca04 \
   --description "Reaches the business: management and the commissioner notice it"
 ```
+
+**A missing reach label is two different situations and this step must not assume the harmless one.**
+Every other label below is missing because the repo never had it; this one can be missing because the
+repo **renamed** it and has not answered the seam. Creating it then leaves two labels for one axis, one
+of them empty, with every existing issue on the other -- and nothing reports it, because the run is
+doing exactly what it was written to do. That is the state `smartwatchbanden` was one re-adopt away
+from on September 11, 2026
+([#1841](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1841)); the seam above is the
+repair, and this paragraph is what keeps the repair from being skipped by a repo that has not adopted
+it yet. So **before creating it, read the whole label list** (`gh label list --repo <owner>/<repo>`)
+and look for the axis under another name -- a label carrying issues and describing reach. Where you
+find one, the answer is `Get-ReachLabel`, not a second label. Where the list genuinely has no such
+label, create it.
+
+**The hazard is not unique to this label; the measurement is.** Rename `documentation` or a prio label
+and this step would re-create that one beside it in exactly the same way -- the difference is that
+`needs-info` already has a seam (`NeedsInfoLabel`), the prio labels are written by a sweep that would
+report a failure, and the reach label is the one a consumer has actually renamed. So the pause is
+written here, where it has been paid for, rather than four times on speculation. If a second rename
+lands on one of the others, that is the moment for its own seam -- not a reason to widen this one now.
 
 **And the four prio labels**, which the reconcile sweep needs: it sets one of them on every open
 issue from its Asana task's `Prio-Score`, and `gh issue edit` fails on a label the repo does not have
