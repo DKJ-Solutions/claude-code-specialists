@@ -36,23 +36,71 @@
 
 ### PLAN
 
-State the second, unversioned propagation channel in the repo slot, so a reader stops concluding a shared gate script cannot reach a consumer before a cut
+State the second propagation channel in `CLAUDE.md`'s repo slot -- issue #1851.
+
+#### The two statements that cannot both be the whole picture
+
+The repo slot says a change that lands without a version bump *"reaches no session at all, and an
+agent def you modify on a branch takes effect after merge, push **and a release** -- not after a
+refresh."* True, and it is the always-on statement of how change reaches a consumer -- so it reads
+as the whole model. It is not: the three runners `adopt-dkj-policy` scaffolds check this repository
+out at `ref: main` and run a path into it, so a change to `check-branch-entry.ps1`,
+`check-unfolded-entry.ps1`, `fold-changelog-entry.ps1` or `verify-resolved-issues.ps1` is live in
+every adopted consumer's next CI run with nothing bumped.
+
+#### Verified before repairing, not taken from the report
+
+Both halves read against the tree: `consumer-runner-lib.ps1`'s header carries the checkout step
+verbatim with `ref: main`, and `plugins/dkj-policy/skills/adopt-dkj-policy/SKILL.md` argues that pin
+by name at "**The workflow pins `ref: main` rather than a tag**" -- with #1805's own sharpening of it
+directly beneath. So the mechanism is deliberate and the repair is prose only; nothing about the
+runners changes, exactly as the report proposed.
 
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [x] A two-paragraph addition to the repo slot in `CLAUDE.md`, directly after the paragraph it
+      qualifies. The first names the second channel and what it is gated by -- nothing; the second
+      says the pin is not the defect and points at the skill page's existing argument rather than
+      restating it.
+- [x] The rule it leaves behind is a writing rule, not a mechanism: **name the two channels together
+      or name neither**, because a release doctrine stated alone is read as covering everything.
 
 ### TEST
 
+- [x] Lint gate: the dead-link scan resolves the new link to the skill page and both issue links.
+- [x] Full suite via `open-pr.ps1` -- this touches always-on prose, which `measure-always-on` and the
+      consumer-prose gate both read.
+
 ### DEPLOY: docs/1851-two-propagation-channels
 
-**Score:**
+`CLAUDE.md`'s repo slot named one way a change reaches a consumer -- the plugin payload, gated by a
+release and a version bump, landing in a session after `plugin update`. There are two. The three
+runners `adopt-dkj-policy` scaffolds check this repository out at `ref: main` and run a path into
+it, so a change to `check-branch-entry.ps1`, `check-unfolded-entry.ps1`, `fold-changelog-entry.ps1`
+or `verify-resolved-issues.ps1` is live in every adopted consumer's next CI run: no tag, no bump, no
+refresh, no restart.
+
+Strictly the old sentence was never false -- CI is not a session. What made it worth repairing is
+that the paragraph reads as the whole propagation model, and it is the document every session loads,
+so a reader reasoning from it concludes that a shared gate script cannot reach a consumer before a
+cut. That is the opposite of what happens, and the layer it was silent about is the one that can
+change a consumer's required check with nobody bumping anything.
+
+Nothing about the runners changes. The `ref: main` pin is argued by name in `adopt-dkj-policy`'s
+skill page and #1805 already sharpened that argument; the addition points at it rather than
+restating it. What is new is the writing rule: name the two channels together or name neither.
+
+**Score:** 2
 
 #### What makes this deploy extra special
 
-**Score:**
+A consumer reading this repo's `CLAUDE.md` as the model for their own now sees that adopting these
+runners means tracking this trunk -- which is the one thing about the arrangement they cannot learn
+from their side, and the reason a tag they own the bump on is offered as a trade in the skill page.
+Nothing they run changes.
+
+**Score:** 1
 
 #### Pull Request
 
-CLAUDE.md names the consumers' CI second checkout as the propagation model's second channel
-
+CLAUDE.md names the consumers' CI second checkout as the second propagation channel
