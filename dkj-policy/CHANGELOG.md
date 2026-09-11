@@ -43,7 +43,49 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**7 / 13 minor entries** <!-- pending-tally -->
+**7 / 14 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1850-runner-adoption-visible · 20260911-123203
+
+The connector register can now tell an unadopted consumer from a clean one. Check 6 judges the paths
+a consumer's CI runners name, so a consumer running NONE of the three runners this workflow
+scaffolds named none, produced no finding, and read exactly like a fully adopted repo -- the limit
+`consumer-runner-lib.ps1` had written into its own docstring without closing. Check 6c asks the
+other question: does anything in that consumer reach into this tree at all.
+`DaveKJohn/djcylow-react` is the measured case -- full core-team adoption registered, workflow
+plugin listed, entire `.github/workflows/` one `ci.yml` -- and it reported green.
+
+It is an `[INFO]`, on the line this register already draws for an unmigrated plugin id: both halves
+of `adopt-dkj-policy` that place those runners are optional, so their absence is a state that may be
+a decision. The finding says so, and points at the manifest's `notes` for recording one. Two bounds
+are in the finding itself: only a manifest naming the workflow plugin is asked, and this repo's own
+record never is -- it runs those scripts by local path, being the tree every consumer checks out, so
+it is the one registered repo that can never produce a reference. It runs on the disk and, under
+`-RemoteRunners`, over the network, where `no-workflows` used to be deliberate silence.
+
+Worth keeping from the build: reading only one of the two record shapes the callers hold is a silent
+miss rather than an error -- a hashtable's `PSObject.Properties` are Keys/Values/Count, so `Text` is
+never found and every file reads as unreadable. That is what the first real run said, and
+`Get-RunnerRecordField` is the answer.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+Nothing a consumer runs behaves differently -- this check lives in the maintainer's register and
+reads consumers from the outside. What it changes is on the maintainer's side: a repo that never ran
+parts 1 and 3 of the adoption is now visible instead of reading as clean, which is the difference
+between knowing the gate is off and assuming it is on.
+
+**Score:** N/A
+
+#### Pull Request
+
+the connector register reports a consumer that runs none of the scaffolded runners
+
+[PR #1854](https://github.com/DKJ-Solutions/dkj-claude-plugins/pull/1854)
+
+---
 
 ### DEPLOY: feat/1842-unify-prio-labels-bwj · 20260911-122226
 
