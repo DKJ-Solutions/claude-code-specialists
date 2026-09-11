@@ -161,7 +161,8 @@ be thorough about machines nobody uses.
 check across all manifests: plugin still enabled, registered extensions present (outbound),
 unregistered extensions flagged (inbound), the machine version against the source, whether the
 consumer's CI runners still name paths that exist here (#1805 — the one check whose subject is a path
-*into* this tree), and per consumer the content drift check
+*into* this tree), whether that consumer reaches into this tree *at all* (#1850, below), and per
+consumer the content drift check
 ([`check-consumer-drift.ps1`](../scripts/lint/check-consumer-drift.ps1)). Run it at the
 start of a workday or session:
 
@@ -185,6 +186,27 @@ that way**: this script is what `connector-sessioncheck.ps1` runs at every sessi
 network call per absent connector does not belong on that path. Where the read cannot be made — no
 `gh`, no credential, a repository this token cannot see — it says so per connector and quotes what the
 API answered, rather than falling through to a silence that would read as an all-clear.
+
+**And the runner check could not tell an unadopted consumer from a clean one, which is a different
+blind spot in the same place** (#1850, September 11, 2026). That check judges paths a runner *names*,
+so a consumer running none of the three runners names none, produces no finding, and reads exactly
+like a fully adopted repo. Measured: `DaveKJohn/djcylow-react` registers the full core-team adoption
+and lists the workflow plugin, and its entire `.github/workflows/` is one `ci.yml` — no
+`branch-entry.yml`, no `fold-on-merge.yml`, no `verify-resolved.yml` — and the register reported it
+green. The lib's own docstring had written the limit down (*"a finding here is therefore always about
+a path that IS named; the absence of one is never evidence that a consumer is clean"*) without closing
+it.
+
+It is now reported, as an **`[INFO]`**, on both routes — the disk and, under `-RemoteRunners`, the
+network, where it replaces what used to be deliberate silence. `[INFO]` rather than `[ERROR]` is this
+register's own line, the same one drawn above for an unmigrated plugin id: the two halves of
+`adopt-dkj-policy` that place those runners are optional and separate from enabling the plugin, so
+their absence is a **state that may be a decision**, while a runner naming a path this tree no longer
+has is red on every pull request with nobody able to learn it from their side. The finding says so and
+points at `notes` for recording a deliberate answer. Two bounds worth knowing: it is asked only of a
+manifest that **names the workflow plugin** (nothing else scaffolds those runners), and never of this
+repo's own record — this tree runs those scripts by local path, being the one every consumer checks
+out, so it is the only registered repo that can never produce a reference.
 
 Syncing itself remains **pull-based per consumer**: each connected repo pulls changes in its own
 session, under its own governance — this registry signals, it never writes cross-repo.

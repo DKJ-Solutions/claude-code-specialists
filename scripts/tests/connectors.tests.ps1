@@ -1458,6 +1458,73 @@ try {
     Assert-Match 'does not exist here' $r.Out 'retired repo name: the stale path is still found'
     Assert-Match 'branch-entry\.yml line \d+' $r.Out 'retired repo name: names the workflow file and the line'
 
+    # --- 12j-12m. Check 6c: a consumer that reaches into this tree NOWHERE AT ALL (#1850) ----------
+    # Check 6 judges paths that ARE named, so every scenario above needs a reference to exist before it
+    # can say anything. A consumer running none of the three runners names none, produces no finding,
+    # and reads exactly like a fully adopted one -- measured on DaveKJohn/djcylow-react, which
+    # registers the full core-team adoption and whose entire .github/workflows/ is one ci.yml.
+    #
+    # THE FIXTURE MANIFEST HAS TO NAME THE WORKFLOW PLUGIN, because that is the gate: the runners come
+    # from adopt-dkj-policy, so a consumer registered for the subagent teams alone is not asked. 12m is
+    # that gate's own scenario, and it is the one that keeps every scenario ABOVE this block silent --
+    # each of them writes the default manifest, which names dkj-subagents-alpha only.
+    $wfPlugin = 'dkj-policy@dkj-claude-plugins'
+
+    # 12j. ADOPTED -- silence. The case every healthy consumer is in, asserted first for the same
+    #      reason 12a is: a check that cannot stay quiet here is one nobody keeps.
+    New-FixtureConsumer -ExtensionIds @()
+    Set-FixtureEnabledPlugins -Ids @($wfPlugin)
+    New-FixtureWorkflow -Name 'branch-entry.yml' -Repository 'DKJ-Solutions/dkj-claude-plugins' -ScriptPath 'plugins/dkj-policy/scripts/lint/check-branch-entry.ps1'
+    $mf = New-FixtureManifest -Extensions @() -Plugin $wfPlugin
+    $r = Invoke-Ps $Script ($base + @('-Manifest', $mf, '-ConsumerPathOverride', $Fixture))
+    Assert-Equal 0 $r.Code 'adopted consumer: exit code 0'
+    Assert-NotMatch 'none of the runners' $r.Out 'adopted consumer: no adoption finding'
+
+    # 12k. WORKFLOWS, BUT NOT ONE OF THEM CHECKS THIS REPOSITORY OUT. This is djcylow-react's shape,
+    #      and before #1850 it was indistinguishable from 12j. [INFO] and exit 0, not [ERROR]: both
+    #      halves of adopt-dkj-policy are optional, so this is a state that may be a decision -- the
+    #      register's own doctrine for an unmigrated plugin id, one check over.
+    New-FixtureConsumer -ExtensionIds @()
+    Set-FixtureEnabledPlugins -Ids @($wfPlugin)
+    New-FixtureWorkflow -Name 'ci.yml' -Repository 'someone/unrelated-repo' -ScriptPath 'plugins/dkj-policy/scripts/lint/check-branch-entry.ps1'
+    $mf = New-FixtureManifest -Extensions @() -Plugin $wfPlugin
+    $r = Invoke-Ps $Script ($base + @('-Manifest', $mf, '-ConsumerPathOverride', $Fixture))
+    Assert-Equal 0 $r.Code 'unadopted consumer: exit code 0 -- a state, not a defect'
+    Assert-Match '\[INFO\]' $r.Out 'unadopted consumer: reported as an INFO'
+    Assert-Match 'none of the runners' $r.Out 'unadopted consumer: says no runner of this workflow is running there'
+    Assert-Match 'not one of them checks this repository out' $r.Out 'unadopted consumer: says which of the two no-runner states it is in'
+    Assert-Match "notes" $r.Out 'unadopted consumer: hands over where to record a deliberate answer'
+    Assert-Match 'nothing recognisable reaches into this tree' $r.Out 'unadopted consumer: states its own bound rather than claiming nothing is there'
+
+    # 12l. NO .github/workflows AT ALL -- the same finding, and it has to READ differently, because
+    #      "you have workflows and none of them does this" and "you have none" are different repairs.
+    New-FixtureConsumer -ExtensionIds @()
+    Set-FixtureEnabledPlugins -Ids @($wfPlugin)
+    $mf = New-FixtureManifest -Extensions @() -Plugin $wfPlugin
+    $r = Invoke-Ps $Script ($base + @('-Manifest', $mf, '-ConsumerPathOverride', $Fixture))
+    Assert-Equal 0 $r.Code 'no workflows at all: exit code 0'
+    Assert-Match 'has no \.github/workflows at all' $r.Out 'no workflows at all: named as its own state'
+    Assert-NotMatch 'not one of them checks this repository out' $r.Out 'no workflows at all: not the other sentence'
+
+    # 12m. THE GATE. A consumer registered for the subagent teams only has no reason to hold these
+    #      runners, and an [INFO] against it would be this register inventing an expectation that
+    #      consumer never took on.
+    New-FixtureConsumer -ExtensionIds @('06-16')
+    $mf = New-FixtureManifest -Extensions @('06-16')
+    $r = Invoke-Ps $Script ($base + @('-Manifest', $mf, '-ConsumerPathOverride', $Fixture))
+    Assert-Equal 0 $r.Code 'workflow plugin not registered: exit code 0'
+    Assert-NotMatch 'none of the runners' $r.Out 'workflow plugin not registered: not asked at all'
+
+    # 12n. THE SOURCE REPO IS NEVER ASKED, and this is a regression test rather than a nicety: THIS
+    #      repo names the workflow plugin in its own record and runs all three of those scripts by
+    #      LOCAL path, because it is the tree every consumer checks out. So it is the one registered
+    #      repo that can never produce a reference, and without the exclusion it would be the loudest
+    #      finding in every run. The exit code is deliberately not asserted -- this points the check at
+    #      the real repository, whose other verdicts are not this scenario's subject.
+    $mf = New-FixtureManifest -Extensions @() -Plugin $wfPlugin -Repo 'DKJ-Solutions/dkj-claude-plugins'
+    $r = Invoke-Ps $Script ($base + @('-Manifest', $mf, '-ConsumerPathOverride', $RepoRoot))
+    Assert-NotMatch 'none of the runners' $r.Out 'source repo: not asked whether it checks itself out'
+
     # --- 13. Check 6b: -RemoteRunners reads an ABSENT consumer's runners over the API (#1808) ------
     # Check 6 reads the consumer's local checkout, so it inherited check 1: an absent consumer was
     # [SKIP] and its runners were not read at all -- and the consumers most likely to carry a stale
