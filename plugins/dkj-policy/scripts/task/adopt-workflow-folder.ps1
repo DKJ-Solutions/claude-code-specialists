@@ -699,8 +699,9 @@ if (-not (Test-Path -LiteralPath $folderReadmeAbs -PathType Leaf)) {
         # one file it compares against: $existingReadme is read byte-exact, so on a page checked out CRLF
         # every single line of the composed block differs from the identical committed line, the compare
         # below always fails, and the verdict reads 'drifted' on every fresh checkout. That is the whole
-        # value of the verdict gone -- a genuinely stale block reads the same as a current one, which is
-        # #788's 'cries wolf 37 times out of 37' one reader over.
+        # value of the verdict gone -- a genuinely stale block reads the same as a current one. #788 is
+        # the same failure in a different check ('the drift read cries wolf 37 times out of 37'): a
+        # verdict that fires every time carries no information, whichever reader it is written for.
         #
         # AND -Apply MADE IT WORSE RATHER THAN REPAIRING IT. The rewrite kept head and tail untouched
         # (they are substrings) and wrote the fresh block LF, leaving a MIXED file: measured on a fixture
@@ -712,6 +713,14 @@ if (-not (Test-Path -LiteralPath $folderReadmeAbs -PathType Leaf)) {
         # SO THE STYLE IS READ OFF THE PAGE, the same idiom release-lib.ps1 and pr-body-lib.ps1 already
         # use on the documents they edit in place. Both halves follow from one reading: the compare stops
         # seeing a difference that is not there, and the write stops introducing one.
+        #
+        # IT IS A WHOLE-FILE READING, AND THAT IS THE KNOWN LIMIT OF IT. A page that is ALREADY mixed --
+        # mostly LF with one stray CRLF somewhere else in it -- answers 'CRLF' here, so the block is
+        # composed CRLF while the head and tail immediately around it are LF: the mix is relocated
+        # rather than removed. That is accepted rather than overlooked. Every other document-editing
+        # script in this tree reads the same whole-file question, so a neighbourhood-local answer here
+        # would make this the one file that judges differently from all of them, and the page it would
+        # be judging is one nothing in this workflow wrote that way.
         $pageNl = if ($existingReadme.Contains("`r`n")) { "`r`n" } else { $nl }
         # The block is composed with its own leading blank line, so the head is trimmed of trailing
         # newlines to keep a re-run from growing the gap above it by one line every time.

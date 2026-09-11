@@ -82,6 +82,31 @@ defect was masking its own symptom. Without `autocrlf` the same write is a whole
 - [x] Confirmed the section goes red without the repair: 4 failed, 108 passed
 - [x] Full suite green with it: 112 asserts
 
+#### The review round, and the two gaps it found in the above
+
+Victor, Edith, Sebastian and Nolan read the diff in parallel. Edith reproduced every figure in this
+document independently -- the 19 CRLF, the 4-of-112, the #788 wording, the v5.0.0 quote -- and Sebastian
+found no widening of the write boundary and nothing in the diff that puts page content anywhere but a
+`.Contains` / `.IndexOf` / `-eq`. Two of Victor's findings were real defects in the work above, not
+polish:
+
+- [x] **The append had no CRLF fixture at all.** Every state-2 assert needs a page that already carries
+      both markers, and section 11's append fixture is pure LF -- so reverting the append's `$pageNl`
+      alone would have passed the entire suite, in the one path a consumer's *first* adoption takes.
+      Added, and verified to fail on its own: reverting only state 4 gives 2 failed, 116 passed.
+- [x] **One of my own asserts could not fail.** `crlf: and the LF page this suite scaffolded has no CR`
+      compared `$readme11`, captured 150 lines earlier in section 11, so it re-checked a fact that was
+      already true before the `-Apply` it was placed after. It reads the file back from disk now and
+      compares both the bytes and the CR count.
+- [x] Named the whole-file `Contains` reading as the accepted limit it is: an already-mixed page has its
+      mix relocated rather than removed, and the answer is deliberately the same one every other
+      document-editing script in this tree gives.
+- [x] Reworded the `#788` clause Edith flagged as parsing three ways.
+- [~] The eight-site duplication of the newline reading is NOT repaired here -- filed as #1832. It spans
+      three mirrored libs and five files, and my own sweep found a site the review did not name
+      (`cut-release.ps1:1129`); repointing all eight is its own change, not a rider on a two-line fix.
+- [x] Suite green after the round: 118 asserts
+
 ### DEPLOY: fix/1829-crlf-section-drift
 
 `adopt-dkj-policy` Part 1's README top-up now judges the block it owns, not the line endings of the page

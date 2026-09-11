@@ -545,11 +545,35 @@ Assert-Match 'releases/history\.md' $relText '-Apply: it names where the list ac
     Assert-Equal 0 ([regex]::Matches($after15, "(?<!`r)`n").Count) 'crlf stale: the rewritten page carries no bare LF -- no mixed endings'
     Assert-True $after15.EndsWith("## Ours`r`n`r`nbelow the block, in CRLF.`r`n") 'crlf stale: and the repo''s own writing below the block survives'
 
+    # STATE 4 ON A CRLF PAGE -- the append, which is where a consumer's FIRST adoption goes. It has no
+    # verdict to get wrong, so nothing above reaches it: the state-2 asserts all need a page that
+    # already carries both markers, and section 11's append fixture is pure LF. Without this, reverting
+    # the append's $pageNl alone would pass every other assert in this suite (Victor, on this branch).
+    $c16 = New-FixtureConsumer -Label 'crlf-append'
+    New-Item -ItemType Directory -Path (Join-Path $c16 'dkj-policy') -Force | Out-Null
+    $ownCrlf = "# ``dkj-policy/`` -- our folder`r`n`r`nWe wrote this ourselves, on Windows.`r`n"
+    [System.IO.File]::WriteAllText((Join-Path $c16 'dkj-policy\README.md'), $ownCrlf, (New-Object System.Text.UTF8Encoding($false)))
+    $r16 = Invoke-Adopt -Dir $c16 -ScriptArgs @('-Apply')
+    Assert-Match "the plugin's block was appended" $r16.Flat 'crlf append: the block is appended to a CRLF page'
+    $after16 = [System.IO.File]::ReadAllText((Join-Path $c16 'dkj-policy\README.md'), [System.Text.Encoding]::UTF8)
+    Assert-True $after16.StartsWith($ownCrlf) 'crlf append: their own writing survives byte for byte and still leads'
+    Assert-Match ([regex]::Escape($Marker)) $after16 'crlf append: the block is there'
+    Assert-Equal 0 ([regex]::Matches($after16, "(?<!`r)`n").Count) 'crlf append: and the appended block carries no bare LF'
+    # AND THE VERDICT IT LEAVES BEHIND IS 'CURRENT' -- the append and the compare have to agree about the
+    # style, or a first adoption reports drift on its second run.
+    $r16b = Invoke-Adopt -Dir $c16
+    Assert-Match 'already carries the current block' $r16b.Flat 'crlf append: the page it just wrote reads as current'
+
     # AND THE LF PAGE IS UNCHANGED BY THE REPAIR, which is the assert that keeps this from being a
     # one-platform fix: the style is read off the page, so a page with no CR in it still gets pure LF.
+    # READ BACK FROM DISK, not from $readme11 -- that variable was captured in section 11 and asserting
+    # against it here would re-check a fact that was already true before this -Apply ran, which is the
+    # shape of an assert that cannot fail (Victor, on this branch).
     $r15f = Invoke-Adopt -Dir $c11 -ScriptArgs @('-Apply')
     Assert-Match 'already carries the current block' $r15f.Flat 'crlf: an LF page is still judged current'
-    Assert-Equal 0 ([regex]::Matches($readme11, "`r").Count) 'crlf: and the LF page this suite scaffolded has no CR at all'
+    $after11 = [System.IO.File]::ReadAllText((Join-Path $c11 'dkj-policy\README.md'), [System.Text.Encoding]::UTF8)
+    Assert-Equal $readme11 $after11 'crlf: and the LF page is byte for byte what it was'
+    Assert-Equal 0 ([regex]::Matches($after11, "`r").Count) 'crlf: no CR was introduced into an LF page'
 } finally {
     if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture -ErrorAction SilentlyContinue }
 }
