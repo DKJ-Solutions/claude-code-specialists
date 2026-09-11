@@ -43,8 +43,10 @@
     git-identity-sessioncheck.ps1 (workflow plugin), which tells the session at start -- the moment
     before it claims an issue and starts committing.
 
-    NO NETWORK. `gh auth status` reads the keyring and `git config` reads a config file, so this adds
-    nothing to a session start beyond two local processes.
+    NO NETWORK. `gh auth status` reads the keyring, `git config` reads a config file, and `git var`
+    reads config plus the environment, so this adds nothing to a session start beyond three local
+    processes -- and only one of them on the checkout that cannot commit, which exits before the two
+    identity reads.
 
     RUN IT from the command line whenever you want the answer directly:
 
@@ -141,25 +143,18 @@ if (Test-FunctionDefined 'Resolve-CheckRepoRoot') {
 # script's: what it does with the two names once it has them.
 . (Join-Path $PSScriptRoot '..\lib\git-identity-lib.ps1')
 
-# The overrides exist so the suite can put this script in front of every state without a keyring or a
-# git identity of its own. 'NONE' is the spelling for "absent"; see the .PARAMETER blocks.
-if ($GhAccountOverride) {
-    $ghAccount = if ($GhAccountOverride -eq 'NONE') { '' } else { $GhAccountOverride }
-} else {
-    $ghAccount = Get-ActiveGhAccount
-}
-
-if ($GitUserNameOverride) {
-    $gitUserName = if ($GitUserNameOverride -eq 'NONE') { '' } else { $GitUserNameOverride }
-} else {
-    $gitUserName = Get-GitUserName -RepoRoot $repoRoot
-}
-
-# CAN THIS CHECKOUT COMMIT AT ALL? AND IT IS ASKED FIRST (inbound #1867). Everything below this block
+# CAN THIS CHECKOUT COMMIT AT ALL? AND IT IS ASKED FIRST (inbound #1867) -- first meaning BEFORE THE
+# TWO IDENTITY READS BELOW, not merely before the three skips further down. Everything after this block
 # compares two identities; this asks whether there is a usable one at all, and that question outranks
-# the comparison -- a machine that cannot commit cannot act on the answer to it either. It runs ahead
-# of the gh-absent skip for the same reason: gh absent is the ordinary state of a consumer that never
-# uses the tracker, while no author identity breaks every commit in the cycle.
+# the comparison -- a machine that cannot commit cannot act on the answer to it either. It also runs
+# ahead of the gh-absent skip, for the same reason: gh absent is the ordinary state of a consumer that
+# never uses the tracker, while no author identity breaks every commit in the cycle.
+#
+# AND THE ORDER IS A COST DECISION TOO, not only a precedence one. Get-ActiveGhAccount shells out to
+# `gh auth status` through the heavier capture arm; this probe is one `git var` that reads config files.
+# Sitting below those reads, the branch that fires on the broken machine -- at EVERY session start on it,
+# since a SessionStart hook is this script's one automatic caller -- would be the most expensive path
+# through the file while discarding both values it had just paid for. Above them it is the cheapest.
 #
 # THE THIRD SKIP BELOW IS WHAT THIS SPLITS OUT. 'user.name is unset' used to carry this state and
 # justify its silence with "a state git itself refuses to commit in, so it needs no second reporter".
@@ -185,6 +180,20 @@ if (-not $canCommit) {
     Write-Host '          git config --global user.email "<the address on that account>"' -ForegroundColor Yellow
     Write-Host '        (Drop --global to set it for this checkout only.)' -ForegroundColor Yellow
     exit 0
+}
+
+# The overrides exist so the suite can put this script in front of every state without a keyring or a
+# git identity of its own. 'NONE' is the spelling for "absent"; see the .PARAMETER blocks.
+if ($GhAccountOverride) {
+    $ghAccount = if ($GhAccountOverride -eq 'NONE') { '' } else { $GhAccountOverride }
+} else {
+    $ghAccount = Get-ActiveGhAccount
+}
+
+if ($GitUserNameOverride) {
+    $gitUserName = if ($GitUserNameOverride -eq 'NONE') { '' } else { $GitUserNameOverride }
+} else {
+    $gitUserName = Get-GitUserName -RepoRoot $repoRoot
 }
 
 # THREE WAYS THERE IS NOTHING TO SAY, and each is a [SKIP] rather than a pass: a pass would claim the

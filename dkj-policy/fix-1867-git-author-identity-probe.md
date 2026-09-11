@@ -80,7 +80,19 @@ correction is recorded because the issue will be closed against this branch.
 - [x] `scripts/task/new-branch.ps1` -- refuses beside the trunk refusal, before the checkout, the
       fetch and the scaffold. Guarded dot-source plus `Test-FunctionDefined`, so a plugin payload
       predating the lib degrades to the old behaviour rather than failing to load.
-- [x] Mirrors rebuilt with `scripts/sync/build-shared-scripts.ps1` (three files).
+- [x] Mirrors rebuilt with `scripts/sync/build-shared-scripts.ps1`.
+- [x] Review round, on the committed diff: code review, copy edit and security review in parallel.
+      Security found nothing. Two findings were acted on:
+  - The probe was **reordered above the two identity reads**, where it had sat below them. Its own
+    comment claimed it was "asked first" -- true only against the three `[SKIP]`s further down, while
+    `Get-ActiveGhAccount` shells out to `gh auth status` before it. On the broken machine that made
+    the firing branch the most expensive path through the file, at every session start, discarding
+    both values it had just paid for. Above them it is the cheapest.
+  - **Content drift the change itself created**, in four places that describe this behaviour and were
+    not touched by the first commit: `git-identity-lib.ps1`'s synopsis (two functions, "two local
+    process launches"), `check-git-identity.ps1`'s own `NO NETWORK` paragraph (the same count),
+    `plugins/dkj-policy/scripts/README.md`'s two rows, and the two `shared-scripts-lib.ps1` registry
+    comments. All four now say three processes and name the third question.
 
 ### TEST
 
@@ -99,11 +111,18 @@ correction is recorded because the issue will be closed against this branch.
       file the refusal degrades to silence and `(y)` would have passed saying nothing.
 - [x] Green: `git-identity-gate` 39/39, `new-branch` 265/265, `check-plugin-integrity` 0 errors.
 
-#### Test gap, named rather than papered over
+#### Test gaps, named rather than papered over
 
-Nothing asserts the real `git var` call inside `Test-GitCanCommit` at the unit level -- the check
-suite stubs it by design, and the `new-branch` fixture exercises it end to end instead. That fixture
-is the coverage; a unit case would need a second git installation to be worth more than it.
+Two, both deliberate:
+
+- Nothing asserts the real `git var` call inside `Test-GitCanCommit` at the unit level -- the check
+  suite stubs it by design, and the `new-branch` fixture `(y)` exercises it end to end instead. That
+  fixture is the coverage; a unit case would need a second git installation to be worth more.
+- Nothing asserts that the probe runs **before** the two identity reads. That ordering is a cost
+  property, not a behavioural one -- every verdict is identical either way -- so the only test for it
+  would read the source for line order, which pins formatting rather than behaviour and breaks on any
+  honest refactor. The reasoning is in the block's own comment, where the next person to move it will
+  be standing.
 
 ### DEPLOY: fix/1867-git-author-identity-probe
 

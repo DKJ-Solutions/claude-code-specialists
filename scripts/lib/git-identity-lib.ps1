@@ -1,24 +1,33 @@
 <#
 .SYNOPSIS
-    The identity a checkout ACTS as on the tracker and the identity it COMMITS as -- read once, for
-    every caller that needs either (issue #1315, extracted for claim-issue.ps1).
+    The identity a checkout ACTS as on the tracker, the identity it COMMITS as, and whether it can
+    commit at all -- read once, for every caller that needs one of them (issue #1315, extracted for
+    claim-issue.ps1; the third question added for inbound #1867).
 
 .DESCRIPTION
     Dot-source this file:
 
         . (Join-Path $PSScriptRoot '..\lib\git-identity-lib.ps1')
 
-    WHY IT IS A LIB. These three functions were written inside check-git-identity.ps1, which REPORTS
-    the split identity, and they are now needed by claim-issue.ps1, which has to ACT under the right
-    one. A script cannot dot-source check-git-identity.ps1 to reach them -- that file runs its whole
-    comparison and `exit`s on load -- so the alternative to extracting was a second copy of
+    WHY IT IS A LIB. The first three functions were written inside check-git-identity.ps1, which
+    REPORTS the split identity, and they are now needed by claim-issue.ps1, which has to ACT under the
+    right one. A script cannot dot-source check-git-identity.ps1 to reach them -- that file runs its
+    whole comparison and `exit`s on load -- so the alternative to extracting was a second copy of
     Get-ActiveGhAccount's multi-account parse. That parse is the subtle one (see its own header), and
     a repo whose branch-prefix table carries "do it here -- and nowhere else" does not get to keep two
-    of it.
+    of it. Test-GitCanCommit arrived as a lib for the same reason one step on: check-git-identity.ps1
+    reports that state and new-branch.ps1 REFUSES on it, which is two callers on day one.
 
-    NO NETWORK, and that property is load-bearing for both callers: `gh auth status` reads the keyring
-    and `git config` reads a file, so the SessionStart hook behind check-git-identity.ps1 pays two local
-    process launches and nothing more.
+    THE FOURTH FUNCTION ANSWERS A DIFFERENT KIND OF QUESTION, and the file is no longer named by the
+    pair alone. The three above are advisory reads feeding a comparison; Test-GitCanCommit is a
+    blocker -- there is no useful answer to "which account" on a checkout that cannot commit under any
+    of them.
+
+    NO NETWORK, and that property is load-bearing for every caller: `gh auth status` reads the
+    keyring, `git config` reads a file, and `git var` reads config plus the environment. The
+    SessionStart hook behind check-git-identity.ps1 pays three local process launches and nothing
+    more -- and only one of the three on a checkout that cannot commit, which is where that script
+    exits first.
 
     Dot-sources native-capture-lib.ps1 itself, guarded -- a mirror built before that lib existed
     degrades to a caller that has already loaded it rather than throwing on load.
@@ -128,8 +137,9 @@ function Test-GitCanCommit {
         in that same state refused with the identical message.
 
         NO NETWORK, like everything else in this lib: git reads config files and the environment. That
-        property is load-bearing -- the SessionStart hook behind check-git-identity.ps1 pays one more
-        local process launch and nothing more.
+        property is load-bearing -- this is a third local process launch at every session start, on top
+        of the two the identity reads above already cost, and nothing more. On the broken machine it is
+        the ONLY one: check-git-identity.ps1 runs this probe before either read and exits on it.
 
         UNKNOWN IS TREATED AS CAN-COMMIT, deliberately. git absent, or a tree that is not a checkout,
         returns $true: this function's one job is to refuse a state it has PROVEN broken, and a
