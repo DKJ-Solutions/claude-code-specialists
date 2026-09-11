@@ -34,13 +34,24 @@
          holds puts you beside them and reports success. Reading the claim is a separate command that
          the rule names and nobody runs; here it is one step with the write.
 
+    AND ONE THING IT READS THAT NOTHING ELSE DOES: THE BRANCHES (issue #1853). All three signals a
+    session has at pickup -- the issue's state, its assignees, and any PR resolving it -- read exactly
+    the same whether the work is untouched or already done and PUSHED ON A PARKED BRANCH. Measured
+    September 11, 2026: #1847 was claimed correctly and repaired in full, while the identical repair sat
+    in a commit on origin/feat/1842-unify-prio-labels-bwj, which has no PR and never closed the issue.
+    So on a claim (and on a resume) this scans the commit messages OFF THE TRUNK for the issue number
+    and names the branch and the commit. It WARNS and never refuses: it cannot tell a fix from a
+    mention, and a claim that blocks costs the whole assignment (#1485).
+
     IT WRITES ONE THING AND NOTHING ELSE. An assignee on one issue. No branch, no checkout, no commit,
     no label, no comment -- opening the branch is new-branch.ps1's job and stays a separate decision,
-    because the branch name is a judgement about the work and this step has not read the work yet.
+    because the branch name is a judgement about the work and this step has not read the work yet. The
+    scan above does not break that: `git fetch` and `git log` write nothing in the tree, and HEAD does
+    not move.
 
     THE VERDICT IS TESTED AND THE COMMANDS ARE NOT (scripts/lib/claim-issue-lib.ps1). Everything here
-    around the two library calls is a gh round-trip a suite cannot run; the decisions are pure, so they
-    are where the refusals live.
+    around the library calls is a gh or git round-trip a suite cannot run; the decisions are pure, so
+    they are where the refusals live -- and so are the scan's pattern, its two parses and its report.
 
     Dual-context: run the root copy in this repo, the plugin mirror in a consumer.
 
@@ -109,12 +120,23 @@ $number = $raw
 # to remove. Read defensively, like every other shared script reads repo-config.ps1 -- that file
 # belongs to the consumer, and a fault in it must not take this step down. Without it, gh's own
 # resolution stands and is said out loud.
+#
+# THE TRUNK NAME IS READ IN THE SAME BLOCK, from the same OPTIONAL seam (Get-TrunkBranchName), because
+# the parked-fix scan below needs it and 'main' is a consumer's answer rather than a constant. It is
+# deliberately NOT taken from entry-scaffold-lib.ps1's Get-BranchTrunkName, which is the same three
+# lines: that lib is thousands of lines long and this script currently dot-sources four small ones, so
+# pulling it in for one accessor would put the cost of the whole scaffolder on every claim.
 $repoName = ''
+$trunkBranch = 'main'
 $configPath = Join-Path $repoRoot 'scripts\repo-config.ps1'
 if (Test-Path -LiteralPath $configPath -PathType Leaf) {
     try {
         . $configPath
         if (Test-FunctionDefined 'Get-RepoName') { $repoName = [string](Get-RepoName) }
+        if (Test-FunctionDefined 'Get-TrunkBranchName') {
+            $configuredTrunk = [string](Get-TrunkBranchName)
+            if ($configuredTrunk) { $trunkBranch = $configuredTrunk }
+        }
     } catch {
         $repoName = ''
     }
@@ -202,6 +224,141 @@ if ($assignees.Count -gt 0) { Write-Host "  assignees: $($assignees -join ', ')"
 
 # --- MAY IT BE CLAIMED ----------------------------------------------------------------------------
 $verdict = Get-ClaimVerdict -Account $identity.Account -State ([string]$facts.state) -Assignees $assignees
+
+# --- IS THE FIX ALREADY SITTING ON A BRANCH (issue #1853) -----------------------------------------
+#
+# THE FOURTH PICKUP SIGNAL, and the one none of the three above can carry. The verdict just reached
+# reads the issue's STATE and its ASSIGNEES; Get-TargetIssueWarnings, which new-branch.ps1 and
+# open-pr.ps1 both run, resolves an issue to a PULL REQUEST. Measured September 11, 2026: a session
+# claimed #1847 -- open, unassigned, correctly -- and wrote the fix, only for open-pr's remote-ahead
+# gate to show that the identical repair was already pushed on origin/feat/1842-unify-prio-labels-bwj
+# and said so in its own commit message. That branch is PARKED, so there was no PR to find and nothing
+# had closed the issue: all three signals read 'untouched'. The commit message is where a parked fix
+# announces itself and the only place it does.
+#
+# IT RUNS ONLY WHERE THERE IS SOMETHING TO SAVE, which is why it sits above the switch rather than
+# below it. 'claim' is the case #1853 measured; 'skip' is a RESUME, where it matters at least as much --
+# Chris's own body says resuming is picking up, and on a second machine the other session's branch is
+# the only trace there is. The two refusals below never reach it, so a closed or taken issue pays
+# nothing for a check whose answer it would not use.
+#
+# ADVISORY, NEVER A REFUSAL. An issue can be legitimately named in a commit on a branch that does not
+# fix it -- the run that produced this measurement saw open-pr warn about four such mentions, all
+# correct as context -- and a claim that blocks costs the whole assignment (#1485). Every failure below
+# is therefore a note and a carry-on, including the fetch's.
+if ($verdict.Action -eq 'claim' -or $verdict.Action -eq 'skip') {
+    $scanPattern = Get-IssueMentionPattern -Issue ([int]$number)
+
+    # THE EXCLUSIONS ARE ESTABLISHED BEFORE THE NETWORK CALL, because they decide whether it is worth
+    # making. Without a trunk ref to subtract, `git log --all` reports every commit on the trunk that
+    # ever named this number -- which for a long-lived issue is its own repair, merged, and is exactly
+    # the noise that teaches a reader to skip this warning. So: no trunk ref, no scan.
+    $trunkRefs = @()
+    foreach ($ref in @($trunkBranch, "origin/$trunkBranch")) {
+        $probe = Invoke-NativeCapture -FilePath 'git' -Arguments @('-C', $repoRoot, 'rev-parse', '--verify', '--quiet', $ref) -DiscardStderr
+        if ($probe -and $probe.ExitCode -eq 0) { $trunkRefs += $ref }
+    }
+
+    $headProbe = Invoke-NativeCapture -FilePath 'git' -Arguments @('-C', $repoRoot, 'rev-parse', '--abbrev-ref', 'HEAD') -DiscardStderr
+    $currentBranch = if ($headProbe -and $headProbe.ExitCode -eq 0) { (@($headProbe.Output) -join '').Trim() } else { '' }
+    $excludeBranches = @($trunkBranch, "origin/$trunkBranch")
+    if ($currentBranch -and $currentBranch -ne 'HEAD') { $excludeBranches += @($currentBranch, "origin/$currentBranch") }
+
+    if ($scanPattern -and $trunkRefs.Count -gt 0) {
+        # THE FETCH IS THE ONLY NETWORK CALL THIS SCRIPT MAKES TO git, and it is the cost #1853 weighed
+        # this check against. It is `fetch --quiet` rather than `--all`: one remote's default refspec is
+        # what the scan reads, and a checkout with three remotes should not pay for two of them here.
+        # Bounded like every other network call in this family (#1639) and BEST-EFFORT -- a failure
+        # leaves the already-fetched refs in place, which is a smaller answer rather than a wrong one,
+        # and the note below says so instead of letting it read as a clean scan.
+        #
+        # NO -DiscardStderr, AND THAT IS THE CONVENTION RATHER THAN AN OVERSIGHT (#1313). A git call that
+        # talks to a remote writes ALL of its output to stderr, and git redacts the credential out of
+        # that line itself (transport_anonymize_url -- measured on 2.55.0). Nothing here parses the
+        # capture, so the flag would buy nothing and cost the reader git's own reason: exactly the trade
+        # #1313 declined for ship-pr's fetch, worktree-lane and prune-merged. The lines are printed under
+        # the note below, because keeping stderr and then never showing it is the same loss one step
+        # later. The two reads further down DO parse, so they keep the flag.
+        $staleNote = ''
+        $staleDetail = @()
+        $fetch = Invoke-NativeCapture -FilePath 'git' -Arguments @('-C', $repoRoot, 'fetch', '--quiet') `
+                                      -TimeoutSeconds $NativeCaptureNetworkTimeoutSeconds
+        if (-not $fetch -or $fetch.ExitCode -ne 0 -or $fetch.TimedOut) {
+            $staleNote = if ($fetch -and $fetch.TimedOut) {
+                "git fetch did not answer within $NativeCaptureNetworkTimeoutSeconds seconds"
+            } elseif ($fetch) {
+                "git fetch exited $($fetch.ExitCode)"
+            } else {
+                'git fetch could not be run at all'
+            }
+            if ($fetch) { $staleDetail = @(@($fetch.Output) | Where-Object { $_ -and ([string]$_).Trim() }) }
+        }
+
+        $logArgs = @('-C', $repoRoot, 'log', '--all', '-E', "--grep=$scanPattern", '--format=%H%x1f%s', '--not') + $trunkRefs
+        $scanLog = Invoke-NativeCapture -FilePath 'git' -Arguments $logArgs -Utf8 -DiscardStderr
+        if (-not $scanLog -or $scanLog.ExitCode -ne 0 -or $scanLog.ShortRead) {
+            $why = if (-not $scanLog) { 'it could not be run at all' } elseif ($scanLog.ShortRead) { 'its capture was still being written when it was read' } else { "it exited $($scanLog.ExitCode)" }
+            Write-Host "  [parked-fix scan skipped] git log for #$number was not readable -- $why." -ForegroundColor DarkGray
+        } else {
+            # THE CONTAINMENT LOOP IS BOUNDED, and the display cap in Format-ParkedFixReport does NOT
+            # bound it -- that one trims what is printed, after every commit has already paid for its own
+            # ancestry walk. Measured here on the review pass: `git branch -a --contains` costs ~30ms and
+            # a realistic parked branch matches 0-4 commits, so the ordinary run spends under 120ms; the
+            # worst case is a branch whose every subject carries the number (the convention is
+            # `fix(1853): ...`), which one issue in this repo's history reaches at 21.
+            #
+            # INVERTING THE LOOP WAS CONSIDERED AND DECLINED. Asking each branch which of ITS commits
+            # match -- one `git log <branch>` per branch -- is O(branches) instead of O(matches), and this
+            # repo carries 19 branches off the trunk against a handful of matches, so it makes the
+            # ordinary run four times slower to make the rare one faster. The ceiling costs nothing in
+            # the ordinary run and is what the rare one actually needs.
+            #
+            # NEWEST FIRST, because that is git log's own order and the newest commits are the ones whose
+            # branches are still live. The overflow is stated rather than swallowed -- a truncation a
+            # reader cannot see is the defect this whole check exists to remove, one layer in.
+            $maxContainmentReads = 25
+            $scanMatches = @(ConvertFrom-CommitScanLog -Text ((@($scanLog.Output) -join "`n")))
+            $resolved = @($scanMatches | Select-Object -First $maxContainmentReads)
+            if ($scanMatches.Count -gt $resolved.Count) {
+                Write-Host "  [parked-fix scan] $($scanMatches.Count) commits name #$number off the trunk; the newest $($resolved.Count) were resolved to a branch." -ForegroundColor DarkGray
+            }
+            $findings = @()
+            foreach ($commit in $resolved) {
+                $contains = Invoke-NativeCapture -FilePath 'git' -Arguments @('-C', $repoRoot, 'branch', '-a', '--contains', $commit.Sha) -Utf8 -DiscardStderr
+                if (-not $contains -or $contains.ExitCode -ne 0) { continue }
+                $branches = @(Get-ContainingBranchNames -Text ((@($contains.Output) -join "`n")) -Exclude $excludeBranches)
+                if ($branches.Count -eq 0) { continue }
+                # THE BRANCH NAME IS UNTRUSTED TEXT TOO, and it was the half that got printed raw. A
+                # subject and a ref name come from the same place -- anyone who can push -- so both go
+                # through the same filter, AFTER the exclusion above, which must compare the ref as git
+                # spells it. git's own check-ref-format already refuses the C0 range in a ref, so this
+                # strips nothing in practice today; it is here so that the one sanitiser this output has
+                # covers every field of it, rather than leaving a second class of pushed text as the
+                # exception a later widening would have to remember.
+                $findings += [pscustomobject]@{
+                    Sha      = $commit.Sha
+                    Subject  = (Format-ForConsole -Text $commit.Subject)
+                    Branches = @($branches | ForEach-Object { Format-ForConsole -Text $_ })
+                }
+            }
+
+            foreach ($line in @(Format-ParkedFixReport -Issue ([int]$number) -Findings $findings)) {
+                Write-Host "  $line" -ForegroundColor Yellow
+            }
+        }
+
+        # PRINTED WHETHER OR NOT ANYTHING WAS FOUND, and that is the whole reason it is a separate line:
+        # "nothing names this issue" and "I could not refresh the refs I looked at" are different
+        # sentences, and merging them lets a failed fetch read as a clean scan.
+        if ($staleNote) {
+            Write-Host "  [parked-fix scan] $staleNote -- the branches read here may be behind origin." -ForegroundColor DarkGray
+            # git's own words, which is the whole reason stderr was kept above: "could not read from
+            # remote repository" and "Authentication failed" are what tell a reader whether this is
+            # their credentials or their network, and neither is derivable from the exit code.
+            foreach ($detail in $staleDetail) { Write-Host "                    $(Format-ForConsole -Text $detail)" -ForegroundColor DarkGray }
+        }
+    }
+}
 
 switch ($verdict.Code) {
     'no-account' {
