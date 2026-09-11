@@ -36,19 +36,54 @@
 
 ### PLAN
 
+Fix #1830: `git-identity-sessioncheck.ps1` branched on the child's exit code alone (`$code -eq 0`) to
+decide whether to print the agreement sentence. All three `[SKIP]` states in
+`check-git-identity.ps1` also exit 0, so the hook collapsed them into `[OK]`'s "the gh account and
+the git identity agree" sentence -- a claimed comparison on a machine that may have no git identity
+at all. Repair: match the `[OK]` token itself, the same way the existing code already matches
+`[ERROR]`, and let `[SKIP]` fall through to a genuinely silent branch, matching the docstring's own
+promise.
+
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [x] `plugins/dkj-policy/hooks/git-identity-sessioncheck.ps1`: match `[OK]` explicitly (`-cmatch
+      '\[OK\]'`) alongside the existing `[ERROR]` match; `[SKIP]` (exit 0, neither token) now stays
+      silent instead of falling into the agreement sentence. Docstring updated to describe three
+      outcomes instead of two.
+- [x] `scripts/tests/git-identity-gate.tests.ps1`: added the regression assert (a `[SKIP]` stub must
+      not produce "agree") and corrected the stale comment claiming `[SKIP]` was "the same branch as
+      `[OK]` by design".
 
 ### TEST
 
+- [x] `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/tests/git-identity-gate.tests.ps1`
+      -- 28/28 asserts pass, including the new `[SKIP]`-must-not-say-`agree` regression assert.
+- [x] `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/lint/check-plugin-integrity.ps1`
+      -- 0 errors.
+- [~] Full `scripts/tests/*.tests.ps1` sweep -- not run by hand; `open-pr.ps1` runs the full gate
+      (lint + every suite) before the push, which is the same gate this PR relies on to merge.
+
 ### DEPLOY: fix/1830-git-identity-skip-vs-ok
 
-**Score:**
+`git-identity-sessioncheck.ps1` (the SessionStart hook of the workflow plugin) now distinguishes a
+genuine `[OK]` from a `[SKIP]` instead of treating both as "clean" because both exit 0. Previously,
+on a machine with no git identity at all (or one `check-git-identity.ps1` could not compare for any
+of its three `[SKIP]` reasons), the hook still printed "the gh account and the git identity agree" --
+a claim that a comparison happened when none had. That is what it cost a session on the measured
+machine: the false "agree" line was read as "identity is fine", and the session's first commit then
+failed outright (`Please tell me who you are`). `[SKIP]` now stays silent at session start, matching
+the check script's own documented promise; `[OK]` keeps its one-line agreement sentence, and
+`[ERROR]` keeps its full report -- neither of those two paths changed.
+
+**Score:** 3
 
 #### What makes this deploy extra special
 
-**Score:**
+Every consumer repo running the workflow plugin gets the corrected hook on its next plugin release --
+one fewer false "identity is fine" signal on any machine with no git identity or a display-name
+`user.name`, which is the exact shape that produced a failed first commit here.
+
+**Score:** 2
 
 #### Pull Request
 
