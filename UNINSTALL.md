@@ -33,6 +33,13 @@ files and no tool that knows which of them it wrote, because the distinction it 
 [Step 1](#step-1--take-the-plugin-out-of-your-repo)) lives in the skill and not in the files. Everything
 else in this procedure can be redone in any order; this one cannot.
 
+**Count the checkouts on this machine before you begin, because it decides how long the procedure is.**
+Steps 1 to 4 are about your repo and are the same either way. Step 5 is about the **machine**, and on a
+machine where a second checkout still uses this family it is a step you must not run — the procedure
+ends at Step 4 instead. [If this machine has more than one
+checkout](#if-this-machine-has-more-than-one-checkout) has the measurement and the query that answers
+it; knowing now saves reading four steps under the wrong assumption.
+
 **The same trap applies to this page itself, so keep a copy before you begin.** `UNINSTALL.md` is not
 part of the plugin payload — it ships only in the cached marketplace clone, and
 [Step 5](#step-5--drop-the-marketplace-registration-last) deletes that clone in its entirety — the measured
@@ -352,18 +359,108 @@ confirmation and not as proof: this is CLI `2.1.220` behaviour and can shift wit
 Everything above is verifiable with the marketplace still registered, which is why the registration comes
 off last.
 
+**And for one reader there is no step after this one.** "Last" is an ordering argument about *this* repo's
+teardown, and it silently assumes the machine holds no other. If it does, Step 5 is not yours to run and
+Step 4 is where you stop — read the next section before going on.
+
+## If this machine has more than one checkout
+
+> **Read this before Step 5.** It changes nothing about the command. It changes whether you run it at all.
+
+An install record is keyed on the folder it was written for, which is what makes Step 2 per checkout: it
+took this repo's records and only this repo's. **`claude plugin marketplace remove` is keyed on nothing of
+the sort.** It drops the registration machine-wide and takes every install record still keyed on that
+marketplace with it — including the records of checkouts this teardown never named and never touched.
+
+**Measured on the install side, not on a teardown** (September 11, 2026, one machine with three checkouts,
+read before and after from `~/.claude/plugins/installed_plugins.json`,
+[#1820](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1820)):
+
+| records on the machine | count |
+|---|---|
+| before starting | **16**, over three checkouts |
+| after the first checkout's own uninstalls (its six) | 10 — all belonging to the other two checkouts |
+| after that checkout's `marketplace remove`, and the install that followed it | **6** — its own six, and nothing else |
+
+So the ten records left at that point were taken, silently, without either checkout being named by any
+command in the run — and **the six in the last row were written by the install step after it**, which is
+precisely the step a teardown does not have. **Where this paragraph stops, so you can judge it:** that run was a
+migration, not a teardown, so what carries over is the command's reach and not a second set of numbers. No
+teardown-specific measurement was taken, deliberately — taking one means de-installing this family from
+every other checkout on the machine, which is the thing being warned about.
+
+**On the install side that costs a procedure; here it costs the other repos.** There the remaining
+checkouts reinstall a few commands later, so a record is bookkeeping and the damage is a page that reads
+wrong mid-run. Here nothing reinstalls. Your intent was to disconnect *one* repo, and the other checkouts
+are left loading nothing.
+
+**And a repo loading no plugin has no way to tell you so.** The hooks are *in* the plugin, so there is
+nothing left to complain; `git status` is clean, no file in those repos changed, and their `enabledPlugins`
+still reads perfectly correct. That is the same invisibility [Step 4](#step-4--verify-that-you-actually-stand-free)
+warns about for this repo, and the same one [INSTALL.md](INSTALL.md#staying-up-to-date) records for a
+record orphaned by a directory rename — different cause, identical silence.
+
+**So: skip Step 5, and leave the registration standing.** Your teardown is complete at Step 4. This is the
+one step of this page that is about the machine rather than about your repo, and a machine another repo is
+still using is not yours to clear.
+
+**What skipping costs, stated so you can weigh it rather than wonder:** the `known_marketplaces.json`
+entry, the cached clone and the unpacked cache all stay, `claude plugin marketplace list` still names
+`dkj-claude-plugins`, and [Starting from a genuinely clean machine](#starting-from-a-genuinely-clean-machine)
+below does **not** describe your machine — correctly, because the family is still installed there. Nothing
+in that is a failed teardown of your repo: every check in Step 4 is about `projectPath`, and all of them
+still pass. One thing it buys you: this page survives, since the clone it lives in is what Step 5 deletes.
+
+**When Step 5 *is* yours: when the checkout you just disconnected was the last one on this machine using
+this family.** Run [Step 2](#step-2--uninstall-the-plugin-one-command-per-plugin)'s record query without
+its `projectPath` filter to find out — after Step 2, so anything it still prints belongs to somebody else:
+
+```powershell
+(Get-Content "$env:USERPROFILE\.claude\plugins\installed_plugins.json" -Raw | ConvertFrom-Json).plugins.PSObject.Properties |
+  Where-Object { $_.Name -like '*@dkj-claude-plugins' } |   # the name carries the marketplace after the @
+  ForEach-Object { $n = $_.Name; $_.Value |
+    ForEach-Object { "$n -> $($_.projectPath) [$($_.scope) $($_.version) $($_.gitCommitSha)]" } } | Sort-Object
+```
+
+Any path it prints is a checkout Step 5 would de-install — go and ask whoever owns it, or skip the step.
+It carries Step 2's four verdict fields for the same reason Step 2 does, and here they are what separate
+three readings you should expect rather than puzzle over: a record with an **empty** path and `user` scope
+is not a checkout at all; a path that **no longer exists** is an orphaned record rather than a live repo;
+and records belonging to **other** marketplaces are kept out by the filter, being none of Step 5's
+business.
+
+**Empty output only means Step 5 is safe if the name in that filter is the name your machine registered.**
+Get it wrong and the query comes back empty on a machine full of records, which reads as a clearance rather
+than as a typo — the one failure of this query that points the dangerous way. It is not hypothetical: a
+machine registered under this marketplace's **previous** name answers nothing to `'*@dkj-claude-plugins'`
+while holding six records under `'*@claude-code-specialists'` (measured September 11, 2026, on a checkout
+that had not migrated). So read the name off `claude plugin marketplace list` and paste *that* into the
+filter, and treat an empty answer from a machine you know has adoptions as a wrong filter rather than as a
+clean machine.
+
 ## Step 5 — drop the marketplace registration, last
 
 This is the step that also takes the cached clone — and with it this page — off the machine, which is why
 it waits until Step 4 is done:
 
 ```powershell
+# MACHINE-WIDE, and it is the only command on this page that is: besides the registration it
+# takes every install record still keyed on this marketplace, including those of OTHER
+# checkouts on this machine -- which then load nothing, with no way to say so. If this machine
+# has a second checkout, read "If this machine has more than one checkout" above and SKIP this
+# step; unlike the migration in INSTALL.md, nothing here reinstalls afterwards.
 claude plugin marketplace remove dkj-claude-plugins
 ```
 
 It takes an optional `--scope <user|project|local>`; omit it and the declaration is removed from every
-scope. Then the last verification: **`claude plugin marketplace list` no longer names
-`dkj-claude-plugins`.**
+scope. **Do not count on that flag to narrow the reach above: whether it does is untested.** What it
+demonstrably governs is which scope the *declaration* comes out of, and the measurement behind that
+reach was taken without it ([#1820](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1820)
+lists this as explicitly unmeasured, along with whether `user`-scope records are treated the same) — so
+on a machine with a second checkout, skip the step rather than hoping a flag fences it. Then the last
+verification: **`claude plugin marketplace list` no longer names `dkj-claude-plugins`.** That one is
+this step's own check, so a reader who skipped the step skips its verification too — for them the
+marketplace is *meant* to still be listed.
 
 **If you declared the marketplace at *user* scope, expect it to edit `~/.claude/settings.json` and to leave
 an empty key behind** (inbound [#357](https://github.com/DaveKJohn/claude-code-specialists/issues/357)). The
@@ -492,6 +589,12 @@ Useful if you are testing the adoption path as a first-time consumer would meet 
 a previous install is indistinguishable from the path working. Everything this family leaves outside your
 repo lives under `~/.claude/`, and the list below was taken from a machine that has run it:
 
+> **This whole section assumes the repo you just disconnected held the machine's last adoption.** If
+> another checkout still uses this family you skipped Step 5 on purpose, and a clean machine is then the
+> wrong goal rather than an unmet one — see
+> [If this machine has more than one checkout](#if-this-machine-has-more-than-one-checkout). Read the two
+> tables below as *what a final teardown closes*, and not as a checklist your machine has failed.
+
 | location | what it holds |
 |---|---|
 | `~/.claude/plugins/installed_plugins.json` | the install records, keyed on `projectPath` |
@@ -506,7 +609,7 @@ Which step closes which — including the one entry that no step closes for you 
 
 | location | what closes it |
 |---|---|
-| `installed_plugins.json` | Step 2 removes the record; the file itself stays, holding `{"version": 2, "plugins": {}}` |
+| `installed_plugins.json` | Step 2 removes **this repo's** record; the file itself stays, holding `{"version": 2, "plugins": {}}`. **Step 5 removes every record still keyed on this marketplace, whichever checkout it belongs to** — see [If this machine has more than one checkout](#if-this-machine-has-more-than-one-checkout) |
 | `marketplaces/<marketplace>/` | Step 5 — `marketplace remove` deletes the clone |
 | `cache/<marketplace>/` | **no step** — it follows the marketplace, not the install. Delete it by hand in Step 5. Per plugin the answer is the same: uninstalling one plugin leaves that plugin's own extracted trees where they are, measured September 10, 2026 ([#1812](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1812)) |
 | `data/<plugin>-<marketplace>/` | Step 2's uninstall, unless you passed `--keep-data` |

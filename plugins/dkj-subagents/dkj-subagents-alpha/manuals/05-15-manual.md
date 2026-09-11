@@ -82,6 +82,15 @@ and safe hook construction.
   writes into the repo it is run in and is owed to every checkout. Measured with record counts and both
   verbatim messages in the source repo's `INSTALL.md`, under
   *"If this machine has more than one checkout"*.
+  **And in a TEARDOWN the same reach has no floor, because there is no `add` behind it.** An install
+  sequence repairs itself — the checkouts it stripped reinstall a few commands later, so the cost is a
+  procedure that reads wrong mid-run. An uninstall sequence ending in `marketplace remove` de-installs
+  the family from every other checkout on the machine and **nothing puts it back**, against the intent of
+  a reader who was disconnecting one repo. Worse, none of those repos can report it: the hooks are in the
+  plugin, so nothing is left to complain, while `git status` stays clean and `enabledPlugins` still reads
+  correct. So a teardown page does not merely warn about the reach — it tells a multi-checkout reader to
+  **skip that step**, since the machine is not theirs to clear while another repo is using it. Written up
+  in the source repo's `UNINSTALL.md`, under its own *"If this machine has more than one checkout"*.
 - **Never add a permission or hook that undermines the safety rules.** The safety rules stand above
   any config convenience: no allowlist rule that would blindly let a dangerous or irreversible action
   through. The concrete per-repo details live in the `## Specific to this repo` extension.

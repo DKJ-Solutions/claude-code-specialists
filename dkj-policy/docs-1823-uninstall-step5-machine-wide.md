@@ -38,19 +38,83 @@
 
 Mirror #1820's repair onto UNINSTALL.md: a multi-checkout section, a fence at Step 5, the teardown table row, and re-read the 'comes off last' framing plus the clean-machine claim for the skipping reader. One sentence in Sylvester's portable manual for the no-floor half.
 
+#### The decision the issue left open
+
+#1823 filed the repair as a procedural decision rather than a sentence, and named the candidate:
+tell a multi-checkout reader to **skip Step 5 entirely** and leave the registration standing. Taken,
+because the alternative is strictly worse: running the step and then reinstalling in the other
+checkouts asks the reader to break two repos in order to repair them, for no gain over not breaking
+them. Unlike #1820's fork — reorder versus state the consequence, which genuinely traded one reader
+population against another — there is no second population here: `marketplace remove` is already last,
+so there is nothing to reorder, and the reader's own intent was to disconnect one repo.
+
+What that decision then obliges, and why three of the four edits are not the warning itself: the
+page's *"the registration comes off last"* framing, its `marketplace list` verification and its
+clean-machine section are all written for a reader who finishes at Step 5, and each reads as a failed
+teardown to one who correctly stopped at Step 4.
+
+#### What is deliberately NOT measured here
+
+No teardown-specific run on a two-checkout profile, which is what #1823 asked for. Taking it means
+de-installing this family from every other checkout on the machine — the thing being warned about —
+and it would re-measure the same command's reach that #1820 already measured with record counts.
+So the page carries #1820's numbers under an explicit label saying they are install-side, plus a
+sentence saying no teardown measurement was taken and why. Stated rather than quietly reused: this
+page's own convention is that a bracket names the profile it was taken on.
+
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [x] `UNINSTALL.md` — new `## If this machine has more than one checkout` section before Step 5:
+      the reach, #1820's record counts labelled install-side, the no-floor difference, the
+      no-way-to-report silence, the skip instruction, what skipping costs, and the record query that
+      answers whether Step 5 is yours to run
+- [x] `UNINSTALL.md` — Step 5's command block carries the fence comment, and its scope-flag sentence
+      no longer implies the flag narrows the reach (#1820 lists that as untested)
+- [x] `UNINSTALL.md` — the three claims written for a finish-at-Step-5 reader get their second
+      reading: Step 4's *"comes off last"* closer, the `marketplace list` verification, and the
+      clean-machine section's opening
+- [x] `UNINSTALL.md` — the per-file teardown table stops attributing install records to Step 2 alone
+- [x] `UNINSTALL.md` — `Before you start` tells the reader to count checkouts first, since it decides
+      how long the procedure is
+- [x] `05-15-manual.md` (portable) — the teardown half of the mechanism: no `add` behind it, so the
+      reach has no floor, and a teardown page must say *skip* rather than merely warn
 
 ### TEST
 
+- [x] Lint gate + all suites green (`open-pr.ps1` runs both; no script changed on this branch)
+- [~] No new automated test — the change is prose in a published document and a portable manual, and
+      the dead-link scan in `check-plugin-integrity.ps1` already covers the five new anchors
+
 ### DEPLOY: docs/1823-uninstall-step5-machine-wide
 
-**Score:**
+`UNINSTALL.md`'s Step 5 ran `claude plugin marketplace remove` with no reader-facing statement that the
+command is machine-wide over install records. On a machine with more than one checkout, a reader tearing
+down one repo exactly by the book silently de-installed this family from every other repo on it — and
+`INSTALL.md`'s migration has a floor that this page does not: there the remaining checkouts reinstall,
+here nothing does, and a repo loading no plugin cannot report it (the hooks are in the plugin, `git
+status` is clean, `enabledPlugins` still reads correct). The page was thorough about this command and
+measured a different axis: its per-file table credited Step 5 with the clone and the
+`known_marketplaces.json` entry, attributed every install record to Step 2, and every bracket on the page
+was taken on a single-adoption profile, where Step 5 provably touches no record because Step 2 already
+took the only one. Such a reader is now told to skip Step 5 and stop at Step 4, and the three claims
+written for a reader who finishes there — *"the registration comes off last"*, the `marketplace list`
+verification, and the clean-machine section — each say so. The scope flag no longer reads as a fence,
+since whether it narrows the reach is untested. The teardown half of the mechanism lands in Sylvester's
+portable manual rather than a lens: it is a property of the CLI, so it travels to every consumer.
+
+**Score:** 3
 
 #### What makes this deploy extra special
 
-**Score:**
+`UNINSTALL.md` is one of the two procedures a consumer of this marketplace meets, and this is the step
+where following it correctly broke their other repos. Anyone running the teardown on a machine with more
+than one adoption is affected, and the damage was silent in all three of the places they would look. The
+failure being prevented, named because no teardown run has been measured hitting it: a consumer
+disconnecting one of several checkouts loses this family from every other repo on the machine, with no
+signal anywhere — their `enabledPlugins` still reads correct and the hooks that would complain went with
+the plugin.
+
+**Score:** 4
 
 #### Pull Request
 
