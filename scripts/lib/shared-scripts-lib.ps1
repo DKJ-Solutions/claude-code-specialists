@@ -205,6 +205,9 @@ function Get-SharedScriptPairs {
             SkillParamsExempt = @('RootOverride', 'RootDocument')
             # Timeable with no arguments: it reads files and prints, and writes nothing anywhere.
             MeasureArgs = @()
+            # Step 4a ascends two levels off $PSScriptRoot to find the sibling plugin folders, so the
+            # mirror has to be RUN from its own depth and not only compared with the source (#1857).
+            MirrorRun = 'policy-drift-report.tests.ps1'
         },
         @{
             # Issue #411. Was excluded as "workshop-only" on the reasoning that merge policy and the CI
@@ -852,6 +855,10 @@ function Get-SharedScriptPairs {
             # A test points the command at a fixture blueprint instead of the shipped one. A consumer
             # never types it, and documenting it would invite someone to.
             SkillParamsExempt = @('BlueprintPath')
+            # Resolve-Blueprint's FIRST candidate is '..\..\blueprint\config-blueprint.json', which is
+            # the plugin root from the mirror and the repo root from the source -- the candidate a
+            # consumer actually hits, and the one the source copy can never exercise (#1857).
+            MirrorRun = 'config-blueprint.tests.ps1'
         },
         @{
             # The workflow's own root folder (Dave, August 14, 2026): a plugin install writes nothing
@@ -1123,6 +1130,12 @@ function Get-SharedScriptPairs {
             SkillParamsExempt = @('RootOverride', 'GhAccountOverride', 'GitUserNameOverride')
             # Timeable with no arguments: two local process reads and a report, no write and no network.
             MeasureArgs = @()
+            # DECLARED THOUGH NOT REQUIRED: this script resolves nothing above its own scripts\ folder,
+            # so the depth check would not ask. It is registered because it is the precedent -- the
+            # first suite in the tree to run a mirror from its own directory, four weeks before #1857
+            # named the class -- and because the registry should be able to answer "which mirrors are
+            # executed" without anyone grepping the suites for it.
+            MirrorRun = 'git-identity-gate.tests.ps1'
         },
         @{
             # The fixture-pollution check (issue #1609). A throwaway debug script ran without
@@ -1438,6 +1451,23 @@ function Get-SharedScriptPairs {
             # reported as undeclared and skipped. Same reasoning as LibOnly being normalized to [bool].
             MeasureDeclared = [bool]$p.ContainsKey('MeasureArgs')
             MeasureArgs = if ($p.ContainsKey('MeasureArgs')) { [string[]]$p.MeasureArgs } else { $null }
+            # WHICH SUITE RUNS THE MIRROR COPY, for the depth check (#1857). Check 8 holds the two
+            # copies byte-identical, which proves they are the same TEXT and says nothing about them
+            # behaving the same -- and they sit at different depths, so a $PSScriptRoot resolution that
+            # ascends two levels means the repo root in one copy and the plugin root in the other.
+            # Get-DepthSensitiveResolutions finds exactly that class; a pair that has one must name the
+            # suite that executes its mirror, or declare why it does not.
+            #
+            # Here rather than in a list inside the gate, for the reason every other key on this object
+            # is here: a hand-written second list is one a newly shared script falls out of silently
+            # (#275/#331), and this key's whole job is to catch the script somebody has not thought
+            # about yet.
+            MirrorRun = if ($p.ContainsKey('MirrorRun')) { [string]$p.MirrorRun } else { $null }
+            # The valve, and it is not politeness. A gate with no declared exception gets bypassed
+            # wholesale the first time it fires on something legitimate, and a gate that gets bypassed
+            # guards nothing -- the reasoning SkillParamsExempt above already carries. A reason is
+            # required rather than a bare $true, so the exception is readable where it is taken.
+            MirrorRunExempt = if ($p.ContainsKey('MirrorRunExempt')) { [string]$p.MirrorRunExempt } else { $null }
         }
     }
 }
@@ -1463,4 +1493,88 @@ function Get-NormalizedScriptContent {
     if (-not (Test-Path -LiteralPath $Path)) { return $null }
     $raw = [System.IO.File]::ReadAllText($Path, [System.Text.Encoding]::UTF8)
     return ($raw -replace "`r`n", "`n")
+}
+
+function Get-DepthSensitiveResolutions {
+    <#
+        Every place a script resolves a path off $PSScriptRoot that ASCENDS TWO OR MORE LEVELS -- the
+        only class of code where a mirrored script's two copies can behave differently while being
+        byte-identical.
+
+        WHY TWO AND NOT ONE. A shared entry point sits at <x>\scripts\<area>\<name>.ps1 in both
+        copies, where <x> is the repo root for the workshop source and the PLUGIN root for the mirror.
+        One hop reaches <x>\scripts\ -- the same folder relative to the file in both copies, which is
+        why '..\lib\...' is depth-invariant and needs no proof. Two hops reach <x> itself, and there
+        the two copies part: the source lands on the repo root, the mirror on the plugin root. Same
+        characters, different folder, and check 8's byte-equality cannot see it because there is
+        nothing to see -- the text IS identical. That is the whole gap (#1857).
+
+        TWO FORMS, because the tree uses both:
+          * a string literal with two or more leading '..' segments, in the same statement as a
+            $PSScriptRoot reference -- 'Join-Path $PSScriptRoot ''..\..\blueprint\x.json'''
+          * two or more nested Split-Path -Parent calls over $PSScriptRoot -- the same ascent written
+            without a literal, which a scan for '..' would miss entirely
+
+        VIA THE AST, NOT A LINE SCAN. The statement is the unit, so a Join-Path whose literal sits on
+        the next line is seen exactly like one that fits on a line -- the blind spot a 140-character
+        window after the variable would have had, and a gate with a silent blind spot is worse than no
+        gate. Returns @() for a file that is missing or does not parse.
+    #>
+    param([Parameter(Mandatory = $true)][string]$Path)
+
+    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { return @() }
+    $ast = [System.Management.Automation.Language.Parser]::ParseFile($Path, [ref]$null, [ref]$null)
+    if (-not $ast) { return @() }
+
+    $vars = @($ast.FindAll({
+        param($n)
+        ($n -is [System.Management.Automation.Language.VariableExpressionAst]) -and
+        ($n.VariablePath.UserPath -eq 'PSScriptRoot')
+    }, $true))
+
+    $findings = New-Object System.Collections.Generic.List[string]
+    foreach ($v in $vars) {
+        # Up to the enclosing TOP-LEVEL statement: the unit a resolution is written in, and what makes
+        # a multi-line Join-Path readable to this function.
+        #
+        # NOT "the nearest StatementAst", which was the first attempt and silently halved the second
+        # form. A PipelineAst is itself a statement, so a nested call --
+        # `Split-Path (Split-Path $PSScriptRoot -Parent) -Parent` -- stops the climb at the INNER
+        # pipeline, where exactly one Split-Path is in scope and the ascent therefore reads as one
+        # level. check-policy-drift's own resolution is written that way, so the detector found
+        # nothing there while reporting adopt-config correctly. Climbing to the statement that sits
+        # directly in a block sees the whole expression.
+        $stmt = $v
+        while ($stmt.Parent -and -not (
+            ($stmt -is [System.Management.Automation.Language.StatementAst]) -and
+            (($stmt.Parent -is [System.Management.Automation.Language.StatementBlockAst]) -or
+             ($stmt.Parent -is [System.Management.Automation.Language.NamedBlockAst]))
+        )) {
+            $stmt = $stmt.Parent
+        }
+        if (-not $stmt) { continue }
+
+        foreach ($s in @($stmt.FindAll({
+            param($n) $n -is [System.Management.Automation.Language.StringConstantExpressionAst]
+        }, $true))) {
+            $segments = @(($s.Value -split '[\\/]+') | Where-Object { $_ -ne '' })
+            $leading = 0
+            foreach ($seg in $segments) { if ($seg -eq '..') { $leading++ } else { break } }
+            if ($leading -ge 2) {
+                $text = $stmt.Extent.Text -replace '\s+', ' '
+                if (-not $findings.Contains($text)) { $findings.Add($text) | Out-Null }
+            }
+        }
+
+        $parentHops = @($stmt.FindAll({
+            param($n)
+            ($n -is [System.Management.Automation.Language.CommandAst]) -and
+            ($n.GetCommandName() -eq 'Split-Path')
+        }, $true))
+        if ($parentHops.Count -ge 2) {
+            $text = $stmt.Extent.Text -replace '\s+', ' '
+            if (-not $findings.Contains($text)) { $findings.Add($text) | Out-Null }
+        }
+    }
+    return @($findings)
 }
