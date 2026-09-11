@@ -57,6 +57,14 @@
 # more than any other file in the tree, and Get-ReleaseAudienceTier's is the frame #1723 faulted in.
 . (Join-Path $PSScriptRoot 'command-probe-lib.ps1')
 
+# THE DOCUMENT-NEWLINE READING (issue #1832): Get-DocumentNewline, where the two sites below hand-typed
+# it. Same unconditional, $PSScriptRoot-relative shape as the two leaves above and for the same reason --
+# it has to resolve in the plugin mirror as well as here -- and it is likewise a leaf with no dependencies
+# of its own. Loaded HERE rather than in each caller because release-lib, cut-release,
+# fold-changelog-entry and adopt-workflow-folder all already load this file, so they reach the helper
+# without gaining a dependency.
+. (Join-Path $PSScriptRoot 'document-newline-lib.ps1')
+
 # The English fallbacks, and the ONLY copy of them. new-branch.ps1 held these literals until
 # the gate needed the same list; it now reads them from here.
 #
@@ -3848,7 +3856,7 @@ function Set-ChangelogPendingSummary {
     #>
     param([Parameter(Mandatory)][AllowEmptyString()][string]$Content)
 
-    $nl = if ($Content.Contains("`r`n")) { "`r`n" } else { "`n" }
+    $nl = Get-DocumentNewline -Content $Content
     $summary = Format-ChangelogPendingSummary -Content $Content
     $lines = @($Content -split "`r?`n")
     $fenced = Get-FencedLineFlags -Lines $lines
@@ -4166,7 +4174,7 @@ function Get-ChangelogEntryBlocks {
     #>
     param([Parameter(Mandatory)][AllowEmptyString()][string]$Content)
 
-    $nl = if ($Content.Contains("`r`n")) { "`r`n" } else { "`n" }
+    $nl = Get-DocumentNewline -Content $Content
     $lines = @($Content -split "`r?`n")
     $headingRx = Get-EntryHeadingPattern
     $fenced = Get-FencedLineFlags -Lines $lines

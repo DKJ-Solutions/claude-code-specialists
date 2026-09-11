@@ -442,8 +442,7 @@ function Split-Changelog {
     #>
     param([Parameter(Mandatory)][string]$Content)
 
-    $usesCRLF = $Content.Contains("`r`n")
-    $nl = if ($usesCRLF) { "`r`n" } else { "`n" }
+    $nl = Get-DocumentNewline -Content $Content
     $lines = $Content -split "`r?`n"
 
     # Fence-aware: an intro that quotes an entry heading inside a fence -- this repo's own changelog
@@ -666,8 +665,7 @@ function Set-ReleaseInternalNoteLink {
         [string]$DevRelPath = ''
     )
 
-    $usesCRLF = $Content.Contains("`r`n")
-    $nl = if ($usesCRLF) { "`r`n" } else { "`n" }
+    $nl = Get-DocumentNewline -Content $Content
 
     # The row's own shape: '| [3.6.0](<target>) | <date> | <type> | <title> |'. Anchored on the VERSION
     # inside the link text, so an overview holding every release ever cut cannot have an older row

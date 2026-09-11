@@ -710,18 +710,13 @@ if (-not (Test-Path -LiteralPath $folderReadmeAbs -PathType Leaf)) {
         # 'already carries the current block' -- the defect repairing its own symptom while leaving the
         # page in a state nobody wrote. Without autocrlf it is a whole-file whitespace diff instead.
         #
-        # SO THE STYLE IS READ OFF THE PAGE, the same idiom release-lib.ps1 and pr-body-lib.ps1 already
-        # use on the documents they edit in place. Both halves follow from one reading: the compare stops
-        # seeing a difference that is not there, and the write stops introducing one.
-        #
-        # IT IS A WHOLE-FILE READING, AND THAT IS THE KNOWN LIMIT OF IT. A page that is ALREADY mixed --
-        # mostly LF with one stray CRLF somewhere else in it -- answers 'CRLF' here, so the block is
-        # composed CRLF while the head and tail immediately around it are LF: the mix is relocated
-        # rather than removed. That is accepted rather than overlooked. Every other document-editing
-        # script in this tree reads the same whole-file question, so a neighbourhood-local answer here
-        # would make this the one file that judges differently from all of them, and the page it would
-        # be judging is one nothing in this workflow wrote that way.
-        $pageNl = if ($existingReadme.Contains("`r`n")) { "`r`n" } else { $nl }
+        # SO THE STYLE IS READ OFF THE PAGE, through the same helper release-lib.ps1 and pr-body-lib.ps1
+        # read it with on the documents they edit in place. Both halves follow from one reading: the
+        # compare stops seeing a difference that is not there, and the write stops introducing one. The
+        # reading was hand-typed here and at eight other sites until #1832 gave it one definition;
+        # document-newline-lib.ps1's banner carries the whole-file limit of it, which is accepted rather
+        # than overlooked and is the same in every caller.
+        $pageNl = Get-DocumentNewline -Content $existingReadme
         # The block is composed with its own leading blank line, so the head is trimmed of trailing
         # newlines to keep a re-run from growing the gap above it by one line every time.
         $fresh = (($folderReadmeUpdate -join $pageNl).TrimStart("`r", "`n"))
@@ -748,7 +743,7 @@ if (-not (Test-Path -LiteralPath $folderReadmeAbs -PathType Leaf)) {
     # CRLF page leaves exactly the mixed file state 2 was leaving, in the one branch that puts the block
     # into a page this command has never touched before. A consumer's FIRST adoption is the worst moment
     # to do that, so it reads the style off the page for the same one-line cost.
-    $pageNl = if ($existingReadme.Contains("`r`n")) { "`r`n" } else { $nl }
+    $pageNl = Get-DocumentNewline -Content $existingReadme
     $readmeAppendix = (($folderReadmeUpdate -join $pageNl) + $pageNl)
     if ($existingReadme.Length -gt 0 -and -not $existingReadme.EndsWith("`n")) { $readmeAppendix = $pageNl + $readmeAppendix }
     [System.IO.File]::AppendAllText($folderReadmeAbs, $readmeAppendix, $Utf8NoBom)
