@@ -1,6 +1,6 @@
 ---
 name: adopt-dkj-policy
-description: Adopt the dkj-policy workflow in a consuming repo, in three independent parts that can run in any order or alone. Part 1 scaffolds the workflow's own root folder -- dkj-policy/ -- the folder docs (README and CONTRIBUTING), the releases root with this repo's release answers, and the branch-entry CI gate; use this right after installing the plugin, or when the script-contract session check reports the folder missing, since an install alone writes nothing into the repo. Part 2 adopts the source repo's workflow configuration from the shipped blueprint -- placing the values that state the shared way of working into this repo's own seam libs, and proposing the rest for a person to answer; use this after specialists-init has laid down scripts/repo-config.ps1 and scripts/lib/branch-info.ps1, or whenever the script-contract check reports functions this repo has never configured. Part 3 builds the CI floor -- it places the two runners that keep the fold and the resolves verification alive across a merge the shipping session never observes (a merge queue, or the GitHub UI merge button), and reports whether a required status check exists at all, which is the certificate ship-pr dates its staleness guard from; use it after installing the plugin, when ship-pr says the staleness guard is off because no required check is known, or when a merge landed and nothing folded. A merge queue is optional and is not this workflow policy: most repos cannot have one, so a missing queue is reported as the ordinary state rather than as a gap. All three parts are strictly additive and dry-run by default; none overwrites anything.
+description: Adopt the dkj-policy workflow in a consuming repo, in three independent parts that can run in any order or alone. Part 1 scaffolds the workflow's own root folder -- dkj-policy/ -- the folder docs (README and CONTRIBUTING), the releases root with this repo's release answers, the branch-entry CI gate, and the PR template open-pr fills in; use this right after installing the plugin, or when the script-contract session check reports the folder missing, since an install alone writes nothing into the repo. Part 2 adopts the source repo's workflow configuration from the shipped blueprint -- placing the values that state the shared way of working into this repo's own seam libs, and proposing the rest for a person to answer; use this after specialists-init has laid down scripts/repo-config.ps1 and scripts/lib/branch-info.ps1, or whenever the script-contract check reports functions this repo has never configured. Part 3 builds the CI floor -- it places the two runners that keep the fold and the resolves verification alive across a merge the shipping session never observes (a merge queue, or the GitHub UI merge button), and reports whether a required status check exists at all, which is the certificate ship-pr dates its staleness guard from; use it after installing the plugin, when ship-pr says the staleness guard is off because no required check is known, or when a merge landed and nothing folded. A merge queue is optional and is not this workflow policy: most repos cannot have one, so a missing queue is reported as the ordinary state rather than as a gap. All three parts are strictly additive and dry-run by default; none overwrites anything.
 ---
 
 # adopt-dkj-policy -- scaffold the folder, place the config seams, build the CI floor
@@ -37,12 +37,22 @@ dkj-policy/
   (<branch>.md is NOT placed -- one per branch, living only while that branch is open)
 ```
 
-**And one file outside it**, since August 20, 2026 (inbound
-[#789](https://github.com/DaveKJohn/claude-code-specialists/issues/789)):
+**And two files outside it**, since August 20, 2026 (inbound
+[#789](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/789)) and September 11, 2026
+([#1843](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1843)):
 
 ```text
 .github/workflows/branch-entry.yml   the CI gate that holds every PR to carrying a written entry
+.github/pull_request_template.md     the PR body open-pr fills in, copied from the plugin's reference
 ```
+
+The second is a **copy** where the first is a call, and it has to be: GitHub reads a PR template only
+from that path in your own repo, so it is the one file in this cycle that cannot be imported. It used to
+be the one file you copied by hand -- and the cost of forgetting was invisible, because `open-pr` builds
+its body only when that path exists and says nothing when it does not. **A repo without it got PRs with
+no body at all.** Like everything else here it is never overwritten, so a template you already have --
+your checkboxes, your sections, even an older placeholder the matcher still recognises on purpose --
+is left exactly as it is.
 
 ### Run it
 
