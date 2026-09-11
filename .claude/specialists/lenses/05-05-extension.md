@@ -662,6 +662,39 @@ is the half of #1685 that had a deadline: a taxonomy applied only to new issues 
 two, and the older half is where the backlog actually is. Two came out at `prio-4` (#1678, #1679), three
 at `prio-3` (#1685 itself among them), four at `prio-2` and one at `prio-1`.
 
+### The reach label — `minor`, and it is a second axis, not a fifth rung
+
+**`minor` is the reach label, and it answers a different question from `prio-N`.** Priority says *when
+somebody should do this*; reach says *who will notice once it lands* — and the two are independent, so an
+issue may carry both, either, or neither. A `prio-4` tier-0 defect is ordinary here (a broken gate nobody
+outside this repo sees), and so is a `prio-1` issue carrying `minor` (a cosmetic change a consumer will
+nonetheless read about in a release note).
+
+| | what it says | who sets it |
+|---|---|---|
+| `prio-1` … `prio-4` | when this should be picked up | whoever files, by judgement |
+| `minor` | the landing will be written at tier 1 or 2, so the release carrying it is a minor | whoever files, from the same scale the entry will be scored on |
+
+**It is not this repo's own convention** — it is the tier model read on an issue instead of on a changelog
+entry, prescribed for every repo running this workflow
+([#1870](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1870), Dave, September 11, 2026), and
+defined in [`RELEASES-portable.md`](../../../plugins/dkj-policy/RELEASES-portable.md#the-same-scale-on-an-issue--the-reach-label).
+That is the whole difference from the prio axis directly above, which
+[#1686](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1686) half 2 deliberately kept
+repo-local: *nothing in the workflow reads a priority*, while the reach scale is read on every entry this
+repo writes. Same shape of question, opposite answer, and the reason is the mechanism rather than the
+preference.
+
+**Absence is the answer, not a missing field.** Tier 0 — only this repo's own developers notice — carries
+no label, and doubt resolves there. A filter that matches everything filters nothing, so the point of the
+label is that `is:open label:minor` is a short list somebody can actually work.
+
+**This repo's label reads the tier-2 wording**, because `Get-ReleaseAudienceTier = 2` here: *"Reaches
+beyond tier 0: subscribers of this service notice it."* A store repo answering tier 1 carries the same
+name with the management wording. The name is deliberately the same in both — it is named after what the
+landing does to the release, which is the one thing true at either audience tier — and `Get-ReachLabel`
+states the string for a repo whose colleagues know the axis by another word. This repo does not answer it
+and does not need to: `minor` is the default.
 ### Tooling & account
 
 - **GitHub CLI (`gh`)** is used for PRs. This repo lives under the **`DKJ-Solutions`** org and is

@@ -195,11 +195,13 @@ the project:
   skips whichever is unset without saying anything. Where a board does carry one, leaving it unset is
   the state that costs something, because the field is then filled by hand or not at all.
 - `Get-ReachLabel` -- **the name GitHub stores for the reach label**, and the one function in this list
-  that says nothing about Asana. The axis it carries is fixed and portable, explained as `tier-1` in
-  [`WORKFLOW-portable.md`](WORKFLOW-portable.md#the-reach-label----the-reach-axis-carried-onto-issues);
+  that says nothing about Asana. The axis it carries is fixed and portable, defined for every repo running this workflow in
+  [`RELEASES-portable.md`](https://github.com/DKJ-Solutions/dkj-claude-plugins/blob/main/plugins/dkj-policy/RELEASES-portable.md#the-same-scale-on-an-issue--the-reach-label)
+  and applied to these two stores in [`WORKFLOW-portable.md`](WORKFLOW-portable.md#the-reach-label----the-reach-axis-carried-onto-issues);
   the string is yours, because a repo renames a label for its own colleagues without consulting a
-  plugin. **Optional, default `tier-1`** -- so answer it only where your label is called something
-  else, and every existing consumer is unchanged by its arrival. A consumer renaming that label on
+  plugin. **Optional, default `minor`** -- so answer it only where your label is called something
+  else, which since [#1870](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1870) means a
+  store still carrying `tier-1` rather than one that has renamed. A consumer renaming that label on
   September 11, 2026 is what made this a seam rather than a literal
   ([#1841](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1841)): `gh issue create` fails
   outright on a label the repo does not have, so the filing half broke loudly -- while

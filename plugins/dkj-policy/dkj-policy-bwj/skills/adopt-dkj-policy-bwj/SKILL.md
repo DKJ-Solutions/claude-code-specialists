@@ -128,9 +128,10 @@ function Get-AsanaIssueFieldGid { $null }
 # resolves Bug/Feature/Task by name from the project itself.
 function Get-AsanaTypeFieldGid { $null }
 
-# The NAME GitHub stores for the reach label. The axis itself is fixed and WORKFLOW-portable.md
-# explains it as tier-1; only the string is this repo's to choose. Optional: 'tier-1' is the default,
-# so a repo that never answers it is unchanged.
+# The NAME GitHub stores for the reach label. The axis itself is fixed and portable -- defined in
+# RELEASES-portable.md -- and only the string is this repo's to choose. Optional: 'minor' is the
+# default, so a store whose label is already called that never writes this function at all. Answer it
+# where yours is not: 'tier-1' in a store that has not renamed its label.
 function Get-ReachLabel { 'tier-1' }
 ```
 
@@ -139,8 +140,10 @@ one out and belongs in the list anyway: every other value states something about
 states a string GitHub holds. It exists because a consumer renamed that label while the name was
 written as a literal in four places, two of which then pointed at a label the repo no longer had
 ([#1841](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1841)). **Propose it only where
-the repo's label is not `tier-1`**: the default is what every existing consumer already has, and a
-function restating the default is a value somebody now has to maintain.
+the repo's label is not `minor`**: that is this workflow's default since
+[#1870](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1870), and a function restating the
+default is a value somebody now has to maintain. Today that means proposing it in a store still carrying
+`tier-1` and not in one that has already renamed.
 
 **`SubmitterPattern` is the one value here that decides whether a whole column is used.** Stage 6 is
 entered only once the submitter has been told, so a repo that names no pattern never enters it: every

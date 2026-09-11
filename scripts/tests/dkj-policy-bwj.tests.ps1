@@ -573,10 +573,11 @@ Write-Host "`n-- the reach label --" -ForegroundColor Cyan
 
 # A consumer may rename the GitHub label that carries the reach axis -- smartwatchbanden renamed
 # 'tier-1' to 'minor' on September 11, 2026 -- so every place this plugin TYPES a label name reads
-# Get-ReachLabel instead. The axis itself is still explained under the name 'tier-1' in the prose, and
-# that is deliberate: what is repo-specific is the string GitHub stores, not the model. So these
-# asserts are aimed at the COMMANDS and nothing else, which is why they match on the flag as well as
-# on the name rather than on 'tier-1' anywhere in the file.
+# Get-ReachLabel instead. Since #1870 'minor' is the workflow's own default and the axis is defined one
+# layer up, in dkj-policy's RELEASES-portable.md; what stays repo-specific is the string GitHub stores,
+# never the model. So these asserts are aimed at the COMMANDS and nothing else, which is why they match
+# on the flag as well as on the name rather than on 'tier-1' anywhere in the file -- the word is still
+# legitimate prose here, naming the store that has not renamed its label.
 $reachDocs = @{
     'skills\report-issue\SKILL.md'        = 'report-issue'
     'skills\adopt-dkj-policy-bwj\SKILL.md' = 'adopt-dkj-policy-bwj'
@@ -609,13 +610,14 @@ foreach ($rel in $reachDocs.Keys) {
     Assert-True ($txt -match 'Get-ReachLabel') "$($reachDocs[$rel]) names the Get-ReachLabel seam"
 }
 
-# The default is stated, and it is the name every existing consumer already carries -- an arrival that
-# changed the default would silently relabel every one of them. The subject is the VALUE and not the
-# snippet's formatting: an optional 'return', either quote style and a trailing ';' are all the same
-# answer, and pinning the assert to one spelling would fail on a reflow that changed nothing.
+# The PROPOSED value is 'tier-1', and since #1870 that is no longer the default but the opposite: the
+# workflow defaults to 'minor', so this snippet is proposed precisely to a store that has NOT renamed
+# its label and would otherwise file against a name it does not have. The subject is the VALUE and not
+# the snippet's formatting: an optional 'return', either quote style and a trailing ';' are all the
+# same answer, and pinning the assert to one spelling would fail on a reflow that changed nothing.
 $adoptTxt = Get-Content -LiteralPath (Join-Path $PluginRoot 'skills\adopt-dkj-policy-bwj\SKILL.md') -Raw
 Assert-True ([regex]::IsMatch($adoptTxt, 'function\s+Get-ReachLabel\s*\{\s*(?:return\s+)?(["''])tier-1\1\s*;?\s*\}')) `
-    'the proposed seam defaults to tier-1, so an unanswered repo is unchanged'
+    'the proposed seam states tier-1 -- the answer a store that has not renamed its label owes'
 
 # --- every label step 4 checks for is also created (issue #1846) ----------------------------------
 Write-Host "`n-- step 4's label-existence check --" -ForegroundColor Cyan

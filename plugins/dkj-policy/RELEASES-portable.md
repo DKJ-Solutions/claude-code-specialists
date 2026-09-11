@@ -92,6 +92,61 @@ direction that empties a release. Recognise both, write one.
 held against the 19 entries pending at v3.2.0, the single most consequential change for a consumer —
 renaming the marketplace, which breaks every existing install — arrived on a `chore/` branch.
 
+### The same scale on an issue — the reach label
+
+**Reach is a property of the change, not of the document it is written in**, so the scale reads on an
+issue too — before the entry it will eventually be written into exists. An issue whose landing will be
+written at tier 1 or 2 carries the **reach label**; one that will be written at tier 0 does not.
+
+| the issue will land as | label | what that says |
+|---|---|---|
+| tier 1 or 2 | `minor` | it reaches past this repo's own developers, so the release carrying it is a **minor** |
+| tier 0 | *(none)* | only this repo's own developers notice, so the release carrying it is a **patch** |
+
+**The label is named for what the landing does to the release, not for a tier number**, and that is what
+makes one name serve every repo. [What a release must earn](#what-a-release-must-earn) below already
+reads the scale this way — tier 0 alone is a patch, and a tier-1 or tier-2 entry is what earns a minor —
+so `minor` is true in a tier-1 repo and a tier-2 repo alike. A label named `tier-1` is not: it names the
+audience the repo answering `Get-ReleaseAudienceTier = 2` does not have, and the reverse for a tier-1
+repo. The tiers stay the vocabulary of the *entry*, where both numbers are asked for; the label carries
+the one distinction an issue can already answer.
+
+**The name is a row in your tracker's settings, and `Get-ReachLabel` states it** — defaulting to `minor`,
+so a repo that never answers the seam is already right. A repo whose colleagues know the axis by another
+word answers that instead, and every command that types a label reads the seam rather than a literal.
+Reading it is not politeness: `gh issue create` **fails outright** on a label the repo does not have, so
+a literal typed into a repo that renamed its label gets you an error instead of an issue. The seam exists
+because the name *was* a literal, in four places, two of which pointed at a label its own repo no longer
+had ([#1841](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1841), September 11, 2026).
+
+**This is the one label this workflow prescribes**, and [`CONTRIBUTING-portable.md`](CONTRIBUTING-portable.md)
+names it as the exception it is: your other labels are your tracker's business. This one is not a
+free-standing convention but the scale above, projected — which is why it is here, in the document that
+defines that scale, rather than in a repo's own lens.
+
+**The model transfers; the mechanism does not.** A changelog entry is a form with a field per reader, and
+every tier is scored on it — tier 0 included, because an unanswered field reads as an omission rather
+than a decision. A label is not a field, it is a filter, and *a filter that matches everything filters
+nothing*. So: **score every tier on an entry, label only the exception on an issue** (Dave, September 1,
+2026, after two other shapes were tried in a consuming store repo — a `tier-0` label marking the
+exception, which labelled 106 of 135 issues and left the actionable set unmarked, and a `tier-0` floor
+with a second label stacked on it, which is the changelog model exactly and is where the two genuinely
+part company). `is:open label:minor` is then a worklist somebody can actually work.
+
+**The test is whether the reader notices the DEFECT, not whether the file renders to them.** This is the
+mistake a file path invites, and it was made: `smartwatchbanden#455` is a storefront block on the product
+page — inline CSS, an invented hex instead of the token, five unsynchronised copies. It renders correctly
+to every shopper. The named failure is that a copy change has to be made in four places with nothing
+reporting the one left behind, which only a developer can see. Tier 0, first classified a tier up on the
+wrong question (*the product page is customer-facing, so a product-page file reaches the business*).
+Re-testing all 31 labelled issues on the sharper question moved a second. **The inverse holds too**: a
+build script no customer will ever load, whose breakage stops a release the business is waiting on, is
+not tier 0.
+
+**Doubt resolves to tier 0** — no label (Dave, September 1, 2026, on three borderline cases in that
+backfill). The point of the label is a short list somebody can work, and it is cheap to add later with
+`gh issue edit <n> --repo <owner>/<repo> --add-label <reach label>`.
+
 ### What a release must earn
 
 `cut-release.ps1` refuses a bump the pending entries have not earned. Three rules, all checked before
