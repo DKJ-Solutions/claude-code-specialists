@@ -105,7 +105,33 @@ polish:
 - [~] The eight-site duplication of the newline reading is NOT repaired here -- filed as #1832. It spans
       three mirrored libs and five files, and my own sweep found a site the review did not name
       (`cut-release.ps1:1129`); repointing all eight is its own change, not a rider on a two-line fix.
-- [x] Suite green after the round: 118 asserts
+
+#### And then Nolan measured what the new fixture costs, so three of its runs are gone
+
+Every `Invoke-Adopt` is a real child process running the scaffold -- ~440ms, most of it the script's own
+dot-sourcing rather than interpreter start-up -- and this suite was already 31st of 84 before the branch
+touched it. The first draft added 8 spawns; 3 of them bought nothing:
+
+- [x] The "current CRLF page" case no longer scaffolds a page to convert. It seeds the fixture from
+      `$readme11`, which **is** the page the scaffold writes, read off disk in section 11 -- so the
+      fixture is derived from that page rather than restated, and stays in step if it ever changes.
+- [x] Its dry run is gone: the `already carries the current block` branch is decided by
+      `$rebuilt -eq $existingReadme` and never consults `$Apply`, so the dry run reached the identical
+      line and wrote nothing either. One `-Apply` run pins the verdict *and* byte-for-byte, which is
+      strictly the stronger pair. The dry-run contract on a CRLF page is asserted on the stale-block run
+      instead, which this section still spawns -- dropping the assert along with the spawn would have
+      quietly taken that coverage with it.
+- [x] The "an LF page is still current" run is gone: section 11's re-run already applies the repaired
+      script to an LF page and compares the result byte for byte. Only the CR count was missing, and that
+      is an assert on bytes already in hand. Moved there.
+- [x] 25 spawns against the 20 this suite had before the branch, not 28. Measured 10.7-10.9s over three
+      runs, against the ~11.9s the 8-spawn draft took.
+- [x] Re-verified that the leaner suite is no weaker -- each half of the repair still fails on its own:
+      whole repair reverted 5 failed / 111 passed, state 2 only 4 / 112, state 4 only 2 / 114
+- [x] Suite green: 116 asserts
+- [~] `suite-durations.json` still carries this suite's pre-branch row and cannot be refreshed from here
+      -- `record-suite-durations.ps1` regenerates it from CI **run ids**, which do not exist until this
+      merges. Filed as #1833, with the general question of what reports such staleness at all.
 
 ### DEPLOY: fix/1829-crlf-section-drift
 

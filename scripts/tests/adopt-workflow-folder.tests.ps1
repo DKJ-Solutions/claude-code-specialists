@@ -409,6 +409,11 @@ Assert-Match 'releases/history\.md' $relText '-Apply: it names where the list ac
     Assert-Equal 1 ([regex]::Matches($readme11b, [regex]::Escape($Marker)).Count) 'update re-run: still exactly one section'
     Assert-Equal $readme11 $readme11b 'update re-run: the page was not touched at all'
     Assert-Match 'already carries the current block' $r11b.Flat 'update re-run: and it says so rather than staying silent'
+    # AND PURE LF, which is what keeps #1829's repair from being a one-platform fix: the style is read
+    # off the page, so a page with no CR in it is still written without one. Asserted here rather than
+    # in section 13 because this run has already applied the repaired script to an LF page -- the fact
+    # was there to be read, not to be measured again in a fresh process (Nolan, on this branch).
+    Assert-Equal 0 ([regex]::Matches($readme11b, "`r").Count) 'update re-run: and the page is still pure LF -- no CR was introduced'
 
     # THE CASE THIS BLOCK EXISTS FOR: a repo that adopted BEFORE the section existed. Its README is its
     # own writing with no marker anywhere -- the state every already-adopted consumer is in.
@@ -508,23 +513,29 @@ Assert-Match 'releases/history\.md' $relText '-Apply: it names where the list ac
     # each fails on its own: the VERDICT must read 'current', and a page that genuinely IS stale must
     # still be replaced -- a compare repaired by normalising both sides would pass the first assert
     # and then write LF into the page anyway, which is the mixed file the defect already produced.
+    # THE FIXTURE IS SEEDED FROM $readme11, NOT SCAFFOLDED AGAIN (Nolan, on this branch). Every
+    # Invoke-Adopt here is a real child process at ~440ms, so a spawn that only produces bytes this
+    # suite is already holding is 440ms of gate and CI time on every PR. $readme11 IS the page the
+    # scaffold writes -- section 11 read it off disk -- so converting a copy of it is the same fixture
+    # one process cheaper, and it stays in step if that page's content ever changes.
     Write-Host "adopt-workflow-folder -- a CRLF page is judged on its block, and rewritten in its own endings" -ForegroundColor Cyan
     $c15 = New-FixtureConsumer -Label 'crlf-page'
-    $r15 = Invoke-Adopt -Dir $c15 -ScriptArgs @('-Apply')
-    Assert-Equal 0 $r15.Code 'crlf: scaffold exit 0'
+    New-Item -ItemType Directory -Path (Join-Path $c15 'dkj-policy') -Force | Out-Null
     $p15 = Join-Path $c15 'dkj-policy\README.md'
 
-    # Convert the freshly scaffolded page to CRLF, exactly as autocrlf=true checks it out. Nothing else
-    # about it changes -- this is the same bytes the previous section asserted 'nothing to do' on.
-    $lf15 = [System.IO.File]::ReadAllText($p15, [System.Text.Encoding]::UTF8)
-    $crlf15 = (($lf15 -replace "`r`n", "`n") -replace "`n", "`r`n")
+    # The page exactly as autocrlf=true checks it out. Nothing about it changes but the line endings --
+    # these are the bytes section 11 asserted 'nothing to do' on, one conversion over.
+    $crlf15 = (($readme11 -replace "`r`n", "`n") -replace "`n", "`r`n")
     [System.IO.File]::WriteAllText($p15, $crlf15, (New-Object System.Text.UTF8Encoding($false)))
-    Assert-True ($crlf15 -ne $lf15) 'crlf: the fixture really is a different byte sequence than the LF page'
+    Assert-True ($crlf15 -ne $readme11) 'crlf: the fixture really is a different byte sequence than the LF page'
 
-    $r15b = Invoke-Adopt -Dir $c15
-    Assert-Match 'already carries the current block' $r15b.Flat 'crlf: the current block reads as current, not as drift'
-    Assert-True ($r15b.Flat -notmatch 'would be replaced') 'crlf: and nothing is proposed'
+    # ONE RUN PROVES BOTH FACTS, so there is no dry run beside it: the script's 'already carries the
+    # current block' branch is decided by `$rebuilt -eq $existingReadme` and never consults $Apply, so a
+    # dry run over a current page reaches the identical line and writes nothing either. An -Apply run
+    # therefore pins the verdict AND that the page is left byte for byte, which is the stronger pair.
     $r15c = Invoke-Adopt -Dir $c15 -ScriptArgs @('-Apply')
+    Assert-Match 'already carries the current block' $r15c.Flat 'crlf: the current block reads as current, not as drift'
+    Assert-True ($r15c.Flat -notmatch 'drifted') 'crlf: and no drift is reported'
     Assert-Equal $crlf15 ([System.IO.File]::ReadAllText($p15, [System.Text.Encoding]::UTF8)) `
         'crlf: -Apply over a current CRLF page leaves it byte for byte'
 
@@ -538,6 +549,11 @@ Assert-Match 'releases/history\.md' $relText '-Apply: it names where the list ac
     [System.IO.File]::WriteAllText($p15, $stale15, (New-Object System.Text.UTF8Encoding($false)))
     $r15d = Invoke-Adopt -Dir $c15
     Assert-Match 'would be replaced' $r15d.Flat 'crlf stale: a genuinely stale CRLF block is still reported'
+    # THE DRY-RUN CONTRACT ON A CRLF PAGE, asserted here because this is the one dry run this section
+    # still spawns -- the 'current page' case above no longer needs one, and dropping the assert with
+    # the spawn would have quietly taken this half of the coverage with it.
+    Assert-Equal $stale15 ([System.IO.File]::ReadAllText($p15, [System.Text.Encoding]::UTF8)) `
+        'crlf stale dry: and wrote nothing'
     $r15e = Invoke-Adopt -Dir $c15 -ScriptArgs @('-Apply')
     Assert-Match 'brought up to date' $r15e.Flat 'crlf stale: and replaced'
     $after15 = [System.IO.File]::ReadAllText($p15, [System.Text.Encoding]::UTF8)
@@ -564,16 +580,12 @@ Assert-Match 'releases/history\.md' $relText '-Apply: it names where the list ac
     $r16b = Invoke-Adopt -Dir $c16
     Assert-Match 'already carries the current block' $r16b.Flat 'crlf append: the page it just wrote reads as current'
 
-    # AND THE LF PAGE IS UNCHANGED BY THE REPAIR, which is the assert that keeps this from being a
-    # one-platform fix: the style is read off the page, so a page with no CR in it still gets pure LF.
-    # READ BACK FROM DISK, not from $readme11 -- that variable was captured in section 11 and asserting
-    # against it here would re-check a fact that was already true before this -Apply ran, which is the
-    # shape of an assert that cannot fail (Victor, on this branch).
-    $r15f = Invoke-Adopt -Dir $c11 -ScriptArgs @('-Apply')
-    Assert-Match 'already carries the current block' $r15f.Flat 'crlf: an LF page is still judged current'
-    $after11 = [System.IO.File]::ReadAllText((Join-Path $c11 'dkj-policy\README.md'), [System.Text.Encoding]::UTF8)
-    Assert-Equal $readme11 $after11 'crlf: and the LF page is byte for byte what it was'
-    Assert-Equal 0 ([regex]::Matches($after11, "`r").Count) 'crlf: no CR was introduced into an LF page'
+    # THE OTHER HALF OF "not a one-platform fix" -- that an LF page is still judged current and still
+    # written pure LF -- IS PINNED IN SECTION 11 AND NOT RE-SPAWNED HERE. Its re-run already applies the
+    # repaired script to an LF page, reads the result off disk and compares it byte for byte; the only
+    # thing missing was the CR count, which is an assert on bytes this suite already holds rather than a
+    # reason to start a sixth process (Nolan, on this branch). A copy here would have been the same
+    # fixture, in the same state, one process later.
 } finally {
     if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture -ErrorAction SilentlyContinue }
 }
