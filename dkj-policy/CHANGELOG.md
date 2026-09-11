@@ -43,7 +43,61 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**2 / 2 minor entries** <!-- pending-tally -->
+**3 / 3 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1821-connector-origin-mismatch · 20260911-005322
+
+`check-connectors.ps1` followed a record's `localCheckout` by path and never asked which repository
+the folder actually was. Measured on two machines: the record for `BWJ-Development/smartwatchbanden`
+resolves to a clone of the archived `BWJ-ecommerce/smartwatchbanden` -- two distinct repositories that
+merely share a name half -- and the check printed five confident `[ERROR]` lines about a repository it
+had never opened. That is worse than silence, because it invites somebody to repair a consumer that is
+already correct.
+
+Check **1b** now reads the checkout's own `origin` before anything reads that disk on the named repo's
+behalf, and says what it measured rather than what it guessed. Agreement is silent. A mismatch is one
+`[ERROR]` naming both slugs, stating that nothing about the named repository was checked, and giving
+the two things it can be -- a clone of a different repository, or a `localCheckout` pointing at the
+wrong folder here -- with the command for each; every verdict below is withheld rather than printed
+against a repo that was never read. It does not claim more than a local read can support: without a
+network call this run cannot tell a different repository from an old spelling still answering a
+transfer redirect, and the finding says so.
+
+Two things the review round changed, both of which the finding turns on. The question asked is whether
+the checkout is the work tree **root**, not whether it sits inside one -- `--is-inside-work-tree` is
+true for any folder nested in a parent repo, so a `localCheckout` resolving to a folder that was never
+a clone used to be reported under its enclosing repository's `origin`: a false `[ERROR]` blaming the
+wrong repo, or a false *silent agreement* where the enclosing repo happened to match. And the printed
+remedy holds the register's slug to GitHub's own shape before composing a copy-pasteable command from
+it -- the guard this same file already applies to that field before it reaches an API call, which the
+first draft skipped.
+
+The arm that makes it safe to ship is the one the issue did not anticipate. A plain comparison fires
+falsely on the source repo's **own** connector -- `connectors/dkj-claude-plugins.json` names
+`DKJ-Solutions/dkj-claude-plugins` while this checkout's `origin` is still
+`DKJ-Solutions/claude-code-specialists`, the #1769 rename landing on a transfer redirect. So a mismatch
+that this repo's own rename history explains is a dim `[SKIP]` naming the one command that ends it, and
+the run proceeds untouched. Without it the check would have cried wolf about itself at every session
+start, in the repo that ships it.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+A consumer's own session runs this check too, scoped to its own manifest, so a consumer whose checkout
+was cloned before a rename or an org move stops being told that five plugins are not enabled and is
+told the one true thing instead: the folder being read is not the repository the register names. It
+only fires where that is actually the case, which is why it is not higher.
+
+**Score:** 2
+
+#### Pull Request
+
+check-connectors names the repository a checkout actually is
+
+[PR #1826](https://github.com/DKJ-Solutions/dkj-claude-plugins/pull/1826)
+
+---
 
 ### DEPLOY: docs/1820-marketplace-remove-machine-wide · 20260910-231520
 
