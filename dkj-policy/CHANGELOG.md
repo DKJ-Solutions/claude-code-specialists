@@ -43,7 +43,48 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**9 / 18 minor entries** <!-- pending-tally -->
+**9 / 19 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1853-parked-fix-scan · 20260911-134537
+
+`claim-issue` now reads the **branches** as well as the tracker. Before this, all three signals a
+session has when it picks up an issue -- the issue's state, its assignees, and any pull request
+resolving it -- read exactly the same whether the work was untouched or already finished and pushed
+on a **parked** branch, because the PR-shaped check has nothing to find when there is no PR. Measured
+September 11, 2026 ([#1853](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1853)): #1847
+was claimed correctly, read, repaired and committed, and only `open-pr`'s remote-ahead gate revealed
+that the identical fix was already sitting on `origin/feat/1842-unify-prio-labels-bwj` and said so in
+its own commit message. The claim step now scans the commit messages off the trunk for the issue
+number -- in the three spellings this workflow writes: `#1853`, the commit scope `fix(1853):`, and
+the branch name `/1853-` that a freshly parked branch carries -- and names the branch and the commits
+it found, grouped by branch and capped so a long branch cannot bury the rest of the output. It
+**warns and never refuses**: an issue can be legitimately named by a commit that does not fix it, and
+a claim that blocks costs the whole assignment. It runs on a resume as well as a fresh claim, and it
+is silent about the session's own branch and about the trunk.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A. The audience here is whoever picks up an issue in a repo running this workflow -- a developer,
+never a subscriber of any service either consumer repo sells. What it saves them is the work between
+a claim and the first gate that would have noticed: in the measured instance, one file read, one line
+edited, one lint run and one commit, all discarded. That cost scales with how long the fixing branch
+stays parked without a PR, which can be indefinite.
+
+**Score:** N/A
+
+#### Pull Request
+
+claim-issue reads the branches for a fix already pushed without a PR
+
+Closes #1853
+
+Plugins: dkj-policy
+
+[PR #1861](https://github.com/DKJ-Solutions/dkj-claude-plugins/pull/1861)
+
+---
 
 ### DEPLOY: feat/1857-mirror-depth-gate · 20260911-132257
 
