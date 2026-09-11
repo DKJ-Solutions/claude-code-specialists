@@ -148,6 +148,9 @@ try {
     Assert-Match 'DRY RUN' $r1.Out 'dry run: says so out loud'
     Assert-Match '\[create\]\s+dkj-policy/README\.md' $r1.Out 'dry run: lists the folder README as to-create'
     Assert-True (-not (Test-Path -LiteralPath (Join-Path $c1 'dkj-policy'))) 'dry run: the folder was not created'
+    # The PR template is in the plan and not on disk -- the whole promise of the default run (#1843).
+    Assert-Match '\[create\]\s+\.github/pull_request_template\.md' $r1.Out 'dry run: lists the PR template as to-create'
+    Assert-True (-not (Test-Path -LiteralPath (Join-Path $c1 '.github\pull_request_template.md'))) 'dry run: and did not write it'
 
     # --- 2. -Apply places the whole folder ----------------------------------------------------------
     Write-Host "adopt-workflow-folder -- -Apply places every file" -ForegroundColor Cyan
@@ -178,6 +181,40 @@ try {
     foreach ($judged in @(Test-SharedScriptReference -Reference $gateRefs -SourceRoot $RepoRoot)) {
         Assert-True $judged.Exists "-Apply: the gate runs '$($judged.Path)', and that path EXISTS in this tree"
     }
+
+    # --- THE PR TEMPLATE, THE SECOND FILE PLACED OUTSIDE THE FOLDER (#1843) -----------------------
+    # It is a COPY where the gate above is a call, because GitHub reads a PR template only from this path
+    # in the consumer's own repo. What makes its absence worth a test rather than a note: open-pr wraps
+    # its whole body-building block in 'if (Test-Path $templatePath)' with no else, so a consumer without
+    # the file gets a PR with no body at all and no warning -- the one warning that block carries fires
+    # on a placeholder that does not MATCH, which is a different state.
+    #
+    # NEITHER ASSERT RESTATES THE TEMPLATE, for the reason the gate asserts above were rewritten (#1805):
+    # a literal here would compare the scaffolder's output against this file rather than against the
+    # thing it has to agree with, and stay green when that thing moves. So the first reads the shipped
+    # reference off disk, and the second reads the placeholder list open-pr itself matches on.
+    $prtRel = '.github\pull_request_template.md'
+    $prtPlaced = Join-Path $c2 $prtRel
+    Assert-True (Test-Path -LiteralPath $prtPlaced -PathType Leaf) '-Apply: the PR template is placed'
+    $prtRefPath = Join-Path $RepoRoot 'plugins\dkj-policy\templates\pull_request_template.md'
+    Assert-True (Test-Path -LiteralPath $prtRefPath -PathType Leaf) '-Apply: and the shipped reference it is copied from exists in this tree'
+    if ((Test-Path -LiteralPath $prtPlaced) -and (Test-Path -LiteralPath $prtRefPath)) {
+        $prtPlacedText = [System.IO.File]::ReadAllText($prtPlaced, [System.Text.Encoding]::UTF8)
+        $prtRefText    = [System.IO.File]::ReadAllText($prtRefPath, [System.Text.Encoding]::UTF8)
+        Assert-Equal ($prtRefText -replace "`r`n", "`n") ($prtPlacedText -replace "`r`n", "`n") `
+            '-Apply: what is placed is the shipped reference, not a second copy typed into the scaffolder'
+
+        # THE CONTRACT, NOT THE BYTES: one line of what lands has to be a placeholder open-pr recognises,
+        # or the consumer gets PRs with no description -- the outcome the whole list exists to prevent.
+        # Read from pr-body-lib so a reference edited without its matcher fails HERE, at adoption, rather
+        # than silently in a consumer's first PR.
+        . (Join-Path $RepoRoot 'scripts\lib\pr-body-lib.ps1')
+        $prtKnown = @(Get-PrDescriptionPlaceholderDefaults)
+        $prtLines = @(($prtPlacedText -replace "`r`n", "`n") -split "`n" | ForEach-Object { $_.TrimEnd() })
+        Assert-True ([bool](@($prtLines | Where-Object { $prtKnown -contains $_ }).Count)) `
+            '-Apply: and it carries a line open-pr recognises as the description placeholder'
+    }
+
     # THE BRANCH DOCUMENT IS NOT PLACED, and that is this adopter's half of the lifetime rule (Dave,
     # August 23, 2026). It used to be written here in its reset state, so a consumer's first look at the
     # folder was also their reference. The document exists only while a branch is open now, so placing one
@@ -256,6 +293,19 @@ Assert-Match 'releases/history\.md' $relText '-Apply: it names where the list ac
     Assert-Match '\[exists\]\s+dkj-policy/CONTRIBUTING\.md' $r3.Out 're-run: the edited file is reported as left alone'
     $kept = [System.IO.File]::ReadAllText((Join-Path $c2 'dkj-policy\CONTRIBUTING.md'), [System.Text.Encoding]::UTF8)
     Assert-Equal $marker $kept 're-run: the hand-edited content survives byte for byte'
+
+    # AND THE SAME FOR THE PR TEMPLATE, asserted separately because it is the file most likely to be
+    # already there and the only one placed as a verbatim copy (#1843). A consumer who has been running
+    # this workflow for months has their own -- with their checkboxes, their sections, possibly an older
+    # placeholder this script's own matcher still recognises on purpose. Overwriting it would replace a
+    # working form with a one-line stub and take their PR body's whole structure with it.
+    $prtMine = "<!-- MY OWN TEMPLATE -- the scaffold must never win over this -->`n`n## Checklist`n- [ ] mine"
+    [System.IO.File]::WriteAllText((Join-Path $c2 $prtRel), $prtMine)
+    $r3b = Invoke-Adopt -Dir $c2 -ScriptArgs @('-Apply')
+    Assert-Equal 0 $r3b.Code 're-run: exit 0 with a PR template already present'
+    Assert-Match '\[exists\]\s+\.github/pull_request_template\.md' $r3b.Out 're-run: the consumer PR template is reported as left alone'
+    Assert-Equal $prtMine ([System.IO.File]::ReadAllText((Join-Path $c2 $prtRel), [System.Text.Encoding]::UTF8)) `
+        're-run: the consumer PR template survives byte for byte'
 
     # --- 4. THE SOURCE OF THIS WORKFLOW is refused ---------------------------------------------------
     Write-Host "adopt-workflow-folder -- refused in the source of this workflow" -ForegroundColor Cyan

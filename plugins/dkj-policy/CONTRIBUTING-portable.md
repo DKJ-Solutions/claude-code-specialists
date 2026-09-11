@@ -235,10 +235,18 @@ about what the change is called.
 
 **The body comes from your own `.github/pull_request_template.md`, and that one file cannot travel with
 the plugin.** GitHub reads it only from that path in your repo, so unlike everything else in this cycle it
-has to be a copy rather than an import. The plugin ships the reference to copy and to diff against at
-`${CLAUDE_PLUGIN_ROOT}/templates/pull_request_template.md`, and **the whole interface is one line: the
-placeholder** the script recognises verbatim, which is where the description is inserted. Break it and
-nothing errors; you get PRs whose body has no description. **The shipped reference is that one line and
+has to be a copy rather than an import. **`adopt-dkj-policy` Part 1 makes that copy for you** — it places
+the file alongside the branch-entry gate, from the plugin's own reference, under the same never-overwrite
+rule as everything else it writes, so a template you already have is left exactly as it is
+([#1843](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1843)). The reference stays published at
+`${CLAUDE_PLUGIN_ROOT}/templates/pull_request_template.md` to read and to diff against, and **the whole
+interface is one line: the placeholder** the script recognises verbatim, which is where the description is
+inserted. Break it and nothing errors; you get PRs whose body has no description.
+
+**And having no file at all is quieter still, which is why the adoption places it rather than advising it.**
+`open-pr` builds its body only when that path exists, so a repo without one gets a PR with **no body at
+all** — no description, no form — and no warning to say why. The warning that block does carry fires on a
+placeholder that does not *match*, which is a different state and the only one anybody had been told about. **The shipped reference is that one line and
 no heading at all, which is the normal shape rather than a broken one** — `-RefreshBody` reads where the
 placeholder sits, so with nothing above it the description is the body's leading section. Everything you
 add below it is the form's, and every heading there is a boundary the refresh will not cross. The
