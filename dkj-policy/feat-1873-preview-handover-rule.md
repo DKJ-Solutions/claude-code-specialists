@@ -36,21 +36,75 @@
 
 ### PLAN
 
+#### What #1873 asks for, and what verifying it changed
+
+Inbound #1873: both BWJ store repos hand a reviewer a markdown table of preview URLs. Verified against
+the tree before routing -- the symptom stands (`Write-PreviewUrls` in `scripts/task/push-preview.ps1`
+prints one bare URL per line; the skill's own description says it "prints the preview URL(s) to hand
+over"), and nothing anywhere states how a preview is handed over. The reason stands too: no page is
+loaded at the moment a preview is pushed, so a policy page alone loses to the printed list.
+
+One thing the report left implicit and this branch states outright: the QR codes it asks for are
+served through the Artifact CSP, which blocks images from every host. A rule prescribing QR codes
+without that constraint produces a page of ten invisible boxes and no error.
+
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [ ] `PREVIEW-HANDOVER-portable.md` -- chapter three of `dkj-policy-bwj`: one link to a published
+      page, what that page carries per market, and why a QR rather than a URL
+- [ ] The plugin `README.md` -- two chapters become three, in all four places it says so
+- [ ] The three overviews outside the plugin that state the chapter count: the root `README.md`,
+      `plugins/dkj-policy/README.md`, and both descriptions in `.claude-plugin/marketplace.json`
+- [ ] The mechanism side, so the rule is carried where the list is printed: a `Get-PreviewHandoverNote`
+      in `scripts/lib/preview-theme.ps1`, printed by `push-preview.ps1` when it emits more than one URL,
+      and a section in the `push-preview` skill page
+- [ ] Mirror the two shared scripts into the plugin (`scripts/sync/build-shared-scripts.ps1`)
 
 ### TEST
 
+- [ ] `push-preview.tests.ps1` covers the new note -- silent on one URL, and carries what it has to
+- [ ] `dkj-policy-bwj.tests.ps1` asserts both portable pages ship and the chapter count is stated
+- [ ] The lint gate and all suites green
+
 ### DEPLOY: feat/1873-preview-handover-rule
 
-**Score:**
+`dkj-policy-bwj` gains a third chapter, `PREVIEW-HANDOVER-portable.md`: **a Shopify preview is handed
+over as one link to a published page, never as a table of URLs.** The page carries, per market, a QR
+code and the concretely changed pages, plus what the gates already proved and the one question the
+reviewer is being asked. The existing requirement is untouched -- the changed pages, per market,
+unasked -- and so is the rule it serves: no PR opens before the preview is approved. What changes is
+the carrier.
+
+The rule is carried where the failure happens, not only where it is stated. `push-preview` printed a
+bare list of URLs and its own page called that list "the preview URL(s) to hand over", so a policy page
+nothing loads at push time would have lost to it every time. `Get-PreviewHandoverNote` in
+`preview-theme.ps1` now prints a closing note whenever more than one URL is emitted -- a list is raw
+material, not a handover -- and the `push-preview` page says the same in prose. Both stay **generic**,
+naming no repo: what is true everywhere is that a wrapped column of 90-character URLs is not a handover
+and the reviewer is on a phone; what the handover *is* stays BWJ's house rule. One URL prints nothing,
+because a single line in a terminal genuinely is a handover.
+
+One thing the report left implicit is stated outright, because without it the rule is unfollowable: a
+published Artifact's CSP permits external scripts from a short list of CDNs and blocks images from
+every host, so a QR pulled from a QR-image API renders as a blank square and says nothing. The page
+names the two shapes that work.
+
+**Score:** 2
 
 #### What makes this deploy extra special
 
-**Score:**
+Both BWJ store repos stop handing their reviewer something they cannot use. The measured handover was
+ten URLs of 70 to 100 characters in a two-column table: the terminal wrapped it until the columns
+saying *which market, which page* were gone, the reviewer was on the phone the change only existed on,
+and everything about what was proven and what was being asked stayed in the transcript. A QR per market
+is the difference between reviewing the change and retyping a query string ten times.
+
+Every other Shopify consumer gets the generic half -- the note under a multi-URL list -- and nothing
+else changes for them: no seam to answer, no file to scaffold, and a single-market repo sees no new
+output at all.
+
+**Score:** 4
 
 #### Pull Request
 
 A preview is handed over as one link to a published page, not as a table of URLs
-
