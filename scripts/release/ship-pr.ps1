@@ -377,6 +377,26 @@ if (-not (Test-Path -LiteralPath $configPath)) {
 # dot-source as the six above -- a payload missing this file must fail at load rather than print an
 # unguarded command.
 . (Join-Path $PSScriptRoot '..\lib\ref-print-lib.ps1')
+
+# THE CLOSE-OUT RECEIPT SHAPE (issue #1884), printed as this run's last line -- see closeout-lib.ps1
+# for why step 6 of the ritual got a mechanism after losing four times in prose. Guarded on
+# git-porcelain-lib's grounds: a consumer whose mirror predates this lib must not crash on load, and
+# the call site tests for the function rather than assuming the dot-source took.
+$shipCloseoutLib = Join-Path $PSScriptRoot '..\lib\closeout-lib.ps1'
+if (Test-Path -LiteralPath $shipCloseoutLib -PathType Leaf) { . $shipCloseoutLib }
+
+# WHAT THIS RUN WAS TOLD TO SKIP, in the words the operator typed (issue #1884). The close-out's three
+# permitted shapes have no home for "I deviated from a gate", so a session that bypassed one discloses
+# it in the reply -- correctly refusing to let the requester learn it later, and with nowhere else to
+# put it. The script knows the fact and the persona cannot, so the reminder carries it to the PR body.
+function Get-ShipBypassNote {
+    $skipped = @()
+    if ($SkipLint)  { $skipped += '-SkipLint' }
+    if ($SkipTests) { $skipped += '-SkipTests' }
+    if ($skipped.Count -eq 0) { return '' }
+    return ($skipped -join ' and ')
+}
+
 $repo = Get-RepoName
 
 # The merge method is repo POLICY, not script logic (issue #411): this workshop merges, another repo
@@ -2429,6 +2449,12 @@ if ($queueActive) {
         Write-Host "  The NOT-required checks were not waited for here (#1602). Read them with:" -ForegroundColor DarkGray
         Write-Host "    gh pr checks $pr --repo $repo" -ForegroundColor DarkGray
     }
+    # THE RECEIPT SHAPE IS THE LAST THING ON SCREEN (issue #1884), on this ending as much as on the
+    # merged one below: a queue ship closes out too, and its receipt is the harder of the two to keep
+    # short, because the run has just printed a page about what the queue will do next.
+    if (Test-FunctionDefined 'Write-CloseOutReceipt') {
+        Write-CloseOutReceipt -Cite "PR #$pr" -Bypass (Get-ShipBypassNote)
+    }
     exit 0
 }
 if (-not $mergedState) {
@@ -3045,4 +3071,11 @@ if (-not $watchNarrowed) {
     # NO THIRD ARM ON PURPOSE. On a timeout the two lines above the report have already said what
     # happened and what to run; claiming green here would be the same overclaim the TimedOut guard
     # above exists to prevent, and repeating the giving-up sentence would be noise.
+}
+
+# THE LAST LINE OF THE MERGED ENDING, and deliberately the last line of the file: step 7's tail-check
+# block above is conditional, so anything placed inside it would be absent from exactly the quiet,
+# everything-green ship that is most likely to be closed out from memory.
+if (Test-FunctionDefined 'Write-CloseOutReceipt') {
+    Write-CloseOutReceipt -Cite "PR #$pr" -Bypass (Get-ShipBypassNote)
 }

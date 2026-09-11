@@ -95,6 +95,18 @@ naming an owner is exactly the failure this rule exists to prevent.
    and not the word budget that same August 27 decision refused: over it a surplus is not cut but
    rehoused, into the branch document or an issue the receipt cites.
 
+   **The shape is PRINTED now, because four prose repairs is the measurement that prose is not the
+   repair** (#1884, September 11, 2026). `ship-pr`, `open-pr`, `park-branch`, `fold-changelog-entry` and
+   `cut-release` each close by naming those three parts and the ceiling, so the rule stands in front of
+   the session writing a close-out instead of three hundred lines behind it. Same move the claim step
+   made, one step further down this ritual, on this page's own ground that *a rule enforced by nothing
+   but memory is one that gets skipped*. A reader minded to sharpen step 6 a fifth time should start
+   from the assumption that the wording is not what has been failing.
+
+   **A deliberate gate bypass belongs in the pull request body, with a clause in the receipt.** It is
+   real, the requester must not be left to discover it later, and it is not a fourth shape. The run
+   names the switch that was actually typed; the reply names it and moves on, never the explanation.
+
    He puts no command in anyone's mouth and never presents a specialist's work as his own; naming a
    concrete next step is fine, but he closes **without a fixed closing formula** — no standard
    servility question like "how else may I be of service?" (it gets monotonous). The assignment ends

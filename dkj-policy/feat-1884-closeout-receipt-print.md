@@ -36,21 +36,90 @@
 
 ### PLAN
 
+#### What #1884 actually reports, and why the repair is not more prose
+
+Inbound [#1884](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1884), filed from the
+consumer `BWJ-Development/smartwatchbanden`. Chris's fixed ritual has six steps, and step 6 -- the
+close-out -- is the only one with no mechanism behind it. It is also the step that runs last, when the
+session is longest and the rule is furthest back in context.
+
+Verified on pickup against this tree, all six axes:
+
+| axis | verdict |
+|---|---|
+| symptom | **stands** -- the rule is memory-only; every repair to date is prose |
+| reason | **stands** -- `01-01-persona.md:335` states *"a rule enforced by nothing but memory is one that gets skipped"*, and that principle was acted on for the claim step and not for this one |
+| proposed repair | **exists** -- `ship-pr.ps1` carries its `Done: PR #<n> shipped` line at three sites, `park-branch.ps1` and `fold-changelog-entry.ps1` are both real chain enders |
+| size | **understated, in the direction that strengthens it** -- see below |
+| subject | **exists** -- the persona is 380 lines, and the three repairs it cites are live at lines 73, 83 and 91 |
+| repo | **correct** -- the persona is shared plugin source and this repo is its source |
+
+The one correction: the report counts **three** prose repairs from August 27. There are **four** --
+[#849](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/849) (August 24, 2026) created the
+three permitted shapes in the first place, and the August 27 receipt rule,
+[#1402](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1402) and
+[#1408](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1408) all followed it. Recounting a
+report's own figure is this repo's standing habit and it usually shrinks the finding; here it grows it,
+and #1402's diagnosis -- *"this is not a missing rule. It is a rule that keeps losing"* -- holds one
+repair harder than the report claims.
+
+#### Which of #1884's two options this builds, and why
+
+Option 1, printing the shape where a chain ends. Option 2 -- a `Stop` hook measuring the transcript --
+is not built, and the reason is on its merits rather than on cost: it reports a close-out that has
+**already been written**, so its output is a second report to read, which is the complaint itself. The
+report also lists transcript-reading across harness versions as *not investigated*. Option 1 lands
+before a close-out is composed, which is the only moment at which a reminder is free.
+
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [x] `scripts/lib/closeout-lib.ps1` -- `Write-CloseOutReceipt`, printing the three parts and the
+      ceiling in three lines, plus a conditional fourth naming a gate this run was told to skip.
+- [x] Registered in `Get-SharedScriptPairs` as `LibOnly`, and mirrored into `dkj-policy` by
+      `build-shared-scripts.ps1`, so a consumer meets the same shape this repo does.
+- [x] Five chain enders call it, each with the citation that run already knows: `ship-pr.ps1` (both
+      endings -- the queue arm exits before the foot of the file), `open-pr.ps1` (both endings),
+      `park-branch.ps1`, `fold-changelog-entry.ps1` (both arms -- a refusal is closed out too), and
+      `cut-release.ps1` (inside `Write-FollowUpSteps`, so its two exits cannot drift apart).
+- [x] Every dot-source **and** every call is guarded, so a consumer whose mirror predates this lib
+      does not crash on load of the script that merges their work.
+- [x] `#1884`'s second finding answered mechanically rather than in prose: `ship-pr` and `open-pr`
+      read their own `-SkipLint`/`-SkipTests` and route the disclosure to the PR body.
+- [x] `01-01-persona.md`: the mechanism named, and a home stated for a deliberate gate bypass.
 
 ### TEST
 
+- [x] `scripts/tests/closeout-lib.tests.ps1` -- 49 asserts, green. The structural half is the point:
+      each of the five callers is held to dot-sourcing the lib, guarding that dot-source, calling the
+      function and guarding the call, and the two scripts with two endings are held to calling it from
+      both. A mechanism that is defined but not called is the fifth prose repair with extra steps.
+- [x] Output asserted on its three **parts** and its line count, never on its wording -- the wording
+      will be sharpened, and what must not drift is that a part has quietly gone missing.
+- [x] All seven touched scripts parse; the full lint + test gate is green.
+
 ### DEPLOY: feat/1884-closeout-receipt-print
 
-**Score:**
+Chris's close-out now has a mechanism instead of only a rule. The five scripts that end a work chain --
+`ship-pr`, `open-pr`, `park-branch`, `fold-changelog-entry` and `cut-release` -- print the receipt shape
+as their last line: what happened, where to read it, whether the session can be cleared, in two or three
+lines, with anything longer rehoused rather than cut. Where the run was told to skip a gate it says so
+too, and sends that disclosure to the pull request body, which is the one part of a close-out that had
+no home at all.
+
+This is the fifth repair to step 6 and the first that is not prose. The other four -- the three
+permitted shapes, the receipt rule, the bounded filing line and the ceiling -- were all live, all in
+context, and lost anyway; the persona's own principle for the claim step, *a rule enforced by nothing
+but memory is one that gets skipped*, is simply applied one step further down the same ritual.
+
+**Score:** 4
 
 #### What makes this deploy extra special
 
-**Score:**
+N/A -- no subscriber of a service notices this. It changes what a session reads at the end of a run in
+this repo and in every repo running `dkj-policy`; a consumer's own users see nothing.
+
+**Score:** N/A
 
 #### Pull Request
 
 Print the close-out receipt shape where a chain ends
-

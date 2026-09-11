@@ -754,6 +754,27 @@ function Get-SharedScriptPairs {
             LibOnly = $true
         },
         @{
+            # Issue #1884, September 11, 2026. The close-out receipt shape, printed as the last line of a
+            # chain-ending script. Mirrored because EVERY caller is -- ship-pr, open-pr, park-branch,
+            # fold-changelog-entry and cut-release -- and the whole point of the file is that a consumer's
+            # session meets the shape at the same moment this repo's does. A mirror that did not carry it
+            # would leave every consumer on the memory-only rule that has now lost four times.
+            #
+            # THE DOT-SOURCE IS GUARDED IN ALL FIVE CALLERS, on git-porcelain-lib's grounds one entry down:
+            # a consumer whose mirror predates this entry must not crash on load, and each call site tests
+            # for the function rather than assuming the dot-source took. The guard buys an ordered release,
+            # not an optional file.
+            #
+            # ITS OWN FILE, not a function in one of the libs above. Its subject is neither a park, a
+            # capture, a porcelain read nor a PR body -- it is the one thing in this workflow addressed to
+            # the READER of the run rather than to the run. Nothing in it is repo-owned (it takes two
+            # strings and prints), so no contract row follows.
+            Name    = 'closeout-lib'
+            Source  = 'scripts\lib\closeout-lib.ps1'
+            Plugin = 'dkj-policy'
+            LibOnly = $true
+        },
+        @{
             # Issue #1682, September 9, 2026. The one reading of `git status --porcelain`: the command
             # with its two flags, and the line parse. Mirrored because BOTH its callers are, and each
             # dot-sources it by name -- park-lib.ps1 (the uncommitted count behind the backing gate) and

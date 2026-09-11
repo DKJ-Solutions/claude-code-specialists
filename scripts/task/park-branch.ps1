@@ -86,6 +86,13 @@ $repoRoot = if ($env:CLAUDE_PROJECT_DIR) { $env:CLAUDE_PROJECT_DIR } else { (git
 # and with new-branch.ps1, the only two callers there are.
 . (Join-Path $PSScriptRoot '..\lib\park-lib.ps1')
 
+# THE CLOSE-OUT RECEIPT SHAPE (issue #1884), printed as this run's last line -- see closeout-lib.ps1
+# for why step 6 of the ritual got a mechanism after losing four times in prose. Guarded on
+# git-porcelain-lib's grounds: a consumer whose mirror predates this lib must not crash on load, and
+# the call site tests for the function rather than assuming the dot-source took.
+$parkCloseoutLib = Join-Path $PSScriptRoot '..\lib\closeout-lib.ps1'
+if (Test-Path -LiteralPath $parkCloseoutLib -PathType Leaf) { . $parkCloseoutLib }
+
 # Current branch from HEAD. Via Invoke-NativeCapture so a detached/edge git state cannot turn a
 # stderr line into a terminating error before the exit code is judged.
 $branchRes = Invoke-NativeCapture -FilePath 'git' -Arguments @('-C', $repoRoot, 'rev-parse', '--abbrev-ref', 'HEAD')
@@ -109,4 +116,14 @@ if ($branch -eq 'main') {
 # chooses the words, so the log says which half of the work is on origin.
 $ok = Invoke-GitPark -RepoRoot $repoRoot -Branch $branch -Scope 'Everything' -Intent $Intent
 if (-not $ok) { exit 1 }
+
+# THE RECEIPT SHAPE, LAST (issue #1884) -- see closeout-lib.ps1. A deliberate park is close-out shape
+# C almost by definition: the work stopped, the state is already handled, and what is owed is a
+# report rather than a question. That is the shape whose receipt most often grows into an apology.
+if (Test-FunctionDefined 'Write-CloseOutReceipt') {
+    # NOT A SPELLED-OUT DOCUMENT PATH. That name has been renamed four times and is named by its
+    # resolver everywhere else in this workflow for exactly that reason; a hand-rolled copy here
+    # would be a fifth spelling to go stale, and this script does not load the resolver's lib.
+    Write-CloseOutReceipt -Cite "the branch document, parked on origin"
+}
 exit 0
