@@ -122,6 +122,16 @@ Three reviewers ran in parallel on the diff, and two found real defects:
       which a child process inherits. A `-Quiet` switch forwarded by hand at each spawn was rejected on
       this branch's own terms -- it would be enforced by nothing but memory at every future nesting
       site, which is the failure mode the whole change exists to retire.
+- [x] **This branch was pushed with `-SkipTests`, deliberately, and here is the disclosure this change
+      exists to give a home to.** The local suite pool is red on exactly one suite,
+      `new-branch.tests.ps1`, for a reason unrelated to anything here: its no-identity fixture is
+      vacuous on this machine. Proven pre-existing by running that suite in a detached worktree at
+      `origin/main` with nothing else changed -- the same 8 failures, byte-identical -- and CI is green
+      on `main` for the last five runs, so the CI gate on this PR is the authoritative run and it
+      exercises the full pool. Filed with its measured cause and a verified repair as
+      [#1888](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1888); not fixed here because
+      it has nothing to do with this branch. Every other gate was run locally and is green: the lint
+      gate at 0 errors, and the other 95 suites.
 - [~] `scripts/maintenance/record-suite-durations.ps1` deliberately **not** run. It reads CI runs, so it
       can only record this suite after the merge, and the gate's own code says an unknown suite is
       charged the maximum on purpose -- "the one position a suite of unknown cost must never take". That
