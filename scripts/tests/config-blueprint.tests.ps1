@@ -293,9 +293,15 @@ Assert-Equal 0 $shared.Count "no `$script: variable is assigned by more than one
 # dkj-policy/ and therefore had to STATE Get-ChangelogPath and Get-ReleaseInternalNotesRoot --
 # the first to differ from its own computed answer, the second because that one still branches on the
 # source and would have recreated the root releases/ directory the move had just emptied. The two roots
-# whose defaults stopped branching at #914 are still unstated, which is why it is seven and not five.
+# whose defaults stopped branching at #914 are still unstated, which is why it was seven and not five.
+#
+# EIGHT SINCE SEPTEMBER 11, 2026 (#1870): Get-ReachLabel joined, and it is the cleanest member of this
+# set. The seam names the STRING a tracker stores for the reach label, the workflow's default is 'minor',
+# and this repo's label is called exactly that -- so a function here would restate the default and become
+# a value somebody has to maintain. Recorded as declared=false, which tells a consumer the truth: the
+# source does not state it either, and neither should they unless their own label is spelled otherwise.
 $undeclared = @($bp.records | Where-Object { -not $_.declared })
-Assert-Equal 7 $undeclared.Count 'the seven functions the source itself leaves at the fallback are recorded, not dropped'
+Assert-Equal 8 $undeclared.Count 'the eight functions the source itself leaves at the fallback are recorded, not dropped'
 foreach ($rec in $undeclared) {
     Assert-Equal '' $rec.text "$($rec.function): an undeclared record carries no text to copy"
 }
