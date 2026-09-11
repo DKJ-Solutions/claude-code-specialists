@@ -386,7 +386,57 @@ try {
             if (Test-Path -LiteralPath $capture -PathType Leaf) {
                 . $capture
                 $cap = Invoke-NativeCapture -FilePath 'powershell' -Arguments @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $engine, '-Brief') -DiscardStderr -TimeoutSeconds $VersionTimeoutSeconds
-                $vout = @($cap.Output)
+                # A TIMEOUT IS DECIDED BY TimedOut, NOT BY WHAT LANDED IN THE CAPTURE (#1852). The bound
+                # firing does not mean the capture is empty: Invoke-NativeCapture kills the tree and then
+                # reads the files anyway, so whatever the engine had already flushed comes back WITH
+                # TimedOut = $true. Every branch below picks its verdict from the CONTENT of $vout, so a
+                # partial capture carrying a [SUMMARY] was reported as an ordinary clean version check --
+                # the 124 sitting unread in $vcode, on the one branch that never prints it. That is the
+                # [UNREGISTERED] lesson again: an all-clear for a run that did not finish, and nothing in
+                # the line said so. Measured September 11, 2026, in CI under the gate's own sixteen lanes,
+                # where taskkill.exe's OWN cold startup let a killed 5s engine finish inside the post-kill
+                # grace window; reproduced deterministically by an engine that prints before it sleeps.
+                #
+                # SO THE ENGINE'S HALF-ANSWER IS DROPPED RATHER THAN PARSED, and the exit code is kept so
+                # the degraded line still names 124. This hook never echoes $vout on that branch -- it
+                # prints one line pointing at the plugin-versions skill -- so nothing a reader would have
+                # seen is lost, which is what separates it from ship-pr keeping a stalled push's tail
+                # (#1252): there the tail IS the diagnosis and it is printed. Dropping it before the cache
+                # write below also keeps the stored entry telling the same story as the live run, which a
+                # flag tested only here would not: the cache carries output and an exit code, not fields.
+                #
+                # ship-pr.ps1 makes exactly this call at its own bounded site and says why in the same
+                # words -- TimedOut is the field to read when certainty is needed.
+                #
+                # AND THE CLASS IS NARROWER THAN "BOUNDED", which is worth stating so the next reader does
+                # not go auditing sites that are fine. What makes a caller vulnerable is deciding a
+                # VERDICT from the capture's CONTENT: most bounded sites here judge from ExitCode and
+                # merely print Output as progress (Get-TrunkGap in entry-scaffold-lib.ps1 is the clearest
+                # -- $fetch.ExitCode -eq 0, and the lines relayed for a human to read), and a timeout
+                # cannot mislead them. Of the callers that DO read the content, this hook was the one
+                # reading neither field.
+                #
+                # SHORT READ IS THE SAME DEFECT THROUGH A SECOND DOOR, so it is answered in the same
+                # condition rather than left for a second report. Passing -TimeoutSeconds routes this call
+                # through the Start-Process arm, which can answer exit 0 with a capture a grandchild was
+                # still writing -- and the engine runs git inside a clone, so it HAS grandchildren. A
+                # truncated capture that happens to end after the [SUMMARY] but before an [ERROR] is the
+                # worst shape this hook can print: 'up to date' about a checkout that is behind. The lib's
+                # own docstring states the rule this site was breaking -- a caller that PARSES Output must
+                # read ShortRead -- and check-connectors.ps1 already reads it at its own gh call.
+                #
+                # BOTH DEGRADE TO THE SAME LINE, which is deliberate and not a lost distinction. That line
+                # already carries whatever exit code it was given (branch 3's scenario is exit 3), so a
+                # short read reads as 'no readable output (exit 0)' without any new verdict shape to pin
+                # -- and a distinct sentence could not survive the cache below anyway, which stores output
+                # and an exit code rather than fields. Same reason the drop happens HERE rather than at
+                # the branch: whatever is stored is what a later firing in this session replays, so the
+                # live run and the replay have to be told the same thing.
+                if ($cap.TimedOut -or $cap.ShortRead) {
+                    $vout = @()
+                } else {
+                    $vout = @($cap.Output)
+                }
                 $vcode = $cap.ExitCode
             } else {
                 $vout = @(& powershell -NoProfile -ExecutionPolicy Bypass -File $engine -Brief)

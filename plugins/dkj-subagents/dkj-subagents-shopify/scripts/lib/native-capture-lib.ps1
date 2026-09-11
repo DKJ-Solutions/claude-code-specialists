@@ -539,8 +539,24 @@ function Stop-NativeProcessTree {
         BOTH ATTEMPTS ARE ALLOWED TO FAIL, and that is deliberate rather than sloppy. taskkill reports
         "not found" for a child that exited in the gap between the wait giving up and this call, and it
         can be refused for a process this session may not signal. By the time we are here the wait has
-        already stopped waiting, so a failed kill costs a stray process rather than a wrong answer --
-        whereas a throw would replace a diagnosable timeout with an unrelated error.
+        already stopped waiting, so failing is better than throwing -- a throw would replace a
+        diagnosable timeout with an unrelated error.
+
+        WHAT A FAILED OR SLOW KILL COSTS IS NOT ONLY A STRAY PROCESS, and this paragraph said for months
+        that it was (#1852). THIS FUNCTION IS NOT THE END OF THE TIMEOUT PATH: its caller waits up to five
+        more seconds to reap the child and then reads the capture files regardless. So a child that
+        outlives the kill -- because taskkill was refused, OR merely because taskkill.exe's own cold
+        startup under load took longer than the child had left to run -- finishes inside that grace
+        window, and its FULL output is read back and returned as Output with TimedOut = $true. Measured
+        September 11, 2026 in CI under the test gate's sixteen lanes: a 5s child under a 1s bound came
+        back complete, and connector-sessioncheck.ps1 -- which picked its verdict from Output's content
+        and never read TimedOut -- printed the killed run's answer as a clean version check.
+
+        SO THE ANSWER IS STILL NOT TO THROW HERE, and nothing below this line changed: a kill is
+        best-effort by nature, and no amount of trying makes the read that follows it unambiguous. The
+        answer is at the CALLER, and the fields it needs already exist -- TimedOut and ShortRead say what
+        the exit code and the content cannot. Read them before parsing Output. What was wrong was this
+        paragraph telling a caller there was nothing here to read.
 
         taskkill writes to stderr, so its call is bracketed with EAP=Continue for the #96/#107 reason
         this whole lib exists for. The -Utf8 arm that calls this does NOT set EAP itself (it has no &
