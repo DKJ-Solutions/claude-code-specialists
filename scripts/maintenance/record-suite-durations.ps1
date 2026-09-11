@@ -37,7 +37,9 @@
     records which runs produced the numbers, so a later reader can re-derive them or notice they are old.
 
 .PARAMETER RunId
-    One or more GitHub Actions run ids of the CI workflow. Each must have run the sharded suites job.
+    One or more GitHub Actions run ids of the CI workflow. Each must have run the sharded suites job --
+    which rules out the run on a `fold:` push to the trunk, the newest of the two runs every ship leaves
+    behind and therefore the one nearest to hand. See the throw that names it.
 
 .PARAMETER RepoRoot
     The repo to write into. Defaults to the git root of the working directory.
@@ -117,7 +119,14 @@ foreach ($id in $runIds) {
         $found++
     }
     if ($found -eq 0) {
-        throw "run $id printed no per-suite duration table - is it a CI run that ran the suites job?"
+        # THE FOLD COMMIT'S RUN IS THE ONE THAT LOOKS RIGHT AND IS NOT, so it is named rather than left
+        # to the caller to rediscover. ship-pr pushes to the trunk twice per branch and BOTH pushes get a
+        # CI run: the merge commit's runs the suites, the fold commit's skips the step outright (#1300 --
+        # its only untested delta is changelog prose). The second is the newer of the two, so it is the
+        # one at the top of `gh run list` and the one a caller reaches for; its suites jobs complete
+        # green having checked out and stopped, so nothing about the run says it measured nothing.
+        # Measured on #1833, whose own refresh reached for it first.
+        throw "run $id printed no per-suite duration table - is it a CI run that ran the suites job? A push to the trunk whose commit message starts with 'fold:' skips that step by design (#1300), so take the MERGE commit's run or a PR run instead."
     }
     Write-Host "  $found suite rows" -ForegroundColor DarkGray
 }
