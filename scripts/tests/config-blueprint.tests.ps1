@@ -395,6 +395,47 @@ Assert-Equal 1 $r.Code 'missing seam lib: exits non-zero'
 Assert-Match 'specialists-init' $r.Out 'missing seam lib: points at the bootstrap rather than half-creating one'
 Remove-Item -Recurse -Force -LiteralPath $bare -ErrorAction SilentlyContinue
 
+# --- The plugin mirror, run from its OWN depth (issue #1857) ---------------------------------------
+# check-plugin-integrity's check 8 proves this script and its mirror are byte-identical, and that is
+# exactly what hides the difference here: Resolve-Blueprint's FIRST candidate is
+# '..\..\blueprint\config-blueprint.json', two levels up from $PSScriptRoot -- the repo root from the
+# source copy and the PLUGIN root from the mirror. Same characters, different folder.
+#
+# EVERY ASSERT ABOVE RUNS THE SOURCE COPY, so all of them exercise the workshop fallbacks and none of
+# them exercises candidate 1 -- the one that fires in every released install. It was verified by hand
+# when the candidate was introduced, which is what #1857 was filed about.
+#
+# AND THE MIRROR HAS NO SECOND ROUTE, which is what makes this assert worth its seconds rather than a
+# duplicate of the one above. The fallbacks are derived from plugin roots under $PSScriptRoot\..\..
+# and under $RepoRoot: from the mirror the first is plugins\dkj-policy\, which publishes no
+# marketplace, and the second is this fixture, which publishes nothing at all. Both yield zero roots,
+# so a pass here can only mean candidate 1 resolved.
+$mirrorAdopt = Join-Path $RepoRoot 'plugins\dkj-policy\scripts\task\adopt-config.ps1'
+Assert-True (Test-Path -LiteralPath $mirrorAdopt -PathType Leaf) 'the plugin mirror exists at the registered path'
+
+$mirrorFixture = Join-Path $Fixture '..\config-blueprint-test-mirror'
+New-ConsumerFixture -Path $mirrorFixture
+$mirrorFixture = (Resolve-Path -LiteralPath $mirrorFixture).Path
+$mirrorConfig = Join-Path $mirrorFixture 'scripts\repo-config.ps1'
+try {
+    $prevProjectDir = $env:CLAUDE_PROJECT_DIR
+    $env:CLAUDE_PROJECT_DIR = $mirrorFixture
+    try {
+        $mirrorOut = & powershell -NoProfile -ExecutionPolicy Bypass -File $mirrorAdopt '-Apply'
+        $mirrorCode = $LASTEXITCODE
+    } finally { $env:CLAUDE_PROJECT_DIR = $prevProjectDir }
+
+    Assert-Equal 0 $mirrorCode 'mirror: exit 0 -- it found the blueprint beside itself, with no workshop root to fall back on'
+    $mirrorAfter = [System.IO.File]::ReadAllText($mirrorConfig)
+    Assert-Match 'Get-RosterPath' $mirrorAfter 'mirror: a copy record landed in the consumer lib, so the artefact it read was the real one'
+    Assert-Match 'Adopted from the DKJ-Solutions/dkj-claude-plugins config blueprint' $mirrorAfter 'mirror: the placed block says where it came from'
+    # The doctrine assert, repeated on this side on purpose: the two copies could only diverge by
+    # reading a different artefact, and a decide record leaking through is what that would look like.
+    Assert-NotMatch '(?m)^\s*function\s+Get-ReleasePluginTier\b' $mirrorAfter "mirror: a decide record was still NOT placed"
+} finally {
+    Remove-Item -Recurse -Force -LiteralPath $mirrorFixture -ErrorAction SilentlyContinue
+}
+
 } finally {
     if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture -ErrorAction SilentlyContinue }
 }

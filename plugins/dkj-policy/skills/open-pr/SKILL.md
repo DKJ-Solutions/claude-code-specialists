@@ -299,8 +299,11 @@ description in the entry, or a body that already matches, in which case nothing 
 is the **last heading above the placeholder**, at any level (`#` through `######`); every heading **below**
 the placeholder belongs to the form and is a boundary the description stops at. Where the placeholder comes
 before any heading — the shipped reference's own shape — there is no description heading at all: the
-description is the body's **leading section**, and every heading in the template is a boundary. Only a
-**missing** template warns and changes nothing; a heading-less one is a supported shape.
+description is the body's **leading section**, and every heading in the template is a boundary. A
+heading-less template is a supported shape, not a broken one. **A missing one is the failure — and it
+is the silent one**: the script builds no body at all and says nothing, which is why the adopter places
+the file rather than telling you to. The warning further down fires on a placeholder that does not
+*match*, which is the other failure.
 
 **That rule arrived in two steps, and both are worth knowing if your own template's shape has moved.** The
 match was `## ` exactly until August 9, 2026, which meant a template promoted to `#` silently lost the
@@ -313,11 +316,18 @@ would have named the checklist as the description and overwritten it on every re
 
 `.github/pull_request_template.md` is **your** file: GitHub reads it only from that path in your own
 repo, so unlike the rest of this workflow it cannot live in the plugin and cannot be `@`-imported. What
-the plugin ships instead is a **reference to copy and to diff against**:
+the plugin ships instead is a **reference**, which `adopt-dkj-policy` Part 1 copies into place for you on
+adoption and never overwrites afterwards ([#1843](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1843)) —
+so it is there to read and to diff against, not a step you owe:
 
 ```text
 ${CLAUDE_PLUGIN_ROOT}/templates/pull_request_template.md
 ```
+
+**If that path is empty in your repo, this script builds no body at all** — it wraps the whole
+body-building block in a test for the file, with nothing on the other side, so you get a PR with no
+description and no warning. Running the adopter is what fills it; the warning below is about a
+placeholder that does not *match*, which is the other failure and the loud one.
 
 Everything `open-pr` needs from that file is **one line**, and it is the whole interface: a **placeholder
 line the matcher recognises, verbatim**, which is where the description is inserted when the PR is created

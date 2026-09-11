@@ -1108,6 +1108,97 @@ foreach ($p in @($pairs | Where-Object { $_.SkillParamsExempt.Count -gt 0 })) {
     }
 }
 
+# --- Get-DepthSensitiveResolutions (check 39's input) ---------------------------------------------
+# ISSUE #1857. The ONE class of difference a byte-identical mirror can still carry: a $PSScriptRoot
+# resolution ascending two levels lands on the repo root from the source copy and on the plugin root
+# from the mirror. The gate acts on what this function returns, so its two forms and its one
+# deliberate non-subject are pinned here rather than only through the gate's own fixture.
+Write-Host ""
+Write-Host "Get-DepthSensitiveResolutions" -ForegroundColor Cyan
+
+$depthDir = Join-Path ([System.IO.Path]::GetTempPath()) ("depthres-$PID-" + [guid]::NewGuid().ToString('N').Substring(0, 8))
+New-Item -ItemType Directory -Path $depthDir -Force | Out-Null
+try {
+    $depthAscii = New-Object System.Text.UTF8Encoding($false)
+    function New-DepthFixture {
+        param([string]$Name, [string]$Body)
+        $path = Join-Path $depthDir "$Name.ps1"
+        [System.IO.File]::WriteAllText($path, $Body, $depthAscii)
+        return $path
+    }
+
+    # ONE HOP IS NOT A SUBJECT, and this is asserted FIRST on purpose: a detector that returns
+    # everything satisfies every positive case below while being worthless as a gate.
+    $fOne = New-DepthFixture -Name 'one-hop' -Body ". (Join-Path `$PSScriptRoot '..\lib\x.ps1')`n"
+    Assert-Equal 0 (@(Get-DepthSensitiveResolutions -Path $fOne).Count) `
+        'a single-hop resolution is not reported -- it is the same folder relative to the file in both copies'
+
+    $fTwo = New-DepthFixture -Name 'two-hop' -Body "`$p = Join-Path `$PSScriptRoot '..\..\blueprint\x.json'`n"
+    Assert-Equal 1 (@(Get-DepthSensitiveResolutions -Path $fTwo).Count) `
+        'a two-hop literal is reported'
+
+    # FORWARD SLASHES TOO. A consumer-facing script may be written either way, and a detector that
+    # only understood backslashes would be silent on exactly the half a reader finds most portable.
+    $fSlash = New-DepthFixture -Name 'two-hop-slash' -Body "`$p = Join-Path `$PSScriptRoot '../../blueprint/x.json'`n"
+    Assert-Equal 1 (@(Get-DepthSensitiveResolutions -Path $fSlash).Count) `
+        'a two-hop literal written with forward slashes is reported too'
+
+    # THE SECOND FORM, and the one that caught this function's own first draft: the same ascent with no
+    # '..' anywhere in it. Climbing only to the NEAREST statement stops inside the inner pipeline,
+    # where one Split-Path is in scope, so the nesting reads as a single hop and nothing is reported.
+    # check-policy-drift's step 4a is written exactly this way, so that draft was silent on one of the
+    # two crossings in the tree while reporting the other correctly.
+    $fSplit = New-DepthFixture -Name 'split-chain' -Body "`$own = Split-Path (Split-Path `$PSScriptRoot -Parent) -Parent`n"
+    Assert-Equal 1 (@(Get-DepthSensitiveResolutions -Path $fSplit).Count) `
+        'a nested Split-Path ascent is reported, though it contains no ".." at all'
+
+    $fSplitOne = New-DepthFixture -Name 'split-one' -Body "`$own = Split-Path `$PSScriptRoot -Parent`n"
+    Assert-Equal 0 (@(Get-DepthSensitiveResolutions -Path $fSplitOne).Count) `
+        'a single Split-Path is not reported -- one hop is one hop in either spelling'
+
+    # THE MULTI-LINE CASE, which is why this reads the AST rather than a window of characters after
+    # the variable. A Join-Path whose literal sits on the next line is the same resolution.
+    $fWrap = New-DepthFixture -Name 'wrapped' -Body "`$p = Join-Path `$PSScriptRoot ```n    '..\..\blueprint\x.json'`n"
+    Assert-Equal 1 (@(Get-DepthSensitiveResolutions -Path $fWrap).Count) `
+        'a resolution wrapped across lines is reported -- the statement is the unit, not the line'
+
+    # A '..' that is not LEADING is not an ascent: it is a path that descends and then steps back.
+    $fInner = New-DepthFixture -Name 'inner-dots' -Body "`$p = Join-Path `$PSScriptRoot 'a\..\b\..\c'`n"
+    Assert-Equal 0 (@(Get-DepthSensitiveResolutions -Path $fInner).Count) `
+        'a ".." that is not leading is not an ascent and is not reported'
+
+    Assert-Equal 0 (@(Get-DepthSensitiveResolutions -Path (Join-Path $depthDir 'no-such-file.ps1')).Count) `
+        'a missing file yields nothing instead of throwing'
+} finally {
+    Remove-Item -LiteralPath $depthDir -Recurse -Force -ErrorAction SilentlyContinue
+}
+
+# --- The MirrorRun declarations, against the tree ---------------------------------------------------
+# The gate refuses an UNDECLARED crossing; these hold the declarations themselves honest, which is the
+# half a gate scanning for the defect cannot see. A declaration that names a suite that is not there,
+# or one that has stopped naming the mirror, reads as proof while proving nothing.
+foreach ($p in @($pairs | Where-Object { $_.MirrorRun })) {
+    $suite = Join-Path $RepoRoot "scripts\tests\$($p.MirrorRun)"
+    Assert-True (Test-Path -LiteralPath $suite -PathType Leaf) `
+        "$($p.Name): the declared MirrorRun suite '$($p.MirrorRun)' exists"
+    if (Test-Path -LiteralPath $suite -PathType Leaf) {
+        $suiteText = [System.IO.File]::ReadAllText($suite, [System.Text.Encoding]::UTF8)
+        Assert-True ($suiteText.Contains($p.MirrorRel)) `
+            "$($p.Name): that suite names the mirror it is declared to run"
+    }
+    Assert-True (-not $p.MirrorRunExempt) `
+        "$($p.Name): declares MirrorRun, so it does not also declare MirrorRunExempt -- they are opposite answers"
+}
+
+# EVERY CROSSING IN THE TREE IS DECLARED. The same invariant check 39 enforces, asserted here too --
+# deliberately, because the gate is skippable per category (-SkipCheck) and this suite is not.
+foreach ($p in @($pairs)) {
+    if (-not (Test-Path -LiteralPath $p.SourcePath -PathType Leaf)) { continue }
+    if (@(Get-DepthSensitiveResolutions -Path $p.SourcePath).Count -eq 0) { continue }
+    Assert-True ([bool]($p.MirrorRun -or $p.MirrorRunExempt)) `
+        "$($p.Name): crosses the plugin-root boundary off `$PSScriptRoot, and declares how its mirror is proven"
+}
+
 Write-Host ""
 # ABOVE THE VERDICT AND EVEN ON A GREEN RUN: a clean sweep over a fixture repo that was never built
 # proves less than it appears to, so the count decides the exit code too (issue #1635).
