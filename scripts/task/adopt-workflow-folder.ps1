@@ -30,10 +30,14 @@
     answer into scripts/repo-config.ps1 rather than printing it as an instruction. Any repo with notes
     already at the fallback keeps them and is told what to do instead; nothing is ever moved.
 
-    AND ONE FILE OUTSIDE IT (inbound #789):
+    AND TWO FILES OUTSIDE IT (inbound #789; issue #1843):
 
         .github/workflows/branch-entry.yml   the CI gate that holds every PR to carrying a written
                                              entry, by calling the shipped check-branch-entry.ps1
+        .github/pull_request_template.md     the PR body open-pr fills in -- copied from the plugin's
+                                             own templates/ reference, because GitHub reads a PR
+                                             template only from this path in your repo and so it is
+                                             the one file in the cycle that cannot be imported
 
     A PLUGIN INSTALL CANNOT CREATE THIS FOLDER -- an install is a clone into the plugin cache and
     writes nothing into the repo -- so the folder arrives through this command, and
@@ -584,8 +588,62 @@ $changelogIntro = @(
     $unreleasedHeading
 )
 
+# THE SECOND FILE THIS COMMAND PLACES OUTSIDE THE FOLDER, and unlike the gate above it is a COPY rather
+# than six lines calling a shipped script (issue #1843). GitHub reads a PR template only from
+# .github/pull_request_template.md in the consumer's own repo, so this is the one file in the whole cycle
+# that cannot be imported -- CONTRIBUTING-portable.md said exactly that, and then left the copying to a
+# person, which this change ends and that page now records. Nothing anywhere had stated a reason for
+# leaving it manual, and that is what separated it from every genuine 'decide' seam in this workflow:
+# those are answered by hand because only the repo knows the answer, and here the plugin already ships
+# the answer.
+#
+# WHY A MISSING ONE COSTS MORE THAN A MISSING FILE USUALLY DOES: open-pr wraps its whole body-building
+# block in 'if (Test-Path $templatePath)' with no else, so a consumer without the file gets a PR with no
+# body at all -- no description, no type box, nothing -- and no warning. The one warning that block does
+# carry fires when a placeholder does not MATCH, which is a different state and the only one anybody has
+# been told about. So the absence is silent at exactly the moment a reviewer needs the description.
+#
+# THE CONTENT COMES OFF THE SHIPPED REFERENCE, NEVER RETYPED. The whole interface is one line -- the
+# placeholder open-pr recognises verbatim -- so a literal copy of it here would be a second definition,
+# free to drift from the first. That is the same argument the gate above makes for not hand-writing its
+# check in shell. The reference sits at the plugin root in both contexts this script runs in (the released
+# mirror and the source tree), so one relative path reaches it from either.
+#
+# AN ABSENT REFERENCE PLACES NOTHING, rather than falling back to a literal. A fallback would be that
+# second definition wearing an emergency jacket, and it would be the copy that ships in the one case
+# nobody is watching. Everything else this command places is unaffected; the run names the file it could
+# not read.
+#
+# TWO CANDIDATE PATHS, BECAUSE THIS FILE EXISTS TWICE AND THE DRIFT LINT HOLDS THE TWO BYTE-IDENTICAL.
+# In the released mirror, scripts/task/ sits under the plugin root and '..\..\templates' is the shipped
+# folder. In the source tree the same bytes also sit at the repo's own scripts/task/, where that path
+# points at a <repo>/templates that does not exist and the reference is one level deeper, under
+# plugins/dkj-policy/. Both hang off $PSScriptRoot and NEITHER off $repoRoot, which is the consuming
+# repo being scaffolded -- a tree that by definition does not ship this plugin. Getting that wrong is
+# not a silent miss: the fallback simply never fires and the template is never placed, which is how
+# this pair was measured rather than reasoned.
+$prTemplateRef = @(
+    (Join-Path $PSScriptRoot '..\..\templates\pull_request_template.md'),
+    (Join-Path $PSScriptRoot '..\..\plugins\dkj-policy\templates\pull_request_template.md')
+) | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } | Select-Object -First 1
+
+$prTemplateTargets = @()
+if ($prTemplateRef) {
+    $prTemplateTargets = @(
+        @{ Rel = '.github/pull_request_template.md'; Content = ([System.IO.File]::ReadAllText($prTemplateRef)) }
+    )
+} else {
+    # BOTH candidates are named, not just the first. This branch only fires on a checkout that is
+    # already broken, which is exactly the reader who cannot afford to be told half of what was tried.
+    Write-Warning ("The shipped PR template reference could not be found -- .github/pull_request_template.md is not placed by this run.`n" +
+        "  Looked for: $(Join-Path $PSScriptRoot '..\..\templates\pull_request_template.md')`n" +
+        "         and: $(Join-Path $PSScriptRoot '..\..\plugins\dkj-policy\templates\pull_request_template.md')`n" +
+        '  Everything else below is unaffected. Copy it by hand from the plugin''s templates/ folder, or open-pr builds PR bodies with no description at all.')
+}
+
 $targets = @(
-    @{ Rel = '.github/workflows/branch-entry.yml'; Content = (($entryGateWorkflow -join $nl) + $nl) },
+    @{ Rel = '.github/workflows/branch-entry.yml'; Content = (($entryGateWorkflow -join $nl) + $nl) }
+) + $prTemplateTargets + @(
     @{ Rel = 'dkj-policy/README.md';           Content = (($folderReadme -join $nl) + $nl) },
     @{ Rel = 'dkj-policy/CONTRIBUTING.md';     Content = (($folderContributing -join $nl) + $nl) },
     @{ Rel = 'dkj-policy/releases/README.md';  Content = (($releasesReadme -join $nl) + $nl) },
