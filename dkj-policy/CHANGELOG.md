@@ -43,7 +43,59 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**3 / 4 minor entries** <!-- pending-tally -->
+**4 / 5 minor entries** <!-- pending-tally -->
+
+### DEPLOY: docs/1823-uninstall-step5-machine-wide · 20260911-073858
+
+`UNINSTALL.md`'s Step 5 ran `claude plugin marketplace remove` with no reader-facing statement that the
+command is machine-wide over install records, so a reader tearing down one of several checkouts, exactly
+by the book, silently took this family's install records off every other repo on the machine. The page was
+thorough about that command and measured a different axis: its per-file table credited Step 5 with the
+clone and the `known_marketplaces.json` entry, attributed every install record to Step 2, and every
+bracket on the page was taken on a single-adoption profile — where Step 5 provably touches no record,
+because Step 2 already took the only one. Such a reader is now told to **skip Step 5** and stop at Step 4,
+and the claims written for a reader who finishes there each get their second reading: *"the registration
+comes off last"*, the `marketplace list` verification, and the clean-machine section. What skipping costs
+is stated so it can be weighed, and the query that answers *"am I the last checkout?"* is given — with the
+three ways it misreads, including the false negative found by running it here: a machine registered under
+the marketplace's retired name answers nothing to a filter naming the current one.
+
+**The reason #1823 gave for the severity does not hold, and the page now says what does.** That issue
+argued the damage has no floor because nothing reinstalls. Step 3's own measured table (inbound
+#327/#382) says a sibling checkout repairs itself in two session starts with no command run, because a
+teardown removes only the keys its own repo wrote and `extraKnownMarketplaces` is what puts the
+marketplace back. The real cost is narrower and worth avoiding anyway: one session that silently loads
+nothing, a clone rebuilt at the marketplace's current HEAD rather than the version that repo was running,
+a recovery that is CLI behaviour nobody owns, and no recovery at all for a checkout whose owner has since
+tidied that key away. `INSTALL.md` also loses a false claim caught alongside this: `--scope` is documented
+on `marketplace remove`, verified against the CLI, though it still fences nothing that was measured. The
+mechanism lands in Sylvester's portable manual rather than a lens, being a property of the CLI, and it
+carries the corrected version plus a standing warning against the confident one.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+`UNINSTALL.md` is one of the two procedures a consumer of this marketplace meets, and this is the step
+where following it correctly reaches into their other repos. Anyone running the teardown on a machine with
+more than one adoption is affected, and it was silent in all three of the places they would look. The
+failure being prevented, named because no teardown run has been measured hitting it: a consumer
+disconnecting one of several checkouts loses this family's install records from every other repo on the
+machine with no signal anywhere — `enabledPlugins` still reads correct and the hooks that would complain
+went with the plugin — and gets them back, if at all, from a self-repair nobody commanded, onto whatever
+the marketplace's HEAD is by then.
+
+**Score:** 4
+
+#### Pull Request
+
+UNINSTALL.md's Step 5 states its machine-wide reach, and a multi-checkout reader is told to skip it
+
+Plugins: dkj-subagents-alpha
+
+[PR #1828](https://github.com/DKJ-Solutions/dkj-claude-plugins/pull/1828)
+
+---
 
 ### DEPLOY: docs/1824-install-cross-plugin-reinstall · 20260911-070940
 
