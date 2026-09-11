@@ -43,7 +43,40 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**4 / 5 minor entries** <!-- pending-tally -->
+**5 / 6 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1829-crlf-section-drift · 20260911-092050
+
+`adopt-dkj-policy` Part 1's README top-up now judges the block it owns, not the line endings of the page
+around it. It reads the page's own newline style and composes the block with it, so a page checked out
+CRLF -- which is what `core.autocrlf=true` gives every Windows clone -- no longer reports
+`the plugin's block has drifted` on every fresh checkout, and `-Apply` no longer leaves the page with LF
+between CRLF. A genuinely stale block is still replaced, and an LF page is still written pure LF.
+
+**Score:** 2
+
+This repo refuses that scaffold outright -- it publishes the workflow -- so nothing here changes but the
+suite. What it gains is the regression test: every fixture in it wrote LF until now, which is how a
+Windows-only defect survived in the one block the suite pins hardest.
+
+#### What makes this deploy extra special
+
+Consumers on Windows get a verdict that carries information again. The failure was quiet and permanent
+rather than one-off: the command said "drifted" every time, so a block that really was stale read exactly
+like one that was current, and the only way to tell them apart was to run `-Apply` and check `git diff`
+afterwards. That is the feature v5.0.0 announces as "can be kept current with one command".
+
+**Score:** 3
+
+#### Pull Request
+
+The README block top-up preserves the page's own line endings
+
+Plugins: dkj-policy
+
+[PR #1834](https://github.com/DKJ-Solutions/dkj-claude-plugins/pull/1834)
+
+---
 
 ### DEPLOY: docs/1823-uninstall-step5-machine-wide · 20260911-073858
 
