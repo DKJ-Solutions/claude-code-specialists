@@ -43,7 +43,42 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**9 / 21 minor entries** <!-- pending-tally -->
+**9 / 22 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1860-shared-fetch-freshness · 20260911-145710
+
+An unreachable `origin` no longer stalls the opening of an issue-driven assignment twice. `claim-issue`
+and `new-branch` run back to back by design and both fetch the same remote, each bounded at two
+minutes independently -- so a session that had nothing on screen yet could wait four. They now share
+one record of the last fetch attempt (`scripts/lib/fetch-attempt-lib.ps1`, mirrored into the plugin),
+and the second call reports the first one's failure instead of buying another bound.
+
+**A recent SUCCESS never lets a fetch be skipped, deliberately** -- the symmetric version of this was
+built first and refused by `new-branch.tests.ps1`, whose #1139 and #1439 cases reproduce two runs
+seconds apart with another session's push between them. So the duplicated ~700ms #1860 also reports
+is still paid: it is what those two probes are reading.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+The suite refused the design, not the implementation. The seam was built to the issue's own first
+option, passed every assert written for it, and then took eleven off an unrelated file -- each one a
+guardrail about another session's push, which is the event a freshness window is exactly wide enough
+to hide. The half that survives is the half with no counterparty: a failed attempt refreshed nothing,
+so standing on it blinds nothing.
+
+**Score:** N/A
+
+#### Pull Request
+
+One shared fetch-attempt record, so an unreachable origin is not waited out twice
+
+Plugins: dkj-policy
+
+[PR #1866](https://github.com/DKJ-Solutions/dkj-claude-plugins/pull/1866)
+
+---
 
 ### DEPLOY: fix/1852-timeout-decisive-in-sessioncheck · 20260911-142702
 
