@@ -288,9 +288,16 @@ has; installing writes it again, which is what step 4 does anyway. What the mach
 the **procedure**, not your repos.
 
 **Where this paragraph stops, so you can judge it:** one machine, one CLI version, three checkouts.
-Whether `marketplace remove` treats `user`-scope records the same way is untested, and `--scope` is a flag
-on `add` rather than on `remove`, so there is probably nothing to narrow it with
-([#1820](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1820)).
+Whether `marketplace remove` treats `user`-scope records the same way is untested
+([#1820](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1820)). **And `--scope` is not the
+fence it might look like, though not for the reason this paragraph used to give:** it said the flag lives
+on `add` rather than on `remove`, which is simply wrong — `claude plugin marketplace remove --help` on CLI
+`2.1.268` documents it, as *"Remove the marketplace declaration from a specific settings scope"* (measured
+September 11, 2026, while repairing the sibling page's half of this;
+[#1823](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1823)). The conclusion survives the
+correction and the reason changes: what the flag governs is which settings scope the **declaration** comes
+out of, and the reach above was measured without it, so nothing here establishes that it narrows the
+records.
 
 ---
 
