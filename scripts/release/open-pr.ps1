@@ -2019,5 +2019,9 @@ $openSkipped = @()
 if ($SkipLint)  { $openSkipped += '-SkipLint' }
 if ($SkipTests) { $openSkipped += '-SkipTests' }
 if (Test-FunctionDefined 'Write-CloseOutReceipt') {
-    Write-CloseOutReceipt -Cite "the PR just opened for '$branch'" -Bypass ($openSkipped -join ' and ')
+    # NO BRANCH NAME IN THE CITATION, deliberately. The line above prints one and this file has never
+    # routed a ref through Get-DisplayRef, so adding one here would be a 33rd site of #1623's class in
+    # a run that has no need of it: what the receipt has to point at is the pull request, which the
+    # create above has just printed the URL of.
+    Write-CloseOutReceipt -Cite 'the pull request just opened' -Bypass ($openSkipped -join ' and ')
 }
