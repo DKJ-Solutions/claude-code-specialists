@@ -245,7 +245,7 @@ file, and the rule flips with the destination rather than with the text.
 
 **It is NOT the only console this workflow writes somebody else's words to** -- that claim stood here
 and was false from the day `ship-pr` began relaying the sentence a failing workflow wrote about itself
-(`Get-AuthoredFailureNote`, `scripts/lib/pr-issues-lib.ps1`, #1103). **There are four**, and the count
+(`Get-AuthoredFailureNote`, `scripts/lib/pr-issues-lib.ps1`, #1103). **There are five**, and the count
 is worth stating precisely because the wrong one is what kept the second site unguarded:
 
 1. **This one** -- the remote tip's `%an` and `%s`, printed by `new-branch` and `open-pr`
@@ -264,17 +264,26 @@ is worth stating precisely because the wrong one is what kept the second site un
    check-ref-format` enforces `\p{Cc}` and **accepts** `\p{Cf}`, so a branch created by hand, cloned or
    fetched carries U+202E or a zero-width run straight into those lines; `sync-main`'s come off `git
    ls-remote` and its seam answers, which git never validated at all. Not capped.
+5. **`claim-issue`'s own report** -- the issue TITLE off the tracker, plus the commit subjects and
+   branch names its parked-fix scan prints (`Format-ForConsole`, `scripts/lib/claim-issue-lib.ps1`,
+   #1858). The title is the one entry here whose author needed no push access at all: on a public
+   tracker anybody can open an issue. Not capped.
 
-**This entry is why the count was worth stating.** It was three until September 8, 2026, and #1623 was
-filed as the third counter-example to the sentence this section retired -- the same shape as #1612's own
-second half. The list is the thing that has to be kept true, not the number in front of it.
+**This entry is why the count was worth stating.** It was three until September 8, 2026, four until
+September 11, and each new one arrived as a counter-example to a sentence that had stopped being
+checked. **The list is the thing that has to be kept true, not the number in front of it** -- entry 5
+sat outside it for as long as the list existed, guarded by an ASCII-only strip nobody had re-read.
 
-The class itself is hand-typed in **two** libs now, on purpose and knowingly: this one and
-`ref-print-lib.ps1`. #1594 re-typed it with this site already in place and recorded why, and #1623
-retired that third copy rather than adding a fourth -- `remote-ahead-lib.ps1` acquired a reason to load
-`ref-print-lib.ps1` for its own sake (its branch label, printed raw beside the subject it already
-sanitised), and once the lib was loaded a private copy was pure drift surface. The two that remain share
-nothing else -- different bounds, different source processes, and neither is loaded by the other's
+The class itself is hand-typed in **three** libs, on purpose and knowingly: this one,
+`ref-print-lib.ps1` and `claim-issue-lib.ps1`. #1594 re-typed it with this site already in place and
+recorded why; #1623 retired a copy rather than adding one -- `remote-ahead-lib.ps1` acquired a reason to
+load `ref-print-lib.ps1` for its own sake (its branch label, printed raw beside the subject it already
+sanitised), and once the lib was loaded a private copy was pure drift surface. #1858 added one back, for
+the two reasons that keep the others apart and one more: no function in `ref-print-lib.ps1` fits an issue
+title. `Get-DisplayRef` collapses runs of spaces and trims, and a title is quoted evidence that must not
+be re-spaced; `Get-DisplayPath` answers the all-stripped case with `(no printable path)`, the wrong noun
+for a title -- so reuse would have meant a fourth function there rather than one regex fewer. The three
+share nothing else -- different bounds, different source processes, and none of them loaded by another's
 callers -- so what is guarded is that they cannot DISAGREE, by an assert in `pr-issues.tests.ps1` that
 compares the patterns themselves and pins **which** libs carry the class. A reader who needs every place
 this workflow prints foreign text now has the list, which is what the retired sentence was for.

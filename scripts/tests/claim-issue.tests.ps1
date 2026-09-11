@@ -149,6 +149,35 @@ Assert-True ($t -eq 'a b') 'a control character becomes a space rather than vani
 
 Assert-True ((Format-ForConsole -Text '') -eq '') 'an empty title is an empty string, not a crash'
 
+# ISSUE #1858. The class was '[\x00-\x1F\x7F]' until then -- C0 and DEL -- so every hazard below
+# reached the terminal untouched, none of it carrying a byte under 0x80. The asserts are per code
+# point rather than one sweep because they fail for different reasons: C1 is a second CONTROL range
+# the old class simply did not reach, while the rest are \p{Cf}, which is a different category and
+# which `git check-ref-format` accepts in a branch name to this day (#1617's own measurement).
+$t = Format-ForConsole -Text ('a' + [char]0x9B + 'b')
+Assert-True ($t -eq 'a b') 'a C1 control (0x9B, read as CSI by some terminals) becomes a space -- it is above 0x7F and the old class stopped there'
+
+$t = Format-ForConsole -Text ('report' + [char]0x202E + 'gnp.txt')
+Assert-True ($t -eq 'report gnp.txt') 'a RIGHT-TO-LEFT OVERRIDE cannot reorder the line it sits on -- the Trojan-Source shape #1858 was filed for'
+
+$t = Format-ForConsole -Text ('a' + [char]0x2066 + 'b' + [char]0x2069 + 'c')
+Assert-True ($t -eq 'a b c') 'the bidi isolates go too, both halves of the pair'
+
+$t = Format-ForConsole -Text ('ad' + [char]0x200B + 'min')
+Assert-True ($t -eq 'ad min') 'a zero-width space becomes a visible space rather than vanishing -- two words are never welded into one that reads as a different title'
+
+$t = Format-ForConsole -Text ([char]0xFEFF + 'title')
+Assert-True ($t -eq ' title') 'and nothing is trimmed or collapsed: a title is quoted evidence, which is why this is NOT Get-DisplayRef'
+
+$t = Format-ForConsole -Text 'Ordinary title -- with punctuation! 100% (v2)'
+Assert-True ($t -eq 'Ordinary title -- with punctuation! 100% (v2)') 'printable text survives the widening exactly as written'
+
+# THE DRIFT PIN'S LOCAL HALF. pr-issues.tests.ps1 asserts WHICH libs type this class and that they
+# agree; this asserts there is ONE definition inside this one, the same shape that suite uses for
+# Format-AuthoredText. A second -replace here would be a strip that could drift from its own docstring.
+$libText = [System.IO.File]::ReadAllText($Lib)
+Assert-True ([regex]::Matches($libText, [regex]::Escape("-replace '[\p{Cc}\p{Cf}]', ' '")).Count -eq 1) 'ONE definition inside this lib -- Format-ForConsole, which the title, the commit subjects and the branch names all go through'
+
 Write-Host ''
 Write-Host 'claim-issue.ps1 -- the properties a suite can hold' -ForegroundColor Cyan
 

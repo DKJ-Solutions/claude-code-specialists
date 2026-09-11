@@ -24,7 +24,7 @@
 function Format-ForConsole {
     <#
         .SYNOPSIS
-            Strip control characters out of tracker-supplied text before it is printed.
+            Strip control AND format characters out of tracker-supplied text before it is printed.
 
         .DESCRIPTION
             An issue title is written by whoever opened the issue, and on a public tracker that is
@@ -34,18 +34,42 @@ function Format-ForConsole {
             operator has to point the run at that exact number; the reason to strip anyway is that the
             output of this step is what a session then decides on.
 
-            C0 (00-1F) and DEL (7F) go, tab included -- a tab in a title is a layout accident rather
-            than content. Everything printable stays exactly as written, because a title is quoted
-            evidence and a mangled one is worse than a blunt one. Each character becomes a space
-            rather than vanishing, so a title cannot be made to read as a different sentence by
-            deleting the separator between two words.
+            THE CLASS WAS ASCII-ONLY UNTIL #1858, AND THAT IS THE HALF WORTH RECORDING. It was
+            '[\x00-\x1F\x7F]' -- C0 and DEL -- which neutralises an ANSI escape and nothing above
+            0x7F. So a Trojan-Source-shaped spoof reached the terminal untouched: U+202E RIGHT-TO-LEFT
+            OVERRIDE, the U+2066..U+2069 isolates, a zero-width run. Many terminals render those, and
+            a line carrying one visually reorders itself without a single byte below 0x80. It also
+            missed C1 (U+0080..U+009F), where some terminals read 0x9B as CSI. Both gaps close at once
+            now: '\p{Cc}' is C0, DEL and C1, and '\p{Cf}' is the bidi and zero-width class.
+
+            A SPACE, NOT A RENDERED CODE POINT, WHICH IS THE QUESTION #1858 LEFT OPEN. Rendering
+            U+202E as '<U+202E>' keeps more evidence and was weighed: it loses, because the argument
+            already in this function decides it. Each character becomes a space rather than vanishing,
+            so a title cannot be made to read as a different sentence by deleting the separator between
+            two words -- and a space is equally the answer to a bidi mark, which git forbids in a ref
+            and which no title needs in order to be RECOGNISED. The cost is real and is accepted: a
+            title written in Arabic or Hebrew loses the marks that order it, and an emoji sequence
+            joined by U+200D prints as its parts. Everything printable stays exactly as written,
+            because a title is quoted evidence and a mangled one is worse than a blunt one.
+
+            THE SAME CLASS THIS REPO ALREADY SHIPS, and this is the THIRD lib that types it. The other
+            two are pr-issues-lib.ps1 (Format-AuthoredText, #1612) and ref-print-lib.ps1
+            (Get-DisplayRef, #1623), and the argument that keeps them apart is exactly true here:
+            different source processes, no bound at all on this one, and neither lib is loaded by this
+            one's callers -- so lifting it would cost a dot-source in every caller and a Copy-Item in
+            every fixture suite to save one regex. Neither of their functions fits either, which is the
+            stronger half: Get-DisplayRef collapses runs of spaces and trims, and a title is evidence
+            that must not be re-spaced; Get-DisplayPath answers the all-stripped case with
+            '(no printable path)', which is the wrong noun for an issue title. What the three copies may
+            not do is DISAGREE, so pr-issues.tests.ps1 compares the class itself and asserts which libs
+            carry it.
 
             IT IS IN THIS LIB RATHER THAN IN THE SCRIPT so that it can be tested at all: a lib is
             dot-sourceable and claim-issue.ps1 is not. Same reasoning as the two decisions below.
     #>
     param([string]$Text)
     if (-not $Text) { return '' }
-    return ([regex]::Replace($Text, '[\x00-\x1F\x7F]', ' '))
+    return ($Text -replace '[\p{Cc}\p{Cf}]', ' ')
 }
 
 function Get-AssigneeLogins {
