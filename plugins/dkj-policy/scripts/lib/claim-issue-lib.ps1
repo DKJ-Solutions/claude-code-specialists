@@ -371,6 +371,13 @@ function Get-ContainingBranchNames {
                 the current branch because on a resume the session's OWN commits name the issue, and
                 reporting a session's work back to it as somebody else's is the fastest way to teach it
                 to stop reading this warning.
+              - A LOCAL BRANCH WHOSE OWN REMOTE-TRACKING TWIN IS ALSO LISTED. `git branch -a --contains`
+                names both 'feat/x' and 'origin/feat/x' when a checkout holds a local copy of a parked
+                branch, and they are one piece of work, not two -- so counting both would inflate the
+                one number this report exists to give ("how many places is this already being worked").
+                The REMOTE spelling is the one kept, because it is the address that is true for anybody
+                reading over your shoulder; a branch that exists only locally keeps its own name, having
+                no twin to fold into.
 
             SORTED AND DEDUPED, so two runs on one repo print the same line in the same order -- a
             warning a reader cannot diff against the last one is a warning they read once.
@@ -403,7 +410,20 @@ function Get-ContainingBranchNames {
         if ($drop -ccontains $name) { continue }
         if (-not $names.Contains($name)) { $names.Add($name) | Out-Null }
     }
-    return @($names | Sort-Object)
+
+    # THE LOCAL/REMOTE FOLD, AFTER the whole list is known -- it cannot be decided one line at a time,
+    # because git prints the local copy before the remote one and the twin is not yet in hand. Only a
+    # 'remotes/' entry can be a twin, which is why the suffix is matched against the cleaned list rather
+    # than against the raw text: 'origin/feat/x' folds 'feat/x' away, and a remote called anything else
+    # ('upstream/feat/x') folds nothing, because a local branch tracking a second remote is a case this
+    # cannot tell apart from two unrelated branches sharing a name.
+    $remoteSuffixes = @{}
+    foreach ($n in $names) {
+        if ($n -match '^origin/(.+)$') { $remoteSuffixes[$Matches[1]] = $true }
+    }
+    $folded = @($names | Where-Object { -not $remoteSuffixes.ContainsKey($_) })
+
+    return @($folded | Sort-Object)
 }
 
 function Format-ParkedFixReport {

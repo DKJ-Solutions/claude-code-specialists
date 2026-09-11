@@ -291,7 +291,6 @@ Assert-True ($body -notmatch '\$\(\$facts\.title\)') 'the issue title is never p
 Assert-True ($body -match 'open the branch \(new-branch\)') 'the fresh-claim verdict says what follows a successful claim'
 Assert-True ($body -match 'read the branch and its document') 'the already-yours verdict still says what follows a resume'
 
-
 # --- THE FOURTH PICKUP SIGNAL: A FIX PARKED ON A BRANCH WITH NO PR (#1853) ------------------------
 #
 # The four functions below are the pure half of a check whose other half is git. Same split, and the
@@ -383,6 +382,20 @@ $deduped = @(Get-ContainingBranchNames -Text $dupText)
 Assert-True ($deduped.Count -eq 2) 'a name listed twice appears once'
 Assert-True ($deduped[0] -eq 'feat/x' -and $deduped[1] -eq 'origin/a') 'and the order is sorted, so two runs print the same line'
 
+# THE LOCAL/REMOTE FOLD. A checkout holding a local copy of a parked branch gets both spellings from
+# `git branch -a --contains`, and they are ONE piece of work -- counting both inflates the single
+# number this report exists to give.
+$twinText = "  feat/x`n  remotes/origin/feat/x`n  remotes/origin/other"
+$folded = @(Get-ContainingBranchNames -Text $twinText)
+Assert-True ($folded.Count -eq 2) 'a local branch and its own remote-tracking twin count once'
+Assert-True ($folded -contains 'origin/feat/x') 'and the REMOTE spelling is the one kept -- it is the address that is true for anybody'
+Assert-True (-not ($folded -contains 'feat/x')) 'so the bare local name is folded away'
+Assert-True (@(Get-ContainingBranchNames -Text "  feat/local-only") -contains 'feat/local-only') 'a branch with no twin keeps its own name'
+# A SECOND REMOTE IS NOT A TWIN: a local branch tracking 'upstream' is indistinguishable here from two
+# unrelated branches sharing a name, so the fold deliberately only knows 'origin/'.
+$otherRemote = @(Get-ContainingBranchNames -Text "  feat/x`n  remotes/upstream/feat/x")
+Assert-True ($otherRemote.Count -eq 2) 'a non-origin remote folds nothing -- it cannot be told from two unrelated branches'
+
 Write-Host ''
 Write-Host 'Format-ParkedFixReport -- what is worth saying, and what is not (#1853)' -ForegroundColor Cyan
 
@@ -443,11 +456,38 @@ Assert-True ($scan -notmatch 'REFUSED') 'and it never speaks in the refusal voca
 Assert-True ($scan -match "(?s)'fetch'.*?-TimeoutSeconds\s+\`$NativeCaptureNetworkTimeoutSeconds") 'the fetch is bounded'
 Assert-True ($scan -match '\$staleNote') 'a fetch that did not answer is reported rather than read as a clean scan'
 
+# AND THE FETCH KEEPS STDERR, which is this family's standing decision rather than this script's taste
+# (#1313): a git call to a remote writes everything to stderr, git redacts the credential out of it
+# itself, and nothing here parses the capture -- so discarding it would remove git's own reason from the
+# one failure path a reader cannot diagnose from an exit code. The two reads below it DO parse and keep
+# the flag, so the assert is on the fetch statement alone rather than on the block.
+$fetchCall = if ($scan -match "(?s)(\`$fetch\s*=\s*Invoke-NativeCapture.*?)\n\s*if\s*\(") { $Matches[1] } else { '' }
+Assert-True ($fetchCall -ne '') 'the fetch statement is findable'
+Assert-True ($fetchCall -notmatch '-DiscardStderr') "the fetch keeps git's own diagnosis (#1313), unlike the two reads that parse"
+Assert-True ($scan -match '\$staleDetail') 'and those lines are actually printed -- keeping stderr and never showing it is the same loss one step later'
+
+# BOTH UNTRUSTED FIELDS GO THROUGH THE ONE SANITISER. A commit subject and a ref name come from the
+# same place -- anyone who can push -- and the branch name was the half printed raw.
+Assert-True ($scan -match '(?s)Subject\s*=\s*\(Format-ForConsole') 'the commit subject is stripped before printing'
+Assert-True ($scan -match '(?s)Branches\s*=\s*@\(\$branches\s*\|\s*ForEach-Object\s*\{\s*Format-ForConsole') 'and so is every branch name'
+
 # WITHOUT A TRUNK REF TO SUBTRACT, `git log --all` reports the issue's own merged repair on the trunk --
 # the noise that teaches a reader to skip the warning. So: no trunk ref, no scan.
 Assert-True ($scan -match '\$trunkRefs\.Count\s+-gt\s+0') 'the scan is skipped where no trunk ref could be verified'
 Assert-True ($scan -match "'--not'") 'and the trunk is subtracted from the log it reads'
 Assert-True ($scan -match '\$currentBranch') "the session's own branch is excluded, so a resume is not warned about itself"
+
+# THE CONTAINMENT LOOP IS BOUNDED, and Format-ParkedFixReport's display cap does NOT bound it -- that
+# one trims what is PRINTED, after every commit has already paid for its own ancestry walk. A branch
+# whose every subject carries the number (the convention is `fix(<n>): ...`) is the shape that runs
+# away, and one issue in this repo's history is named by 21 commits.
+Assert-True ($scan -match '\$maxContainmentReads\s*=\s*[0-9]+') 'the per-commit containment reads have a stated ceiling'
+Assert-True ($scan -match 'Select-Object\s+-First\s+\$maxContainmentReads') 'and the loop actually honours it'
+Assert-True ($scan -match 'were resolved to a branch') 'a truncation says so -- a cap a reader cannot see is the defect this check exists to remove, one layer in'
+# $matches is a PowerShell automatic variable; assigning to it inside a script that also uses -match
+# is the kind of collision that produces a wrong answer rather than an error.
+Assert-True ($scan -notmatch '\$matches\s*=') 'the match list does not shadow the automatic $Matches'
+
 foreach ($path in @($Script, $Lib, $IdLib)) {
     $errors = $null
     [void][System.Management.Automation.Language.Parser]::ParseFile($path, [ref]$null, [ref]$errors)

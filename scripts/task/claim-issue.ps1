@@ -271,8 +271,17 @@ if ($verdict.Action -eq 'claim' -or $verdict.Action -eq 'skip') {
         # Bounded like every other network call in this family (#1639) and BEST-EFFORT -- a failure
         # leaves the already-fetched refs in place, which is a smaller answer rather than a wrong one,
         # and the note below says so instead of letting it read as a clean scan.
+        #
+        # NO -DiscardStderr, AND THAT IS THE CONVENTION RATHER THAN AN OVERSIGHT (#1313). A git call that
+        # talks to a remote writes ALL of its output to stderr, and git redacts the credential out of
+        # that line itself (transport_anonymize_url -- measured on 2.55.0). Nothing here parses the
+        # capture, so the flag would buy nothing and cost the reader git's own reason: exactly the trade
+        # #1313 declined for ship-pr's fetch, worktree-lane and prune-merged. The lines are printed under
+        # the note below, because keeping stderr and then never showing it is the same loss one step
+        # later. The two reads further down DO parse, so they keep the flag.
         $staleNote = ''
-        $fetch = Invoke-NativeCapture -FilePath 'git' -Arguments @('-C', $repoRoot, 'fetch', '--quiet') -DiscardStderr `
+        $staleDetail = @()
+        $fetch = Invoke-NativeCapture -FilePath 'git' -Arguments @('-C', $repoRoot, 'fetch', '--quiet') `
                                       -TimeoutSeconds $NativeCaptureNetworkTimeoutSeconds
         if (-not $fetch -or $fetch.ExitCode -ne 0 -or $fetch.TimedOut) {
             $staleNote = if ($fetch -and $fetch.TimedOut) {
@@ -282,6 +291,7 @@ if ($verdict.Action -eq 'claim' -or $verdict.Action -eq 'skip') {
             } else {
                 'git fetch could not be run at all'
             }
+            if ($fetch) { $staleDetail = @(@($fetch.Output) | Where-Object { $_ -and ([string]$_).Trim() }) }
         }
 
         $logArgs = @('-C', $repoRoot, 'log', '--all', '-E', "--grep=$scanPattern", '--format=%H%x1f%s', '--not') + $trunkRefs
@@ -290,16 +300,45 @@ if ($verdict.Action -eq 'claim' -or $verdict.Action -eq 'skip') {
             $why = if (-not $scanLog) { 'it could not be run at all' } elseif ($scanLog.ShortRead) { 'its capture was still being written when it was read' } else { "it exited $($scanLog.ExitCode)" }
             Write-Host "  [parked-fix scan skipped] git log for #$number was not readable -- $why." -ForegroundColor DarkGray
         } else {
+            # THE CONTAINMENT LOOP IS BOUNDED, and the display cap in Format-ParkedFixReport does NOT
+            # bound it -- that one trims what is printed, after every commit has already paid for its own
+            # ancestry walk. Measured here on the review pass: `git branch -a --contains` costs ~30ms and
+            # a realistic parked branch matches 0-4 commits, so the ordinary run spends under 120ms; the
+            # worst case is a branch whose every subject carries the number (the convention is
+            # `fix(1853): ...`), which one issue in this repo's history reaches at 21.
+            #
+            # INVERTING THE LOOP WAS CONSIDERED AND DECLINED. Asking each branch which of ITS commits
+            # match -- one `git log <branch>` per branch -- is O(branches) instead of O(matches), and this
+            # repo carries 19 branches off the trunk against a handful of matches, so it makes the
+            # ordinary run four times slower to make the rare one faster. The ceiling costs nothing in
+            # the ordinary run and is what the rare one actually needs.
+            #
+            # NEWEST FIRST, because that is git log's own order and the newest commits are the ones whose
+            # branches are still live. The overflow is stated rather than swallowed -- a truncation a
+            # reader cannot see is the defect this whole check exists to remove, one layer in.
+            $maxContainmentReads = 25
+            $scanMatches = @(ConvertFrom-CommitScanLog -Text ((@($scanLog.Output) -join "`n")))
+            $resolved = @($scanMatches | Select-Object -First $maxContainmentReads)
+            if ($scanMatches.Count -gt $resolved.Count) {
+                Write-Host "  [parked-fix scan] $($scanMatches.Count) commits name #$number off the trunk; the newest $($resolved.Count) were resolved to a branch." -ForegroundColor DarkGray
+            }
             $findings = @()
-            foreach ($commit in @(ConvertFrom-CommitScanLog -Text ((@($scanLog.Output) -join "`n")))) {
+            foreach ($commit in $resolved) {
                 $contains = Invoke-NativeCapture -FilePath 'git' -Arguments @('-C', $repoRoot, 'branch', '-a', '--contains', $commit.Sha) -Utf8 -DiscardStderr
                 if (-not $contains -or $contains.ExitCode -ne 0) { continue }
                 $branches = @(Get-ContainingBranchNames -Text ((@($contains.Output) -join "`n")) -Exclude $excludeBranches)
                 if ($branches.Count -eq 0) { continue }
+                # THE BRANCH NAME IS UNTRUSTED TEXT TOO, and it was the half that got printed raw. A
+                # subject and a ref name come from the same place -- anyone who can push -- so both go
+                # through the same filter, AFTER the exclusion above, which must compare the ref as git
+                # spells it. git's own check-ref-format already refuses the C0 range in a ref, so this
+                # strips nothing in practice today; it is here so that the one sanitiser this output has
+                # covers every field of it, rather than leaving a second class of pushed text as the
+                # exception a later widening would have to remember.
                 $findings += [pscustomobject]@{
                     Sha      = $commit.Sha
                     Subject  = (Format-ForConsole -Text $commit.Subject)
-                    Branches = $branches
+                    Branches = @($branches | ForEach-Object { Format-ForConsole -Text $_ })
                 }
             }
 
@@ -313,6 +352,10 @@ if ($verdict.Action -eq 'claim' -or $verdict.Action -eq 'skip') {
         # sentences, and merging them lets a failed fetch read as a clean scan.
         if ($staleNote) {
             Write-Host "  [parked-fix scan] $staleNote -- the branches read here may be behind origin." -ForegroundColor DarkGray
+            # git's own words, which is the whole reason stderr was kept above: "could not read from
+            # remote repository" and "Authentication failed" are what tell a reader whether this is
+            # their credentials or their network, and neither is derivable from the exit code.
+            foreach ($detail in $staleDetail) { Write-Host "                    $(Format-ForConsole -Text $detail)" -ForegroundColor DarkGray }
         }
     }
 }

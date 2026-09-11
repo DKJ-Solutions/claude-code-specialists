@@ -65,7 +65,7 @@ name while every commit lands under the other. Nothing errors, no gate fails, an
 the wrong question.
 
 Measured, September 3, 2026
-([#1315](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1315)): `gh` authenticated as
+([#1315](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1315)): `gh` authenticated as
 `DaveKJohn` on a checkout committing as `davekokbwj`, so claiming #1314 with the documented idiom put
 the wrong account on it and it had to be corrected by hand.
 
@@ -123,11 +123,11 @@ and the account was absent *and* when the read had never happened -- and then pr
 returned 0 and the read *before* the write answered normally, so the far likelier state is a claim
 that landed and a read that did not -- and everything that guards against duplicate work has already
 succeeded by then. Refusing there costs the whole assignment, which is exactly what a claim is not
-allowed to do ([#1485](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1485): the
+allowed to do ([#1485](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1485): the
 claim is the *opening* of the work). So it says which of the two it is in and hands over the one
 command that settles it, the way `new-branch` already words its own unreachable-`gh` line.
 
-Measured on the claim of [#1623](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1623)
+Measured on the claim of [#1623](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1623)
 in the source repo: the old message fired, named a cause it had not measured, and told the operator to
 treat the issue as unclaimed -- while a plain `gh issue view` on the same checkout, seconds later,
 showed the claim sitting there. Followed literally by a second session, that inverts the very hazard
@@ -153,18 +153,27 @@ writes -- `#1853`, the conventional-commit scope `fix(1853):`, and the branch na
 freshly parked branch carries in its creation commit -- and prints what it found, grouped by branch:
 
 ```
-  parked-fix scan: #1852 is named by 2 commits on 1 branch off the trunk --
+  parked-fix scan: #1852 is named by 4 commits on 1 branch off the trunk --
     origin/fix/1852-timeout-decisive-in-sessioncheck
+        9058ff3d  park: fix/1852-timeout-decisive-in-sessioncheck (the branch files only)
+        7b69acf3  fix: copy-edit pass on the #1852 repair
         eb8d24a4  fix: a timed-out version check no longer reports its killed run as a clean verdict
-        99ad0ef8  park: fix/1852-timeout-decisive-in-sessioncheck (the branch files only)
+        ... and 1 more naming #1852
 ```
+
+**Three commits per branch, then an overflow line.** A branch cut for an issue writes that issue's
+number into *every* commit subject, so a week-old one matches dozens of times and would push
+everything after it off the screen. The count in the lead line is the real one; the list is what fits.
+Separately, and for the same reason one layer down, only the newest 25 matching commits are resolved
+to a branch at all -- resolving each one costs a git call, and a run that says nothing about having
+stopped is the defect this whole check exists to remove.
 
 **It warns and never refuses.** An issue can be legitimately named in a commit on a branch that does
 not fix it, and the run that produced the measurement above saw `open-pr` warn about four such
 mentions, all correct as context. The check cannot tell a fix from a mention and does not claim to;
 what it does is make looking cost one command instead of a whole assignment. The claim stands either
 way, because a claim that blocks costs the whole assignment
-([#1485](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1485)).
+([#1485](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1485)).
 
 **It runs on a resume as well as on a fresh claim, and it is silent about your own work.** The
 checked-out branch and the trunk are excluded, so a session resuming its own branch is not warned
@@ -176,7 +185,7 @@ different sentences, and a failed fetch must not be able to read as a clean scan
 
 All three network calls -- the read, the write, and the read-back -- pass the shared network bound
 (two minutes), the same one every other script in this workflow passes on a push or a fetch
-([#1639](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1639), September 8, 2026).
+([#1639](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1639), September 8, 2026).
 They were unbounded until then, and this is the worst step in the workflow to stall in: the claim is
 the **first** move of an issue-driven assignment, so a hang here is a session that never starts, with
 nothing printed to say why. The shape is not hypothetical -- #1628's measurement is a checkout where
@@ -212,7 +221,7 @@ number and no branch has then been told precisely what **not** to do next and no
 do, so stopping there reads as obedience to this page rather than as the failure it is.
 
 Measured in the source repo, September 5, 2026
-([#1485](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1485)): a session resolved
+([#1485](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1485)): a session resolved
 the identity, claimed #1483, got a clean `[OK]`, and closed out with *"Say the word and Derek opens
 the branch, or the session can be cleared."* Dave's correction was that the point of the step is that
 you get started right away. The general rule already covered it -- *"Moving forward within a chain --

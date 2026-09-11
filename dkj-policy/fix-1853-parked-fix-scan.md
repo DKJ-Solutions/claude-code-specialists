@@ -72,8 +72,8 @@ not a second chance.
 - [x] `scripts/lib/claim-issue-lib.ps1` -- four pure functions: `Get-IssueMentionPattern` (the three
       spellings), `ConvertFrom-CommitScanLog`, `Get-ContainingBranchNames`, `Format-ParkedFixReport`.
 - [x] `scripts/task/claim-issue.ps1` -- the git half: the trunk-ref probe, the bounded fetch, the log,
-      the `branch -a --contains` per match, and the report. Plus `Get-TrunkBranchName` read from the
-      same optional seam block that already reads `Get-RepoName`.
+      a ceilinged `branch -a --contains` per match, and the report. Plus `Get-TrunkBranchName` read
+      from the same optional seam block that already reads `Get-RepoName`.
 - [x] `plugins/dkj-policy/skills/claim-issue/SKILL.md` -- the consumer-facing section, the worked
       output, and `git` added to the requirements.
 - [x] Mirrors regenerated (`scripts/sync/build-shared-scripts.ps1`).
@@ -92,17 +92,20 @@ not a second chance.
 
 ### TEST
 
-- [x] `scripts/tests/claim-issue.tests.ps1` -- 55 new asserts, 68 -> 123: the pattern's three positives and four
-      negatives, both parses against the shapes git actually emits (missing separator, empty sha, a
-      subject holding pipes/tabs/colons **and a second separator**, CRLF), the branch cleaner's five
-      drops and its case-sensitive exclusion, the report's grouping, counting, cap and overflow, and
-      five structural asserts on the scan block itself -- that it is gated on the verdict, that
-      nothing in it exits, and that the fetch is bounded.
+- [x] `scripts/tests/claim-issue.tests.ps1` -- 69 new asserts, 68 -> 137: four positive matches across
+      the pattern's three spellings and four negatives, both parses against the shapes git actually
+      emits (missing separator, empty sha, a subject holding pipes/tabs/colons **and a second
+      separator**, CRLF), the branch cleaner's five drops, its case-sensitive exclusion and its
+      local/remote fold, the report's grouping, counting, cap and overflow, and **18** structural
+      asserts on the scan block itself -- that it is gated on the verdict, that nothing in it exits or
+      speaks in the refusal vocabulary, that the fetch is bounded and keeps git's diagnosis, that both
+      untrusted fields are sanitised, and that the containment loop has a ceiling it honours.
 - [x] Full gate: `check-plugin-integrity.ps1` -- **0 errors**. All suites green.
 - [x] Exercised live, which is the half a suite cannot reach: `claim-issue.ps1 1853 -DryRun` on this
-      branch prints **nothing**, which is correct (the only commits naming 1853 are this branch's own
-      and are excluded); the same pipeline run against `#1852` reports its real parked branch
-      `origin/fix/1852-timeout-decisive-in-sessioncheck` with both its commits.
+      branch prints **nothing** from the scan, which is correct -- the only commits naming 1853 are
+      this branch's own and are excluded. The same pipeline run against `#1852` reports its real
+      parked branch `origin/fix/1852-timeout-decisive-in-sessioncheck` -- 4 matching commits, 3 shown
+      and the overflow line naming the fourth, which also exercises the display cap against real data.
 
 #### One existing assert had to be repaired, and it was arguing for the defect
 
@@ -114,6 +117,41 @@ by backtick continuation. Checked in both directions: `main`'s copy of the suite
 branch's script, fails on exactly that one assert (67 passed, 1 failed) -- so the repair was necessary
 rather than cosmetic; and a mutation dropping the bound from one gh call is still caught by the new
 one.
+
+#### What the parallel review pass changed
+
+Victor, Edith, Sebastian and Nolan on the same diff. Every finding below was verified against the tree
+before it was acted on; nothing was taken on the report alone.
+
+- **The fetch discarded stderr** (Victor, Sebastian). Verified in `native-capture-lib.ps1:592-608`:
+  #1313 measured that git redacts the credential out of its own failure line and DECLINED the flag for
+  three sibling fetches on exactly that ground. Nothing here parses the capture, so the flag cost the
+  reader git's reason for nothing. Removed -- and the lines are now printed under the stale note,
+  because keeping stderr and never showing it is the same loss one step later.
+- **Branch names reached the terminal unsanitised** (Sebastian) while commit subjects did not. Both are
+  written by anyone who can push. Routed through the same `Format-ForConsole`, after the exclusion,
+  which must compare the ref as git spells it.
+- **The containment loop was unbounded** (Victor, Nolan). The display cap trims what is *printed*,
+  after every match has paid for its own ancestry walk. Nolan measured ~30ms per call, 0-4 matches per
+  realistic branch; one issue in this repo's history is named by 21 commits. Given a ceiling of 25,
+  with the truncation stated. **Inverting the loop was declined**, with the measurement: per-branch
+  costs O(branches), and this repo carries 19 branches off the trunk against a handful of matches, so
+  it makes the ordinary run slower to make the rare one faster.
+- **A local branch and its `origin/` twin counted twice** (Victor), inflating the one number the report
+  exists to give. Folded to the remote spelling; a non-`origin` remote deliberately folds nothing,
+  being indistinguishable from two unrelated branches sharing a name.
+- **A new URL on the retired repo name** (Edith) -- corrected, along with the four pre-existing ones in
+  the same file, under the correct-on-edit rule.
+- **The assert counts in this document were wrong** (Edith) -- corrected above, and re-derived rather
+  than re-estimated.
+- **Sebastian's second advisory was filed, not built.** `Format-ForConsole` strips only the ASCII
+  control range, so a Unicode bidi override survives in a title or a ref name. Widening it changes the
+  *existing* issue-title call site too, which is outside this branch:
+  [#1858](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1858).
+- **Nolan's duplicate fetch was filed, not built**, and this branch caused it:
+  [#1860](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1860). The repair spans
+  `new-branch.ps1` as well, which is outside this branch, and a freshness guard on this side alone
+  would be a partial fix with a correctness cost.
 
 #### Two Windows PowerShell 5.1 traps met while building it
 
