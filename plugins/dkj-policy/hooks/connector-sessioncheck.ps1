@@ -406,8 +406,15 @@ try {
                 # flag tested only here would not: the cache carries output and an exit code, not fields.
                 #
                 # ship-pr.ps1 makes exactly this call at its own bounded site and says why in the same
-                # words -- TimedOut is the field to read when certainty is needed. This hook was the one
-                # bounded caller in the tree that read neither it nor ShortRead.
+                # words -- TimedOut is the field to read when certainty is needed.
+                #
+                # AND THE CLASS IS NARROWER THAN "BOUNDED", which is worth stating so the next reader does
+                # not go auditing sites that are fine. What makes a caller vulnerable is deciding a
+                # VERDICT from the capture's CONTENT: most bounded sites here judge from ExitCode and
+                # merely print Output as progress (Get-TrunkGap in entry-scaffold-lib.ps1 is the clearest
+                # -- $fetch.ExitCode -eq 0, and the lines relayed for a human to read), and a timeout
+                # cannot mislead them. Of the callers that DO read the content, this hook was the one
+                # reading neither field.
                 #
                 # SHORT READ IS THE SAME DEFECT THROUGH A SECOND DOOR, so it is answered in the same
                 # condition rather than left for a second report. Passing -TimeoutSeconds routes this call
