@@ -43,7 +43,50 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**9 / 20 minor entries** <!-- pending-tally -->
+**9 / 21 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1852-timeout-decisive-in-sessioncheck · 20260911-142702
+
+The session-start version check no longer reports a run that was killed mid-flight as a clean result.
+
+`connector-sessioncheck.ps1` bounds the plugin-versions engine and then chose its verdict from whatever
+landed in the capture. But a bound that fires does not empty the capture: `Invoke-NativeCapture` kills
+the child's process tree and reads its output files regardless, so a child that outlives the kill by a
+moment -- which needs nothing worse than `taskkill.exe` paying its own cold startup under load -- comes
+back complete, flagged `TimedOut` in a field this hook never read. The result was an all-clear printed
+for a check that did not finish: the `[UNREGISTERED]` hazard the hook's own wording exists to prevent,
+arriving through the one field it was not reading. A capture truncated by the kill can also end after a
+`[SUMMARY]` and before an `[ERROR]`, which reads as "up to date" about a checkout that is behind.
+
+The hook now reads `TimedOut` and `ShortRead` -- as the other bounded callers that judge from a
+capture's content already do -- and degrades to its honest one-line verdict instead of parsing a
+document the engine never finished writing. `Stop-NativeProcessTree`'s docstring, which had told
+callers a failed kill costs nothing but a stray process, now says what it actually costs and where the
+answer is.
+
+It surfaced as an intermittent red suite (#1852, CI run 34596638888) whose own comment said it could
+not fail under load. That comment was arguing from the bound, which is load-proof, rather than from the
+verdict, which was not. The new block 7 pins it deterministically, and fails with exactly the two
+assertions CI saw when the repair is removed.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A -- this repo's audience is its own maintainers. The two changed sources ship inside plugins, to a
+consumer who runs this workflow, rather than to a subscriber of a service.
+
+**Score:** N/A
+
+#### Pull Request
+
+A timed-out version check no longer reports its killed run as a clean verdict
+
+Plugins: dkj-policy, dkj-subagents-shopify
+
+[PR #1864](https://github.com/DKJ-Solutions/dkj-claude-plugins/pull/1864)
+
+---
 
 ### DEPLOY: fix/1858-bidi-console-strip · 20260911-140829
 
