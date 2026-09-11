@@ -43,7 +43,39 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**9 / 19 minor entries** <!-- pending-tally -->
+**9 / 20 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1858-bidi-console-strip · 20260911-140829
+
+`claim-issue` neutralised only the ASCII control range in the text it prints, so a Trojan-Source-shaped
+spoof reached the terminal untouched: a U+202E RIGHT-TO-LEFT OVERRIDE, a bidi isolate pair or a
+zero-width run in an issue title, a commit subject or a branch name could visually reorder the line
+reporting it, without a single byte below 0x80. It now strips `[\p{Cc}\p{Cf}]` -- the same class
+`pr-issues-lib.ps1` and `ref-print-lib.ps1` already apply to the other four consoles this workflow
+writes foreign text to -- which closes the C1 range (0x9B reads as CSI in some terminals) in the same
+move. Each character still becomes a space rather than vanishing, so nothing can be welded into a
+title that reads as a different sentence, and nothing is collapsed or trimmed: a title is quoted
+evidence. The cost is stated rather than hidden -- a title written in Arabic or Hebrew loses the marks
+that order it, and an emoji joined by U+200D prints as its parts.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+N/A -- nothing outside this repo's own workflow surface changes. It hardens a console line a maintainer
+reads; no subscriber of any service touches `claim-issue`.
+
+**Score:** N/A
+
+#### Pull Request
+
+Format-ForConsole also neutralises Unicode bidi and zero-width controls
+
+Plugins: dkj-policy
+
+[PR #1863](https://github.com/DKJ-Solutions/dkj-claude-plugins/pull/1863)
+
+---
 
 ### DEPLOY: fix/1853-parked-fix-scan · 20260911-134537
 
