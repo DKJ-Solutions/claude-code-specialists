@@ -151,6 +151,15 @@ issue whose label already names the prefix its branch will get reads as work; on
 classified twice. Your prefixes are your own (step 2) and your labels are your tracker's — **nothing in
 this plugin reads either**, so that alignment is a convention you keep rather than one a gate holds you to.
 
+**Exactly one label is the exception, and it is the only one this workflow prescribes: the reach label.**
+An issue that will land above tier 0 carries it, and `minor` is its default name. It is prescribed where
+your other labels are not, because it is not a free-standing convention: it is
+[the tier model](RELEASES-portable.md#the-same-scale-on-an-issue--the-reach-label) — the scale your repo
+already answers on every changelog entry it writes, and the one that already decides patch versus minor —
+read one step earlier, on the issue instead of on the entry. `Get-ReachLabel` states the string GitHub
+stores, so a repo whose colleagues know the axis by another word renames the label and answers the seam;
+the axis is unaffected, and a repo that answers nothing is already right.
+
 ### 2. Branch — and its two files come along in the same move
 
 [`skills/new-branch/SKILL.md`](skills/new-branch/SKILL.md) · `new-branch.ps1`

@@ -43,7 +43,40 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**9 / 26 minor entries** <!-- pending-tally -->
+**10 / 27 minor entries** <!-- pending-tally -->
+
+### DEPLOY: feat/1870-reach-label-portable · 20260911-191808
+
+The reach label becomes part of `dkj-policy` rather than of its BWJ chapter, and its name becomes
+`minor`. It is the tier model -- which this workflow already reads on every changelog entry, and which
+already decides patch versus minor -- read one step earlier, on the issue instead of on the entry. An
+issue whose landing will be written at tier 1 or 2 carries the label; tier 0 carries none, and doubt
+resolves there. `Get-ReachLabel` states the string a tracker stores, defaulting to `minor`, so a repo
+that spells the axis otherwise answers one function instead of being renamed.
+
+**Score:** 4
+
+#### What makes this deploy extra special
+
+This is the first issue label this workflow has ever prescribed, and it arrives with the sentence that
+used to forbid it rewritten rather than quietly contradicted: your other labels are still your
+tracker's business. A consumer gets a worklist -- `is:open label:minor` is every open issue whose
+landing will be visible past their own developers -- for the price of one `gh label create`, which
+`adopt-dkj-policy` Part 4 now hands them. A consumer already running the axis as `tier-1` is not
+renamed by this: they either rename the label themselves, which GitHub does without dropping it from a
+single issue, or answer `Get-ReachLabel` with the word they have.
+
+**Score:** 3
+
+#### Pull Request
+
+The reach label goes portable: every consumer carries 'minor'
+
+Plugins: dkj-policy, dkj-policy-bwj
+
+[PR #1872](https://github.com/DKJ-Solutions/dkj-claude-plugins/pull/1872)
+
+---
 
 ### DEPLOY: feat/1869-consumer-divergence-check · 20260911-190506
 
