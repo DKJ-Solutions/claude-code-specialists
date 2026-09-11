@@ -71,7 +71,10 @@ session start.
       `scripts/repo-config.ps1` rather than a stub, the same coupling the suite's existing check-6
       scenario already carries, so a future rename of this repo updates both together.
 - [x] The existing suites stay green -- `connectors.tests.ps1` and `connector-sessioncheck.tests.ps1`.
-- [ ] Review round on the diff: code review, copy edit, security.
+- [x] Review round on the diff: code review, copy edit, security and cost, in parallel. Four findings
+      accepted and applied -- the work-tree-root question (the enclosing repo was being read), the slug
+      guard on the printed remedy, an arm-2 justification that claimed more than `CLAUDE.md` grants, and
+      `ssh://` origins falling through unasked. Cost measured at ~63 ms on a 1.6 s run: noise.
 
 ### DEPLOY: fix/1821-connector-origin-mismatch
 
@@ -90,6 +93,15 @@ wrong folder here -- with the command for each; every verdict below is withheld 
 against a repo that was never read. It does not claim more than a local read can support: without a
 network call this run cannot tell a different repository from an old spelling still answering a
 transfer redirect, and the finding says so.
+
+Two things the review round changed, both of which the finding turns on. The question asked is whether
+the checkout is the work tree **root**, not whether it sits inside one -- `--is-inside-work-tree` is
+true for any folder nested in a parent repo, so a `localCheckout` resolving to a folder that was never
+a clone used to be reported under its enclosing repository's `origin`: a false `[ERROR]` blaming the
+wrong repo, or a false *silent agreement* where the enclosing repo happened to match. And the printed
+remedy holds the register's slug to GitHub's own shape before composing a copy-pasteable command from
+it -- the guard this same file already applies to that field before it reaches an API call, which the
+first draft skipped.
 
 The arm that makes it safe to ship is the one the issue did not anticipate. A plain comparison fires
 falsely on the source repo's **own** connector -- `connectors/dkj-claude-plugins.json` names

@@ -28,6 +28,11 @@ $HookHome = Join-Path ([System.IO.Path]::GetTempPath()) "connectors-hook-home-$P
 # rather than merely stating it. Declared here so the closing finally can clear both and put PATH back.
 $FakeBin  = Join-Path ([System.IO.Path]::GetTempPath()) "connectors-fakegh-$PID-$([guid]::NewGuid().ToString('n'))"
 $GhCalls  = Join-Path ([System.IO.Path]::GetTempPath()) "connectors-ghcalls-$PID-$([guid]::NewGuid().ToString('n')).log"
+# A wrapper directory git-init'd in its OWN right, for check 1b's arm-4 nested-checkout scenarios
+# (#1821): the consumer fixture is built one or more levels INSIDE it via New-FixtureConsumer/
+# New-FixtureManifest's -Root, so the folder resolves inside a git work tree without BEING that work
+# tree's root. Never $Fixture's own parent -- that parent is the shared system temp folder.
+$NestedFixtureRoot = Join-Path ([System.IO.Path]::GetTempPath()) "connectors-nested-fixture-$PID-$([guid]::NewGuid().ToString('n'))"
 $PrevPath = $env:PATH
 
 $script:pass = 0
@@ -90,18 +95,22 @@ function Invoke-HookIsolated {
 # Builds a fixture consumer with settings.json + given extensions. -Layout chooses where the
 # lenses live: 'legacy' (.claude/extensions/) or 'plugins'
 # (.claude/plugins/claude-specialists/dkj-subagents-alpha/, since life-hub parity).
+# -Root defaults to $Fixture (every pre-#1821 call site) and exists so the arm-4 nested-checkout
+# scenarios (#1821) can build a consumer at a path that itself sits INSIDE another, separately
+# git-init'd directory -- $Fixture's own parent is the shared system temp folder, which is not a
+# place this suite may git-init.
 function New-FixtureConsumer {
-    param([string[]]$ExtensionIds, [bool]$PluginEnabled = $true, [string]$Layout = 'legacy')
-    if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture }
+    param([string[]]$ExtensionIds, [bool]$PluginEnabled = $true, [string]$Layout = 'legacy', [string]$Root = $Fixture)
+    if (Test-Path -LiteralPath $Root) { Remove-Item -Recurse -Force -LiteralPath $Root }
     $extDir = if ($Layout -eq 'plugins') {
-        Join-Path $Fixture '.claude\plugins\claude-specialists\dkj-subagents-alpha'
+        Join-Path $Root '.claude\plugins\claude-specialists\dkj-subagents-alpha'
     } else {
-        Join-Path $Fixture '.claude\extensions'
+        Join-Path $Root '.claude\extensions'
     }
     New-Item -ItemType Directory -Path $extDir -Force | Out-Null
     $enabled = if ($PluginEnabled) { '{ "dkj-subagents-alpha@dkj-claude-plugins": true }' } else { '{ }' }
     $settings = '{ "enabledPlugins": ' + $enabled + ' }'
-    [System.IO.File]::WriteAllText((Join-Path $Fixture '.claude\settings.json'), $settings)
+    [System.IO.File]::WriteAllText((Join-Path $Root '.claude\settings.json'), $settings)
     foreach ($id in $ExtensionIds) {
         $p = Join-Path $extDir "$id-extension.md"
         [System.IO.File]::WriteAllText($p, "---`nid: $($id.Split('-')[1])`ngroup: $($id.Split('-')[0])`n---`nfixture")
@@ -121,9 +130,12 @@ function New-FixtureManifest {
         # The register's own name for the consumer. A parameter since #1808: it is what the network
         # read turns into an API owner and name, so a scenario has to be able to hand it a slug the
         # guard must refuse.
-        [string]$Repo = 'fixture/consumer'
+        [string]$Repo = 'fixture/consumer',
+        # Mirrors New-FixtureConsumer's -Root (#1821): the nested-checkout scenarios write their
+        # manifest beside a consumer that does not live at $Fixture.
+        [string]$Root = $Fixture
     )
-    $mfPath = Join-Path $Fixture 'manifest.json'
+    $mfPath = Join-Path $Root 'manifest.json'
     $obj = [ordered]@{
         repo          = $Repo
         visibility    = 'private'
@@ -167,20 +179,25 @@ function Set-FixtureEnabledPlugins {
     [System.IO.File]::WriteAllText((Join-Path $Fixture '.claude\settings.json'), ('{ "enabledPlugins": ' + $enabled + ' }'))
 }
 
-# Turns $Fixture into a real git work tree (for check 1b, #1821), optionally with an 'origin' remote.
-# NO NETWORK: 'git init' and 'git remote add' only ever write local .git config, and the URL passed in
-# is never fetched from or pushed to -- check 1b itself only ever reads .git/config via
-# 'remote get-url'. Called AFTER New-FixtureConsumer, which rebuilds $Fixture from scratch and would
-# wipe a '.git' folder written before it. Same '2>$null' + $LASTEXITCODE idiom check-connectors.ps1's
-# own check 1b uses for the identical local git calls (see its comment on why this is not routed
-# through native-capture-lib.ps1: that lib exists to bound a call that LEAVES the machine).
+# Turns $At (default $Fixture) into a real git work tree (for check 1b, #1821), optionally with an
+# 'origin' remote. NO NETWORK: 'git init' and 'git remote add' only ever write local .git config, and
+# the URL passed in is never fetched from or pushed to -- check 1b itself only ever reads .git/config
+# via 'remote get-url'. Called AFTER New-FixtureConsumer, which rebuilds $Fixture from scratch and
+# would wipe a '.git' folder written before it. Same '2>$null' + $LASTEXITCODE idiom
+# check-connectors.ps1's own check 1b uses for the identical local git calls (see its comment on why
+# this is not routed through native-capture-lib.ps1: that lib exists to bound a call that LEAVES the
+# machine).
+# -At exists for the arm-4 nested-checkout scenarios (#1821): there the git work tree is init'd one
+# level ABOVE the actual consumer folder, on a dedicated wrapper directory that is not $Fixture at
+# all -- $Fixture's own parent is the shared system temp folder, which is not a place this suite may
+# git-init.
 function Set-FixtureGitCheckout {
-    param([string]$OriginUrl = '')
-    & git -C $Fixture init -q 2>$null
-    if ($LASTEXITCODE -ne 0) { throw "git init failed in fixture ($Fixture)" }
+    param([string]$OriginUrl = '', [string]$At = $Fixture)
+    & git -C $At init -q 2>$null
+    if ($LASTEXITCODE -ne 0) { throw "git init failed in fixture ($At)" }
     if ($OriginUrl) {
-        & git -C $Fixture remote add origin $OriginUrl 2>$null
-        if ($LASTEXITCODE -ne 0) { throw "git remote add origin failed in fixture ($Fixture)" }
+        & git -C $At remote add origin $OriginUrl 2>$null
+        if ($LASTEXITCODE -ne 0) { throw "git remote add origin failed in fixture ($At)" }
     }
 }
 
@@ -231,6 +248,17 @@ try {
     Assert-Match '\[OK\]\s+plugin is enabled' $r.Out 'origin agrees (ssh): ordinary verdicts still print'
     Assert-NotMatch "this checkout's 'origin' is" $r.Out 'origin agrees (ssh): no arm-3 ERROR'
 
+    # --- 1d2. Check 1b, arm 1 again: the THIRD URL shape, 'ssh://git@github.com/...' -- a valid,
+    #      not-rare remote shape the parse used to fall through on unasked (Victor's finding, #1821).
+    #      1c/1d already pin the other two; this pins the parse on all three rather than two of three.
+    New-FixtureConsumer -ExtensionIds @('06-16')
+    Set-FixtureGitCheckout -OriginUrl 'ssh://git@github.com/acme-org/widgets.git'
+    $mf = New-FixtureManifest -Extensions @('06-16') -Repo 'acme-org/widgets'
+    $r = Invoke-Ps $Script ($base + @('-Manifest', $mf, '-ConsumerPathOverride', $Fixture))
+    Assert-Equal 0 $r.Code 'origin agrees (ssh://): exit code 0'
+    Assert-Match '\[OK\]\s+plugin is enabled' $r.Out 'origin agrees (ssh://): ordinary verdicts still print'
+    Assert-NotMatch "this checkout's 'origin' is" $r.Out 'origin agrees (ssh://): no arm-3 ERROR (the shape used to fall through unrecognised)'
+
     # --- 1e. Check 1b, arm 3: a GENUINE mismatch -- this is the whole point of #1821. The fixture is
     #      set up so that, WITHOUT check 1b's 'continue', two of the ordinary verdicts below would
     #      ALSO have fired here: the plugin is disabled (-> '[ERROR] ... is NOT (or no longer)
@@ -269,6 +297,12 @@ try {
     Assert-Match 'git -C <this checkout> remote set-url origin https://github\.com/DKJ-Solutions/dkj-claude-plugins\.git' $r.Out 'own rename history: names the one command that ends it'
     Assert-Match '\[OK\]\s+plugin is enabled' $r.Out 'own rename history: proceeds exactly as on agreement'
     Assert-NotMatch "this checkout's 'origin' is" $r.Out 'own rename history: no arm-3 ERROR'
+    # THE WORDING IS SOFTENED ON PURPOSE (#1821, Edith's finding): this run makes no network call, so
+    # it cannot CONFIRM a transfer redirect -- only that the mismatch is CONSISTENT with one. Pinned
+    # here so a future edit cannot drift the claim back to something the run never measured.
+    Assert-Match 'consistent with a transfer redirect rather than confirmed as one' $r.Out 'own rename history: the softened claim is pinned'
+    Assert-Match 'since this run makes no network call' $r.Out 'own rename history: and names why it cannot go further'
+    Assert-NotMatch 'a transfer redirect, not a different repository' $r.Out 'own rename history: the old, over-confident wording is gone'
 
     # --- 1g. Check 1b, arm 4: not a git work tree at all -> the question could not be asked ---------
     #      New-FixtureConsumer's plain folder is never a git work tree, so every scenario ABOVE this
@@ -290,6 +324,64 @@ try {
     Assert-Equal 0 $r.Code 'work tree, no origin: exit code unchanged'
     Assert-Match "could not read this checkout's own git identity" $r.Out 'work tree, no origin: same SKIP as no-git-at-all'
     Assert-Match '\[OK\]\s+plugin is enabled' $r.Out 'work tree, no origin: checks below still run'
+
+    # --- 1i. Check 1b, arm 4's nested-checkout sub-case (#1821, Victor's finding, medium severity): the
+    #      folder resolves INSIDE a git work tree but is NOT that work tree's own root. Before the fix
+    #      this read via '--is-inside-work-tree', which answers 'true' for any folder nested inside
+    #      somebody else's checkout, and 'remote get-url origin' then walked UP and answered with the
+    #      ENCLOSING repo's origin as if it were this checkout's own identity. THE BITING CASE: the
+    #      wrapper's origin does NOT match the manifest, so the pre-fix code would have printed a false
+    #      arm-3 [ERROR] blaming a repository that has nothing to do with the folder actually named by
+    #      localCheckout. The fixed code must instead recognise this is arm 4 (the question does not
+    #      apply to a non-root folder at all) and print no mismatch.
+    if (Test-Path -LiteralPath $NestedFixtureRoot) { Remove-Item -Recurse -Force -LiteralPath $NestedFixtureRoot }
+    New-Item -ItemType Directory -Path $NestedFixtureRoot -Force | Out-Null
+    Set-FixtureGitCheckout -At $NestedFixtureRoot -OriginUrl 'https://github.com/other-org/gadgets.git'
+    $nestedCheckout = Join-Path $NestedFixtureRoot 'sub\consumer'
+    New-FixtureConsumer -ExtensionIds @('06-16') -Root $nestedCheckout
+    $mf = New-FixtureManifest -Extensions @('06-16') -Repo 'acme-org/widgets' -Root $nestedCheckout
+    $r = Invoke-Ps $Script ($base + @('-Manifest', $mf, '-ConsumerPathOverride', $nestedCheckout))
+    Assert-Equal 0 $r.Code 'nested, non-root, enclosing origin mismatches manifest: exit code 0 (no false alarm)'
+    Assert-NotMatch "this checkout's 'origin' is" $r.Out 'nested, non-root, enclosing origin mismatches manifest: no arm-3 ERROR blaming the enclosing repo'
+    Assert-NotMatch '\[ERROR\]' $r.Out 'nested, non-root, enclosing origin mismatches manifest: no ERROR at all'
+    Assert-Match 'is not the root of the git work tree it sits inside' $r.Out 'nested, non-root, enclosing origin mismatches manifest: named as arm 4, precisely'
+    Assert-Match 'acme-org/widgets' $r.Out 'nested, non-root, enclosing origin mismatches manifest: still names the manifest slug it could not check'
+    Assert-Match '\[OK\]\s+plugin is enabled' $r.Out 'nested, non-root, enclosing origin mismatches manifest: checks below still run'
+
+    # --- 1j. Same nested-checkout sub-case, but the enclosing repo's origin HAPPENS to match the
+    #      manifest -- the silent-agreement half, invisible by construction. Before the fix this would
+    #      have read the enclosing origin, found it equal to the manifest, and fired NO signal at all --
+    #      a false arm-1 agreement for a folder that was never a clone of anything in its own right. The
+    #      only way to prove the fix still catches this is to assert the arm-4 SKIP is present: if it
+    #      were ever missing, the run would have silently agreed instead.
+    if (Test-Path -LiteralPath $NestedFixtureRoot) { Remove-Item -Recurse -Force -LiteralPath $NestedFixtureRoot }
+    New-Item -ItemType Directory -Path $NestedFixtureRoot -Force | Out-Null
+    Set-FixtureGitCheckout -At $NestedFixtureRoot -OriginUrl 'https://github.com/acme-org/widgets.git'
+    $nestedCheckout = Join-Path $NestedFixtureRoot 'sub\consumer'
+    New-FixtureConsumer -ExtensionIds @('06-16') -Root $nestedCheckout
+    $mf = New-FixtureManifest -Extensions @('06-16') -Repo 'acme-org/widgets' -Root $nestedCheckout
+    $r = Invoke-Ps $Script ($base + @('-Manifest', $mf, '-ConsumerPathOverride', $nestedCheckout))
+    Assert-Equal 0 $r.Code 'nested, non-root, enclosing origin happens to match manifest: exit code 0'
+    Assert-NotMatch "this checkout's 'origin' is" $r.Out 'nested, non-root, enclosing origin happens to match manifest: no arm-3 ERROR'
+    Assert-Match 'is not the root of the git work tree it sits inside' $r.Out 'nested, non-root, enclosing origin happens to match manifest: arm 4 still fires -- NOT a silent arm-1 agreement'
+    Assert-Match '\[OK\]\s+plugin is enabled' $r.Out 'nested, non-root, enclosing origin happens to match manifest: checks below still run'
+
+    # --- 1k. Check 1b, arm 3's remedy line, guarded (#1821, Sebastian's finding): a manifest 'repo' that
+    #      is not a well-formed GitHub slug must not be composed into the printed 'git remote set-url'
+    #      command -- the [ERROR] itself still fires (nothing about the malformed value was checked
+    #      either way), but the remedy names the field as not a well-formed slug instead of building a
+    #      URL from it. Made precise enough that reintroducing the raw string interpolation would fail
+    #      it: the malformed value itself must never appear inside a 'remote set-url' line.
+    New-FixtureConsumer -ExtensionIds @('06-16')
+    Set-FixtureGitCheckout -OriginUrl 'https://github.com/acme-org/widgets.git'
+    $mf = New-FixtureManifest -Extensions @('06-16') -Repo 'fixture/consumer/../../etc'
+    $r = Invoke-Ps $Script ($base + @('-Manifest', $mf, '-ConsumerPathOverride', $Fixture))
+    Assert-Equal 1 $r.Code 'malformed manifest repo slug (arm 3): exit code 1'
+    Assert-Match '\[ERROR\]' $r.Out 'malformed manifest repo slug (arm 3): the finding still fires'
+    Assert-Match "this checkout's 'origin' is" $r.Out 'malformed manifest repo slug (arm 3): still the arm-3 mismatch line'
+    Assert-Match 'not a valid GitHub owner/name slug -- rejected before it became an API call' $r.Out 'malformed manifest repo slug (arm 3): named as not well-formed'
+    Assert-Match 'No ready-to-run repoint command is printed here' $r.Out 'malformed manifest repo slug (arm 3): says so plainly'
+    Assert-NotMatch 'remote set-url origin https://github\.com/fixture' $r.Out 'malformed manifest repo slug (arm 3): the raw value is never composed into a remote set-url command'
 
     # --- 2. Registered extension is missing -> exit 1 ----------------------------------------
     New-FixtureConsumer -ExtensionIds @('06-16')
@@ -1612,6 +1704,7 @@ exit 1
     if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture }
     if (Test-Path -LiteralPath $HookHome) { Remove-Item -Recurse -Force -LiteralPath $HookHome -ErrorAction SilentlyContinue }
     if (Test-Path -LiteralPath $FakeBin) { Remove-Item -Recurse -Force -LiteralPath $FakeBin -ErrorAction SilentlyContinue }
+    if (Test-Path -LiteralPath $NestedFixtureRoot) { Remove-Item -Recurse -Force -LiteralPath $NestedFixtureRoot -ErrorAction SilentlyContinue }
     Remove-Item -Path $GhCalls -Force -ErrorAction SilentlyContinue
     $env:PATH = $PrevPath
     foreach ($v in @('GH_CALL_LOG', 'GH_GRAPHQL_BODY', 'GH_GRAPHQL_EXIT', 'GH_AUTH_FAIL')) {
