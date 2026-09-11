@@ -92,7 +92,7 @@ not a second chance.
 
 ### TEST
 
-- [x] `scripts/tests/claim-issue.tests.ps1` -- 51 new asserts: the pattern's three positives and four
+- [x] `scripts/tests/claim-issue.tests.ps1` -- 55 new asserts, 68 -> 123: the pattern's three positives and four
       negatives, both parses against the shapes git actually emits (missing separator, empty sha, a
       subject holding pipes/tabs/colons **and a second separator**, CRLF), the branch cleaner's five
       drops and its case-sensitive exclusion, the report's grouping, counting, cap and overflow, and
@@ -110,7 +110,10 @@ not a second chance.
 the bound compared with a whole-file count of the gh calls. That was exact only while `gh` was the
 only bounded caller in the script, and the bounded `git fetch` broke it -- so the suite failed on a
 script where every gh call was in fact bounded. It now reads each gh invocation on its own, delimited
-by backtick continuation. Mutation-checked: dropping the bound from one call is still caught.
+by backtick continuation. Checked in both directions: `main`'s copy of the suite, run against this
+branch's script, fails on exactly that one assert (67 passed, 1 failed) -- so the repair was necessary
+rather than cosmetic; and a mutation dropping the bound from one gh call is still caught by the new
+one.
 
 #### Two Windows PowerShell 5.1 traps met while building it
 
