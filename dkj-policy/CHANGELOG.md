@@ -43,7 +43,47 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**12 / 30 minor entries** <!-- pending-tally -->
+**13 / 31 minor entries** <!-- pending-tally -->
+
+### DEPLOY: feat/1881-converge-bwj-floor · 20260911-213048
+
+`dkj-policy-bwj` now states which mechanisms it owns, and ships the first one: the test harness the two
+BWJ stores were each maintaining their own drifted copy of.
+
+The sibling check landed a day earlier and reported 93 findings without being able to act on any of
+them, because acting needed one decision nobody had made -- which plugin owns a mechanism two stores
+both need. The answer is BWJ by default, and the price is stated rather than hidden: `dkj-policy` stays
+thinner than it could be, and the two stores get a BWJ-only copy of things that are arguably universal.
+
+The harness was chosen as the first increment because it is the case where merging is a decision rather
+than a diff. Each store's copy was ahead of the other -- one had the two mechanisms born from a false
+GREEN in the very gate these suites are read by, the other the three-legged plugin-loaded check, and it
+was still in the language the first had been translated out of a month earlier.
+
+Beside the ruling sits the question that makes it stick: a store's own rule asks *"does the plugin
+provide this?"*, which with a structural N of two answers "no duplication" right up until somebody opens
+the other repo.
+
+**Score:** 4
+
+#### What makes this deploy extra special
+
+For the two BWJ stores this is the first mechanism they stop maintaining twice, and the README tells
+them how to adopt it -- one forwarder, no suite changes. For every other consumer of this marketplace
+the answer is N/A by design: the ruling exists precisely so that a mechanism two stores need does not
+arrive in the plugin everybody runs.
+
+**Score:** 3
+
+#### Pull Request
+
+Converge the BWJ store floor: dkj-policy-bwj owns what the two stores share
+
+Plugins: dkj-policy-bwj
+
+[PR #1887](https://github.com/DKJ-Solutions/dkj-claude-plugins/pull/1887)
+
+---
 
 ### DEPLOY: docs/1875-tracker-language-convention · 20260911-195522
 
