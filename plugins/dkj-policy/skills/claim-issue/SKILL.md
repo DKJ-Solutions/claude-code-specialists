@@ -155,9 +155,9 @@ freshly parked branch carries in its creation commit -- and prints what it found
 ```
   parked-fix scan: #1852 is named by 4 commits on 1 branch off the trunk --
     origin/fix/1852-timeout-decisive-in-sessioncheck
-        9058ff3d  park: fix/1852-timeout-decisive-in-sessioncheck (the branch files only)
-        7b69acf3  fix: copy-edit pass on the #1852 repair
-        eb8d24a4  fix: a timed-out version check no longer reports its killed run as a clean verdict
+        9058ff3d  davekokbwj, 2 hours ago -- park: fix/1852-timeout-decisive-in-sessioncheck (the branch files only)
+        7b69acf3  davekokbwj, 2 hours ago -- fix: copy-edit pass on the #1852 repair
+        eb8d24a4  davekokbwj, 3 hours ago -- fix: a timed-out version check no longer reports its killed run as a clean verdict
         ... and 1 more naming #1852
 ```
 
@@ -168,12 +168,51 @@ Separately, and for the same reason one layer down, only the newest 25 matching 
 to a branch at all -- resolving each one costs a git call, and a run that says nothing about having
 stopped is the defect this whole check exists to remove.
 
+**Each commit says WHO wrote it and HOW LONG AGO, ahead of its subject**
+([#1878](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1878)). That order is the order the
+decision is made in -- which commit, whose, how fresh, and only then what it says -- and the subject
+comes last because it is the field that misled. Measured September 11, 2026, one day after the scan
+landed: a session ran it on #1874, was told there was one commit on one branch off the trunk, read that
+commit exactly as instructed, found a `park:` scaffold touching only the branch document, and carried
+on. **A park commit is empty by design**, so its content is the one thing that cannot report a
+collision -- and a colleague was three minutes into the same issue, with their pull request twenty
+minutes from opening. Two implementations, discovered at the push.
+
+**And where the newest of those commits is not yours, the scan says so as a verdict:**
+
+```
+  NOT YOURS: the newest of those commits was written by 'maikel-bwj', 3 minutes ago, on
+  origin/docs/1874-preview-control-variant
+  That is the locked-door shape -- a different account, and a branch that already exists --
+  reaching you through the branch instead of through the assignee field, where nothing would
+  have reported it. ASK THEM BEFORE YOU WRITE ANYTHING.
+  Do NOT settle this by reading the commit: a park commit is empty by design, so its
+  content is the one thing that cannot tell you whether somebody is mid-flight.
+```
+
+**The comparison is against the git AUTHOR name, not the GitHub login**, because `%an` is what the scan
+read and the git name is what this checkout would itself have written. A repo whose `user.name` is a
+display name ("Ada Lovelace") never matches its own login, so comparing against the login alone would
+report every one of that person's own parked commits as a stranger's; both names are accepted, so a
+split checkout recognises itself under either. With **no** name configured there is nothing to compare
+against, and then no verdict is printed at all -- the author and the age still are, because they are
+facts rather than a judgement.
+
 **It warns and never refuses.** An issue can be legitimately named in a commit on a branch that does
 not fix it, and the run that produced the measurement above saw `open-pr` warn about four such
 mentions, all correct as context. The check cannot tell a fix from a mention and does not claim to;
 what it does is make looking cost one command instead of a whole assignment. The claim stands either
 way, because a claim that blocks costs the whole assignment
 ([#1485](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1485)).
+
+**That holds for the verdict above too, and its shape is the whole of the answer #1878 left open.** It
+is refusal-*shaped* and refuses nothing -- not as a hedge, but because of what the scan measures: it
+matches any commit **naming** the issue, and a colleague mentioning one in a commit of their own is
+both ordinary and correct. A block there would be wrong far more often than right. **What it does
+change is what this script says last**: a run that prints *ASK THEM BEFORE YOU WRITE ANYTHING* and then
+closes with *the work starts here* has told the reader both things and settled neither, and the closing
+line is the one a session acts on. So on a find, the `[OK]` points at the verdict instead -- on a fresh
+claim and on a resume alike.
 
 **It runs on a resume as well as on a fresh claim, and it is silent about your own work.** The
 checked-out branch and the trunk are excluded, so a session resuming its own branch is not warned

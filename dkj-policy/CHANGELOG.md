@@ -43,7 +43,44 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**11 / 28 minor entries** <!-- pending-tally -->
+**12 / 29 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1878-parked-fix-attribution · 20260911-193600
+
+The parked-fix scan now names WHO parked each commit and HOW LONG AGO, ahead of the subject, and says
+so as a verdict where the newest one is not this checkout's own.
+
+The scan landed on September 11, 2026 and was defeated the next day by the one commit shape a parked
+branch always has. A session claimed #1874, was told there was one commit on one branch off the trunk,
+read it exactly as the warning instructs, found a `park:` scaffold touching only the branch document,
+and carried on -- while its author was three minutes in and twenty minutes from opening their pull
+request. A park commit is empty by design, so content is the one thing that cannot report a collision.
+Both facts that would have stopped it were one git format field away and neither was asked for.
+
+The verdict is refusal-shaped and refuses nothing, which is the precision of the measurement rather
+than a hedge: the scan matches any commit *naming* the issue, and a colleague mentioning one is
+ordinary. What it does change is the closing line, because a run that says ASK THEM BEFORE YOU WRITE
+ANYTHING and then THE WORK STARTS HERE has settled nothing.
+
+**Score:** 4
+
+#### What makes this deploy extra special
+
+The claim step ships in `dkj-policy`, so every consumer running this workflow gets the attribution and
+the verdict at the moment a session picks up an issue -- the one moment duplicate work can still be
+prevented for free. A reader who has ever dismissed a parked branch on its contents is the audience.
+
+**Score:** 3
+
+#### Pull Request
+
+claim-issue: the parked-fix scan names who parked a commit and how long ago
+
+Plugins: dkj-policy
+
+[PR #1883](https://github.com/DKJ-Solutions/dkj-claude-plugins/pull/1883)
+
+---
 
 ### DEPLOY: feat/1873-preview-handover-rule · 20260911-192647
 
