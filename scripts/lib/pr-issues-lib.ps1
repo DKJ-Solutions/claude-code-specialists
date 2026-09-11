@@ -1995,14 +1995,18 @@ function Format-AuthoredText {
         THE WORDS STAY. The note only has to be READABLE; quoting the payload would keep it and add
         noise. Same choice and same reasoning as the sibling site.
 
-        TWO LIBS CARRY THIS CLASS, AND THE COUNT IS STATED BECAUSE A WRONG ONE IS WHAT MADE THIS GAP HARD
-        TO FIND (the second half of #1612). It was three until #1623, and the arrangement is worth reading
-        before it is changed again:
+        THREE LIBS CARRY THIS CLASS, AND THE COUNT IS STATED BECAUSE A WRONG ONE IS WHAT MADE THIS GAP
+        HARD TO FIND (the second half of #1612). It was three until #1623, two until #1858, and the
+        arrangement is worth reading before it is changed again:
 
           - THIS LIB types it, for the reason above.
           - ref-print-lib.ps1 types it, inside Get-DisplayRef -- the one definition of the prose strip
             since #1623, applied at thirty-two printed sentences across ship-pr.ps1, sync-main.ps1,
             remote-ahead-lib.ps1 and worktree-lib.ps1, and to this lib's sibling Get-PasteableRef note.
+          - claim-issue-lib.ps1 types it, inside Format-ForConsole -- the issue title, the commit
+            subjects and the branch names claim-issue.ps1 prints. It reached only '[\x00-\x1F\x7F]'
+            until #1858, so a bidi override or a zero-width run in a title passed through it untouched,
+            as did the whole C1 range.
           - remote-ahead-lib.ps1 typed the FIRST copy (a commit's %an and %s, #1439) and no longer does:
             #1623 gave it a caller's reason to load ref-print-lib anyway -- the branch label in its own
             sentence, which it had been printing raw beside the subject it sanitised -- and once the lib
@@ -2015,9 +2019,15 @@ function Format-AuthoredText {
         caller and a Copy-Item in every fixture suite to save one regex. remote-ahead-lib's case is the
         one that changed, and it changed because it acquired the dependency for its own sake.
 
+        AND #1858's COPY HAS A SECOND REASON ON TOP OF THAT, THE STRONGER OF THE TWO: no existing
+        function fits its contract. Get-DisplayRef collapses runs of spaces and trims, and an issue title
+        is quoted evidence that must not be re-spaced; Get-DisplayPath answers the all-stripped case with
+        '(no printable path)', the wrong noun for a title. Reuse there would have meant a FOURTH function
+        in ref-print-lib rather than one regex fewer.
+
         What the remaining copies must never do is DISAGREE -- so pr-issues.tests.ps1 compares them to the
         same character class and asserts WHICH libs carry it, guarding the drift instead of designing it
-        away. A third site appearing again is not forbidden; it has to update that assert, this block and
+        away. A fourth site appearing is not forbidden; it has to update that assert, this block and
         the new-branch skill page, which is the claim #1612 was filed about.
     #>
     param([string]$Text)
