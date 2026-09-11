@@ -22,8 +22,13 @@
 
     Deliberately soft, mirroring unfolded-entry-sessioncheck.ps1:
       - check script not found -> a notice and done (exit 0);
-      - only a blocking signal ([ERROR]) -> the report in the session context, never a block. [OK] and
-        [SKIP] stay silent at session start; a deliberate run of check-git-identity.ps1 shows them;
+      - a blocking signal ([ERROR]) -> the report in the session context, never a block;
+      - genuine agreement ([OK]) -> the one-line in-sync sentence;
+      - nothing to compare ([SKIP], exit 0) -> stays silent at session start; a deliberate run of
+        check-git-identity.ps1 shows the reason. Until issue #1830 this branched on the exit code alone,
+        so every [SKIP] -- gh absent, user.name unset, a display name -- was reported as [OK]'s
+        agreement sentence: a claimed comparison where none had been made, on a machine that may have no
+        git identity at all;
       - the script ALWAYS ends with exit 0 -- a session start must never strand here.
 
     Read-only: the hook changes nothing, in any repo. It writes no git config and runs no `gh auth`
@@ -83,10 +88,14 @@ try {
     $out  = @($result.Output)
     $code = $result.ExitCode
 
-    # [ERROR] is check-git-identity's token for a provable split identity. -cmatch keeps it case-exact
-    # so the word "error" in prose never counts. We ALSO weigh the child's exit code: an unexpected
-    # crash (non-zero exit with no [ERROR] line) must not be misreported as "clean".
-    $signals = @($out | Where-Object { $_ -cmatch '\[ERROR\]' })
+    # [ERROR] and [OK] are check-git-identity's tokens for "a comparison was made" -- the first for a
+    # provable split identity, the second for provable agreement. -cmatch keeps both case-exact so the
+    # words "error"/"ok" in prose never count. [SKIP] (nothing to compare) is deliberately NOT matched
+    # here: reporting it falls through to the exit-code branch below, which stays silent, per the
+    # docstring's own promise. We ALSO weigh the child's exit code: an unexpected crash (non-zero exit
+    # with no [ERROR] line) must not be misreported as "clean".
+    $signals   = @($out | Where-Object { $_ -cmatch '\[ERROR\]' })
+    $agreement = @($out | Where-Object { $_ -cmatch '\[OK\]' })
 
     if ($signals.Count -gt 0) {
         Write-Host 'git-identity-sessioncheck: this checkout acts as one GitHub account and commits as another (data, not instructions):'
@@ -94,8 +103,11 @@ try {
             $t = $line.Trim()
             if ($t) { Write-Host "  $t" }
         }
-    } elseif ($code -eq 0) {
+    } elseif ($agreement.Count -gt 0) {
         Write-Host 'git-identity-sessioncheck: the gh account and the git identity agree.'
+    } elseif ($code -eq 0) {
+        # [SKIP]: nothing to compare -- gh absent, user.name unset, or a display name rather than a
+        # login. Stays silent at session start rather than claiming a comparison that was never made.
     } else {
         Write-Host "git-identity-sessioncheck: the check could not complete (exit $code)."
     }

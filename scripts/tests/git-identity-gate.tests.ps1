@@ -216,12 +216,16 @@ try {
     Assert-True ($r.Code -eq 0 -and $r.Out -match 'the gh account and the git identity agree') `
         'a clean check -- the one-line in-sync report, exit 0'
 
-    # A [SKIP] must read as clean rather than as a crash: it is exit 0 with no [ERROR], which is the
-    # same branch as [OK] by design -- there is nothing for a session to act on either way.
+    # A [SKIP] must read as clean rather than as a crash (exit 0, no [ERROR]) -- but issue #1830 is
+    # exactly that it must NOT read as [OK]'s agreement sentence either: a [SKIP] means nothing was
+    # compared, and reporting "agree" there claims a comparison that never happened, on a machine that
+    # may have no git identity at all. So it falls through to a THIRD, silent branch of its own.
     $skipStub = New-StubCheck -Dir $stubs -Name 'stub-skip' -ExitCode 0 -Body "[SKIP] gh names no active account"
     $r = Invoke-Hook -CheckScriptOverride $skipStub
     Assert-True ($r.Code -eq 0 -and $r.Out -notmatch 'could not complete') `
         'a [SKIP] is not a failure -- no "could not complete", exit 0'
+    Assert-True ($r.Out -notmatch 'agree') `
+        'a [SKIP] must NOT be reported as agreement -- #1830, no comparison was made'
 
     # Non-zero exit with no [ERROR] line: an unexpected crash must not be reported as clean.
     $crashStub = New-StubCheck -Dir $stubs -Name 'stub-crash' -ExitCode 3 -Body "something unexpected"
