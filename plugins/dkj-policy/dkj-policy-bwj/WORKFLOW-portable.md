@@ -47,6 +47,25 @@ doc, a decision that is not yours to make -- is **filed on GitHub first**, in th
 in. Full technical detail; repo and code jargon are fine, because the reader is whoever picks the
 work up.
 
+**And it is written in English -- the title as much as the body** (Dave, September 11, 2026,
+[#1875](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1875)). Every consumer of
+`dkj-policy` runs the same GitHub cycle, so an issue filed here is the workflow speaking and takes the
+workflow's language -- the one the plugin's own pages, scripts and console output are already in. The
+title carries it furthest: it is what shows up in every list, every `is:open` filter and every mirrored
+card, so a Dutch title costs the search even when the body is bilingual. **The session-reply language is
+untouched** -- a session answers Dave in Dutch and files in English in the same turn, exactly as it
+writes English scripts while doing so.
+
+Measured the day the rule was written: of the fifteen most recent issues in `smartwatchbanden`, three
+carried Dutch titles (`559`, `554`, `547`), filed by sessions doing everything else on this page right,
+in a repo where nothing had ever said the tracker was in scope. **They are not retitled by this rule.**
+An issue is a record of what was reported and when; rewriting the backlog buys a tidy list and loses
+that, and the rule is about what gets filed from here on. The rule itself is not this page's: it is
+stated for every consumer of the workflow in
+[`dkj-policy`'s step 1](https://github.com/DKJ-Solutions/dkj-claude-plugins/blob/main/plugins/dkj-policy/CONTRIBUTING-portable.md#1-new-issue-or-task--where-the-work-comes-from),
+which requires one answer per repo and leaves the answer to the repo. **BWJ's answer is English**, and
+that is what this section records.
+
 The `dkj-subagents-alpha` orchestrator's filing bar applies **unchanged** -- this rule adds *where the issue
 is mirrored*, it does not loosen *when or whether it is filed*:
 
@@ -135,6 +154,19 @@ a BWJ colleague who does not read code and does not know the repo:
 The colleague-facing wording is Claude's to draft; a colleague may refine it in Asana afterwards
 **without touching GitHub**. GitHub stays leading -- if the two ever disagree on substance, the
 GitHub issue is right and the Asana task is corrected to match.
+
+**This is where the language turns over, and it is the ONLY place in this procedure that it does.**
+The skeleton's four headings stay as written above -- they are the form, which is why the CI mirror's
+own comments are English too -- while what you write under them is addressed to a colleague and
+follows **that colleague**, not the repo. So one finding legitimately reads English on GitHub and the
+colleague's own language on the board: that is the translation this step is named for, and not drift
+between the two.
+
+**And a ticket a person filed in Asana themselves is theirs entirely** (Dave, September 11, 2026,
+[#1875](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1875)) -- the one carve-out the
+English rule in step 1 makes. Quote it into the issue as it was written rather than translating it,
+because the wording is the evidence of what was actually reported, and write your own analysis around
+it in English. Nobody corrects the language of a card a colleague wrote, in either direction.
 
 **A board may also carry a `Github Issue` text custom field** -- that capitalization is the field's
 literal, as-configured name in Asana, not a typo -- **and where it does, task creation is

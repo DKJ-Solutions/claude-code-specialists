@@ -61,6 +61,13 @@ gh issue create --repo <owner>/<repo> --title "<precise technical title>" --body
 | the reach label (`Get-ReachLabel`, default `minor`) | **only** where management or the commissioner would notice it. The test is whether that reader notices the **defect**, not whether the file renders to them: a customer-facing template with a developer-only defect is tier 0, and a build script whose breakage stops a release the business is waiting on is not. **In doubt, leave it off** |
 | `--label documentation` | on a doc finding, on top of its type -- the one content distinction the three types cannot express here |
 
+**Write it in English -- the title as much as the body.** Every consumer of `dkj-policy` runs this same
+cycle, so the issue takes the workflow's language no matter which language the session is being spoken
+to in; the title carries it furthest, into every list, every filter and every mirrored card. The
+carve-out is a person's own words -- a request quoted from an Asana ticket stays as they wrote it. Both
+halves are in
+[`WORKFLOW-portable.md`](../../WORKFLOW-portable.md#1-github-first----github-is-the-source-of-truth).
+
 **Do not add `bug` or `enhancement`.** Both labels were deleted from both repos on September 1, 2026
 because the issue type already carries them. The reasoning behind all three fields is in
 [`WORKFLOW-portable.md`](../../WORKFLOW-portable.md#classify-it-as-you-file-it----three-fields-all-set-at-creation).
@@ -87,6 +94,11 @@ Where:           <which store, and which page or flow>
 How urgent:      <blocking a sale / visible but not blocking / cosmetic / not customer-facing>
 Tracked on GitHub: <issue URL>
 ```
+
+**The four headings stay as written; what goes under them follows the colleague who reads the card.**
+This is the one place in the procedure where the language turns over -- the issue you just filed is
+English and this card need not be. A ticket that colleague filed themselves is quoted rather than
+translated, and its language is never corrected.
 
 Create it in the project `Get-AsanaProjectGid` names, in the workspace `Get-AsanaWorkspaceGid`
 names, via the Asana MCP `create task` tool. Note the task GID and URL.

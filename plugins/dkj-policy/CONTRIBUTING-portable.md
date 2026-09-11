@@ -109,6 +109,24 @@ to be true for it to hold, and where it collapses say so plainly instead of fili
 rest of the bar is short: search the tracker so you add to the existing thread rather than open its
 duplicate, one subject per issue, and say what you **measured** and what you only **inferred**.
 
+**And it is written in your repo's workflow language, not in the language the conversation happened in**
+(Dave, September 11, 2026, [#1875](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1875)). An
+issue is the **form** rather than the message — the same split [the two language
+questions](#what-your-repo-answers) draw between a ticket's headings and the reply that goes back to a
+person — so it takes one answer per repo and
+keeps it: a tracker whose language changes with whoever was at the keyboard cannot be searched by the
+colleague who did not file it, and the title is the half that reaches every list, every filter and every
+mirror. **In the family that ships this plugin the answer is English**, in a consuming repo exactly as in
+the source, and a session replying in another language still files in English — the reply language is free
+per session and was never the issue's. The one thing that stays in its own language is a person's own
+words: a request quoted from their ticket, and the message written back to them.
+
+**A repo adopting this workflow inherits the rule, not the answer.** What this page requires is that your
+repo *has* one answer and that agent and human filings share it; which language that is belongs in the
+table under [What your repo answers](#what-your-repo-answers), beside the two language rows already there.
+A repo that never states it gets the failure this rule was written for: every session picks the language of
+the conversation it happened to be in, and the drift is invisible until somebody searches.
+
 **Those rules are stated here and owned elsewhere.** They are an orchestrator's, and they ship with the
 `dkj-subagents-alpha` plugin — which this workflow does not depend on, so a repo can run this cycle with none of
 them in context. Where this section and that persona body disagree, the body is the source and this is the
@@ -839,6 +857,7 @@ of this plugin uses:
 | **which fields your host tracker already owns** | only if it hosts your tickets rather than a folder doing it; see [Where the ticket lives](#where-the-ticket-lives-and-the-fields-you-therefore-do-not-write) |
 | **the language of the form** | section names, field names, the state vocabulary — one answer per repo |
 | **the language of the outgoing message** | not one answer per repo; see below |
+| **the language your repo's own issues are written in** | one answer per repo, and agent filings share it with human ones — [step 1](#1-new-issue-or-task--where-the-work-comes-from). It is the form question one layer out, so a repo that answered it there has already answered this |
 | **every section and field name** | the roles above are the rule; the names are not |
 | **the state vocabulary** | rule 7 requires it to be *closed*, not to be these eight values |
 | **whether there is an index at all** | rule 10 applies if you have one, and a host tracker gives you one whether or not you wanted it |
