@@ -16,7 +16,7 @@ and to none of the others Dave runs.
 |---|---|---|
 | **ticket handling** | [`WORKFLOW-portable.md`](WORKFLOW-portable.md) | what happens between spotting a problem and it being tracked where every BWJ colleague can see it |
 | **the sync log** | [`SYNC-LOG-portable.md`](SYNC-LOG-portable.md) | what a `sync/` branch owes -- a durable record of what a third party did on the live theme, in the tree rather than only in a merged PR body |
-| **the preview handover** | [`PREVIEW-portable.md`](PREVIEW-portable.md) | what a preview handover owes -- the control variant beside the preview, so the reader sees the difference rather than recalling it |
+| **the preview handover** | [`PREVIEW-portable.md`](PREVIEW-portable.md) | what a preview handover owes and how it reaches the reviewer -- the control variant beside the preview, on one link to a published page rather than a table of URLs |
 
 They are separate chapters rather than sections of one page because they answer different
 questions for different readers, and each of the last two was added later -- the sync log on inbound
@@ -138,10 +138,19 @@ control URL is** -- it names the **live theme id** (`Get-ShopifyLiveThemeId`, wh
 answers for the live-theme guard), and not the bare URL with the parameter dropped. `preview_theme_id`
 sets a cookie, so after a preview has been opened the bare URL keeps serving the preview theme: the
 control tab silently agrees with the preview, and the reviewer concludes nothing changed. Measured, with
-the two neighbouring wrong answers, in [`PREVIEW-portable.md`](PREVIEW-portable.md) -- which is also the
-page to read for the shape of the handover, and for what this chapter deliberately does not decide
-(which changes owe a preview at all, and when the PR may open: both still the consumer's and
-`dkj-policy`'s).
+the two neighbouring wrong answers, in [`PREVIEW-portable.md`](PREVIEW-portable.md).
+
+**And the pair is handed over as ONE LINK to a published page, never as a table of URLs** (inbound
+[#1873](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1873), the same day and the same
+handover as the rule above). Pairing the URLs doubles them, and five markets by two variants is ten
+URLs of 70 to 100 characters -- which a terminal wraps until the columns saying *which market, preview
+or control* are gone, which cannot even be selected to copy, and which a phone cannot scan at all,
+though a phone is where storefront work is judged. So the page carries one card per market: a QR code
+to the preview, the pair as text beneath it, and above and below them what a URL cannot say -- how to
+see the change, what the gates already proved, and the one question being asked. The rule is carried at
+the print site too, generically, so it does not lose to `push-preview`'s own printed list. The page is
+also where this chapter states what it deliberately does **not** decide: which changes owe a preview at
+all, and when the PR may open, both still the consumer's and `dkj-policy`'s.
 
 ## What is in this folder
 
@@ -149,7 +158,7 @@ page to read for the shape of the handover, and for what this chapter deliberate
 |---|---|
 | [`WORKFLOW-portable.md`](WORKFLOW-portable.md) | chapter one in prose -- ticket handling, read alongside your repo's own Asana config |
 | [`SYNC-LOG-portable.md`](SYNC-LOG-portable.md) | chapter two in prose -- what a `sync/` branch owes, where the record lands, and what it stays out of |
-| [`PREVIEW-portable.md`](PREVIEW-portable.md) | chapter three in prose -- what a preview handover contains, and why the control URL names the live theme id |
+| [`PREVIEW-portable.md`](PREVIEW-portable.md) | chapter three in prose -- what a preview handover contains, why the control URL names the live theme id, and why the whole pair travels as one link rather than a table |
 | [`skills/`](skills/) | the skills a specialist invokes |
 | [`templates/`](templates/) | the CI mechanism to **copy** into each repo's `.github/` -- GitHub only runs workflows from a repo's own `.github/`, so what ships here is the reference to copy and diff against, the same pattern as `dkj-policy/templates/pull_request_template.md` |
 
