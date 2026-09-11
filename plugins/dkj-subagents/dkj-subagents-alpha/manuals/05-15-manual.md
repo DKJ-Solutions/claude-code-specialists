@@ -82,15 +82,22 @@ and safe hook construction.
   writes into the repo it is run in and is owed to every checkout. Measured with record counts and both
   verbatim messages in the source repo's `INSTALL.md`, under
   *"If this machine has more than one checkout"*.
-  **And in a TEARDOWN the same reach has no floor, because there is no `add` behind it.** An install
-  sequence repairs itself — the checkouts it stripped reinstall a few commands later, so the cost is a
-  procedure that reads wrong mid-run. An uninstall sequence ending in `marketplace remove` de-installs
-  the family from every other checkout on the machine and **nothing puts it back**, against the intent of
-  a reader who was disconnecting one repo. Worse, none of those repos can report it: the hooks are in the
-  plugin, so nothing is left to complain, while `git status` stays clean and `enabledPlugins` still reads
-  correct. So a teardown page does not merely warn about the reach — it tells a multi-checkout reader to
-  **skip that step**, since the machine is not theirs to clear while another repo is using it. Written up
-  in the source repo's `UNINSTALL.md`, under its own *"If this machine has more than one checkout"*.
+  **And in a TEARDOWN the same reach lands differently, because there is no `add` behind it — but do not
+  say it is unrecoverable.** An install sequence repairs itself explicitly: the checkouts it stripped
+  reinstall a few commands later, so the cost is a procedure that reads wrong mid-run. A teardown has no
+  such step, and the tempting claim is that the other checkouts are then left loading nothing for good.
+  **Measured, they are not**: a checkout that still holds its own `extraKnownMarketplaces` re-registers the
+  marketplace and rebuilds the clone on its next session start, and writes a full record on the one after
+  that — no command run by anyone. What the reach actually costs there is one session that silently loads
+  nothing, a clone rebuilt at the marketplace's **current HEAD** rather than at the version that repo was
+  running, and a recovery that is CLI behaviour rather than anything anybody owns — and none of it fires
+  at all for a checkout whose owner has since tidied that key away. So a teardown page does not merely
+  warn about the reach: it tells a multi-checkout reader to **skip that step**, because the machine is not
+  theirs to clear while another repo is using it, and because what makes the damage survivable is a
+  mechanism nobody promised. Written up in the source repo's `UNINSTALL.md`, under its own *"If this
+  machine has more than one checkout"*, with the self-healing table it leans on under that page's Step 3.
+  **The claim to avoid is the confident one**: "nothing puts it back" was written here first and was
+  false, caught in review against a table the same document already carried.
 - **Never add a permission or hook that undermines the safety rules.** The safety rules stand above
   any config convenience: no allowlist rule that would blindly let a dangerous or irreversible action
   through. The concrete per-repo details live in the `## Specific to this repo` extension.
