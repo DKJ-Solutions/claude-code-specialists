@@ -1239,6 +1239,57 @@ his shipped scope is the **harness** (`.claude/`, settings, hooks, MCP, skills, 
 `scripts/**` is an extension this lens gives him. Writing the skill into his agent def would claim script
 authorship for him in consumers that never granted it.
 
+### The sibling check, and the one axis this repo's checks never looked along (September 11, 2026, #1869)
+
+Every check in `connectors/` ran **source → consumer**: `check-consumer-drift.ps1` compares a consumer's
+agent-def copies against this source, `check-connectors.ps1` asks whether a consumer's register record is
+true. [`check-consumer-siblings.ps1`](../../../scripts/sync/check-consumer-siblings.ps1) is the first that
+runs **consumer → consumer**, and the gap it closes is not a missing check so much as a missing *question*.
+
+**The measurement.** Of the 48 tooling paths the two BWJ stores share, 47 have diverged, and the one that
+has not is a verbatim template this marketplace ships. The load-bearing instance is `prune-merged.ps1`:
+inbound [#815](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/815) asked for it centrally,
+`dkj-policy` 4.21.0 shipped it, one store converged on August 28 and the other still carried its own
+120-line copy three weeks later. **The inbound route worked and nothing propagated the result to the
+second consumer** — so *"shipped centrally"* and *"used centrally"* are different facts, and no check here
+held both at once.
+
+**Why it could not be seen from inside a consumer, which is why it is a source-side script.** Their own
+rule asks *"does the plugin provide this?"* — a one-repo question. The sibling is a repo that session never
+opens, and by the time it would matter the **names have drifted apart**, so no grep finds the pair:
+`market-domains.ps1` against `market-urls.ps1`, both exporting `Get-MarketPreviewUrls`.
+
+**Three design decisions worth not re-litigating:**
+
+- **The grouping is declared (`siblingGroup`), never inferred.** Every consumer of this marketplace shares
+  `dkj-policy`, so a plugin-set inference groups `life-hub` with a Shopify store and reports a
+  personal-life repo as missing a theme-archive mechanism. The reasoning is in
+  [the register's page](../../../connectors/README.md#the-manifest-format); the assert that keeps it that
+  way is case 4 of [`sibling-divergence.tests.ps1`](../../../scripts/tests/sibling-divergence.tests.ps1),
+  and it is the one a later "just group by plugin set" change would delete first.
+- **The exclusions are the difference between a report and a wall.** Lenses, `SPECIALISTS.md`, the seam,
+  `.claude/memory/` and the GitHub boilerplate are repo-specific **by design** — agreement there would be
+  the defect. They remove 27 of the 48, leaving 21 actionable. **The test suites are deliberately kept
+  in**, and that assert exists because excluding them is the plausible next move: they are noisy, and they
+  are also mechanism.
+- **One read route per group, always.** A blob sha (the `gh` route) and a content hash (the disk route) are
+  not comparable, so a group whose members cannot all be read the same way is reported unreadable rather
+  than compared. A mixed vocabulary would report *every* path as drifted — a false alarm shaped exactly
+  like the finding the check exists to make, which is the worst possible failure for a detector nobody is
+  obliged to believe.
+
+**`Test-GitHubOwnerNameSlug` moved to `check-report-lib.ps1` in the same branch**, from inside
+`check-connectors.ps1`. Its own docstring had already argued the case — it was factored out *within* that
+script so two call sites could hold one field to one bound rather than keep "a second, silently drifting
+copy of the regexes" — and a third caller outside the file is that argument one step further on. The rule
+this follows is the repo's own: a semantic decision gets one source (#309).
+
+**It reports and never prevents, and that was Dave's call** on September 11, 2026, choosing the
+detector-first shape over moving ownership immediately. `-FailOnFinding` exists; nothing passes it. The
+converging — which of `dkj-policy` and `dkj-policy-bwj` should own `test-lib.ps1`, `lint-brain.ps1` and the
+market/theme mechanisms — is the follow-up, and it is an ownership decision rather than a repair a script
+can make.
+
 ### Repo-specific rules
 
 - **NEVER ROUND-TRIP A MARKDOWN FILE THROUGH POWERSHELL TO EDIT IT — USE THE EDITOR'S OWN EDIT.**
