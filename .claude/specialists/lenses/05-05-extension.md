@@ -167,6 +167,29 @@ old empty copy, so a self-ticking box keyed on existence would tick for a branch
 pass `-Body` if you want to override the auto-fill; do that via `--body-file`, never inline — see
 [the quoting lesson](#the-quoting-lesson-where-it-was-measured).
 
+#### `Resolves #N (in part)` is not a hedge — the parenthetical is not read
+
+**A closing keyword in a COMMIT message closes the issue when that commit lands on the trunk, and
+qualifying it in prose changes nothing.** GitHub matches `Resolves #1843` and stops; `(in part)`,
+`partially`, or a following sentence explaining the scope are not parsed and do not weaken it. This
+repo merges with a **true merge** by default (`Get-PrMergeMethod`, `'merge'`), so every branch commit
+arrives on `main` with its message intact — the keyword fires there, not only from a PR body.
+
+**So the `-Resolves` / `-NoResolves` gate on `open-pr` is not the whole guard.** That gate reads the
+*PR*, and it is the reason this was caught at all: it refused to guess, which sent somebody to look at
+what the branch actually said. A commit written earlier in the same branch had already answered the
+question the other way, and nothing had asked.
+
+**Write the number without a keyword when the work is one step of a larger issue** — `one step of
+#1843`, `part of #1843`, `see #1843` — and keep the keyword for the PR, where `-Resolves` states it
+deliberately and `verify-resolved-issues.ps1` checks it afterwards.
+
+**And once the commit is pushed, this is not repairable on the branch.** Rewording needs a
+force-push, which is on the never-without-Dave list for any branch whatsoever, so the honest remedy is
+to let the merge close the issue and **reopen it**, with a comment saying why it closed. Measured
+September 11, 2026, on `feat/1843-portable-pr-template`: the commit said `Resolves #1843 (in part)`
+while the branch deliberately built one step of four.
+
 ### Merging to main
 
 No separate merge approval is needed — the default covers it, as does Dave's "open the PR" when the
