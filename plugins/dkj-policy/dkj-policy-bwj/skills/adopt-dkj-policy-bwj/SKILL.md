@@ -271,15 +271,50 @@ issue from its Asana task's `Prio-Score`, and `gh issue edit` fails on a label t
 exactly as `gh issue create` does.
 
 ```bash
-gh label create "very high" --repo <owner>/<repo> --color b60205 \
+gh label create prio-4 --repo <owner>/<repo> --color B60205 \
   --description "Asana Prio-Score 4.00-5.00"
-gh label create "high"      --repo <owner>/<repo> --color d93f0b \
+gh label create prio-3 --repo <owner>/<repo> --color D93F0B \
   --description "Asana Prio-Score 3.00-3.99"
-gh label create "low"       --repo <owner>/<repo> --color 0e8a16 \
+gh label create prio-2 --repo <owner>/<repo> --color FBCA04 \
   --description "Asana Prio-Score 2.00-2.99"
-gh label create "very low"  --repo <owner>/<repo> --color c2e0c6 \
+gh label create prio-1 --repo <owner>/<repo> --color 006B75 \
   --description "Asana Prio-Score 1.00-1.99"
 ```
+
+**The DESCRIPTIONS are score-shaped and that is load-bearing, not decoration.** The names are now the
+same four the source repo's own tracker uses, where a rung is a judgement somebody typed; here it is
+derived from a board nobody in this repo can see. The description is the one place a badge still says
+**which motor set it**, and it survives a rename untouched -- so keep the `Asana Prio-Score` wording
+even if the labels are created by hand. Dave unified the names on September 11, 2026
+([#1842](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1842)), reversing half 1 of
+[#1686](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1686); the grounds that decision
+weighed, and the one it overrode, are recorded there.
+
+**A repo adopted BEFORE that day carries the old names** -- `very high` / `high` / `low` /
+`very low` -- and `gh label create` would leave it holding all eight. Rename in place instead, which
+keeps every label attached to the issues that carry it, so nothing is relabelled by hand and no
+history is lost:
+
+```bash
+gh label edit "very high" --repo <owner>/<repo> --name prio-4 --color B60205
+gh label edit "high"      --repo <owner>/<repo> --name prio-3 --color D93F0B
+gh label edit "low"       --repo <owner>/<repo> --name prio-2 --color FBCA04
+gh label edit "very low"  --repo <owner>/<repo> --name prio-1 --color 006B75
+```
+
+**`prio-2` shares `FBCA04` with `tier-1` in this repo, and that is known rather than a slip.** They
+are two different axes -- a rung and a reach -- so both can sit on one issue as two identical yellow
+badges. It is the hex [#1842](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1842)
+prescribes, and whether either label moves is Dave's to decide:
+[#1844](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1844). Read the name, not the
+badge.
+
+**Do the rename and the `asana-mirror.ps1` refresh of step 1 in one sitting, in either order.** The
+copy in `.github/scripts/` is made by hand, so the gap between the two is yours to keep short -- and
+the sweep that reads these labels runs only on the daily `reconcile` cron, so a run caught inside the
+gap costs one sweep and the next morning repairs it. The sweep also removes the four old names as it
+sets a new one, so a repo that ended up with all eight anyway is swept clean rather than left
+claiming two priorities at once.
 
 **And the `needs-info` label**, which is the entire mechanism for the board's blocked column: while it
 is on an issue the card sits in `NeedsInfo` whatever the branch and the pull request are doing, and

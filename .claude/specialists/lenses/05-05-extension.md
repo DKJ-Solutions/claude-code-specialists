@@ -477,50 +477,55 @@ gh issue edit <n> --add-label prio-2                         # only for one that
 ```
 
 That is the same rule `dkj-policy-bwj` states for its own four buckets, where the Asana sweep removes
-the other three as it sets one — and it is worth knowing that set exists: `very low`/`low`/`high`/`very
-high`, on **two** of the same colour codes, in the BWJ store repos. It was three until
-[#1691](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1691) moved `prio-1` off the
-green the two families disagreed about; the two that remain are the two that agree on the rung, and the
-colour block further down is where that is settled. **Different vocabulary, different
-motor** — that one is derived from an Asana `Prio-Score`, this one is a judgement typed by whoever
-files — so a session moving between the two repo families reaches for a label the other does not have,
-and `gh` fails outright on a label that does not exist.
+the other three as it sets one — **and since September 11, 2026 it is the same four NAMES as well**
+(Dave, [#1842](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1842)), on the same four
+colour codes. `prio-1`…`prio-4` is one vocabulary across the whole family now.
 
-**The two stay apart, and the different names are load-bearing** (decided September 9, 2026,
-[#1686](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1686), by Dave's standing
-instruction to follow the specialist's advice on a question raised while he was away). Three things
-decided it, and the first two are measurements rather than preferences:
+**The two MOTORS are still two motors, and that is the part a shared vocabulary no longer says out
+loud.** A rung in a BWJ store repo is **derived** from the Asana `Prio-Score` the sweep reads, and is
+never typed; a rung here is **typed** by whoever files, because there is no board behind this tracker
+to derive one from. So a session moving between the two repo families now gets an accepted label where
+it used to get a refusal from `gh` — the axis is shared, the mechanism is not, and nothing mechanical
+separates them any more.
 
-1. **The BWJ names are not a convention, they are code.**
+**What separates them is the label's DESCRIPTION, which a rename leaves untouched.** `prio-4` here
+reads `Priority 4 of 4 (highest)`; in a BWJ repo it reads `Asana Prio-Score 4.00-5.00`. That is the
+one place a badge still says which motor set it, and it is why the BWJ side's descriptions stay
+score-shaped.
+
+**This reverses half 1 of
+[#1686](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1686)**, which had held the two
+sets deliberately disjoint two days earlier. Two of that decision's three grounds survive intact and
+are still worth knowing:
+
+1. **The BWJ names are not a convention, they are code** — which is exactly why the reversal arrived as
+   an inbound issue rather than as a label rename somebody typed.
    `plugins/dkj-policy/dkj-policy-bwj/templates/asana-mirror.ps1` holds them as a literal
-   (`$script:PrioLabels = @('very low', 'low', 'high', 'very high')`), `Get-PrioLabelForScore` returns
-   those exact strings from a score band, and `scripts/tests/dkj-policy-bwj.tests.ps1` asserts every
-   boundary from both sides. So unifying is not a rename: it is an edit to a shipped CI mechanism that
-   runs daily against two live stores, a re-pinning of its suite, and a label rename on two live
-   trackers — none of which this repo owns.
-2. **The collision cannot mis-file anything, because the two sets are disjoint in both directions.**
-   Measured on all three trackers in the family on the day of the decision, with `gh label list`: this
-   one carries `prio-1`…`prio-4` and **none** of the four words, while both
-   `BWJ-Development/smartwatchbanden` and `BWJ-ecommerce/xoxowildhearts` carry the four words and **no**
-   `prio-N` at all. A session that reaches for the wrong one is refused by `gh` rather than filing an
-   issue at the wrong rung — the same shape as the **label gate** in `scripts/release/open-pr.ps1`,
-   which exists because `gh` judges an unknown label at the create and refuses the whole command. That
-   gate is cited to the script rather than linked into this page on purpose: the behaviour is recorded
-   in its own comment block (inbound #1221), and the toolbox entry further down names `open-pr.ps1`
-   without describing the gate, so a link there would send a reader to verify a claim the destination
-   does not make. The whole symptom is one failed command that names the label it would not accept, and
-   one re-run.
-3. **And the names are the only thing that says which motor owns the rung.** A single vocabulary would
-   read as a single mechanism, which is the more expensive mistake: a rung typed by hand in a BWJ repo
-   is answering to a score nobody typed, and one derived from a score is meaningless here, where there
-   is no Asana to derive it from. Two names for two motors is information; one name for two motors is a
-   session assuming the sweep applies where it does not.
+   (`$script:PrioLabels`), `Get-PrioLabelForScore` returns those exact strings from a score band, and
+   `scripts/tests/dkj-policy-bwj.tests.ps1` asserts every boundary from both sides. Unifying was an
+   edit to a shipped CI mechanism that runs daily against two live stores, a re-pinning of its suite,
+   and a label rename on two live trackers.
+2. **The collision could never mis-file anything.** Measured on all three trackers with
+   `gh label list` on the day of #1686: this one carried `prio-1`…`prio-4` and **none** of the four
+   words, while both `BWJ-Development/smartwatchbanden` and `BWJ-ecommerce/xoxowildhearts` carried the
+   four words and **no** `prio-N`. So this was never a bug report and unification is not a fix for a
+   measured failure — it is one vocabulary because Dave wants one vocabulary. The
+   `gh`-refuses-an-unknown-label shape that ground relied on is the same one the **label gate** in
+   `scripts/release/open-pr.ps1` is built on; that gate is cited to the script rather than linked from
+   here on purpose, since its behaviour is recorded in its own comment block (inbound #1221) and the
+   toolbox entry further down names `open-pr.ps1` without describing the gate.
 
-**What was NOT weighed: how recently either set was created — and the gap is 32 MINUTES, not the day
-the first draft of this claimed.** `feat/1685-prio-labels` merged at 07:57 and this decision was
-committed at 08:29, the same morning; the BWJ set is a week old. Neither fact is an argument, and that
-matters more here than usual rather than less: half an hour is exactly the interval at which *"this was
-just settled"* feels like a reason. It is not one. The case above is the mechanism or it is nothing.
+**The third ground is the one Dave overrode**, and it was paid rather than argued away: *"the names are
+the only thing that says which motor owns the rung."* The description paragraph above is what replaces
+it. The residual risk is worth naming plainly — a single vocabulary reads as a single mechanism, so a
+session that assumes the Asana sweep applies here, or that a rung over there was typed by somebody, is
+making exactly the mistake #1686 predicted. **Read the description, not just the name**, wherever it
+matters which motor set the rung.
+
+**What was NOT weighed either time: how recently anything was created.** #1686 was committed 32 minutes
+after `feat/1685-prio-labels` merged, and #1842 reversed half of it two days after that. Neither
+interval is an argument — an owner changing their mind is a decision rather than a regression, and
+*"this was just settled"* states a fact about the calendar, not about the merits.
 
 **And the rule stays repo-local rather than moving into `dkj-policy`** (same decision, the issue's
 second half). **Nothing in the workflow reads a priority**: searched across `scripts/`, `plugins/` and
@@ -546,41 +551,49 @@ and turned out to be one label worse than filed:
 
 | Colour | Here | In a BWJ repo | Same rung? |
 |---|---|---|---|
-| `B60205` | `prio-4` — top of four | `very high` — top of four | yes, deliberately |
-| `D93F0B` | `prio-3` — third of four | `high` — third of four | yes, deliberately |
-| `FBCA04` | `prio-2` — second of four | `tier-1` — **a different axis entirely** | n/a — see below |
-| `006B75` | `prio-1` — the floor | *(unused in the family)* | — |
-| `0E8A16` | *(no counterpart any more)* | `low` — second of four; in xoxowildhearts **also `sync`** | — |
-| `c2e0c6` | *(no counterpart)* | `very low` — the floor | — |
+| `B60205` | `prio-4` — top of four | `prio-4` — top of four | yes, deliberately |
+| `D93F0B` | `prio-3` — third of four | `prio-3` — third of four | yes, deliberately |
+| `FBCA04` | `prio-2` — second of four | `prio-2` — second of four, **and `tier-1`** | yes — but see the collision below |
+| `006B75` | `prio-1` — the floor | `prio-1` — the floor | yes, deliberately |
+| `0E8A16` | *(no counterpart any more)* | *(no prio label any more; in xoxowildhearts still `sync`)* | — |
+| `c2e0c6` | *(no counterpart)* | *(no counterpart any more)* | — |
+
+**The whole column is now a mirror, and that is #1842 rather than #1691** — the rename carries the hex
+codes with it, so every rung agrees on both halves across the family. The rows still marked *yes,
+deliberately* are the two that already agreed; the other two agree because they were made to.
 
 **`prio-1` was `0E8A16` and is now `006B75`.** The green a reader trained here knew as *"nobody is
-waiting for it"* was one rung **above** the floor over there, where the floor wears a pale mint this
-repo does not use. And in **one** of the two BWJ repos — `xoxowildhearts` — `0E8A16` turned out to
-carry a second label as well, `sync`, which the filing had not caught; in `smartwatchbanden` that same
-label is grey (`6e7781`), so the doubling is that one store's alone. **Nothing refuses a colour**: the whole safety argument above is about a label's
-NAME, which `gh` judges, and a badge is read by a person scanning an issue list with no command in it to
-fail. That is [#1686](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1686)'s own
+waiting for it"* was, before the unification, one rung **above** the floor over there, where the floor
+wore a pale mint this repo does not use. Left as it was, that would have been a badge meaning two
+different rungs in two repos of one family. And in **one** of the two BWJ repos — `xoxowildhearts` —
+`0E8A16` carried a second label as well, `sync`, which the filing had not caught; in
+`smartwatchbanden` that same label is grey (`6e7781`), so the doubling is that one store's alone.
+**Nothing refuses a colour**: `gh` judges a label's NAME, and a badge is read by a person scanning an
+issue list with no command in it to fail. That is
+[#1686](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1686)'s own
 *goes-wrong-silently* shape, moved onto an axis its reasoning does not reach.
 
-**Why this side and not the BWJ side, which is what #1691 proposed.** Re-colouring BWJ's `low` is an
-edit to live labels in **two repos this one does not own**, and doing only the half that lives here —
-the hex codes `adopt-dkj-policy-bwj`'s step 4 prescribes — would leave the fleet in a third state,
-since that skill is additive and never rewrites an existing label. Both halves therefore belonged to one
-change and to Dave. Moving **`prio-1`** instead is one `gh label edit` in the repo in front of you: it
-needs no access outside, it leaves that skill's prescribed hexes untouched so no future adopter gets a
-third answer, and it keeps the two rows that agree on purpose. `006B75` was verified unused across all
-three trackers before it was taken.
+**Why the repair came from this side in September, and why #1842 then did the other half anyway.**
+Re-colouring BWJ's `low` was an edit to live labels in **two repos this one does not own**, and doing
+only the half that lives here — the hex codes `adopt-dkj-policy-bwj`'s step 4 prescribes — would have
+left the fleet in a third state, since that skill is additive and never rewrites an existing label.
+Both halves belonged to one change and to Dave; moving **`prio-1`** instead was one `gh label edit` in
+the repo in front of you, and `006B75` was verified unused across all three trackers before it was
+taken. #1842 is Dave taking the other half, which is why the whole column agrees now: the rename runs
+`gh label edit --name ... --color ...`, so it settles the name and the hex in the same command.
 
-**`FBCA04` is left alone, and the residual risk is named rather than dismissed** — the conclusion
-red-team on this branch is why that sentence is not the one first written. It is `prio-2` here and
-`tier-1` in a BWJ repo, a **reach** label rather than a rung, so the two are not answers to the same
-question. What that does **not** buy is safety by the argument used to repair the green: *"a badge is
-read by a person with no command in it to fail"* says nothing about axes, and a reader scanning yellow
-does not stop to check whether the label under it is a rung before reacting — `tier-1` sits on a BWJ
-issue independently of that issue's prio label, so both can be on one row. So the reason it is left is
-weaker than the reason the green was moved: the misread cannot make a *rung* wrong, only a *kind*, and
-changing it would break this repo's own readable ramp, which is now teal → yellow → orange → red. No
-instance of either misread has been observed.
+**`FBCA04` NOW CARRIES TWO LABELS INSIDE ONE BWJ REPO, AND THAT IS A NEW COLLISION RATHER THAN THE OLD
+ONE.** Before #1842 the clash was across the family — `prio-2` here, `tier-1` there — and the reason it
+was left alone was that the two are not answers to the same question: `tier-1` is a **reach** label,
+not a rung. That argument is untouched and is also no longer the whole story. `prio-2` is now `FBCA04`
+in a BWJ repo too, where `tier-1` has been `FBCA04` since it was created, so both can sit on **one row
+of one issue** as two identical yellow badges on two different axes. The misread still cannot make a
+*rung* wrong, only a *kind*, and nothing refuses it — so this is named here and filed rather than
+repaired on this branch: changing either hex is an edit to live labels, which is Dave's to take, and
+the mapping in [#1842](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1842) names `FBCA04`
+explicitly. Filed as
+[#1844](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1844). This repo's own ramp is
+unaffected and stays teal → yellow → orange → red. No instance of either misread has been observed.
 
 **And `006B75` was chosen on exact-hex uniqueness, which is not perceptual distinctness** — the same
 red-team's other catch. It sits 14 degrees of hue and 0.03 of lightness from `help wanted`'s `008672`,

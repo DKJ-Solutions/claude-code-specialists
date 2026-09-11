@@ -61,7 +61,7 @@ own `.github/`. Reopening the issue posts the counterpart; a daily reconciliatio
 anything a missed event left behind, without ever saying the same thing twice.
 
 And that same daily run carries exactly one thing the other way: the Asana task's **`Prio-Score`**
-becomes one of four prio labels on the GitHub issue (`very high` / `high` / `low` / `very low`), so
+becomes one of four prio labels on the GitHub issue (`prio-4` / `prio-3` / `prio-2` / `prio-1`), so
 the priority the business sets on the board is readable where the work actually happens. It is the
 only step that moves Asana -> GitHub, and the only thing this plugin writes outside Asana.
 

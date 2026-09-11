@@ -260,31 +260,54 @@ reconcile run reads that score and puts the matching label on the GitHub issue:
 
 | Prio-Score | GitHub label |
 |---|---|
-| 4.00 - 5.00 | `very high` |
-| 3.00 - 3.99 | `high` |
-| 2.00 - 2.99 | `low` |
-| 1.00 - 1.99 | `very low` |
+| 4.00 - 5.00 | `prio-4` |
+| 3.00 - 3.99 | `prio-3` |
+| 2.00 - 2.99 | `prio-2` |
+| 1.00 - 1.99 | `prio-1` |
 
 Dave's mapping, September 2, 2026. **Four buckets and deliberately no `medium`**, and each boundary is
 closed at the bottom and open at the top, so a field with two decimals can never land between two of
 them.
 
 **Exactly one prio label sits on an issue at a time.** The sweep removes the other three as it sets
-one, so a ticket rescored from 2.5 to 4.2 loses `low` as it gains `very high` rather than claiming two
+one, so a ticket rescored from 2.5 to 4.2 loses `prio-2` as it gains `prio-4` rather than claiming two
 priorities at once. Where the issue already reads correctly nothing is written, so a daily re-run is
 quiet.
 
-**The source repo's own tracker uses a different set on purpose, and `gh` refusing one of these labels
-there is the expected answer rather than a broken setup.**
-`DKJ-Solutions/claude-code-specialists` ranks its issues `prio-1` (lowest) to `prio-4` (highest) -- a
-judgement typed by whoever files, because there is no Asana behind it to derive one from. The two sets
-are deliberately disjoint, measured in both directions: neither tracker carries the other's names, so a
-session moving between the two families gets a refused label rather than an issue filed at a rung that
-means something else. **Nothing here needs doing about it** -- this page's four buckets are the whole
-answer for a BWJ repo, and the rule that every issue carries a rung is deliberately NOT part of this
-workflow. Decided September 9, 2026 in
-[#1686](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1686), where the reasoning for
-both halves is written out.
+**ONE VOCABULARY ACROSS THE WHOLE FAMILY, AND THE NAMES SAY NOTHING ABOUT WHICH MOTOR SET THE RUNG**
+(Dave, September 11, 2026,
+[#1842](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1842)). The source repo's own
+tracker ranks its issues on these same four, `prio-1` lowest to `prio-4` highest -- a judgement typed
+by whoever files, because there is no Asana behind it to derive one from. The two motors are still two
+motors: **here the rung is derived from a score and is never typed**, and a task nobody has scored
+carries no label at all.
+
+**What tells them apart now is the label's DESCRIPTION, not its name**, and that is the half worth
+knowing before reading a badge. A BWJ repo's `prio-4` reads `Asana Prio-Score 4.00-5.00`; the source
+repo's reads `Priority 4 of 4 (highest)`. Keep the score-shaped wording when creating or renaming
+these labels -- it survives a rename untouched, and it is the only remaining signal at the one place
+somebody looks when the name has stopped distinguishing.
+
+**This reverses half 1 of
+[#1686](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1686)**, decided two days
+earlier, which held the two sets deliberately disjoint so that a session moving between the families
+got a refused label rather than an issue filed at a rung meaning something else. Two of that
+decision's three grounds are untouched and still correct -- the BWJ names are code rather than
+convention, and the collision could never mis-file anything. The third, *"the names are the only
+signal of which motor owns the rung"*, is the one Dave overrode, and the paragraph above is what
+replaces it rather than drops it. **Half 2 of #1686 is NOT reopened**: nothing in the portable
+workflow reads a priority, `adopt-dkj-policy` still owes no label-creation step, and the rule that
+every issue carries a rung remains deliberately NOT part of this workflow.
+
+**Migrating a repo adopted before that day is one command per label**, and the direction matters more
+than the order: `gh label edit "very high" --name prio-4` renames in place, so every issue keeps the
+label it had and nothing is relabelled by hand.
+[`adopt-dkj-policy-bwj`](skills/adopt-dkj-policy-bwj/SKILL.md) step 4 carries all four lines. Do that
+and the `asana-mirror.ps1` refresh in one sitting: the sweep runs only on the daily `reconcile` cron,
+so a run caught between the two costs one sweep and the next morning repairs it. And the sweep sheds
+the four **old** names as it sets a new one -- never writing them -- so a repo that was brought over
+with the additive create step instead, and so holds all eight, is swept clean rather than left
+claiming two priorities at once.
 
 **No score means no label, and that is the common case.** A task whose `Prio-Score` is empty, or whose
 score falls outside 1.00-5.00, is left without a prio label rather than given a guessed one -- measured

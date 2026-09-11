@@ -193,7 +193,17 @@ $script:AsanaApiBase = 'https://app.asana.com/api/1.0'
 # The four prio labels, low to high. EXACTLY ONE of these belongs on an issue at a time, which is
 # what Set-IssuePrioLabel enforces by removing the other three. Named here rather than inline so the
 # mapping helper and the enforcer cannot drift apart.
-$script:PrioLabels = @('very low', 'low', 'high', 'very high')
+$script:PrioLabels = @('prio-1', 'prio-2', 'prio-3', 'prio-4')
+
+# The names these four carried until September 11, 2026, when Dave unified the axis across the whole
+# family (#1842, reversing half 1 of #1686). They are read on the REMOVAL side only -- never written
+# -- and that asymmetry is the whole point. A repo is migrated with `gh label edit --name`, which
+# renames in place and leaves no issue carrying both; but adopt-dkj-policy-bwj's step 4 is additive
+# and never rewrites an existing label, so a repo brought over by re-running that step instead ends
+# up holding all eight, with the old name still sitting on every issue. Without this list the sweep
+# would then add 'prio-4' beside a standing 'very high' -- an issue claiming two priorities at once,
+# which is the exact failure Set-IssuePrioLabel exists to prevent.
+$script:LegacyPrioLabels = @('very low', 'low', 'high', 'very high')
 
 # The stage map, resolved once per run from the repo's own seam -- see Resolve-AsanaStageMap.
 $script:StageMap = $null
@@ -1553,10 +1563,12 @@ function Get-PrioLabelForScore {
     <#
         The GitHub label for one Asana Prio-Score, or $null when the score names none. Pure.
 
-            1.00-1.99  very low     3.00-3.99  high
-            2.00-2.99  low          4.00-5.00  very high
+            1.00-1.99  prio-1       3.00-3.99  prio-3
+            2.00-2.99  prio-2       4.00-5.00  prio-4
 
-        Dave's mapping, September 2, 2026. There is deliberately no 'medium': four buckets, and each
+        Dave's mapping, September 2, 2026; renamed onto the family's shared vocabulary on
+        September 11, 2026 (#1842), with the bands themselves untouched -- the mapping is the same
+        one, said in the other repos' words. There is deliberately no 'medium': four buckets, and each
         boundary is closed at the bottom and open at the top, so a precision-2 field can never land
         between two of them.
 
@@ -1569,10 +1581,10 @@ function Get-PrioLabelForScore {
 
     if ($null -eq $Score) { return $null }
     $s = [double]$Score
-    if ($s -ge 1 -and $s -lt 2) { return 'very low'  }
-    if ($s -ge 2 -and $s -lt 3) { return 'low'       }
-    if ($s -ge 3 -and $s -lt 4) { return 'high'      }
-    if ($s -ge 4 -and $s -le 5) { return 'very high' }
+    if ($s -ge 1 -and $s -lt 2) { return 'prio-1' }
+    if ($s -ge 2 -and $s -lt 3) { return 'prio-2' }
+    if ($s -ge 3 -and $s -lt 4) { return 'prio-3' }
+    if ($s -ge 4 -and $s -le 5) { return 'prio-4' }
     return $null
 }
 
@@ -1623,14 +1635,20 @@ function Set-IssuePrioLabel {
     <#
         Put EXACTLY ONE prio label on an issue: add -Label if it is missing, and remove whichever of
         the other three the issue carries. That second half is the whole point -- a ticket rescored
-        from 2.5 to 4.2 must lose 'low' as it gains 'very high', or the issue ends up claiming two
+        from 2.5 to 4.2 must lose 'prio-2' as it gains 'prio-4', or the issue ends up claiming two
         priorities at once.
+
+        Seven, not three, since #1842: the four PRE-RENAME names are swept off too. Only ones the
+        issue actually carries are ever passed to `gh`, so on a migrated repo that half is free.
 
         Returns $true when it changed something, $false when the issue already read correctly or the
         edit failed. Nothing is done when there is nothing to do, so a re-run is quiet.
 
-        `gh issue edit` fails outright on a label the repo does not have; adopt-dkj-policy-bwj creates all
-        four, which is why that step and this function ship together.
+        `gh issue edit` fails outright on a label the repo does not have; adopt-dkj-policy-bwj creates
+        all four, which is why that step and this function ship together. On a repo adopted before
+        #1842 that step's rename line is what has to have been run: until it has, every add here is
+        refused and the run says so per issue. The next daily reconcile repairs the lot, so the cost
+        of getting the order wrong is one sweep, not a lost rung.
     #>
     param(
         [Parameter(Mandatory = $true)][string]$Repo,
@@ -1639,7 +1657,8 @@ function Set-IssuePrioLabel {
         [string[]]$Current = @()
     )
 
-    $stale = @($script:PrioLabels | Where-Object { $_ -ne $Label -and $Current -contains $_ })
+    $stale = @(($script:PrioLabels + $script:LegacyPrioLabels) |
+                Where-Object { $_ -ne $Label -and $Current -contains $_ })
     $needsAdd = ($Current -notcontains $Label)
     if (-not $needsAdd -and $stale.Count -eq 0) { return $false }
 
