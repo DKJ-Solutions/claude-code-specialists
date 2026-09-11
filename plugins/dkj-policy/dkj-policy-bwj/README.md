@@ -50,7 +50,7 @@ step begins.
 
 A discovered issue is **created on GitHub first** -- GitHub is the source of truth, full technical
 detail, the normal `dkj-subagents-alpha` filing bar unchanged. It is **classified in the same breath**: an issue
-type (Bug / Feature / Task), plus the `tier-1` label where management and the commissioner would notice
+type (Bug / Feature / Task), plus the reach label where management and the commissioner would notice
 it, both set at creation so nobody has to classify a tracker by hand a second time. It is then
 **mirrored to Asana** as a colleague-friendly variant: plain language, outcome-framed, no code or
 repo jargon, so any BWJ colleague can read it. The two are **cross-linked both ways**. When the
@@ -194,6 +194,16 @@ the project:
   `$null` -- the default -- is the common answer: most boards carry neither, and `report-issue`
   skips whichever is unset without saying anything. Where a board does carry one, leaving it unset is
   the state that costs something, because the field is then filled by hand or not at all.
+- `Get-ReachLabel` -- **the name GitHub stores for the reach label**, and the one function in this list
+  that says nothing about Asana. The axis it carries is fixed and portable, explained under its own
+  name in [`WORKFLOW-portable.md`](WORKFLOW-portable.md#the-reach-label----the-reach-axis-carried-onto-issues);
+  the string is yours, because a repo renames a label for its own colleagues without consulting a
+  plugin. **Optional, default `tier-1`** -- so answer it only where your label is called something
+  else, and every existing consumer is unchanged by its arrival. `smartwatchbanden` renamed it to
+  `minor` on September 11, 2026, which is what made this a seam rather than a literal
+  ([#1841](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1841)): `gh issue create` fails
+  outright on a label the repo does not have, so the filing half broke loudly -- while
+  `adopt-dkj-policy-bwj`, being strictly additive, would have quietly re-created `tier-1` beside it.
 
 `adopt-dkj-policy-bwj` **proposes** these, it never places them: they state what your repo *is*, and the
 project may differ per brand. The CI half reads the project from the repo variable

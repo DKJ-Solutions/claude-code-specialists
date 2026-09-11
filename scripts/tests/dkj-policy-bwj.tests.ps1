@@ -553,6 +553,45 @@ Assert-Equal '{"data":{"task":"1216905543348385"}}' $move.Body 'and the body car
 Assert-Throws { New-AsanaSectionMoveRequest -Gid 'abc' -SectionGid '123' } 'a non-numeric task GID is refused'
 Assert-Throws { New-AsanaSectionMoveRequest -Gid '123' -SectionGid 'x/y' } 'and so is a non-numeric section GID'
 
+# --- the reach label is a seam, not a literal (issue #1841) ---------------------------------------
+Write-Host "`n-- the reach label --" -ForegroundColor Cyan
+
+# A consumer may rename the GitHub label that carries the reach axis -- smartwatchbanden renamed
+# 'tier-1' to 'minor' on September 11, 2026 -- so every place this plugin TYPES a label name reads
+# Get-ReachLabel instead. The axis itself is still explained under the name 'tier-1' in the prose, and
+# that is deliberate: what is repo-specific is the string GitHub stores, not the model. So these
+# asserts are aimed at the COMMANDS and nothing else, which is why they match on the flag as well as
+# on the name rather than on 'tier-1' anywhere in the file.
+$reachDocs = @{
+    'skills\report-issue\SKILL.md'        = 'report-issue'
+    'skills\adopt-dkj-policy-bwj\SKILL.md' = 'adopt-dkj-policy-bwj'
+    'WORKFLOW-portable.md'                 = 'WORKFLOW-portable'
+    'README.md'                            = 'README'
+}
+foreach ($rel in $reachDocs.Keys) {
+    $txt = Get-Content -LiteralPath (Join-Path $PluginRoot $rel) -Raw
+    Assert-True (-not [regex]::IsMatch($txt, '--(?:add-|remove-)?label\s+["'']?tier-1\b')) `
+        "$($reachDocs[$rel]) writes no '--label tier-1' -- the name comes from Get-ReachLabel"
+    Assert-True (-not [regex]::IsMatch($txt, 'gh\s+label\s+create\s+["'']?tier-1\b')) `
+        "$($reachDocs[$rel]) creates no label named 'tier-1' outright"
+    Assert-True (-not [regex]::IsMatch($txt, 'label:tier-1\b')) `
+        "$($reachDocs[$rel]) writes no 'label:tier-1' search query"
+}
+
+# And the seam has to be documented where a consumer looks for it, or the asserts above only prove the
+# literal is gone rather than that anything replaced it.
+foreach ($rel in @('skills\report-issue\SKILL.md', 'skills\adopt-dkj-policy-bwj\SKILL.md',
+                   'WORKFLOW-portable.md', 'README.md')) {
+    $txt = Get-Content -LiteralPath (Join-Path $PluginRoot $rel) -Raw
+    Assert-True ($txt -match 'Get-ReachLabel') "$rel names the Get-ReachLabel seam"
+}
+
+# The default is stated, and it is the name every existing consumer already carries -- an arrival that
+# changed the default would silently relabel every one of them.
+$adoptTxt = Get-Content -LiteralPath (Join-Path $PluginRoot 'skills\adopt-dkj-policy-bwj\SKILL.md') -Raw
+Assert-True ($adoptTxt -match "function\s+Get-ReachLabel\s*\{\s*'tier-1'\s*\}") `
+    'the proposed seam defaults to tier-1, so an unanswered repo is unchanged'
+
 # --- done ---------------------------------------------------------------------------------------
 Write-Host ""
 if ($script:fail -gt 0) {
