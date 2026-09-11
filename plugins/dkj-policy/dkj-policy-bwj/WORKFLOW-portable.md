@@ -12,7 +12,7 @@ It is a layer on top of `dkj-policy`, not a replacement for it. It extends that
 workflow's **ticket-work step -- the layer before the branch** -- and changes nothing else:
 branch naming, what a change owes before a PR, and what a release is are still that workflow's
 answers. Read this page after
-[`dkj-policy`'s ticket-work section](https://github.com/DaveKJohn/claude-code-specialists/blob/main/plugins/dkj-policy/CONTRIBUTING-portable.md#ticket-work--the-layer-before-the-branch),
+[`dkj-policy`'s ticket-work section](https://github.com/DKJ-Solutions/dkj-claude-plugins/blob/main/plugins/dkj-policy/CONTRIBUTING-portable.md#ticket-work--the-layer-before-the-branch),
 which this one sharpens rather than repeats.
 
 **And "a layer on top" is a RANK, not a figure of speech.** Where a repo installs both plugins, this
@@ -23,10 +23,10 @@ to override `dkj-policy` itself.
 
 **The order is stated once, over there, and this line only names which rung this page sits on.** The
 binary choice a consumer actually makes is
-[Precedence -- full adoption, or none](https://github.com/DaveKJohn/claude-code-specialists/blob/main/plugins/dkj-policy/CONTRIBUTING-portable.md#precedence--full-adoption-or-none);
+[Precedence -- full adoption, or none](https://github.com/DKJ-Solutions/dkj-claude-plugins/blob/main/plugins/dkj-policy/CONTRIBUTING-portable.md#precedence--full-adoption-or-none);
 the ranking worked out in detail, what it is scoped to, and the corollary that actually keeps it (a
 consumer document may point at a shared law or answer a seam it names, but may not restate it) are in
-[A third rank sits above both](https://github.com/DaveKJohn/claude-code-specialists/blob/main/plugins/dkj-policy/CONTRIBUTING-portable.md#a-third-rank-sits-above-both-and-nothing-named-it-until-inbound-1379).
+[A third rank sits above both](https://github.com/DKJ-Solutions/dkj-claude-plugins/blob/main/plugins/dkj-policy/CONTRIBUTING-portable.md#a-third-rank-sits-above-both-and-nothing-named-it-until-inbound-1379).
 Read both there rather than here: a second copy of a rank order is exactly the restatement that
 corollary forbids.
 
@@ -271,31 +271,56 @@ reconcile run reads that score and puts the matching label on the GitHub issue:
 
 | Prio-Score | GitHub label |
 |---|---|
-| 4.00 - 5.00 | `very high` |
-| 3.00 - 3.99 | `high` |
-| 2.00 - 2.99 | `low` |
-| 1.00 - 1.99 | `very low` |
+| 4.00 - 5.00 | `prio-4` |
+| 3.00 - 3.99 | `prio-3` |
+| 2.00 - 2.99 | `prio-2` |
+| 1.00 - 1.99 | `prio-1` |
 
 Dave's mapping, September 2, 2026. **Four buckets and deliberately no `medium`**, and each boundary is
 closed at the bottom and open at the top, so a field with two decimals can never land between two of
 them.
 
 **Exactly one prio label sits on an issue at a time.** The sweep removes the other three as it sets
-one, so a ticket rescored from 2.5 to 4.2 loses `low` as it gains `very high` rather than claiming two
+one, so a ticket rescored from 2.5 to 4.2 loses `prio-2` as it gains `prio-4` rather than claiming two
 priorities at once. Where the issue already reads correctly nothing is written, so a daily re-run is
 quiet.
 
-**The source repo's own tracker uses a different set on purpose, and `gh` refusing one of these labels
-there is the expected answer rather than a broken setup.**
-`DKJ-Solutions/claude-code-specialists` ranks its issues `prio-1` (lowest) to `prio-4` (highest) -- a
-judgement typed by whoever files, because there is no Asana behind it to derive one from. The two sets
-are deliberately disjoint, measured in both directions: neither tracker carries the other's names, so a
-session moving between the two families gets a refused label rather than an issue filed at a rung that
-means something else. **Nothing here needs doing about it** -- this page's four buckets are the whole
-answer for a BWJ repo, and the rule that every issue carries a rung is deliberately NOT part of this
-workflow. Decided September 9, 2026 in
-[#1686](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1686), where the reasoning for
-both halves is written out.
+**ONE VOCABULARY ACROSS THE WHOLE FAMILY, AND THE NAMES SAY NOTHING ABOUT WHICH MOTOR SET THE RUNG**
+(Dave, September 11, 2026,
+[#1842](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1842)). The source repo's own
+tracker ranks its issues on these same four, `prio-1` lowest to `prio-4` highest -- a judgement typed
+by whoever files, because there is no Asana behind it to derive one from. The two motors are still two
+motors: **here the rung is derived from a score and is never typed**, and a task nobody has scored
+carries no label at all.
+
+**What tells them apart now is the label's DESCRIPTION, not its name**, and that is the half worth
+knowing before reading a badge. A BWJ repo's `prio-4` reads `Asana Prio-Score 4.00-5.00`; the source
+repo's reads `Priority 4 of 4 (highest)`. Keep the score-shaped wording when creating or renaming
+these labels -- it survives a rename untouched, and it is the only remaining signal at the one place
+somebody looks when the name has stopped distinguishing.
+
+**This reverses half 1 of
+[#1686](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1686)**, decided two days
+earlier, which held the two sets deliberately disjoint so that a session moving between the families
+got a refused label rather than an issue filed at a rung meaning something else. Two of that
+decision's three grounds are untouched and still correct -- the BWJ names are code rather than
+convention, and the collision could never mis-file anything. The third, *"the names are the only
+signal of which motor owns the rung"*, is the one Dave overrode, and the paragraph above is what
+replaces it rather than drops it. **Half 2 of #1686 is NOT reopened**: nothing in the portable
+workflow reads a priority, `adopt-dkj-policy` still owes no label-creation step, and the rule that
+every issue carries a rung remains deliberately NOT part of this workflow.
+
+**Migrating a repo adopted before that day is one command per label**, and the direction matters more
+than the order: `gh label edit "very high" --name prio-4 --color b60205` renames in place, so every
+issue keeps the label it had and nothing is relabelled by hand. **Carry the `--color` on all four**,
+not just this one -- the bottom two rungs change colour as well as name, so a rename without it leaves
+the right word on the wrong badge.
+[`adopt-dkj-policy-bwj`](skills/adopt-dkj-policy-bwj/SKILL.md) step 4 carries all four lines. Do that
+and the `asana-mirror.ps1` refresh in one sitting: the sweep runs only on the daily `reconcile` cron,
+so a run caught between the two costs one sweep and the next morning repairs it. And the sweep sheds
+the four **old** names as it sets a new one -- never writing them -- so a repo that was brought over
+with the additive create step instead, and so holds all eight, is swept clean rather than left
+claiming two priorities at once.
 
 **No score means no label, and that is the common case.** A task whose `Prio-Score` is empty, or whose
 score falls outside 1.00-5.00, is left without a prio label rather than given a guessed one -- measured
@@ -331,12 +356,12 @@ either repo. **The workspace boundary was the first reading of *why*** -- inferr
 above rather than measured, because in that run the same self-filed tasks were unreadable to the
 session's own token, which is the separate cause described three bullets into step 7, and from outside
 the two cannot be told apart. Issue
-[#1213](https://github.com/DaveKJohn/claude-code-specialists/issues/1213). **That reading turned out too
+[#1213](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1213). **That reading turned out too
 narrow, in the safe-looking direction**: measured directly against both boards on September 4, 2026, they
 sit in the *same* workspace, and `GitHub - WH` still carries no `Prio-Score` -- a case the workspace rule
 cannot express, because nothing about it crosses a workspace boundary. The per-project test above is what
 actually gates the field. Issue
-[#1386](https://github.com/DaveKJohn/claude-code-specialists/issues/1386).
+[#1386](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1386).
 
 **Why this direction does not contradict "GitHub first".** That rule is about where a ticket is *born*
 and where its lifecycle is *tracked*. Priority is neither: it is the business's judgement, made in the
@@ -354,10 +379,10 @@ the steps of the contributing cycle. A card's column is the answer to *"where is
 until now the board could not give.
 
 **There is exactly ONE board, and its name is the team's** (Dave, September 2, 2026, closing
-[#1222](https://github.com/DaveKJohn/claude-code-specialists/issues/1222)). At BWJ that is
+[#1222](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1222)). At BWJ that is
 `Workload Overview`; `Development BWJ` was retired in the same decision, and every card of Dave's was
 taken off it that day. So the *"which board, and what happens to the others"* edge that inbound
-[#1217](https://github.com/DaveKJohn/claude-code-specialists/issues/1217) had to be corrected on by
+[#1217](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1217) had to be corrected on by
 hand does not arise here any more -- there is no other board to advance by mistake. The containment
 that answered it is still in the mechanism, and it is what the next two headings are about.
 
@@ -484,7 +509,7 @@ the board*. Only the first may derive a stage; deriving one from the second woul
 board deliberately leaves off its pipeline.
 
 **What its absence cost, because it is four stages and not the three this page describes** (inbound
-[#1536](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1536)). With no board every
+[#1536](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1536)). With no board every
 issue derived nothing, and that also switched off the one promotion no column names: `ReadyToTest` is
 reached from a floor already at `InReview`, so **closing an issue stopped handing the card back to the
 submitter** -- the transition the whole board model exists for. The close update still went out, so the

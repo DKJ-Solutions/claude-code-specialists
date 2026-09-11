@@ -63,7 +63,7 @@ stopped by hand, not the skill. Left to run, step 1 alone would have placed
 `issues: [closed, reopened, labeled, unlabeled]` plus a daily cron, holding `issues: write`, and
 mirroring to an Asana project GID this repo does not own -- onto the tracker that receives every
 consumer's own inbound reports
-([#1522](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1522)).
+([#1522](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1522)).
 
 ## 1 -- copy the CI mechanism into `.github/`
 
@@ -169,10 +169,10 @@ well as by a shared one:
   project, via the project's own `custom_field_settings` -- sitting in the same workspace as the board
   is not enough to guarantee that -- so a task created in a project that does not carry the field can
   never carry a `Prio-Score`, and the sweep of
-  [step 5](https://github.com/DaveKJohn/claude-code-specialists/blob/main/plugins/dkj-policy/dkj-policy-bwj/WORKFLOW-portable.md#5-the-asana-prio-score-comes-back-as-a-github-label)
+  [step 5](https://github.com/DKJ-Solutions/dkj-claude-plugins/blob/main/plugins/dkj-policy/dkj-policy-bwj/WORKFLOW-portable.md#5-the-asana-prio-score-comes-back-as-a-github-label)
   then reaches only the tickets *imported from* the board
-  ([#1213](https://github.com/DaveKJohn/claude-code-specialists/issues/1213),
-  [#1386](https://github.com/DaveKJohn/claude-code-specialists/issues/1386)).
+  ([#1213](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1213),
+  [#1386](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1386)).
 - **The stages.** They live on that board's own sections, so a task filed anywhere else sits on no
   pipeline and never moves a column -- see step 5 below.
 
@@ -202,7 +202,7 @@ custom field's name alongside its value -- no GID needed. Creating a task and se
 custom fields in the same call is the opposite direction: the `create task` call addresses a custom
 field by its GID, which Asana Field settings shows on the field's own page, in the URL. **The same
 per-project constraint
-[step 5](https://github.com/DaveKJohn/claude-code-specialists/blob/main/plugins/dkj-policy/dkj-policy-bwj/WORKFLOW-portable.md#5-the-asana-prio-score-comes-back-as-a-github-label)
+[step 5](https://github.com/DKJ-Solutions/dkj-claude-plugins/blob/main/plugins/dkj-policy/dkj-policy-bwj/WORKFLOW-portable.md#5-the-asana-prio-score-comes-back-as-a-github-label)
 already states for `Prio-Score` applies here too** -- an Asana custom field only becomes usable once it
 has been *added to* a project via that project's own `custom_field_settings`, and definition in the
 right workspace is not enough to guarantee that, so this GID has to come from a field that is actually
@@ -249,7 +249,7 @@ it. Say that plainly when you report, because "the mirror works" and "the board 
 here and the first can be true while the second is not.
 
 **ASK WHETHER THIS REPO HAS A PROJECT BOARD AT ALL, before you print the secret** (inbound
-[#1536](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1536)). Where it has none, the
+[#1536](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1536)). Where it has none, the
 secret is not a gap to close but a line to leave out: there is nothing for the token to read. Such a repo
 says so with an empty `FieldName` and no `Statuses` in `Get-GithubStatusMap`, and the three middle stages
 then come off the issue itself -- closed means `InReview`, open with a pull request linked means
@@ -305,15 +305,50 @@ issue from its Asana task's `Prio-Score`, and `gh issue edit` fails on a label t
 exactly as `gh issue create` does.
 
 ```bash
-gh label create "very high" --repo <owner>/<repo> --color b60205 \
+gh label create prio-4 --repo <owner>/<repo> --color b60205 \
   --description "Asana Prio-Score 4.00-5.00"
-gh label create "high"      --repo <owner>/<repo> --color d93f0b \
+gh label create prio-3 --repo <owner>/<repo> --color d93f0b \
   --description "Asana Prio-Score 3.00-3.99"
-gh label create "low"       --repo <owner>/<repo> --color 0e8a16 \
+gh label create prio-2 --repo <owner>/<repo> --color fbca04 \
   --description "Asana Prio-Score 2.00-2.99"
-gh label create "very low"  --repo <owner>/<repo> --color c2e0c6 \
+gh label create prio-1 --repo <owner>/<repo> --color 006b75 \
   --description "Asana Prio-Score 1.00-1.99"
 ```
+
+**The DESCRIPTIONS are score-shaped and that is load-bearing, not decoration.** The names are now the
+same four the source repo's own tracker uses, where a rung is a judgement somebody typed; here it is
+derived from a board nobody in this repo can see. The description is the one place a badge still says
+**which motor set it**, and it survives a rename untouched -- so keep the `Asana Prio-Score` wording
+even if the labels are created by hand. Dave unified the names on September 11, 2026
+([#1842](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1842)), reversing half 1 of
+[#1686](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1686); the grounds that decision
+weighed, and the one it overrode, are recorded there.
+
+**A repo adopted BEFORE that day carries the old names** -- `very high` / `high` / `low` /
+`very low` -- and `gh label create` would leave it holding all eight. Rename in place instead, which
+keeps every label attached to the issues that carry it, so nothing is relabelled by hand and no
+history is lost:
+
+```bash
+gh label edit "very high" --repo <owner>/<repo> --name prio-4 --color b60205
+gh label edit "high"      --repo <owner>/<repo> --name prio-3 --color d93f0b
+gh label edit "low"       --repo <owner>/<repo> --name prio-2 --color fbca04
+gh label edit "very low"  --repo <owner>/<repo> --name prio-1 --color 006b75
+```
+
+**`prio-2` shares `fbca04` with `tier-1` in this repo, and that is known rather than a slip.** They
+are two different axes -- a rung and a reach -- so both can sit on one issue as two identical yellow
+badges. It is the hex [#1842](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1842)
+prescribes, and whether either label moves is Dave's to decide:
+[#1844](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1844). Read the name, not the
+badge.
+
+**Do the rename and the `asana-mirror.ps1` refresh of step 1 in one sitting, in either order.** The
+copy in `.github/scripts/` is made by hand, so the gap between the two is yours to keep short -- and
+the sweep that reads these labels runs only on the daily `reconcile` cron, so a run caught inside the
+gap costs one sweep and the next morning repairs it. The sweep also removes the four old names as it
+sets a new one, so a repo that ended up with all eight anyway is swept clean rather than left
+claiming two priorities at once.
 
 **And the `needs-info` label**, which is the entire mechanism for the board's blocked column: while it
 is on an issue the card sits in `NeedsInfo` whatever the branch and the pull request are doing, and
@@ -328,7 +363,7 @@ gh label create needs-info --repo <owner>/<repo> --color d4c5f9 \
 
 Four buckets and deliberately no `medium` (Dave, September 2, 2026). **Exactly one of them sits on an
 issue at a time** -- the sweep removes the other three as it sets one, so a ticket rescored from 2.5
-to 4.2 loses `low` as it gains `very high`. A task with **no** score, or a score outside 1.00-5.00,
+to 4.2 loses `prio-2` as it gains `prio-4`. A task with **no** score, or a score outside 1.00-5.00,
 gets no prio label at all rather than a guessed one; on the BWJ board the day this shipped that was
 28 of 96 open tasks, so it is the common case and not an edge one.
 
@@ -340,7 +375,7 @@ existing BWJ repos.
 ## 5 -- check the board's sections are numbered
 
 The stage model of
-[step 6](https://github.com/DaveKJohn/claude-code-specialists/blob/main/plugins/dkj-policy/dkj-policy-bwj/WORKFLOW-portable.md#6-the-boards-sections-are-the-cycle----one-card-one-column-per-stage)
+[step 6](https://github.com/DKJ-Solutions/dkj-claude-plugins/blob/main/plugins/dkj-policy/dkj-policy-bwj/WORKFLOW-portable.md#6-the-boards-sections-are-the-cycle----one-card-one-column-per-stage)
 reads a card's stage off the **number its section's name starts with**, and takes the *meaning* of
 each number from `Get-AsanaStageMap`. **This step is where both halves are established, and it comes
 before step 2's proposal can be written** -- read the sections of the project and report them:
