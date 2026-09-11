@@ -43,7 +43,30 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**6 / 9 minor entries** <!-- pending-tally -->
+**6 / 10 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1838-runid-repo-root-shape · 20260911-100046
+
+`record-suite-durations.ps1` now refuses a run-id-shaped `-RepoRoot` by name instead of failing deep
+inside `Resolve-Path` with no mention of `-RunId`, and its docstring states the comma-separated form
+the script actually expects for several run ids under `-File`.
+
+**Score:** 1 -- a docstring clarification and an error-message fix on a script only a session invokes
+by hand; it prevents a failure that costs a minute of re-diagnosis, nothing more.
+
+#### What makes this deploy extra special
+
+N/A -- an internal maintenance-script fix, not visible to a subscriber of any service this repo ships.
+
+**Score:** N/A
+
+#### Pull Request
+
+record-suite-durations.ps1: space-separated -RunId binds second id to -RepoRoot
+
+[PR #1839](https://github.com/DKJ-Solutions/dkj-claude-plugins/pull/1839)
+
+---
 
 ### DEPLOY: fix/1831-connector-swb-candidate · 20260911-095211
 
