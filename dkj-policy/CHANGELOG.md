@@ -43,7 +43,39 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**7 / 12 minor entries** <!-- pending-tally -->
+**7 / 13 minor entries** <!-- pending-tally -->
+
+### DEPLOY: feat/1842-unify-prio-labels-bwj · 20260911-122226
+
+The BWJ store repos rank their issues on the same four labels as every other repo in the family:
+`prio-1` to `prio-4`, on the same four colours, replacing `very low` / `low` / `high` / `very high`.
+One vocabulary across the family, reversing half 1 of
+[#1686](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1686) on Dave's instruction.
+The score bands behind them are untouched -- the same mapping, said in the other repos' words -- and
+what now says which motor set a rung is the label's **description**, which a rename leaves alone:
+`Asana Prio-Score 2.00-2.99` over there against `Priority 2 of 4` here. The sweep sheds the four old
+names as it sets a new one without ever writing them, so a repo migrated with the additive create
+step instead of the rename is swept clean rather than left claiming two priorities at once.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A. This workflow's consumers are the BWJ store repos, whose *developers* read these labels; no
+customer of either store ever sees one. The migration itself is two `gh label edit` commands per
+store, documented in the skill.
+
+**Score:** N/A
+
+#### Pull Request
+
+Unify the BWJ priority labels on prio-1..prio-4
+
+Plugins: dkj-policy-bwj
+
+[PR #1849](https://github.com/DKJ-Solutions/dkj-claude-plugins/pull/1849)
+
+---
 
 ### DEPLOY: feat/1832-shared-document-newline · 20260911-120331
 
