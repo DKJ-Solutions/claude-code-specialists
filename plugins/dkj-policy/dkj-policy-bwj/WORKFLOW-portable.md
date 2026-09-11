@@ -98,12 +98,12 @@ Tier 2 does not exist in these repos, so one label carries the whole axis and
 is a distinction worth keeping straight rather than collapsing. The model is portable and its name is
 how everything here explains it; the label is a row in one repo's settings, which that repo may rename
 for its own colleagues without consulting a plugin. `smartwatchbanden` did exactly that on
-September 11, 2026 -- `tier-1` became `minor`, carrying all 24 issues with it -- and until then the
-name was written as a literal in four places, two of which then pointed at a label the repo no longer
-had ([#1841](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1841)). So **`Get-ReachLabel`
-in your own `scripts/repo-config.ps1` states the string**, defaulting to `tier-1`, and every command
-that types a label reads it; the paragraphs below keep explaining the axis under its own name, because
-the axis did not change.
+September 11, 2026, and until then the name was written as a literal in four places -- two of which
+then pointed at a label the repo no longer had
+([#1841](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1841)). So **`Get-ReachLabel` in
+your own `scripts/repo-config.ps1` states the string**, defaulting to `tier-1`, and every command that
+types a label reads it; the paragraphs below keep explaining the axis as `tier-1`, because the axis did
+not change.
 
 **The model transfers; the mechanism does not.** A changelog entry is a form with a field per reader, and
 every tier is scored on it -- tier 0 included, because an unanswered field reads as an omission rather

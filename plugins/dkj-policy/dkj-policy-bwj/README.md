@@ -195,12 +195,12 @@ the project:
   skips whichever is unset without saying anything. Where a board does carry one, leaving it unset is
   the state that costs something, because the field is then filled by hand or not at all.
 - `Get-ReachLabel` -- **the name GitHub stores for the reach label**, and the one function in this list
-  that says nothing about Asana. The axis it carries is fixed and portable, explained under its own
-  name in [`WORKFLOW-portable.md`](WORKFLOW-portable.md#the-reach-label----the-reach-axis-carried-onto-issues);
+  that says nothing about Asana. The axis it carries is fixed and portable, explained as `tier-1` in
+  [`WORKFLOW-portable.md`](WORKFLOW-portable.md#the-reach-label----the-reach-axis-carried-onto-issues);
   the string is yours, because a repo renames a label for its own colleagues without consulting a
   plugin. **Optional, default `tier-1`** -- so answer it only where your label is called something
-  else, and every existing consumer is unchanged by its arrival. `smartwatchbanden` renamed it to
-  `minor` on September 11, 2026, which is what made this a seam rather than a literal
+  else, and every existing consumer is unchanged by its arrival. A consumer renaming that label on
+  September 11, 2026 is what made this a seam rather than a literal
   ([#1841](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1841)): `gh issue create` fails
   outright on a label the repo does not have, so the filing half broke loudly -- while
   `adopt-dkj-policy-bwj`, being strictly additive, would have quietly re-created `tier-1` beside it.

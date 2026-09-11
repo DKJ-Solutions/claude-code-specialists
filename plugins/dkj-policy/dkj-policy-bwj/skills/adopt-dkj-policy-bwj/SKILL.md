@@ -128,20 +128,19 @@ function Get-AsanaIssueFieldGid { $null }
 # resolves Bug/Feature/Task by name from the project itself.
 function Get-AsanaTypeFieldGid { $null }
 
-# The NAME GitHub stores for the reach label -- the axis itself is fixed and is explained under its
-# own name in WORKFLOW-portable.md; only the string is this repo's to choose. Optional: 'tier-1' is
-# the default, so a repo that never answers it is unchanged.
+# The NAME GitHub stores for the reach label. The axis itself is fixed and WORKFLOW-portable.md
+# explains it as tier-1; only the string is this repo's to choose. Optional: 'tier-1' is the default,
+# so a repo that never answers it is unchanged.
 function Get-ReachLabel { 'tier-1' }
 ```
 
 **`Get-ReachLabel` is the one seam here that is NOT about Asana**, which is why it reads as the odd
 one out and belongs in the list anyway: every other value states something about a board, and this one
-states a string GitHub holds. It exists because `smartwatchbanden` renamed that label to `minor` on
-September 11, 2026 and the name was written as a literal in four places
-([#1841](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1841)) -- two of which then pointed
-at a label the repo no longer had. **Propose it only where the repo's label is not `tier-1`**: the
-default is what every existing consumer already has, and a function restating the default is a value
-somebody now has to maintain.
+states a string GitHub holds. It exists because a consumer renamed that label while the name was
+written as a literal in four places, two of which then pointed at a label the repo no longer had
+([#1841](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1841)). **Propose it only where
+the repo's label is not `tier-1`**: the default is what every existing consumer already has, and a
+function restating the default is a value somebody now has to maintain.
 
 **`SubmitterPattern` is the one value here that decides whether a whole column is used.** Stage 6 is
 entered only once the submitter has been told, so a repo that names no pattern never enters it: every
@@ -277,7 +276,7 @@ first** and check for *that* name -- `tier-1` where the repo has never answered 
 
 ```bash
 gh label list --repo <owner>/<repo> | grep -E '^(<reach label>|documentation)\b'
-gh label create <reach label> --repo <owner>/<repo> --color fbca04 \
+gh label create "<reach label>" --repo <owner>/<repo> --color fbca04 \
   --description "Reaches the business: management and the commissioner notice it"
 ```
 
@@ -285,8 +284,8 @@ gh label create <reach label> --repo <owner>/<repo> --color fbca04 \
 Every other label below is missing because the repo never had it; this one can be missing because the
 repo **renamed** it and has not answered the seam. Creating it then leaves two labels for one axis, one
 of them empty, with every existing issue on the other -- and nothing reports it, because the run is
-doing exactly what it was written to do. That is what happened to `smartwatchbanden`, which renamed
-`tier-1` to `minor` on September 11, 2026
+doing exactly what it was written to do. That is the state `smartwatchbanden` was one re-adopt away
+from on September 11, 2026
 ([#1841](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1841)); the seam above is the
 repair, and this paragraph is what keeps the repair from being skipped by a repo that has not adopted
 it yet. So **before creating it, read the whole label list** (`gh label list --repo <owner>/<repo>`)

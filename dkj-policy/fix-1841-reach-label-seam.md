@@ -86,6 +86,26 @@ which issues carry it.
 - [x] Suite green: 234 asserts
 - [x] The new asserts verified to BITE -- each of the four original call-site strings matched,
       so the guard is not passing on absence of a pattern nothing could produce
+- [x] Review round on the diff -- Victor, Edith and Sebastian in parallel; every finding applied:
+      - **Victor:** the guard covered three of the four repaired shapes. The label-EXISTENCE check
+        (`gh label list | grep -E '^(tier-1|...'`) is neither a flag, a create nor a query, so the
+        exact line #1841 was filed over could have been reverted green. A fourth pattern added, and
+        verified to catch the original line and not the repaired one.
+      - **Victor:** the second loop re-typed the document list instead of reusing `$reachDocs.Keys` --
+        two hand-kept lists that would drift. Now one.
+      - **Victor:** the default assert was pinned to one spelling of the snippet, so `"tier-1"`,
+        `return` or a trailing `;` would have failed on formatting rather than on the value. Now
+        tolerant of all three and of a reflow, still failing on a changed default.
+      - **Edith:** two placeholder spellings were introduced in one diff -- `<Get-ReachLabel>` in
+        `report-issue`, `<reach label>` elsewhere -- and the first reads as an identifier to type
+        literally, which is the axis/string confusion this branch exists to end. One spelling now.
+      - **Edith:** "explained under its own name" no longer matched the renamed heading. Reworded.
+      - **Sebastian:** the interpolated placeholders were unquoted while the neighbouring multi-word
+        examples on the same page quote theirs (`"very high"`). All three now quoted.
+      - **Sebastian:** the private consumer's new label name and issue count were restated across
+        four shipped documents. Both counts dropped and the name reduced to "a consumer renamed it"
+        plus the issue link -- it survives once, in the changelog entry below, where it is the
+        instruction the affected consumer acts on rather than a citation being re-published.
 
 ### DEPLOY: fix/1841-reach-label-seam
 
@@ -106,9 +126,9 @@ literal in the command shapes if it is ever written back.
 
 `BWJ-Development/smartwatchbanden` renamed its reach label to `minor` on September 11, 2026 and
 `report-issue` has been failing outright there since -- `gh issue create` errors on a label the repo
-does not have. Answering `Get-ReachLabel` with `'minor'` is now the whole fix on their side, and the
-next `adopt-dkj-policy-bwj` run no longer quietly re-creates `tier-1` beside the label that carries all
-24 of their issues.
+does not have. Answering `Get-ReachLabel` with `'minor'` is the whole fix on their side, and the next
+`adopt-dkj-policy-bwj` run no longer quietly re-creates `tier-1` beside the label their issues are
+actually on.
 
 **Score:** 4
 

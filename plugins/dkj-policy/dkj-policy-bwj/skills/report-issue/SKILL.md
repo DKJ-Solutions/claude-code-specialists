@@ -35,9 +35,10 @@ colleague-facing translation is a judgement call, not a transform. The full rule
 - Read **`Get-ReachLabel`** from the same file -- **the name GitHub stores for the reach label**, which
   every command below writes rather than a literal. Optional, and `tier-1` is the default, so a repo
   that has never answered it behaves exactly as this page did before the seam existed. Where it is
-  answered, that answer is the name: `smartwatchbanden` renamed the label to `minor` on
-  September 11, 2026, and `gh issue create` **fails outright** on a label the repo does not have, so a
-  filing session that types the default there gets an error rather than a mislabelled issue.
+  answered, that answer is the name -- and reading it is not optional politeness: `gh issue create`
+  **fails outright** on a label the repo does not have, so typing the default in a repo that renamed
+  its label gets you an error instead of an issue
+  ([#1841](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1841)).
 - Confirm the Asana MCP tools are available in this session. If they are not, you still do step 1 and
   then stop with a clear note -- never skip the GitHub issue.
 
@@ -50,7 +51,7 @@ never left for a later pass:
 
 ```bash
 gh issue create --repo <owner>/<repo> --title "<precise technical title>" --body "<full detail>" \
-  --type <Task|Bug|Feature> [--label <Get-ReachLabel>] [--label documentation]
+  --type <Task|Bug|Feature> [--label "<reach label>"] [--label documentation]
 ```
 
 | what to set | how to decide it |
@@ -71,7 +72,7 @@ fields are set afterwards:
 
 ```bash
 gh api --method PATCH repos/<owner>/<repo>/issues/<n> -f type=Bug
-gh issue edit <n> --repo <owner>/<repo> --add-label <Get-ReachLabel>
+gh issue edit <n> --repo <owner>/<repo> --add-label "<reach label>"
 ```
 
 ## Step 2 -- the Asana task (a translation, not a copy)
@@ -178,4 +179,4 @@ undone on the next sweep while the label stays.
 reach question is answerable from the finding itself, and the whole backfill of 135 issues was
 classified from the issue text alone. Naming the call here is what makes it correctable: it puts the
 answer in front of the person who knows the store, at no extra turn, beside the one line that changes
-it (`gh issue edit <n> --repo <owner>/<repo> --add-label <Get-ReachLabel>`, or `--remove-label`).
+it (`gh issue edit <n> --repo <owner>/<repo> --add-label "<reach label>"`, or `--remove-label`).

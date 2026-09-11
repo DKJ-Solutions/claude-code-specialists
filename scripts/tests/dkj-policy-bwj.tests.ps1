@@ -568,28 +568,38 @@ $reachDocs = @{
     'WORKFLOW-portable.md'                 = 'WORKFLOW-portable'
     'README.md'                            = 'README'
 }
+# ONE PATTERN PER SHAPE THE BRANCH ACTUALLY REPAIRED, and the fourth is the reason to say that out
+# loud: the label-EXISTENCE check (gh label list | grep -E '^(tier-1|documentation)\b') is neither a
+# --label flag nor a create nor a search query, so the first three leave the exact line #1841 was filed
+# over unguarded. A guard that covers three of the four sites reads as covering all of them.
+$reachLiterals = @(
+    @{ Pattern = '--(?:add-|remove-)?label\s+["'']?tier-1\b'; What = "writes no '--label tier-1'" }
+    @{ Pattern = 'gh\s+label\s+create\s+["'']?tier-1\b';      What = "creates no label named 'tier-1' outright" }
+    @{ Pattern = 'label:tier-1\b';                            What = "writes no 'label:tier-1' search query" }
+    @{ Pattern = '\^\((?:[^)\r\n]*\|)?tier-1[|)]';            What = "greps the label list for no literal 'tier-1'" }
+)
 foreach ($rel in $reachDocs.Keys) {
     $txt = Get-Content -LiteralPath (Join-Path $PluginRoot $rel) -Raw
-    Assert-True (-not [regex]::IsMatch($txt, '--(?:add-|remove-)?label\s+["'']?tier-1\b')) `
-        "$($reachDocs[$rel]) writes no '--label tier-1' -- the name comes from Get-ReachLabel"
-    Assert-True (-not [regex]::IsMatch($txt, 'gh\s+label\s+create\s+["'']?tier-1\b')) `
-        "$($reachDocs[$rel]) creates no label named 'tier-1' outright"
-    Assert-True (-not [regex]::IsMatch($txt, 'label:tier-1\b')) `
-        "$($reachDocs[$rel]) writes no 'label:tier-1' search query"
+    foreach ($lit in $reachLiterals) {
+        Assert-True (-not [regex]::IsMatch($txt, $lit.Pattern)) `
+            "$($reachDocs[$rel]) $($lit.What) -- the name comes from Get-ReachLabel"
+    }
 }
 
 # And the seam has to be documented where a consumer looks for it, or the asserts above only prove the
-# literal is gone rather than that anything replaced it.
-foreach ($rel in @('skills\report-issue\SKILL.md', 'skills\adopt-dkj-policy-bwj\SKILL.md',
-                   'WORKFLOW-portable.md', 'README.md')) {
+# literal is gone rather than that anything replaced it. Same set as above, read from the same
+# hashtable: two hand-kept lists would drift the moment a document joins or leaves one of them.
+foreach ($rel in $reachDocs.Keys) {
     $txt = Get-Content -LiteralPath (Join-Path $PluginRoot $rel) -Raw
-    Assert-True ($txt -match 'Get-ReachLabel') "$rel names the Get-ReachLabel seam"
+    Assert-True ($txt -match 'Get-ReachLabel') "$($reachDocs[$rel]) names the Get-ReachLabel seam"
 }
 
 # The default is stated, and it is the name every existing consumer already carries -- an arrival that
-# changed the default would silently relabel every one of them.
+# changed the default would silently relabel every one of them. The subject is the VALUE and not the
+# snippet's formatting: an optional 'return', either quote style and a trailing ';' are all the same
+# answer, and pinning the assert to one spelling would fail on a reflow that changed nothing.
 $adoptTxt = Get-Content -LiteralPath (Join-Path $PluginRoot 'skills\adopt-dkj-policy-bwj\SKILL.md') -Raw
-Assert-True ($adoptTxt -match "function\s+Get-ReachLabel\s*\{\s*'tier-1'\s*\}") `
+Assert-True ([regex]::IsMatch($adoptTxt, 'function\s+Get-ReachLabel\s*\{\s*(?:return\s+)?(["''])tier-1\1\s*;?\s*\}')) `
     'the proposed seam defaults to tier-1, so an unanswered repo is unchanged'
 
 # --- done ---------------------------------------------------------------------------------------
