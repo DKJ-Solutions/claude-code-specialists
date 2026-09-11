@@ -1,7 +1,7 @@
 <#
 .SYNOPSIS
-    Which sibling libs a lib dot-sources, which libs a test suite copies into its fixture, and the
-    gap between the two (issue #1693).
+    Which sibling libs a lib dot-sources, which libs a file under scripts/tests copies into its
+    fixture, and the gap between the two (issues #1693, #1865).
 
 .DESCRIPTION
     WHY THIS EXISTS. Several suites build their fixture tree by HAND-LISTING the libs they copy into
@@ -295,8 +295,13 @@ function Get-FixtureCopiedLibName {
 
 function Get-FixtureDepFinding {
     <#
-        The gap for ONE suite: every lib that some lib it copies dot-sources, and that it does not
-        copy itself. Returns a (possibly empty) list of pscustomobjects { Suite, Lib, Missing }.
+        The gap for ONE fixture builder: every lib that some lib it copies dot-sources, and that it
+        does not copy itself. Returns a (possibly empty) list of pscustomobjects { File, Lib, Missing }.
+
+        THE SUBJECT IS A FILE THAT COPIES A LIB, WHICH IS USUALLY BUT NOT ALWAYS A SUITE. The parameter
+        was -SuitePath and the field was Suite until #1865 widened the scan set; both now name what
+        they actually hold, since check-plugin-integrity-fixture.ps1 is a builder four suites share and
+        no suite itself.
 
         THE CLOSURE IS WALKED, NOT ONE LEVEL. If a copied lib pulls in B and B pulls in C, the fixture
         needs all three -- so reporting only B would make the author fix it, re-run, and be told about
@@ -307,7 +312,7 @@ function Get-FixtureDepFinding {
         place to have an opinion about a name the tree does not carry.
 
         -CopiedLib LETS A CALLER THAT ALREADY ASKED HAND THE ANSWER IN. Get-FixtureDepReport computes
-        the copy list to decide whether a suite is a subject at all, and then called this, which read
+        the copy list to decide whether a file is a subject at all, and then called this, which read
         the same file again -- measured by the cost review at 447 ms against 257 ms over the twelve real
         subjects, so ~190 ms of every run went on parsing each subject twice. Omitted, it reads the
         list itself, which keeps this function usable on its own.
@@ -316,7 +321,7 @@ function Get-FixtureDepFinding {
         rather than from $PSScriptRoot; it is not used for anything else here.
     #>
     param(
-        [Parameter(Mandatory = $true)][string]$SuitePath,
+        [Parameter(Mandatory = $true)][string]$Path,
         [Parameter(Mandatory = $true)][string]$LibDirectory,
         [Parameter(Mandatory = $true)][string]$RepoRoot,
         [string[]]$CopiedLib
@@ -326,10 +331,10 @@ function Get-FixtureDepFinding {
     # unwrapped, so a single-element result arrives as a bare string and .Count below then throws under
     # Set-StrictMode. The inner @() are not enough and it looked like they were.
     $copied = @(if ($PSBoundParameters.ContainsKey('CopiedLib')) { $CopiedLib }
-                else { Get-FixtureCopiedLibName -Path $SuitePath })
+                else { Get-FixtureCopiedLibName -Path $Path })
     if ($copied.Count -eq 0) { return @() }
 
-    $suiteName = Split-Path -Path $SuitePath -Leaf
+    $fileName = Split-Path -Path $Path -Leaf
     $findings = @()
     $seen = @{}
     $queue = New-Object System.Collections.Queue
@@ -353,7 +358,7 @@ function Get-FixtureDepFinding {
 
             if (-not (Test-Path -LiteralPath (Join-Path $LibDirectory $dep) -PathType Leaf)) { continue }
             if ($copied -notcontains $dep) {
-                $findings += [pscustomobject]@{ Suite = $suiteName; Lib = $lib; Missing = $dep }
+                $findings += [pscustomobject]@{ File = $fileName; Lib = $lib; Missing = $dep }
             }
             $queue.Enqueue($dep)
         }
@@ -364,14 +369,37 @@ function Get-FixtureDepFinding {
 
 function Get-FixtureDepReport {
     <#
-        Every suite in -TestsDirectory that copies a lib, with its findings -- the whole answer in one
+        Every file in -TestsDirectory that copies a lib, with its findings -- the whole answer in one
         call, so a gate and a suite cannot disagree about what was examined.
 
-        Returns { Suites, Subjects, Findings }: how many suites were read, how many of them copy a lib
+        Returns { Files, Subjects, Findings }: how many files were read, how many of them copy a lib
         at all, and the flat finding list. SUBJECTS IS RETURNED BECAUSE A SILENT PASS NEEDS IT: zero
         findings over zero subjects is a reader that found nothing to read, and zero findings over
-        twelve is the tree being clean. The two must never print the same line -- the same reason
+        thirteen is the tree being clean. The two must never print the same line -- the same reason
         check-plugin-integrity.ps1's span checks print both figures.
+
+        EVERY '.ps1', NOT ONLY '*.tests.ps1' (issue #1865). The filter was the suite-name pattern until
+        September 11, 2026, on the reasonable-sounding ground that the class this gate measures is "a
+        SUITE copies a lib into a fixture". What that misses is the case where the copying has been
+        FACTORED OUT of the suites, and the tree already holds one: check-plugin-integrity-fixture.ps1
+        is not a suite by name, copies fourteen libs, and is shared by the four
+        check-plugin-integrity-{links,commands,docs,entries} suites -- so the one builder here that four
+        suites depend on was the one the gate could not see.
+
+        MEASURED ON #1860's BRANCH, which gave entry-scaffold-lib.ps1 a new unconditional sibling: this
+        gate reported 7 findings, named all seven suites, and was right about every one of them -- and
+        the four lint suites then failed anyway, 4 of 93 asserts red, because check-plugin-integrity.ps1
+        died on lib load before printing a finding. That is the identical failure mode #1650 records one
+        lib earlier and the identical one #1693 built this gate to prevent. The gate found the seven it
+        could see and was structurally blind to the eighth.
+
+        AND WIDENING IS BORN GREEN, which is why it is this repair rather than the more thorough one.
+        The three other non-suite files here (fresh-consumer, round-baseline and round-tally .measure.ps1)
+        contain no Copy-Item at all, so they are not subjects and cost one substring test each; the
+        builder itself reports 0 findings today. The alternative weighed in #1865 -- follow each suite's
+        own dot-sources, so a builder is reached because a suite LOADS it rather than because of where it
+        sits -- is strictly more correct and strictly more code, and buys nothing this tree can measure
+        today. It is the repair to reach for on the day a builder moves out of scripts/tests.
 
         -RepoRoot is passed through to the dot-source walker; -LibDirectory is where a dependency is
         looked for. They are separate parameters because this lib's own suite points them at a sandbox
@@ -383,20 +411,20 @@ function Get-FixtureDepReport {
         [Parameter(Mandatory = $true)][string]$RepoRoot
     )
 
-    $suites = @(Get-ChildItem -Path $TestsDirectory -Filter '*.tests.ps1' -File | Sort-Object Name)
+    $files = @(Get-ChildItem -Path $TestsDirectory -Filter '*.ps1' -File | Sort-Object Name)
     $subjects = 0
     $findings = @()
-    foreach ($s in $suites) {
+    foreach ($f in $files) {
         # Read ONCE and handed on -- see Get-FixtureDepFinding's -CopiedLib for the measurement.
-        $copied = @(Get-FixtureCopiedLibName -Path $s.FullName)
+        $copied = @(Get-FixtureCopiedLibName -Path $f.FullName)
         if ($copied.Count -eq 0) { continue }
         $subjects++
-        $findings += @(Get-FixtureDepFinding -SuitePath $s.FullName -LibDirectory $LibDirectory `
+        $findings += @(Get-FixtureDepFinding -Path $f.FullName -LibDirectory $LibDirectory `
                                              -RepoRoot $RepoRoot -CopiedLib $copied)
     }
 
     return [pscustomobject]@{
-        Suites   = $suites.Count
+        Files    = $files.Count
         Subjects = $subjects
         Findings = @($findings)
     }
