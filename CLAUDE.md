@@ -192,6 +192,29 @@ repo (inbound [#1449](https://github.com/DKJ-Solutions/claude-code-specialists/i
 instances, and why detection is deliberately left alone, are in
 [the system-administration lens](.claude/specialists/lenses/05-15-extension.md#repo-specific-rules).
 
+**That paragraph describes ONE channel, and there are two — the second reaches a consumer's CI with no
+version behind it at all** ([#1851](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1851),
+September 11, 2026). Everything above is the **plugin payload**: agent defs, hooks, skills, manuals,
+personas, gated by a release and a version bump, landing in a *session* after `plugin update`. But the
+three runners `adopt-dkj-policy` scaffolds into a consumer do not travel that way. They check this
+repository out beside the consumer's own tree, at `ref: main`, and run a path into it — so a change to
+`check-branch-entry.ps1`, `check-unfolded-entry.ps1`, `fold-changelog-entry.ps1` or
+`verify-resolved-issues.ps1` is live in **every adopted consumer's next CI run**: no tag, no bump, no
+refresh, no session restart. Strictly the sentence above stays true, because CI is not a session; the
+trap is that the paragraph reads as the whole propagation model, so a reader reasoning from it concludes
+that a shared gate script cannot reach a consumer before a cut — which is the opposite of what happens.
+
+**Neither the pin nor that paragraph is the defect; the missing sentence was.** `ref: main` is argued by
+name in [`adopt-dkj-policy`'s skill page](plugins/dkj-policy/skills/adopt-dkj-policy/SKILL.md): a pinned
+gate goes on enforcing the shape it was pinned at, and since the entry's own path has moved twice, a
+stale pin does not fail loudly — it refuses branches that *do* carry an entry at the current path. That
+reasoning stands, and [#1805](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1805)
+sharpened it by naming the half it had never weighed: tracking the tip protects a consumer from a stale
+convention and exposes them to a moved *script*. What is added here is only the writing rule — **name
+the two channels together or name neither**, because a release doctrine stated alone is read as covering
+everything, and the layer it does not cover is the one that can change a consumer's required check
+without anybody bumping anything.
+
 **Only two of the six describe this repo, and the other four are on anyway, deliberately.** The core team
 and `dkj-policy` are the two with real work here; the three add-on teams and `dkj-policy-bwj` have none —
 this repo is not a webshop, not a Shopify store, not a personal-life repo and not a BWJ store. They are
