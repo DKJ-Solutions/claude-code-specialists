@@ -100,7 +100,19 @@ BWJ stores carry it; that is what kept the gap invisible rather than what makes 
 - [x] Proven to fail on the defect it guards: with the new create line removed the suite reports
       `[FAIL] step 4 creates the 'documentation' label its own check greps for`, 239 passed / 1
       failed. Restored, it is 240 passed.
-- [x] Full local gate: `check-plugin-integrity.ps1` plus every suite, via `open-pr.ps1`.
+- [x] Full local gate: `check-plugin-integrity.ps1` plus every suite, via `open-pr.ps1` -- all 92
+      suites green.
+- [x] Review round on the diff, in parallel: code review, copy edit and security review.
+      **Three items came back on the guard and all three are applied.** The tail now anchors on
+      `(?=\s|["']|$)` rather than a bare `\b`, which also fires on a hyphen -- a step that gained a
+      `documentation-only` label would otherwise have satisfied the assert for `documentation`; the
+      locator asserts **exactly one** check line rather than binding to the leftmost of several, since
+      the file mentions `gh label list` in prose too; and the loop is gated on that match, so a
+      vanished check cannot emit a `[PASS] ... '' label` for a triager to puzzle over. Re-proven on
+      both defect shapes: create line removed -> FAIL, renamed to `documentation-only` -> FAIL
+      (it passed before this round), repaired -> 240/240.
+      The copy edit returned one reordering, applied; the security review returned nothing, and
+      confirmed the private-consumer citations sit inside this repo's excerpt bound.
 
 ### DEPLOY: docs/1846-adopt-step4-documentation-label
 

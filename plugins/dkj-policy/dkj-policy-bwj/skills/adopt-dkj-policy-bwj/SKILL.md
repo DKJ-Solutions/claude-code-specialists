@@ -269,8 +269,8 @@ workspace.
 
 ## 4 -- make sure the classification labels exist
 
-[`report-issue`](../report-issue/SKILL.md) files every issue with an issue type and, where they
-apply, the reach label and `documentation`. **`gh issue create` fails outright on a label the repo
+[`report-issue`](../report-issue/SKILL.md) files every issue with an issue type, and with the reach
+label and `documentation` where they apply. **`gh issue create` fails outright on a label the repo
 does not have**, so check for both and create whichever is missing. **Read `Get-ReachLabel` from
 `scripts/repo-config.ps1` first** and check for *that* name -- `tier-1` where the repo has never
 answered it:
