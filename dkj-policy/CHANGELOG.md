@@ -43,7 +43,39 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**5 / 6 minor entries** <!-- pending-tally -->
+**6 / 7 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1830-git-identity-skip-vs-ok · 20260911-093136
+
+`git-identity-sessioncheck.ps1` (the SessionStart hook of the workflow plugin) now distinguishes a
+genuine `[OK]` from a `[SKIP]` instead of treating both as "clean" because both exit 0. Previously,
+on a machine with no git identity at all (or one `check-git-identity.ps1` could not compare for any
+of its three `[SKIP]` reasons), the hook still printed "the gh account and the git identity agree" --
+a claim that a comparison happened when none had. That is what it cost a session on the measured
+machine: the false "agree" line was read as "identity is fine", and the session's first commit then
+failed outright (`Please tell me who you are`). `[SKIP]` now stays silent at session start, matching
+the check script's own documented promise; `[OK]` keeps its one-line agreement sentence, and
+`[ERROR]` keeps its full report -- neither of those two paths changed.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+Every consumer repo running the workflow plugin gets the corrected hook on its next plugin release --
+one fewer false "identity is fine" signal on any machine with no git identity or a display-name
+`user.name`, which is the exact shape that produced a failed first commit here.
+
+**Score:** 2
+
+#### Pull Request
+
+git-identity-sessioncheck distinguishes [OK] from [SKIP] instead of branching on exit code
+
+Plugins: dkj-policy
+
+[PR #1835](https://github.com/DKJ-Solutions/dkj-claude-plugins/pull/1835)
+
+---
 
 ### DEPLOY: fix/1829-crlf-section-drift · 20260911-092050
 
