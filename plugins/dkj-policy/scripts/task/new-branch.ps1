@@ -375,13 +375,38 @@ if ($Name -eq $trunk) {
 # Get-TrunkGap gates it on a ref that only exists in a repo with a reachable remote in its history, so the
 # repos that cannot answer the question pay nothing.
 #
+# AND IT IS STILL PAID EVEN THOUGH claim-issue.ps1 JUST PAID IT (issue #1860), which is a decision rather
+# than an oversight. That script fetches the same remote for its parked-fix scan (#1853) and runs
+# immediately before this one by design -- the claim is the OPENING of the work, so new-branch follows in
+# the same turn with only the issue read between them. Skipping this fetch on that one would save ~700ms
+# and blind the two probes below it: the resume question reads refs/remotes/origin/$Name (#1139) and the
+# remote-ahead note reads how far it has moved (#1439), and both exist to see a push made SECONDS ago by
+# another session. This suite's own cases (v) and (y1) reproduce exactly that and refuse the trade.
+#
+# WHAT -RecentFailureSeconds DOES BUY is the half that costs nothing: where the fetch claim-issue just
+# made FAILED, this one reports that failure instead of waiting out a second full network bound. A failed
+# attempt refreshed no ref, so nothing above is blinded by standing on it -- and a session whose first two
+# steps each stall for two minutes has nothing on screen to say why.
+#
+# THE WINDOW IS THE LIB'S CONSTANT, NOT A NUMBER TYPED HERE. Two hand-typed copies of one policy is what
+# #1194 measured drifting inside a day, and the value is a claim about how long an outage may be assumed
+# to persist -- which belongs with the mechanism that acts on it.
+#
 # GIT'S FETCH OUTPUT IS CAPTURED AND DELIBERATELY NOT PRINTED. Get-TrunkGap keeps stderr rather than
 # discarding it -- issue #1313 measured that a failing fetch leaks no credential, and its callers need
 # git's own diagnosis -- and hands it back in .Output. This caller does not read it: nothing here shows
 # git's progress, and the warning below already says the fetch failed and that the real gap may be larger,
 # which is everything a reader can act on.
 $staleBaseNote = ''
-$gap = Get-TrunkGap -RepoRoot $repoRoot -Trunk $trunk -FetchAllRefs
+$gap = Get-TrunkGap -RepoRoot $repoRoot -Trunk $trunk -FetchAllRefs -RecentFailureSeconds $RemoteFetchRecentFailureSeconds
+# THE CARRIED REASON, PRINTED ONCE (issue #1860). .Fresh already decides which sentence the warnings
+# below use, and it cannot say WHY: "a fetch 12s ago failed and was not retried" is exactly the line a
+# reader needs to tell a stale reading from a broken credential, and it is the one thing a skip knows
+# that this run could not have found out for itself. Git's own lines stay in .Output, unprinted here as
+# they always were.
+if ("$($gap.FetchNote)") {
+    Write-Host "Base: $($gap.FetchNote) -- the refs compared here may be behind origin/$trunk." -ForegroundColor DarkGray
+}
 # .Measured IS THE GATE FROM HERE ON, where this block used to carry its own rev-parse exit code. It is
 # $false for a missing refs/remotes/origin/<trunk> -- the reachable case, and the one this line names --
 # and also for the exotic one where that ref exists and `rev-list HEAD..` still cannot answer, on an

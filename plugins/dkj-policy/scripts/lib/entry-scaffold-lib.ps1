@@ -65,6 +65,14 @@
 # without gaining a dependency.
 . (Join-Path $PSScriptRoot 'document-newline-lib.ps1')
 
+# THE FETCH-FRESHNESS SEAM (issue #1860): Invoke-RecordedRemoteFetch, which Get-TrunkGap's fetch now runs
+# through so that claim-issue.ps1 and this file do not each buy the same network call at the opening of
+# an assignment. Same unconditional, $PSScriptRoot-relative shape as the three leaves above and for the
+# same reason -- it has to resolve in the plugin mirror as well as here -- and it is likewise a leaf with
+# no dependencies of its own, Invoke-NativeCapture excepted, which Get-TrunkGap has always required of
+# its caller anyway.
+. (Join-Path $PSScriptRoot 'fetch-attempt-lib.ps1')
+
 # The English fallbacks, and the ONLY copy of them. new-branch.ps1 held these literals until
 # the gate needed the same list; it now reads them from here.
 #
@@ -5654,9 +5662,11 @@ function Get-TrunkGap {
         does not carry.
 
         FRESH SAYS WHICH REF THE COUNT CAME FROM, and it means "this call refreshed the ref" -- so it is
-        $false under -NoFetch too, where the caller has already fetched and knows it. "3 behind the
-        origin/main you last saw" is a different sentence from "3 behind origin/main", and a reader who
-        is offline has to be told which one they got.
+        $false under -NoFetch too, where the caller has already fetched and knows it, and $false on a
+        retry skipped under -RecentFailureSeconds, where nothing was refreshed because the attempt being
+        reported did not refresh anything either. "3 behind the origin/main you last saw" is a different
+        sentence from "3 behind origin/main", and a reader who is offline has to be told which one they
+        got.
 
         THE FETCH IS NARROWED TO THE TRUNK, AND -FetchAllRefs WIDENS IT FOR THE ONE CALLER THAT NEEDS
         THE REST (issue #1416). The fold wants the smallest network call that answers the question and
@@ -5667,6 +5677,24 @@ function Get-TrunkGap {
         exactly the bug #1139 closed, and it would come back silently. So the scope is the caller's to
         state rather than this function's to guess: narrowed by default, widened by the caller that
         knows it is reading more than the trunk off this fetch.
+
+        AND THE FETCH ITSELF IS Invoke-RecordedRemoteFetch's SINCE #1860, which records every attempt and
+        lets an opt-in caller report a recent FAILURE instead of waiting out a second one. Three things
+        follow that are worth stating here rather than only there:
+
+          - A SUCCESS NEVER EXCUSES A FETCH, however recent. The symmetric version of this seam was built
+            first and this repo's own suite refused it: new-branch.tests.ps1 reproduces two runs seconds
+            apart with another session's push between them -- cases (v) and (y1), #1139 and #1439 -- which
+            is exactly the interval a freshness window covers and exactly the event those probes exist to
+            see. The duplicated ~700ms #1860 reports is therefore still paid, deliberately.
+          - THE RECORD IS UNCONDITIONAL, THE SKIP IS NOT. Every call through this function records what
+            its fetch did, so a later opt-in caller can be let off; but only a caller passing
+            -RecentFailureSeconds may itself be let off. That is what keeps this away from the fold, whose
+            fetch backs a REFUSAL rather than an advisory warning -- a fold that refuses on a stale
+            trunk must have looked itself, not been told by a record.
+          - SCOPE IS PART OF THE RECORD, BECAUSE -FetchAllRefs IS. A narrow fetch can fail for a reason
+            that says nothing about a wide one ("couldn't find remote ref main" is about that ref), so a
+            narrow failure may never suppress a widened fetch.
     #>
     param(
         [Parameter(Mandatory)][string]$RepoRoot,
@@ -5680,7 +5708,12 @@ function Get-TrunkGap {
         [switch]$FetchAllRefs,
         # 0 leaves Invoke-NativeCapture on its own default; the fold passes the same network bound it
         # already puts on its push, so a hung fetch cannot turn a refusal into a stall.
-        [int]$TimeoutSeconds = 0
+        [int]$TimeoutSeconds = 0,
+        # How recently an equivalent fetch must have FAILED for this call to report that failure rather
+        # than wait out a second one (issue #1860). 0 -- the default -- never skips, which is every
+        # caller except new-branch.ps1: see the header for why the fold in particular must look for
+        # itself, and for why a recent SUCCESS never excuses a fetch under any value of this.
+        [int]$RecentFailureSeconds = 0
     )
 
     if (-not $Trunk) { $Trunk = Get-BranchTrunkName }
@@ -5692,6 +5725,15 @@ function Get-TrunkGap {
         Trunk    = $Trunk
         Ref      = $ref
         Output   = @()
+        # The reason a SKIPPED fetch gives for the refs possibly being behind (issue #1860) -- empty
+        # whenever this call made the fetch itself, and under -NoFetch.
+        #
+        # ONLY ON A SKIP, DELIBERATELY, because only a skip carries something a caller could not have
+        # found out: "an attempt 12s ago failed and was not retried" is a different sentence from "this
+        # fetch failed", and .Fresh alone collapses them. Where the call DID fetch, new-branch's own
+        # note says the fetch failed and that the real gap may be larger, and the fold prints git's
+        # lines from .Output -- so filling this in there would be a third copy of one fact.
+        FetchNote = ''
     }
 
     $has = Invoke-NativeCapture -FilePath 'git' -Arguments @('-C', $RepoRoot, 'rev-parse', '--verify', '--quiet', $ref) -DiscardStderr
@@ -5704,18 +5746,12 @@ function Get-TrunkGap {
         # the only diagnosis a reader gets. A caller of this function is about to refuse a fold, to
         # explain a rejected push or to warn about a stale base, so git's reason is precisely what the
         # operator needs -- whether it prints the lines or keeps them is then its own call.
-        $fetchArgs = if ($FetchAllRefs) {
-            @('-C', $RepoRoot, 'fetch', 'origin', '--quiet')
-        } else {
-            @('-C', $RepoRoot, 'fetch', 'origin', $Trunk, '--quiet')
-        }
-        $fetch = if ($TimeoutSeconds -gt 0) {
-            Invoke-NativeCapture -FilePath 'git' -Arguments $fetchArgs -TimeoutSeconds $TimeoutSeconds
-        } else {
-            Invoke-NativeCapture -FilePath 'git' -Arguments $fetchArgs
-        }
-        $result.Fresh = ($fetch.ExitCode -eq 0)
+        $refspec = if ($FetchAllRefs) { '' } else { $Trunk }
+        $fetch = Invoke-RecordedRemoteFetch -RepoRoot $RepoRoot -Remote 'origin' -Refspec $refspec `
+                                         -RecentFailureSeconds $RecentFailureSeconds -TimeoutSeconds $TimeoutSeconds
+        $result.Fresh = [bool]$fetch.Fresh
         $result.Output = @($fetch.Output | Where-Object { $_ -and "$_".Trim() })
+        if ($fetch.Skipped) { $result.FetchNote = "$($fetch.Note)" }
     }
 
     $count = Invoke-NativeCapture -FilePath 'git' -Arguments @('-C', $RepoRoot, 'rev-list', '--count', "HEAD..$ref") -DiscardStderr

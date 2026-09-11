@@ -480,19 +480,26 @@ Assert-True ($scan -match "\`$verdict\.Action\s+-eq\s+'skip'") 'and on a resume,
 Assert-True ($scan -notmatch '(?m)^\s*exit\s') 'nothing in the scan exits -- the claim stands whatever it finds'
 Assert-True ($scan -notmatch 'REFUSED') 'and it never speaks in the refusal vocabulary'
 
-# THE NETWORK CALL IS BOUNDED like every other one in this family (#1639): a stall here is a session
-# that never starts, which is precisely what the claim step exists to prevent.
-Assert-True ($scan -match "(?s)'fetch'.*?-TimeoutSeconds\s+\`$NativeCaptureNetworkTimeoutSeconds") 'the fetch is bounded'
+# THE FETCH GOES THROUGH THE SHARED SEAM (#1860), NOT THROUGH A CALL OF ITS OWN. new-branch.ps1 runs
+# immediately after this script by design -- the claim is the OPENING of the work (#1485) -- and it
+# fetches the same remote inside Get-TrunkGap, so before the seam a fresh assignment paid for two full
+# network calls seconds apart, and against an unreachable remote for two full network BOUNDS.
+#
+# WHAT MOVED IS THE CALL, NOT THE RULE. The two properties this block held before -- the bound, and
+# keeping git's stderr (#1313) -- still have to hold, and the assert follows them down one layer:
+# Invoke-RecordedRemoteFetch's own suite (scripts/tests/fetch-attempt.tests.ps1) holds the stderr half
+# where the git call now lives, and the bound stays HERE, because passing it is this script's decision
+# rather than the lib's default.
+Assert-True ($scan -match "(?s)Invoke-RecordedRemoteFetch.*?-TimeoutSeconds\s+\`$NativeCaptureNetworkTimeoutSeconds") 'the fetch is bounded'
 Assert-True ($scan -match '\$staleNote') 'a fetch that did not answer is reported rather than read as a clean scan'
 
-# AND THE FETCH KEEPS STDERR, which is this family's standing decision rather than this script's taste
-# (#1313): a git call to a remote writes everything to stderr, git redacts the credential out of it
-# itself, and nothing here parses the capture -- so discarding it would remove git's own reason from the
-# one failure path a reader cannot diagnose from an exit code. The two reads below it DO parse and keep
-# the flag, so the assert is on the fetch statement alone rather than on the block.
-$fetchCall = if ($scan -match "(?s)(\`$fetch\s*=\s*Invoke-NativeCapture.*?)\n\s*if\s*\(") { $Matches[1] } else { '' }
+# THE ARGUMENT-LESS FORM SURVIVED THE MOVE, and it is the half a shared seam could quietly take away:
+# #1853 chose git's DEFAULT remote over 'origin' by name, so a checkout whose default is something else
+# must match nothing rather than be assumed into another script's premise. -Remote is therefore absent
+# here on purpose, and the seam resolves the name for its record alone.
+$fetchCall = if ($scan -match "(?s)(\`$fetch\s*=\s*Invoke-RecordedRemoteFetch.*?)\n\s*\`$staleNote") { $Matches[1] } else { '' }
 Assert-True ($fetchCall -ne '') 'the fetch statement is findable'
-Assert-True ($fetchCall -notmatch '-DiscardStderr') "the fetch keeps git's own diagnosis (#1313), unlike the two reads that parse"
+Assert-True ($fetchCall -notmatch '-Remote') "the fetch still names no remote, so git's own default is what the scan reads (#1853)"
 Assert-True ($scan -match '\$staleDetail') 'and those lines are actually printed -- keeping stderr and never showing it is the same loss one step later'
 
 # BOTH UNTRUSTED FIELDS GO THROUGH THE ONE SANITISER. A commit subject and a ref name come from the

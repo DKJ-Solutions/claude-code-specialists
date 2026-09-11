@@ -208,6 +208,9 @@ Copy-Item -LiteralPath (Join-Path $RepoRoot 'scripts\lib\command-probe-lib.ps1')
 # document-newline-lib.ps1 likewise (#1832): entry-scaffold-lib.ps1 and pr-body-lib.ps1 dot-source it
 # for Get-DocumentNewline, unconditionally and for the same reason -- so the fixture owes it too.
 Copy-Item -LiteralPath (Join-Path $RepoRoot 'scripts\lib\document-newline-lib.ps1') -Destination (Join-Path $fixture 'scripts\lib\document-newline-lib.ps1') -Force
+# fetch-attempt-lib.ps1 likewise (#1860): entry-scaffold-lib.ps1 dot-sources it for
+# Invoke-RecordedRemoteFetch, which Get-TrunkGap's fetch runs through -- so the fixture owes it too.
+Copy-Item -LiteralPath (Join-Path $RepoRoot 'scripts\lib\fetch-attempt-lib.ps1') -Destination (Join-Path $fixture 'scripts\lib\fetch-attempt-lib.ps1') -Force
 Copy-Item -LiteralPath $ParkLibSrc -Destination (Join-Path $fixture 'scripts\lib\park-lib.ps1') -Force
 Copy-Item -LiteralPath $PorcelainSrc -Destination (Join-Path $fixture 'scripts\lib\git-porcelain-lib.ps1') -Force
 Copy-Item -LiteralPath $PrIssuesLibSrc -Destination (Join-Path $fixture 'scripts\lib\pr-issues-lib.ps1') -Force

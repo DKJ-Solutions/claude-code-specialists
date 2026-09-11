@@ -226,6 +226,9 @@ function New-Fixture {
     # document-newline-lib.ps1 likewise (#1832): entry-scaffold-lib.ps1 and pr-body-lib.ps1 dot-source it
     # for Get-DocumentNewline, unconditionally and for the same reason -- so the fixture owes it too.
     Copy-Item -LiteralPath (Join-Path $RepoRoot 'scripts\lib\document-newline-lib.ps1') -Destination (Join-Path $dir 'scripts\lib\document-newline-lib.ps1') -Force
+    # fetch-attempt-lib.ps1 likewise (#1860): entry-scaffold-lib.ps1 dot-sources it for
+    # Invoke-RecordedRemoteFetch, which Get-TrunkGap's fetch runs through -- so the fixture owes it too.
+    Copy-Item -LiteralPath (Join-Path $RepoRoot 'scripts\lib\fetch-attempt-lib.ps1') -Destination (Join-Path $dir 'scripts\lib\fetch-attempt-lib.ps1') -Force
     Copy-Item -LiteralPath $WorktreeLibSrc   -Destination (Join-Path $dir 'scripts\lib\worktree-lib.ps1')        -Force
     Copy-Item -LiteralPath $RefPrintLibSrc   -Destination (Join-Path $dir 'scripts\lib\ref-print-lib.ps1')       -Force
     Copy-Item -LiteralPath $MergedPrLibSrc   -Destination (Join-Path $dir 'scripts\lib\merged-pr-lib.ps1')       -Force

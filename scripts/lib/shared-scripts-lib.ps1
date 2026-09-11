@@ -613,6 +613,33 @@ function Get-SharedScriptPairs {
             LibOnly = $true
         },
         @{
+            # THE LAST FETCH ATTEMPT PER REMOTE (issue #1860, September 11, 2026) -- what was asked for
+            # and how it went. claim-issue.ps1 and new-branch.ps1 both fetch the same remote at the
+            # opening of an assignment, seconds apart by design, so against an UNREACHABLE remote a
+            # session that has nothing on screen yet used to wait out two full network bounds instead
+            # of one. A recorded failure is reported rather than repeated, which halves that.
+            #
+            # ONLY A FAILURE, AND THE SUITE IS WHY. The symmetric seam -- skip on a recent success too,
+            # which is what would have removed the duplicated ~700ms #1860 also reports -- was built
+            # first and refused by new-branch.tests.ps1 cases (v) and (y1): both reproduce two runs
+            # seconds apart with another session's push between them, which is the interval such a
+            # window covers and the event #1139 and #1439 exist to see. A failed attempt refreshed
+            # nothing, so reporting it costs nothing; a successful one is exactly what those probes read.
+            #
+            # ITS OWN FILE RATHER THAN gate-lib.ps1, whose arrangement it otherwise copies. That one
+            # records per-worktree because a gate judges a working tree; this one records in the git
+            # COMMON directory because whether a REMOTE answered is a property of the clone. Merging
+            # them would mean one file with two scopes, which is the bug rather than the saving. NO
+            # CONTRACT ROW FOLLOWS, for gate-lib's own reason: nothing in it is repo-owned.
+            #
+            # Mirrored because both callers are -- and because entry-scaffold-lib.ps1 dot-sources it as
+            # a $PSScriptRoot sibling, so a consumer running the mirror would otherwise lose Get-TrunkGap.
+            Name    = 'fetch-attempt-lib'
+            Source  = 'scripts\lib\fetch-attempt-lib.ps1'
+            Plugin = 'dkj-policy'
+            LibOnly = $true
+        },
+        @{
             # The remote-ahead note composer (issue #1450), extracted out of new-branch.ps1 the day
             # open-pr.ps1 became a second reader of the same question. Mirrored because both callers
             # are: a consumer running the mirror would otherwise dot-source a file it does not have.
