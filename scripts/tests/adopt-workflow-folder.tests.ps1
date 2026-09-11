@@ -15,6 +15,13 @@
 
     The repo root is pinned per child run via CLAUDE_PROJECT_DIR, the same dual-context branch every
     mirrored script resolves first, so the fixtures need no git of their own.
+
+    EVERY FIXTURE BELOW WROTE LF UNTIL INBOUND #1829, and that is how a Windows-only defect lived in
+    the one block this suite pins hardest. The page the top-up compares against is read byte-exact,
+    so on a CRLF checkout -- core.autocrlf=true, which is the default a Windows consumer clones with
+    -- every line of the composed block differed from the identical committed line and the verdict
+    read 'drifted' forever. Section 13 is the fixture that has the ending the reporter's checkout
+    had; it is not a second reading of section 12.
 #>
 $ErrorActionPreference = 'Stop'
 
@@ -492,6 +499,57 @@ Assert-Match 'releases/history\.md' $relText '-Apply: it names where the list ac
     Assert-Match 'delete the' $r14.Flat 'fence legacy: and the one thing the reader can do about it'
     Assert-Equal $legacy ([System.IO.File]::ReadAllText((Join-Path $c14 'dkj-policy\README.md'), [System.Text.Encoding]::UTF8)) `
         'fence legacy: the page is untouched, including the section written after the marker'
+
+    # --- 13. A CRLF PAGE: the verdict is about the block, not about the line endings (inbound #1829) --
+    # THE STATE EVERY WINDOWS CONSUMER IS IN. core.autocrlf=true is what a Windows clone defaults to,
+    # so the committed LF page arrives on disk CRLF -- and the compare that decides this block's whole
+    # verdict reads the file byte-exact. Measured in a consumer: 'drifted' on every fresh checkout,
+    # -Apply reporting a top-up, and `git diff` empty afterwards. Both halves are pinned here, because
+    # each fails on its own: the VERDICT must read 'current', and a page that genuinely IS stale must
+    # still be replaced -- a compare repaired by normalising both sides would pass the first assert
+    # and then write LF into the page anyway, which is the mixed file the defect already produced.
+    Write-Host "adopt-workflow-folder -- a CRLF page is judged on its block, and rewritten in its own endings" -ForegroundColor Cyan
+    $c15 = New-FixtureConsumer -Label 'crlf-page'
+    $r15 = Invoke-Adopt -Dir $c15 -ScriptArgs @('-Apply')
+    Assert-Equal 0 $r15.Code 'crlf: scaffold exit 0'
+    $p15 = Join-Path $c15 'dkj-policy\README.md'
+
+    # Convert the freshly scaffolded page to CRLF, exactly as autocrlf=true checks it out. Nothing else
+    # about it changes -- this is the same bytes the previous section asserted 'nothing to do' on.
+    $lf15 = [System.IO.File]::ReadAllText($p15, [System.Text.Encoding]::UTF8)
+    $crlf15 = (($lf15 -replace "`r`n", "`n") -replace "`n", "`r`n")
+    [System.IO.File]::WriteAllText($p15, $crlf15, (New-Object System.Text.UTF8Encoding($false)))
+    Assert-True ($crlf15 -ne $lf15) 'crlf: the fixture really is a different byte sequence than the LF page'
+
+    $r15b = Invoke-Adopt -Dir $c15
+    Assert-Match 'already carries the current block' $r15b.Flat 'crlf: the current block reads as current, not as drift'
+    Assert-True ($r15b.Flat -notmatch 'would be replaced') 'crlf: and nothing is proposed'
+    $r15c = Invoke-Adopt -Dir $c15 -ScriptArgs @('-Apply')
+    Assert-Equal $crlf15 ([System.IO.File]::ReadAllText($p15, [System.Text.Encoding]::UTF8)) `
+        'crlf: -Apply over a current CRLF page leaves it byte for byte'
+
+    # THE OTHER HALF: a CRLF page whose block IS stale is still replaced, and the page it gets back is
+    # CRLF throughout. A bare LF anywhere in it is the mixed state the defect produced -- git normalises
+    # it away under autocrlf and reports nothing, so this assert is the only reader that would see it.
+    $s15 = $crlf15.IndexOf($Marker)
+    $e15 = $crlf15.IndexOf($EndMarker) + $EndMarker.Length
+    $stale15 = $crlf15.Substring(0, $s15) + $Marker + "`r`n## Updating the plugins`r`n`r`nstale: development.md`r`n" +
+               $EndMarker + "`r`n`r`n## Ours`r`n`r`nbelow the block, in CRLF.`r`n"
+    [System.IO.File]::WriteAllText($p15, $stale15, (New-Object System.Text.UTF8Encoding($false)))
+    $r15d = Invoke-Adopt -Dir $c15
+    Assert-Match 'would be replaced' $r15d.Flat 'crlf stale: a genuinely stale CRLF block is still reported'
+    $r15e = Invoke-Adopt -Dir $c15 -ScriptArgs @('-Apply')
+    Assert-Match 'brought up to date' $r15e.Flat 'crlf stale: and replaced'
+    $after15 = [System.IO.File]::ReadAllText($p15, [System.Text.Encoding]::UTF8)
+    Assert-True ($after15 -notmatch 'development\.md') 'crlf stale: the stale content is gone'
+    Assert-Equal 0 ([regex]::Matches($after15, "(?<!`r)`n").Count) 'crlf stale: the rewritten page carries no bare LF -- no mixed endings'
+    Assert-True $after15.EndsWith("## Ours`r`n`r`nbelow the block, in CRLF.`r`n") 'crlf stale: and the repo''s own writing below the block survives'
+
+    # AND THE LF PAGE IS UNCHANGED BY THE REPAIR, which is the assert that keeps this from being a
+    # one-platform fix: the style is read off the page, so a page with no CR in it still gets pure LF.
+    $r15f = Invoke-Adopt -Dir $c11 -ScriptArgs @('-Apply')
+    Assert-Match 'already carries the current block' $r15f.Flat 'crlf: an LF page is still judged current'
+    Assert-Equal 0 ([regex]::Matches($readme11, "`r").Count) 'crlf: and the LF page this suite scaffolded has no CR at all'
 } finally {
     if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture -ErrorAction SilentlyContinue }
 }

@@ -36,21 +36,74 @@
 
 ### PLAN
 
-Confirmed: adopt-workflow-folder composes the fresh block with LF while reading the page byte-exact, so a CRLF page always reads as drifted and -Apply leaves it mixed. Next: compose and write with the page's own newline style, in state 2 and state 4.
+Inbound #1829, verified in the tree before anything was changed. The report's reason was explicitly
+filed as a hypothesis ("I did not read the comparison to confirm which side is normalized"), so it was
+the first thing read.
+
+#### What the report got right, and the one thing it did not know
+
+`$nl = "``n"` at `scripts/task/adopt-workflow-folder.ps1:131` composes every generated document, which is
+correct for a file this run **creates** and wrong for the one file it **compares against**: state 2 reads
+the existing page with `ReadAllText` (byte-exact) and tests `$rebuilt -eq $existingReadme`. On a page
+checked out CRLF every line of the composed block therefore differs from the identical committed line.
+Reproduced on a fixture: the same page reads `already carries the current block` as LF and
+`the plugin's block has drifted` as CRLF, with nothing else changed.
+
+The half the report could not see from outside: `-Apply` does not rewrite the page to LF either. Head and
+tail are `Substring`s of the original, so they keep their CRLF, and only the fresh block is written LF --
+**19 CRLF above and below an all-LF block**. `core.autocrlf=true` normalises that away, which is why the
+reporter's `git diff` came up empty and why the second dry run then agreed the block was current: the
+defect was masking its own symptom. Without `autocrlf` the same write is a whole-file whitespace diff.
+
+#### Scope checked, so the repair is not narrower than the class
+
+- **State 4 (the append) has the same write half.** No verdict to get wrong, but it puts an LF block into
+  a CRLF page the command has never touched -- a consumer's *first* adoption. Repaired in the same move.
+- **The sibling adopt scripts do not carry it.** `adopt-config` and `adopt-shopify-floor` only append;
+  `adopt-merge-queue` reads with `\r?\n` throughout and writes create-when-absent. Nothing to file.
 
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [x] Read the comparison in `adopt-workflow-folder.ps1` and reproduce both halves on a fixture, before
+      touching anything -- the report's mechanism was inferred, not measured
+- [x] State 2: read the page's own newline style off `$existingReadme` and compose the block with it, so
+      the compare stops seeing a difference that is not there and the write stops introducing one
+- [x] State 4: the same reading for the append, for the write half
+- [x] Check the sibling adopt scripts for the same compare -- none has one
+- [x] Mirror to `plugins/dkj-policy/scripts/task/` via `build-shared-scripts.ps1`
 
 ### TEST
 
+- [x] `adopt-workflow-folder.tests.ps1` section 13: a CRLF page reads as current, `-Apply` over it is
+      byte-for-byte, a genuinely stale CRLF block is still replaced, and the rewritten page carries **no
+      bare LF** -- the assert that separates this repair from one that normalises both sides of the
+      compare and then writes LF anyway
+- [x] The LF page is asserted unchanged, so the style is read off the page rather than swapped per platform
+- [x] Confirmed the section goes red without the repair: 4 failed, 108 passed
+- [x] Full suite green with it: 112 asserts
+
 ### DEPLOY: fix/1829-crlf-section-drift
 
-**Score:**
+`adopt-dkj-policy` Part 1's README top-up now judges the block it owns, not the line endings of the page
+around it. It reads the page's own newline style and composes the block with it, so a page checked out
+CRLF -- which is what `core.autocrlf=true` gives every Windows clone -- no longer reports
+`the plugin's block has drifted` on every fresh checkout, and `-Apply` no longer leaves the page with LF
+between CRLF. A genuinely stale block is still replaced, and an LF page is still written pure LF.
+
+**Score:** 2
+
+This repo refuses that scaffold outright -- it publishes the workflow -- so nothing here changes but the
+suite. What it gains is the regression test: every fixture in it wrote LF until now, which is how a
+Windows-only defect survived in the one block the suite pins hardest.
 
 #### What makes this deploy extra special
 
-**Score:**
+Consumers on Windows get a verdict that carries information again. The failure was quiet and permanent
+rather than one-off: the command said "drifted" every time, so a block that really was stale read exactly
+like one that was current, and the only way to tell them apart was to run `-Apply` and check `git diff`
+afterwards. That is the feature v5.0.0 announces as "can be kept current with one command".
+
+**Score:** 3
 
 #### Pull Request
 

@@ -694,10 +694,29 @@ if (-not (Test-Path -LiteralPath $folderReadmeAbs -PathType Leaf)) {
     } else {
         $head = $existingReadme.Substring(0, $startIdx)
         $tail = $existingReadme.Substring($endIdx + $updateSectionEndMarker.Length)
+        # THE PAGE'S OWN LINE ENDINGS, not this script's $nl (inbound #1829). Everything else here is
+        # composed with $nl -- pure LF -- which is right for a file this run CREATES, and wrong for the
+        # one file it compares against: $existingReadme is read byte-exact, so on a page checked out CRLF
+        # every single line of the composed block differs from the identical committed line, the compare
+        # below always fails, and the verdict reads 'drifted' on every fresh checkout. That is the whole
+        # value of the verdict gone -- a genuinely stale block reads the same as a current one, which is
+        # #788's 'cries wolf 37 times out of 37' one reader over.
+        #
+        # AND -Apply MADE IT WORSE RATHER THAN REPAIRING IT. The rewrite kept head and tail untouched
+        # (they are substrings) and wrote the fresh block LF, leaving a MIXED file: measured on a fixture
+        # page, 19 CRLF above and below an all-LF block. Under core.autocrlf=true git normalises that
+        # back to the committed content, so `git diff` came up empty and the second dry run then said
+        # 'already carries the current block' -- the defect repairing its own symptom while leaving the
+        # page in a state nobody wrote. Without autocrlf it is a whole-file whitespace diff instead.
+        #
+        # SO THE STYLE IS READ OFF THE PAGE, the same idiom release-lib.ps1 and pr-body-lib.ps1 already
+        # use on the documents they edit in place. Both halves follow from one reading: the compare stops
+        # seeing a difference that is not there, and the write stops introducing one.
+        $pageNl = if ($existingReadme.Contains("`r`n")) { "`r`n" } else { $nl }
         # The block is composed with its own leading blank line, so the head is trimmed of trailing
         # newlines to keep a re-run from growing the gap above it by one line every time.
-        $fresh = (($folderReadmeUpdate -join $nl).TrimStart("`r", "`n"))
-        $rebuilt = $head.TrimEnd("`r", "`n") + $nl + $nl + $fresh + $tail
+        $fresh = (($folderReadmeUpdate -join $pageNl).TrimStart("`r", "`n"))
+        $rebuilt = $head.TrimEnd("`r", "`n") + $pageNl + $pageNl + $fresh + $tail
         if ($rebuilt -eq $existingReadme) {
             Write-Host "  [section] $folderReadmeRel already carries the current block -- nothing to do" -ForegroundColor DarkGray
         } elseif ($Apply) {
@@ -715,8 +734,14 @@ if (-not (Test-Path -LiteralPath $folderReadmeAbs -PathType Leaf)) {
     Write-Host "            to take the current block, delete the '$updateSectionMarker' line and its section, then re-run." -ForegroundColor DarkGray
 } elseif ($Apply) {
     $existingReadme = [System.IO.File]::ReadAllText($folderReadmeAbs)
-    $readmeAppendix = (($folderReadmeUpdate -join $nl) + $nl)
-    if ($existingReadme.Length -gt 0 -and -not $existingReadme.EndsWith("`n")) { $readmeAppendix = $nl + $readmeAppendix }
+    # STATE 4 TAKES THE SAME READING, for the write half of #1829 rather than the compare half. There is
+    # nothing to compare here -- an append has no verdict to get wrong -- but appending an LF block to a
+    # CRLF page leaves exactly the mixed file state 2 was leaving, in the one branch that puts the block
+    # into a page this command has never touched before. A consumer's FIRST adoption is the worst moment
+    # to do that, so it reads the style off the page for the same one-line cost.
+    $pageNl = if ($existingReadme.Contains("`r`n")) { "`r`n" } else { $nl }
+    $readmeAppendix = (($folderReadmeUpdate -join $pageNl) + $pageNl)
+    if ($existingReadme.Length -gt 0 -and -not $existingReadme.EndsWith("`n")) { $readmeAppendix = $pageNl + $readmeAppendix }
     [System.IO.File]::AppendAllText($folderReadmeAbs, $readmeAppendix, $Utf8NoBom)
     $toppedUp++
     Write-Host "  [topped]  $folderReadmeRel -- the plugin's block was appended" -ForegroundColor Green
