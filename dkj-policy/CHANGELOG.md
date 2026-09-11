@@ -43,7 +43,46 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**6 / 7 minor entries** <!-- pending-tally -->
+**6 / 8 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1833-suite-durations-refresh · 20260911-093745
+
+`scripts/tests/suite-durations.json` is re-recorded from two CI runs that carry the suite set as it now
+stands, and the refresh turned out to be larger than the row #1833 was filed about. That row --
+`adopt-workflow-folder.tests.ps1`, understated after `fix/1829-crlf-section-drift` took it from 20 to 25
+scaffold spawns -- moves from 32.6s to 40.6s. The bigger find is the count: the file held **84** rows
+against **91** suites on disk, so seven suites had no row at all and `Invoke-TestSuiteGate` was charging
+each of them the largest recorded value when it packed the four shards. That is the safe direction by
+design -- a new suite starts early and can never be the one left last -- but seven suites priced at 290.2s
+apiece is a packing the measured pool does not support.
+
+`record-suite-durations.ps1` also now names the one run a caller reaches for first and cannot use. A ship
+pushes to the trunk twice and both pushes get a CI run; the **fold** commit's is the newer of the two, so
+it sits at the top of `gh run list`, and #1300 skips the suites step on it outright. Its four suite jobs
+check out, stop, and complete green, so nothing about the run says it measured nothing -- the script's
+`printed no per-suite duration table` throw asked "is it a CI run that ran the suites job?" and the honest
+answer was yes. It now says which commit kind to avoid and which to take instead.
+
+What is deliberately **not** here is #1833's second half. The issue asks whether something should *report*
+this staleness -- option 2, a detector comparing `recordedFrom` against the current suite set -- and calls
+it a decision rather than a repair. It stays on the issue.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A -- neither changed file is plugin payload. `suite-durations.json` and `record-suite-durations.ps1`
+both live under this repo's own `scripts/`, are mirrored into no plugin, and so reach no consumer.
+
+**Score:** N/A
+
+#### Pull Request
+
+Re-record suite-durations.json from CI runs that carry the new CRLF fixture
+
+[PR #1837](https://github.com/DKJ-Solutions/dkj-claude-plugins/pull/1837)
+
+---
 
 ### DEPLOY: fix/1830-git-identity-skip-vs-ok · 20260911-093136
 
