@@ -43,7 +43,44 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**12 / 29 minor entries** <!-- pending-tally -->
+**12 / 30 minor entries** <!-- pending-tally -->
+
+### DEPLOY: docs/1875-tracker-language-convention · 20260911-195522
+
+A GitHub issue a session files is now stated to be English -- title as much as body -- in the four
+portable places a filing session reads: the technical writer's manual, which is the canonical home of
+the language convention and until now named only files in the tree; `dkj-policy`'s step 1, which states
+the filing bar for every consumer whether or not the specialists plugin is installed; and
+`dkj-policy-bwj`'s workflow page plus its `report-issue` steps, where the GitHub issue and the Asana
+card sit side by side. The carve-out is a person's own words: a ticket a colleague wrote, and the
+message going back to them, stay in their language and are quoted rather than translated -- so one
+finding legitimately reads English on GitHub and the colleague's language on the board, which is the
+translation step 2 is named for rather than drift. The session-reply language is untouched.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A -- a writing convention for the two plugins' own tracker artefacts. No subscriber of any service
+reaches it; the readers are the sessions filing issues in the consuming repos and the colleagues who
+later search that tracker.
+
+Worth recording for the next reader: the rule that failed here was not being broken. It was written for
+a scope -- files in the tree -- that a tracker is not in, so every session following it exactly still
+produced the state Dave reported. A convention stated by enumerating layers goes stale the moment the
+system writes somewhere the enumeration never named.
+
+**Score:** N/A
+
+#### Pull Request
+
+State the tracker language convention: an issue a session files is English
+
+Plugins: dkj-policy, dkj-policy-bwj, dkj-subagents-alpha
+
+[PR #1880](https://github.com/DKJ-Solutions/dkj-claude-plugins/pull/1880)
+
+---
 
 ### DEPLOY: fix/1878-parked-fix-attribution · 20260911-193600
 
