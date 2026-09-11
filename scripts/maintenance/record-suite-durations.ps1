@@ -41,6 +41,12 @@
     which rules out the run on a `fold:` push to the trunk, the newest of the two runs every ship leaves
     behind and therefore the one nearest to hand. See the throw that names it.
 
+    SEVERAL IDS UNDER `-File`: pass them as ONE comma-separated string, e.g.
+    `-RunId 34583187104,34583740147`. Both `$RunId` and `$RepoRoot` are positional, so under
+    `powershell -NoProfile -File` -- the form every doc in this repo uses -- a space-separated list binds
+    only the first id to `-RunId` and the second to `-RepoRoot`, which then fails as a missing path. The
+    comma form reaches this script as one string and is split on `[,\s]+` below.
+
 .PARAMETER RepoRoot
     The repo to write into. Defaults to the git root of the working directory.
 
@@ -55,6 +61,16 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+
+# A run id passed as a second space-separated -RunId argument binds here instead (both parameters are
+# positional under `-File`) and would otherwise fail several lines down as a missing path, with no
+# mention of -RunId anywhere in the message. Caught at the point of the mistake, with the caller's own
+# value in the text -- see the .PARAMETER RunId note above.
+if ($RepoRoot -match '^\d{6,}$') {
+    throw "-RepoRoot '$RepoRoot' looks like a GitHub Actions run id, not a path. Pass several run ids " +
+        "to -RunId as one comma-separated string, e.g. -RunId '$($RunId[0]),$RepoRoot', not as " +
+        'separate space-separated arguments.'
+}
 
 # Invoke-NativeCapture rather than a bare `gh ... 2>&1`: under 'Stop' a native command's redirected
 # stderr arrives as an ErrorRecord and kills the script on a line gh writes progress to. The lib runs
