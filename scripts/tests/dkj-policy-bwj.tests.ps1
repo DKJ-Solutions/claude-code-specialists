@@ -617,6 +617,41 @@ $adoptTxt = Get-Content -LiteralPath (Join-Path $PluginRoot 'skills\adopt-dkj-po
 Assert-True ([regex]::IsMatch($adoptTxt, 'function\s+Get-ReachLabel\s*\{\s*(?:return\s+)?(["''])tier-1\1\s*;?\s*\}')) `
     'the proposed seam defaults to tier-1, so an unanswered repo is unchanged'
 
+# --- every label step 4 checks for is also created (issue #1846) ----------------------------------
+Write-Host "`n-- step 4's label-existence check --" -ForegroundColor Cyan
+
+# The check greps the repo's label list for the names report-issue files with, and a name it reports
+# missing is only useful if the step then says how to create it. It named two and created one until
+# September 11, 2026: 'documentation' was checked for and never created, so a repo without it got a
+# hit in the check and no instruction -- and report-issue's `--label documentation` then fails at the
+# gh issue create exactly as the reach label does. Both BWJ stores carry the label (it is one of
+# GitHub's defaults), which is what kept the gap invisible rather than what made it safe.
+#
+# THE ASSERT IS THE INVARIANT, NOT THE ONE NAME. A third name added to the grep without its own
+# create line reopens precisely this gap, and an assert pinned to 'documentation' would pass over it.
+# The seam's '<reach label>' placeholder is skipped, and that skip is load-bearing rather than tidy:
+# the line reads `gh label create "<reach label>"`, where \b cannot fire between '>' and '"' -- both
+# non-word -- so without it the placeholder would fail an assert the reach-label block above already
+# owns.
+#
+# EXACTLY ONE check line, not the first of several. Regex.Match returns the leftmost hit, so binding
+# to a stale or unrelated `gh label list ... grep -E '^(...)` further up would swap the subject of
+# every assert below without failing one. The file already mentions `gh label list` in prose, so the
+# count is asserted rather than the existence.
+$grepMatches = [regex]::Matches($adoptTxt, "gh label list[^\r\n]*grep\s+-E\s+'\^\(([^)]*)\)")
+Assert-Equal 1 $grepMatches.Count 'adopt-dkj-policy-bwj step 4 carries exactly one label-existence check'
+if ($grepMatches.Count -eq 1) {
+    foreach ($labelName in ($grepMatches[0].Groups[1].Value -split '\|')) {
+        if ($labelName -match '^<.*>$') { continue }
+        # The tail is anchored on what may legally follow a label name -- whitespace, a closing quote
+        # or end of line -- and NOT on \b, which also fires on a hyphen: a step that gained a
+        # 'documentation-only' label would then satisfy the assert for 'documentation'.
+        $createPattern = 'gh\s+label\s+create\s+(["''])?' + [regex]::Escape($labelName) + '(?=\s|["'']|$)'
+        Assert-True ([regex]::IsMatch($adoptTxt, $createPattern)) `
+            "step 4 creates the '$labelName' label its own check greps for"
+    }
+}
+
 # --- done ---------------------------------------------------------------------------------------
 Write-Host ""
 if ($script:fail -gt 0) {
