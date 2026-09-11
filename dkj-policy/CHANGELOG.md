@@ -43,7 +43,44 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**8 / 15 minor entries** <!-- pending-tally -->
+**8 / 16 minor entries** <!-- pending-tally -->
+
+### DEPLOY: docs/1846-adopt-step4-documentation-label · 20260911-125339
+
+`adopt-dkj-policy-bwj` step 4 now creates every label its own existence check greps for.
+`documentation` was checked for and never created, so a repo without it got a hit in the check and no
+instruction -- while `report-issue` files `--label documentation` on a doc finding and `gh issue
+create` fails outright on a label the repo does not have, exactly as it does for the reach label. The
+step gains the create line, a paragraph recording why the gap never bit (`documentation` is a GitHub
+default and both BWJ stores carry it) and why the label is load-bearing rather than decorative, and a
+second stating that it deliberately gets no seam: nobody has renamed it, so what was missing is a
+command and not a seam. A guard in `dkj-policy-bwj.tests.ps1` asserts the invariant rather than the
+one name -- every literal label in the grep has a create line -- so a third name added to the check
+without one is refused.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+The report behind it, [#1846](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1846), was
+right about the symptom and wrong about everything else, and its headline repair would have damaged
+the consumer it was filed from: `smartwatchbanden` did not lack `tier-1`, it **renamed** it to `minor`
+with all 24 issues intact, so creating it back is the empty-duplicate state
+[#1845](https://github.com/DKJ-Solutions/dkj-claude-plugins/pull/1845) had forbidden by name hours
+earlier. Verifying the reason rather than the symptom is what turned a harmful one-line fix into the
+one narrow thing that actually stood.
+
+**Score:** N/A
+
+#### Pull Request
+
+adopt-dkj-policy-bwj step 4 creates every label it checks for
+
+Plugins: dkj-policy-bwj
+
+[PR #1855](https://github.com/DKJ-Solutions/dkj-claude-plugins/pull/1855)
+
+---
 
 ### DEPLOY: docs/1851-two-propagation-channels · 20260911-123849
 
