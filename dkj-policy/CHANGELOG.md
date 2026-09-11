@@ -43,7 +43,42 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**9 / 25 minor entries** <!-- pending-tally -->
+**9 / 26 minor entries** <!-- pending-tally -->
+
+### DEPLOY: feat/1869-consumer-divergence-check · 20260911-190506
+
+The connector register can now answer the question it was asked for. `check-consumer-siblings.ps1`
+compares the tooling layers of consumers that declare a shared `siblingGroup` and reports three classes:
+`ONLY-IN` (a mechanism one has and the other does not), `DRIFTED` (two copies of one mechanism that have
+grown apart) and `ALIASED` (one capability under two filenames -- the class no path comparison can make).
+
+Every other check here runs source-to-consumer. This is the first that runs consumer-to-consumer, and
+#1869 measured what that axis was hiding: of the 48 tooling paths the two BWJ stores share, 47 have
+diverged, and the only one that has not is a template this marketplace ships. `prune-merged.ps1` is the
+argument in one file -- shipped centrally in `dkj-policy` 4.21.0, adopted by one store and not the other
+three weeks later, with nothing watching the gap.
+
+It reports and refuses nothing. Converging is an ownership decision, not a repair a script can make.
+
+**Score:** 4
+
+#### What makes this deploy extra special
+
+N/A -- nothing here reaches a subscriber of a service. The register, the check and the group label are
+internal maintenance machinery of this marketplace, and the two consumers it compares are private repos
+whose own tooling is unchanged by this branch.
+
+**Score:** N/A
+
+#### Pull Request
+
+Report mechanisms a sibling consumer has and this one does not
+
+Plugins: dkj-policy, dkj-subagents-alpha
+
+[PR #1879](https://github.com/DKJ-Solutions/dkj-claude-plugins/pull/1879)
+
+---
 
 ### DEPLOY: docs/1874-preview-control-variant · 20260911-185450
 
