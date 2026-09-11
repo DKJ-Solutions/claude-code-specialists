@@ -43,7 +43,42 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**9 / 23 minor entries** <!-- pending-tally -->
+**9 / 24 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1867-git-author-identity-probe · 20260911-181859
+
+A machine with no usable git author identity is now reported at session start and refused by
+`new-branch` before a branch is cut, instead of failing at exit 128 once HEAD has already moved.
+`git var GIT_AUTHOR_IDENT` replaces `user.name` as the reading, because `user.name` disagrees with
+git in both directions: set-but-no-email still refuses, and unset-but-auto-guessable commits fine.
+The three silent `[SKIP]`s keep their silence; only the one that was never "nothing to compare" is
+split out of them.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A -- developer tooling in a workflow plugin. It reports a git configuration state to whoever is
+running the cycle; no subscriber of any service reaches it.
+
+Worth recording for the next reader of this tree, though: it repairs a gap a previous fix
+deliberately left. [#1830](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1830) removed a
+false claim of agreement by routing every `[SKIP]` to silence -- correct for two of the three, and for
+the third it replaced a wrong statement with no statement, on the one machine state where silence
+costs a branch. The lesson is in the split rather than in a revert: three conditions sharing an exit
+code are not thereby the same finding.
+
+**Score:** N/A
+
+#### Pull Request
+
+Report a checkout that cannot commit at all, before a branch is cut
+
+Plugins: dkj-policy
+
+[PR #1871](https://github.com/DKJ-Solutions/dkj-claude-plugins/pull/1871)
+
+---
 
 ### DEPLOY: fix/1865-fixture-dep-scan-set · 20260911-165129
 
