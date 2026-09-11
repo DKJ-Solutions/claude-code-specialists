@@ -2891,11 +2891,23 @@ ascending **two** levels lands on a different folder in each.
 
 **One hop cannot, and that bound is what makes a gate worth having here.** `..\lib\...` reaches
 `<x>\scripts\` — the same folder relative to the file in both copies — so the overwhelming majority of
-resolutions in the tree are depth-invariant by construction. Measured when check 39 was written: **2 of
-34** entry points cross the boundary (`adopt-config`'s `..\..\blueprint\config-blueprint.json` and
-`check-policy-drift`'s `Split-Path (Split-Path $PSScriptRoot -Parent) -Parent`), and **both were already
-correct**. A rule that flagged one hop would have buried those two under thirty-two that cannot differ,
+resolutions in the tree are depth-invariant by construction. Measured when check 39 was written: **3 of
+34** entry points cross the boundary — `adopt-config`'s `..\..\blueprint\config-blueprint.json`,
+`check-policy-drift`'s `Split-Path (Split-Path $PSScriptRoot -Parent) -Parent`, and
+`adopt-workflow-folder`'s `..\..\templates\pull_request_template.md` — and **all three were already
+correct**. A rule that flagged one hop would have buried those under the thirty-odd that cannot differ,
 which is the shape this section already records being declined at 124 findings.
+
+**The third one is the best argument for the check there is, and it is worth keeping for how it
+arrived.** The branch measured **two**; `adopt-workflow-folder`'s PR-template reference merged to `main`
+while the gate was being built, and check 39 caught it on its **first CI run** — because CI tests the
+branch merged with the trunk and the branch's own working copy cannot see what landed beside it. It is
+also the exact resolution #1857 was filed about, so the issue's subject was reachable by the gate and
+not by the session that wrote it. Two things follow. A count taken from a branch base is a **snapshot**,
+and this one went stale inside a day, which is why the live figures belong in the coverage line and the
+number in prose is dated. And a gate whose subject is *"what nobody has thought about yet"* is measured
+correctly only against the trunk — the local run said the tree was clean, and it was right about the
+tree it could see.
 
 **What was actually wrong was the proof, not the code.** Both crossings had been verified by hand, and
 hand verification is what this repo keeps replacing with gates. Worse, the copy that fires in **every

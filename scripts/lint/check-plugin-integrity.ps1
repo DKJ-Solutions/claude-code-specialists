@@ -314,10 +314,10 @@
          MirrorRun (the suite that executes its mirror) or MirrorRunExempt (why none does), and a
          declared suite must exist and name the mirror, so the declaration cannot be fiction. One hop
          is deliberately not asked about: '..\lib\...' is the same folder relative to the file in both
-         copies, and flagging it would bury the two crossings in thirty-two that cannot differ
-         (measured #1857: 2 of 34 entry points, both already correct, and the single suite that ran a
-         mirror at all covered neither). Whether the run ASSERTS anything is the suite's job, the same
-         line check 18 draws between this gate and a skill page.
+         copies, and flagging it would bury the crossings under the thirty-odd that cannot differ
+         (measured #1857: 3 of 34 entry points, all three already correct, and the single suite that
+         ran a mirror at all covered none of them). Whether the run ASSERTS anything is the suite's
+         job, the same line check 18 draws between this gate and a skill page.
     <!-- /checks:list -->
 
     Exit code: 0 = no errors. 1 = at least one error (usable as a gate in open-pr.ps1).
@@ -4642,7 +4642,13 @@ Write-Coverage -Category 'agents-key' -Checked $akPlugins `
 # ONE HOP IS NOT ASKED ABOUT, deliberately. '..\lib\...' reaches <x>\scripts\ in both copies, which is
 # the same folder relative to the file either way -- so the overwhelming majority of resolutions in
 # the tree are depth-invariant by construction and a check that flagged them would be noise. Measured
-# when this was written: 2 of 34 entry points cross the boundary, and both were already correct.
+# when this was written: 3 of 34 entry points cross the boundary, and all three were already correct.
+#
+# THE THIRD ONE ARRIVED WHILE THIS CHECK WAS BEING BUILT, which is the best argument for it there is.
+# The branch measured two; adopt-workflow-folder's PR-template reference merged to main in between and
+# this gate caught it on its first CI run, because CI tests the merge and the branch's own working copy
+# could not see it. A count taken from a branch base is a snapshot, and this one went stale inside a
+# day -- so the live figures are in the coverage line below and this number is dated on purpose.
 $msPairs = @($sharedPairs)
 $msChecked = 0
 $msCrossing = 0
@@ -4700,7 +4706,7 @@ Write-Coverage -Category 'mirror-depth' -Checked $msChecked `
     -Note $(if ($msChecked -eq 0) {
         'the source/mirror pair list is empty, so no script was scanned -- read this as a broken gate rather than a clean one, the way check 8 reads its own empty set'
     } else {
-        "shared script(s) scanned for a `$PSScriptRoot resolution ascending two or more levels -- the ONE class where a byte-identical mirror can behave differently, because the two copies sit at different depths: $msCrossing crossing, $msDeclared with a declared suite, $msFindings finding(s). One hop is not asked about and that is the point: '..\lib\...' is the same folder relative to the file in both copies, so asking about it would bury the two that matter in thirty-two that cannot. What this proves is that no such resolution is UNDECLARED, and what it deliberately leaves to the suite is whether the run asserts anything -- the same line check 18 draws between this gate and a skill page"
+        "shared script(s) scanned for a `$PSScriptRoot resolution ascending two or more levels -- the ONE class where a byte-identical mirror can behave differently, because the two copies sit at different depths: $msCrossing crossing, $msDeclared with a declared suite, $msFindings finding(s). One hop is not asked about and that is the point: '..\lib\...' is the same folder relative to the file in both copies, so asking about it would bury the crossings above under the thirty-odd that cannot. What this proves is that no such resolution is UNDECLARED, and what it deliberately leaves to the suite is whether the run asserts anything -- the same line check 18 draws between this gate and a skill page"
     })
 
 # --- Report ---------------------------------------------------------------------------------------------

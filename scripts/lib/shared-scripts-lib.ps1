@@ -870,6 +870,12 @@ function Get-SharedScriptPairs {
             Source = 'scripts\task\adopt-workflow-folder.ps1'
             Plugin = 'dkj-policy'
             Skill  = 'adopt-dkj-policy'
+            # THE RESOLUTION #1857 WAS FILED ABOUT. The shipped PR template reference is read from
+            # '..\..\templates\pull_request_template.md' with a second candidate one level deeper for
+            # the source copy -- so candidate 1 is the plugin root from the mirror and a
+            # <repo>\templates that does not exist from here. Only the mirror can prove candidate 1,
+            # and it is the one that fires in every released install.
+            MirrorRun = 'adopt-workflow-folder.tests.ps1'
         },
         @{
             # The merge-queue floor (issue #1516). The queue went live on this workflow's source repo on
