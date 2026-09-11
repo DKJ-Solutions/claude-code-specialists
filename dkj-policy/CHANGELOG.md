@@ -43,7 +43,43 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**13 / 31 minor entries** <!-- pending-tally -->
+**13 / 32 minor entries** <!-- pending-tally -->
+
+### DEPLOY: feat/1884-closeout-receipt-print · 20260911-221807
+
+Chris's close-out now has a mechanism instead of only a rule. The five scripts that end a work chain --
+`ship-pr`, `open-pr`, `park-branch`, `fold-changelog-entry` and `cut-release` -- print the receipt shape
+where the run ends: what happened, where to read it, whether the session can be cleared, in two or three
+lines, with anything longer rehoused rather than cut. In four of the five that is literally the last
+line; in `cut-release` it sits just above the hand-written-note reminder, so a note about the close-out
+is not read as the last item on a to-do list. One chain prints one receipt -- `ship-pr` spawns two of
+the others as child processes, and it claims the chain's receipt so they stay quiet. Where the run was
+told to skip a gate it says so too, and sends that disclosure to the pull request body, which is the one
+part of a close-out that had no home at all.
+
+This is the fifth repair to step 6 and the first that is not prose. The other four -- the three
+permitted shapes, the receipt rule, the bounded filing line and the ceiling -- were all live, all in
+context, and lost anyway; the persona's own principle for the claim step, *a rule enforced by nothing
+but memory is one that gets skipped*, is simply applied one step further down the same ritual.
+
+**Score:** 4
+
+#### What makes this deploy extra special
+
+N/A -- no subscriber of a service notices this. It changes what a session reads at the end of a run in
+this repo and in every repo running `dkj-policy`; a consumer's own users see nothing.
+
+**Score:** N/A
+
+#### Pull Request
+
+Print the close-out receipt shape where a chain ends
+
+Plugins: dkj-policy, dkj-subagents-alpha
+
+[PR #1889](https://github.com/DKJ-Solutions/dkj-claude-plugins/pull/1889)
+
+---
 
 ### DEPLOY: feat/1881-converge-bwj-floor · 20260911-213048
 
