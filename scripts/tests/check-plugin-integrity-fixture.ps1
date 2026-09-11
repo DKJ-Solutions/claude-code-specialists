@@ -241,6 +241,13 @@ function New-IntegrityFixture {
     # document-newline-lib.ps1 likewise (#1832): entry-scaffold-lib.ps1 and pr-body-lib.ps1 dot-source it
     # for Get-DocumentNewline, unconditionally and for the same reason -- so the fixture owes it too.
     Copy-Item -LiteralPath (Join-Path $RepoRoot 'scripts\lib\document-newline-lib.ps1') -Destination (Join-Path $Fixture 'scripts\lib\document-newline-lib.ps1') -Force
+    # fetch-attempt-lib.ps1 likewise (#1860): entry-scaffold-lib.ps1 dot-sources it for
+    # Invoke-RecordedRemoteFetch, which Get-TrunkGap's fetch runs through -- so the fixture owes it too.
+    # THE #1650 FAILURE ABOVE, REPRODUCED EXACTLY when this line was missing: 4 of this suite's siblings
+    # went red at once and every one of their "is reported" asserts failed, because the gate died on load
+    # before printing a single finding. fixture-lib-deps.tests.ps1 (#1693) is the gate for this class and
+    # did not catch it -- it walks *.tests.ps1, and this shared builder is not one.
+    Copy-Item -LiteralPath (Join-Path $RepoRoot 'scripts\lib\fetch-attempt-lib.ps1') -Destination (Join-Path $Fixture 'scripts\lib\fetch-attempt-lib.ps1') -Force
 
     # The reference PR template check 24 holds, written from the same function the check compares against
     # -- never typed out here, for the reason stated at the dot-source above.

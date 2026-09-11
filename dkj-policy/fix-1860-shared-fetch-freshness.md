@@ -36,7 +36,7 @@
 
 ### PLAN
 
-claim-issue and new-branch fetch the same remote seconds apart; a shared freshness stamp lets whichever runs second skip, and halves the worst-case stall back to one network bound.
+claim-issue and new-branch fetch the same remote seconds apart; one shared record of the last fetch attempt lets whichever runs second report a recent FAILURE instead of waiting out a second one, halving the worst-case stall at the opening of an assignment back to one network bound.
 
 #### What was verified before building
 
@@ -89,7 +89,7 @@ the plan having been right.
 - [x] `new-branch.ps1` passes the window; `claim-issue.ps1`'s parked-fix fetch goes through the same seam and carries a skipped-on-failure note
 - [~] The symmetric seam -- skip on a recent SUCCESS too, which is what would have removed the duplicated ~700ms -- was built, measured against this repo's own suite, and **dropped**. See TEST.
 - [x] `scripts/tests/fetch-attempt.tests.ps1` -- the failure-only contract, the scope model, the remote key, the failure carry, and the worktree scope
-- [x] The seven suites that copy `entry-scaffold-lib.ps1` into a fixture now copy its new sibling too -- reported by `fixture-lib-deps.tests.ps1` (#1693), which is the gate that exists for exactly this
+- [x] The eight fixtures that copy `entry-scaffold-lib.ps1` into a fixture now copy its new sibling too -- reported by `fixture-lib-deps.tests.ps1` (#1693), which is the gate that exists for exactly this
 
 #### The branch name is one word stale, deliberately not renamed
 
@@ -136,6 +136,15 @@ the duplicate visible):
 `[shared-script-list]` check correctly demanded). Suites re-run after the narrowing:
 `fetch-attempt` 51/51, `new-branch` 255/255, `claim-issue` 137/137, `entry-scaffold` 820/820,
 `fixture-lib-deps` 23/23. The full pool runs on the PR.
+
+**And the fixture gate found seven of eight, which is a finding of its own.** `fixture-lib-deps.tests.ps1`
+(#1693) exists for exactly this class -- a fixture copying a lib without the siblings that lib
+dot-sources -- and it named all seven suites correctly. The four `check-plugin-integrity-*` suites then
+failed anyway, every "is reported" assert red, because their **shared** builder
+`check-plugin-integrity-fixture.ps1` is not a `*.tests.ps1` file and the gate's scan set is
+`-Filter '*.tests.ps1'` (`scripts/lib/fixture-dep-lib.ps1:386`). Repaired here in the builder; the
+blind spot is filed as **#1865**, because widening the filter is a change to that gate rather than to
+this branch.
 
 **Not covered, stated rather than papered over:** the stall itself. Every assert here drives a
 reachable local remote or a hand-written record; nothing in the suite makes a remote hang for two
