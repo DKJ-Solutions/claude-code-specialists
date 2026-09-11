@@ -43,7 +43,31 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**9 / 22 minor entries** <!-- pending-tally -->
+**9 / 23 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1865-fixture-dep-scan-set · 20260911-165129
+
+The fixture dependency gate reads every `.ps1` under `scripts/tests` instead of only the files named
+`*.tests.ps1`, so the fixture builder that four lint suites share is now a subject rather than the one
+blind spot in a gate built to prevent exactly its failure mode. On #1860's branch that gate reported
+seven findings, was right about all seven, and the four lint suites died on lib load anyway.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A -- a test gate in this repo's own tree. No subscriber of anything reaches it, and it ships in no
+plugin payload.
+
+**Score:** N/A
+
+#### Pull Request
+
+The fixture dependency gate reads every file under scripts/tests, not only the suites
+
+[PR #1868](https://github.com/DKJ-Solutions/dkj-claude-plugins/pull/1868)
+
+---
 
 ### DEPLOY: fix/1860-shared-fetch-freshness · 20260911-145710
 
