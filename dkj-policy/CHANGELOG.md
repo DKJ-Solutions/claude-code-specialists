@@ -43,7 +43,133 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**5 / 6 minor entries** <!-- pending-tally -->
+**6 / 10 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1838-runid-repo-root-shape · 20260911-100046
+
+`record-suite-durations.ps1` now refuses a run-id-shaped `-RepoRoot` by name instead of failing deep
+inside `Resolve-Path` with no mention of `-RunId`, and its docstring states the comma-separated form
+the script actually expects for several run ids under `-File`.
+
+**Score:** 1 -- a docstring clarification and an error-message fix on a script only a session invokes
+by hand; it prevents a failure that costs a minute of re-diagnosis, nothing more.
+
+#### What makes this deploy extra special
+
+N/A -- an internal maintenance-script fix, not visible to a subscriber of any service this repo ships.
+
+**Score:** N/A
+
+#### Pull Request
+
+record-suite-durations.ps1: space-separated -RunId binds second id to -RepoRoot
+
+[PR #1839](https://github.com/DKJ-Solutions/dkj-claude-plugins/pull/1839)
+
+---
+
+### DEPLOY: fix/1831-connector-swb-candidate · 20260911-095211
+
+`connectors/smartwatchbanden.json` records a fourth `localCheckout` candidate,
+`../../bwj-development/smartwatchbanden`, so a machine laying the BWJ trees out that way checks that
+consumer instead of skipping it. Before this, `check-connectors.ps1` asserted the checkout was absent
+and exited 0, suppressing five plugin blocks, their extension inventories and their version drift --
+the silent class #1524 named and #1807 repeated, one machine further.
+
+The append is pure: `localCheckout` is first-match-wins and additive, so the three earlier candidates
+keep working on the machines they are true on. #1807's note had anticipated this entry, guessed it as
+`bwjdevelopment/` and deliberately declined to record an unobserved layout; the real folder is
+hyphenated, so that guess would have been wrong -- which is the argument for the rule rather than
+against it.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A -- the connector register is this repo's own maintenance bookkeeping. A consumer of the
+specialists system neither reads it nor is affected by it; what changes is what a maintainer's own
+`check-connectors` run can see on one machine.
+
+**Score:** N/A
+
+#### Pull Request
+
+Record the bwj-development/ layout as a smartwatchbanden connector candidate
+
+[PR #1836](https://github.com/DKJ-Solutions/dkj-claude-plugins/pull/1836)
+
+---
+
+### DEPLOY: fix/1833-suite-durations-refresh · 20260911-093745
+
+`scripts/tests/suite-durations.json` is re-recorded from two CI runs that carry the suite set as it now
+stands, and the refresh turned out to be larger than the row #1833 was filed about. That row --
+`adopt-workflow-folder.tests.ps1`, understated after `fix/1829-crlf-section-drift` took it from 20 to 25
+scaffold spawns -- moves from 32.6s to 40.6s. The bigger find is the count: the file held **84** rows
+against **91** suites on disk, so seven suites had no row at all and `Invoke-TestSuiteGate` was charging
+each of them the largest recorded value when it packed the four shards. That is the safe direction by
+design -- a new suite starts early and can never be the one left last -- but seven suites priced at 290.2s
+apiece is a packing the measured pool does not support.
+
+`record-suite-durations.ps1` also now names the one run a caller reaches for first and cannot use. A ship
+pushes to the trunk twice and both pushes get a CI run; the **fold** commit's is the newer of the two, so
+it sits at the top of `gh run list`, and #1300 skips the suites step on it outright. Its four suite jobs
+check out, stop, and complete green, so nothing about the run says it measured nothing -- the script's
+`printed no per-suite duration table` throw asked "is it a CI run that ran the suites job?" and the honest
+answer was yes. It now says which commit kind to avoid and which to take instead.
+
+What is deliberately **not** here is #1833's second half. The issue asks whether something should *report*
+this staleness -- option 2, a detector comparing `recordedFrom` against the current suite set -- and calls
+it a decision rather than a repair. It stays on the issue.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A -- neither changed file is plugin payload. `suite-durations.json` and `record-suite-durations.ps1`
+both live under this repo's own `scripts/`, are mirrored into no plugin, and so reach no consumer.
+
+**Score:** N/A
+
+#### Pull Request
+
+Re-record suite-durations.json from CI runs that carry the new CRLF fixture
+
+[PR #1837](https://github.com/DKJ-Solutions/dkj-claude-plugins/pull/1837)
+
+---
+
+### DEPLOY: fix/1830-git-identity-skip-vs-ok · 20260911-093136
+
+`git-identity-sessioncheck.ps1` (the SessionStart hook of the workflow plugin) now distinguishes a
+genuine `[OK]` from a `[SKIP]` instead of treating both as "clean" because both exit 0. Previously,
+on a machine with no git identity at all (or one `check-git-identity.ps1` could not compare for any
+of its three `[SKIP]` reasons), the hook still printed "the gh account and the git identity agree" --
+a claim that a comparison happened when none had. That is what it cost a session on the measured
+machine: the false "agree" line was read as "identity is fine", and the session's first commit then
+failed outright (`Please tell me who you are`). `[SKIP]` now stays silent at session start, matching
+the check script's own documented promise; `[OK]` keeps its one-line agreement sentence, and
+`[ERROR]` keeps its full report -- neither of those two paths changed.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+Every consumer repo running the workflow plugin gets the corrected hook on its next plugin release --
+one fewer false "identity is fine" signal on any machine with no git identity or a display-name
+`user.name`, which is the exact shape that produced a failed first commit here.
+
+**Score:** 2
+
+#### Pull Request
+
+git-identity-sessioncheck distinguishes [OK] from [SKIP] instead of branching on exit code
+
+Plugins: dkj-policy
+
+[PR #1835](https://github.com/DKJ-Solutions/dkj-claude-plugins/pull/1835)
+
+---
 
 ### DEPLOY: fix/1829-crlf-section-drift · 20260911-092050
 

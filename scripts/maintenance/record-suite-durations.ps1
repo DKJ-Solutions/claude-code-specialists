@@ -37,7 +37,15 @@
     records which runs produced the numbers, so a later reader can re-derive them or notice they are old.
 
 .PARAMETER RunId
-    One or more GitHub Actions run ids of the CI workflow. Each must have run the sharded suites job.
+    One or more GitHub Actions run ids of the CI workflow. Each must have run the sharded suites job --
+    which rules out the run on a `fold:` push to the trunk, the newest of the two runs every ship leaves
+    behind and therefore the one nearest to hand. See the throw that names it.
+
+    SEVERAL IDS UNDER `-File`: pass them as ONE comma-separated string, e.g.
+    `-RunId 34583187104,34583740147`. Both `$RunId` and `$RepoRoot` are positional, so under
+    `powershell -NoProfile -File` -- the form every doc in this repo uses -- a space-separated list binds
+    only the first id to `-RunId` and the second to `-RepoRoot`, which then fails as a missing path. The
+    comma form reaches this script as one string and is split on `[,\s]+` below.
 
 .PARAMETER RepoRoot
     The repo to write into. Defaults to the git root of the working directory.
@@ -53,6 +61,16 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+
+# A run id passed as a second space-separated -RunId argument binds here instead (both parameters are
+# positional under `-File`) and would otherwise fail several lines down as a missing path, with no
+# mention of -RunId anywhere in the message. Caught at the point of the mistake, with the caller's own
+# value in the text -- see the .PARAMETER RunId note above.
+if ($RepoRoot -match '^\d{6,}$') {
+    throw "-RepoRoot '$RepoRoot' looks like a GitHub Actions run id, not a path. Pass several run ids " +
+        "to -RunId as one comma-separated string, e.g. -RunId '$($RunId[0]),$RepoRoot', not as " +
+        'separate space-separated arguments.'
+}
 
 # Invoke-NativeCapture rather than a bare `gh ... 2>&1`: under 'Stop' a native command's redirected
 # stderr arrives as an ErrorRecord and kills the script on a line gh writes progress to. The lib runs
@@ -117,7 +135,14 @@ foreach ($id in $runIds) {
         $found++
     }
     if ($found -eq 0) {
-        throw "run $id printed no per-suite duration table - is it a CI run that ran the suites job?"
+        # THE FOLD COMMIT'S RUN IS THE ONE THAT LOOKS RIGHT AND IS NOT, so it is named rather than left
+        # to the caller to rediscover. ship-pr pushes to the trunk twice per branch and BOTH pushes get a
+        # CI run: the merge commit's runs the suites, the fold commit's skips the step outright (#1300 --
+        # its only untested delta is changelog prose). The second is the newer of the two, so it is the
+        # one at the top of `gh run list` and the one a caller reaches for; its suites jobs complete
+        # green having checked out and stopped, so nothing about the run says it measured nothing.
+        # Measured on #1833, whose own refresh reached for it first.
+        throw "run $id printed no per-suite duration table - is it a CI run that ran the suites job? A push to the trunk whose commit message starts with 'fold:' skips that step by design (#1300), so take the MERGE commit's run or a PR run instead."
     }
     Write-Host "  $found suite rows" -ForegroundColor DarkGray
 }
