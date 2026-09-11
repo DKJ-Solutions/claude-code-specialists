@@ -197,6 +197,4 @@ stays parked without a PR, which can be indefinite.
 
 claim-issue reads the branches for a fix already pushed without a PR
 
-Plugins: dkj-policy
-
 Closes #1853
