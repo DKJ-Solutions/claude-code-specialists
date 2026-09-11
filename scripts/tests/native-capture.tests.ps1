@@ -210,6 +210,24 @@ try {
     # non-zero exit, which is the "hang presented as something else" the report was about.
     Assert-True  ((@($stalled.Output) -join ' ') -like '*[[]timeout[]]*') 'Output carries a [timeout] line, so an unchanged caller still prints the reason'
 
+    # A TIMED-OUT CAPTURE CAN CARRY THE CHILD'S OWN WORDS, AND THAT IS THE CONTRACT (#1852). The bound
+    # firing says nothing about whether the capture is empty: this arm kills the tree and then reads
+    # out.txt regardless, so everything the child had already flushed comes back in Output WITH
+    # TimedOut = $true. Pinned deterministically here by a child that PRINTS BEFORE IT SLEEPS -- no kill
+    # race involved -- because the property is what the field exists for and a caller that judges a
+    # bounded call from Output's content alone is reading a document the child never finished.
+    #
+    # IT IS PINNED RATHER THAN REPAIRED, deliberately. Discarding the flushed tail here would take the
+    # evidence away from the callers that print it, which is exactly #1252's judgement at the read one
+    # function down: for a stalled git push that tail IS the diagnosis. The half that was missing was
+    # never in this lib -- it was a caller reading neither field. connector-sessioncheck.ps1 was that
+    # caller, and CI is where it surfaced (run 34596638888): a killed version check reported as clean.
+    $flushed = Invoke-NativeCapture -FilePath 'powershell' `
+        -Arguments @('-NoProfile', '-Command', "Write-Host 'FLUSHED-BEFORE-THE-KILL'; Start-Sleep -Seconds 30") -TimeoutSeconds 2
+    Assert-True $flushed.TimedOut 'the bound still fires on a child that spoke first, so this is a timeout and not a fast exit'
+    Assert-Equal 124 $flushed.ExitCode 'and it is reported as one'
+    Assert-True ((@($flushed.Output) -join ' ') -like '*FLUSHED-BEFORE-THE-KILL*') 'yet Output carries what the child managed to say -- so Output is NOT evidence that the call completed, and TimedOut is the only field that answers that'
+
     # A BOUND THAT DOES NOT EXPIRE CHANGES NOTHING. This is the assert that keeps the bound from
     # becoming a second failure mode of its own: the exit code still comes back exactly, which is the
     # #907 empty-ExitCode trap the Start-Process arm has to keep clearing.

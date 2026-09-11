@@ -586,10 +586,23 @@ try {
     Assert-Equal $r4.Text $r5.Text '5d: and the verdict is the one it always printed'
 
     # --- 6. -VersionTimeoutSeconds is honoured, and a hit degrades to the exit-124 line (#1701) -----
-    #     The bound the four blocks above now RAISE, asserted from the other side. It is forced rather
-    #     than raced: the fake engine sleeps five seconds and the bound is one, so the timeout fires on
-    #     any machine at any load -- which is the property block 1 lacked, where a 30s bound and a cold
-    #     PowerShell 5.1 startup under sixteen lanes decided the verdict.
+    #     The bound the four blocks above now RAISE, asserted from the other side. The fake engine sleeps
+    #     five seconds and the bound is one, so the BOUND fires on any machine at any load.
+    #
+    #     THAT IS NOT THE SAME AS THE OUTPUT BEING EMPTY, and this comment claimed it was until #1852.
+    #     It read "forced rather than raced ... the timeout fires on any machine at any load -- which is
+    #     the property block 1 lacked", and the 5:1 ratio does buy exactly that much and no more. What
+    #     this block actually asserts is the line the hook prints AFTER the timeout, and that used to
+    #     depend on a second race the ratio says nothing about: Invoke-NativeCapture kills the tree and
+    #     then waits five more seconds to reap it, so a kill that is merely SLOW -- taskkill.exe paying
+    #     its own cold startup under the gate's sixteen lanes -- lets the 5s child finish inside that
+    #     window and hands its full output back. That is how this block failed in CI on a branch that
+    #     reads nothing it touches (run 34596638888, shard 4 of 4): the bound fired, and the hook printed
+    #     'Version check: 1 plugin(s) enabled here: 0 behind, 1 up to date.' anyway.
+    #
+    #     It is load-proof NOW, and by a mechanism rather than by a ratio: the hook reads $cap.TimedOut
+    #     and drops the engine's half-answer, so whichever way the kill race goes the verdict is the
+    #     same. Block 7 below pins that directly, without needing the race to go either way.
     #
     #     Both halves matter. That the PARAMETER is read at all is what makes raising it above real: a
     #     default the hook ignored would leave those blocks racing exactly as before, silently. And that
@@ -604,6 +617,31 @@ try {
     Assert-Equal 1 $r.Lines.Count '6: exactly one line'
     Assert-Equal "connector-sessioncheck: no source checkout on this machine, so $REGISTER_PHRASE, and the version check produced no readable output (exit 124) -- run the plugin-versions skill to see why." $r.Lines[0] '6: the whole line, naming exit 124 -- which is the substitution that failed block 1 under the gate load'
     Assert-Lacks $r.Text '0 behind, 1 up to date' '6: the engine never answered, so the verdict it would have printed is absent -- without this the assert above could pass on a run that did not time out'
+
+    # --- 7. A TIMED-OUT RUN WHOSE CAPTURE CARRIES A VERDICT STILL DEGRADES (#1852) -------------------
+    #     Block 6's scenario with the engine's two statements swapped: it PRINTS FIRST and then sleeps
+    #     past the bound. So out.txt already holds a well-formed [SUMMARY] at the moment the tree is
+    #     killed, and the hook is handed a complete-looking verdict together with TimedOut = $true.
+    #
+    #     THIS IS THE DEFECT #1852 REPORTED, MADE DETERMINISTIC. In CI the same state arrived by a lost
+    #     kill race, which is why it took a month to see twice; here it is the engine's own statement
+    #     order, so it reproduces on any machine at any load and depends on no timing whatsoever. That
+    #     is what makes this block the one that guards the repair -- block 6 above can only catch a
+    #     regression on a run where the kill happens to win.
+    #
+    #     AND THE HAZARD IS NOT A RED SUITE. A capture truncated at the kill can end anywhere: after the
+    #     [SUMMARY] and before an [ERROR] is a partial run reported as 'up to date' about a checkout that
+    #     is behind -- the [UNREGISTERED] lesson this hook's own $skipped phrase exists for, arriving
+    #     through the one field it was not reading.
+    Write-Host "7. a timed-out run does not report the half-answer its killed engine had already flushed" -ForegroundColor Cyan
+    $c = New-Case 'bound7'
+    $flushedBody = "Write-Host '[SUMMARY] 1 plugin(s) enabled here: 0 behind, 1 up to date.'`r`nStart-Sleep -Seconds 5`r`nexit 0`r`n"
+    $r = Invoke-HookWithFakeEngine -EngineDir (Join-Path $Fixture 'bound7\flushengine') -FakeBody $flushedBody `
+        -RepoDir $c.Repo -HomeDir $c.Home -WithCaptureLib -HookArgs @('-VersionTimeoutSeconds', '1')
+    Assert-Equal 0 $r.Code '7: a bound that is hit still exits 0, exactly as in block 6 -- the repair changes the verdict, not the degradation'
+    Assert-Equal 1 $r.Lines.Count '7: exactly one line'
+    Assert-Equal "connector-sessioncheck: no source checkout on this machine, so $REGISTER_PHRASE, and the version check produced no readable output (exit 124) -- run the plugin-versions skill to see why." $r.Lines[0] '7: the same degraded line block 6 asserts -- a flushed [SUMMARY] does not buy the engine a verdict it did not finish earning'
+    Assert-Lacks $r.Text '0 behind, 1 up to date' '7: THE REGRESSION ASSERT -- this is the exact text CI got instead (run 34596638888), so its absence is what says TimedOut is still being read'
 }
 finally {
     if (Test-Path -LiteralPath $Fixture) { Remove-Item -Recurse -Force -LiteralPath $Fixture -ErrorAction SilentlyContinue }
