@@ -678,6 +678,22 @@ function Get-SharedScriptPairs {
             LibOnly = $true
         },
         @{
+            # THE DOCUMENT-NEWLINE READING (issue #1832). A leaf with no dependencies of its own, like
+            # ref-print-lib and command-probe-lib above, which is what makes it safe for the two libs
+            # that dot-source it to load it first. It is mirrored because those two are:
+            # entry-scaffold-lib and pr-body-lib both dot-source it, and between them they reach every
+            # caller -- release-lib, cut-release, fold-changelog-entry and adopt-workflow-folder all
+            # already load entry-scaffold-lib. An unmirrored source would leave Get-DocumentNewline
+            # undefined in exactly the repos that only ever see the mirror.
+            #
+            # ITS OWN FILE RATHER THAN command-probe-lib.ps1, on park-lib's precedent below: a newline
+            # reading is not a function-table probe, and the cost of keeping them apart is this entry
+            # and one mirror. Nothing in it is repo-owned, so no contract row follows.
+            Name    = 'document-newline-lib'
+            Source  = 'scripts\lib\document-newline-lib.ps1'
+            Plugin  = 'dkj-policy'
+            LibOnly = $true
+        },        @{
             Name    = 'pr-issues-lib'
             Source  = 'scripts\lib\pr-issues-lib.ps1'
             Plugin = 'dkj-policy'

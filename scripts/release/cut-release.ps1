@@ -1126,7 +1126,7 @@ $versionTarget = Get-RelativeLinkPath -FromDir $historyDirRel -To $rowTargetRel
 $newRow = "| [$new]($versionTarget) | $today | $typeLabel | $shortTitle |"
 if (Test-Path -LiteralPath $relReadmePath) {
     $rm = Get-Content -LiteralPath $relReadmePath -Raw -Encoding UTF8
-    $rmNl = if ($rm.Contains("`r`n")) { "`r`n" } else { "`n" }
+    $rmNl = Get-DocumentNewline -Content $rm
     $headerRe = [regex]"(?m)^\| Version \| Date \| Type \| Title \|\r?\n\|[-| ]+\|\r?\n"
     $hm = $headerRe.Match($rm)
     if ($hm.Success) {
