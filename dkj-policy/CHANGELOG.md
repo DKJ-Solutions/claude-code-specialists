@@ -43,7 +43,50 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**8 / 16 minor entries** <!-- pending-tally -->
+**9 / 17 minor entries** <!-- pending-tally -->
+
+### DEPLOY: feat/1843-portable-pr-template · 20260911-130430
+
+`adopt-dkj-policy` Part 1 now places `.github/pull_request_template.md` in a consuming repo, copied from
+the plugin's own reference and never overwriting one that is already there. It was the last file in the
+adoption a person had to copy by hand, and the only one whose absence was silent: `open-pr` builds a PR
+body only when that path exists, so a repo that skipped the copy got pull requests with **no body at
+all** -- no description, no form -- and no warning saying why. The warning that block does carry fires
+on a placeholder that does not *match*, which is the other failure and the loud one.
+
+The content is read from the shipped reference rather than retyped into the scaffolder. The interface is
+a single line -- the placeholder `open-pr` matches verbatim -- and a literal copy of it in the adopter
+would have been a second definition free to drift from the first, which is the same argument the
+branch-entry gate makes for calling a shipped script instead of hand-writing its check in shell. Where
+the reference cannot be read, nothing is placed and the run says so; there is deliberately no fallback
+string, because a fallback is that second definition wearing an emergency jacket and it is the copy that
+ships in the one case nobody is watching.
+
+This is one step of [#1843](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1843), which asks
+for more than this and stays open: a portable `repo-settings.yml`, a CI skeleton, and the label question.
+Each of those needs a decision first, and the issue carries the assessment and the red-team of it.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+The defect it closes was invisible from both ends. A consumer never saw a warning, because there is no
+`else` on that path test; the source never saw it either, because every doc describing the copy was
+written as an instruction to a person, and an instruction nobody follows leaves no trace. What made it
+fixable was checking the reported reason instead of the reported symptom -- the report said `open-pr`
+warns on a missing template, and reading the code showed it does not.
+
+**Score:** 2
+
+#### Pull Request
+
+Place the PR template in a consumer's .github during adoption
+
+Plugins: dkj-policy
+
+[PR #1859](https://github.com/DKJ-Solutions/dkj-claude-plugins/pull/1859)
+
+---
 
 ### DEPLOY: docs/1846-adopt-step4-documentation-label · 20260911-125339
 
