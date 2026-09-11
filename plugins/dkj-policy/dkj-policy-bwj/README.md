@@ -16,27 +16,26 @@ and to none of the others Dave runs.
 |---|---|---|
 | **ticket handling** | [`WORKFLOW-portable.md`](WORKFLOW-portable.md) | what happens between spotting a problem and it being tracked where every BWJ colleague can see it |
 | **the sync log** | [`SYNC-LOG-portable.md`](SYNC-LOG-portable.md) | what a `sync/` branch owes -- a durable record of what a third party did on the live theme, in the tree rather than only in a merged PR body |
-| **the preview handover** | [`PREVIEW-HANDOVER-portable.md`](PREVIEW-HANDOVER-portable.md) | how a preview reaches the person who has to look at it -- one link to a published page, never a table of URLs in a terminal |
+| **the preview handover** | [`PREVIEW-portable.md`](PREVIEW-portable.md) | what a preview handover owes and how it reaches the reviewer -- the control variant beside the preview, on one link to a published page rather than a table of URLs |
 
-They are separate chapters rather than sections of one page because they answer different questions
-for different readers, and each of the last two was added later, on inbound
-[#1382](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1382) and
-[#1873](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1873). Shipping several portable
+They are separate chapters rather than sections of one page because they answer different
+questions for different readers, and each of the last two was added later -- the sync log on inbound
+[#1382](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1382), the preview handover on inbound
+[#1874](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1874). Shipping several portable
 pages is the established form here -- `dkj-policy` carries three.
 
-**Every chapter is policy, never mechanism.** The Asana CI, the sync machinery and the preview push all
-live elsewhere (`.github/` in each repo, and `dkj-subagents-shopify` for the other two); what this
-plugin states is what the two repos *owe*, which is Dave's house rule for them rather than a fact about
-Asana or Shopify.
+**Both chapters are policy, never mechanism.** The Asana CI and the sync machinery both live
+elsewhere (`.github/` in each repo, and `dkj-subagents-shopify` respectively); what this plugin states is what
+the two repos *owe*, which is Dave's house rule for them rather than a fact about Asana or Shopify.
 
 ## It is an add-on, not a replacement
 
 `dkj-policy-bwj` **layers on top of `dkj-policy`** -- it does not stand in for it. It
 extends exactly three seams of that workflow: *ticket-work, the layer before the branch*, *what a
-`sync/` branch owes*, which that workflow deliberately exempts and leaves to the repo, and *how a
-preview is handed to a reviewer*, which that workflow does not speak to at all. It says
-**nothing** about how a branch is named, what a change owes before it can open a PR, or what a
-release is -- those are still `dkj-policy`'s answers, unchanged. So the two do not hand
+`sync/` branch owes*, which that workflow deliberately exempts and leaves to the repo, and *what a
+preview handover contains* once the consumer's own rule says one is owed. It says
+**nothing** about how a branch is named, which changes owe a preview, what a change owes before it can
+open a PR, or what a release is -- those are still `dkj-policy`'s answers, unchanged. So the two do not hand
 the specialists two contradicting answers to the same question; they answer different questions.
 
 That is the deliberate reading of the "second workflow" note left in
@@ -130,18 +129,28 @@ the entry's shape, and why there is no gate are in
 
 ## Chapter three -- the preview handover, in one paragraph
 
-A Shopify change is judged by eye, on a phone, across five markets -- so it needs a link somebody can
-open, and `dkj-subagents-shopify`'s `push-preview` prints one URL per market to hand over. Until inbound
-[#1873](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1873) nothing said what to do with
-that list, so each session re-invented the carrier and landed on a markdown table: ten URLs of 70 to
-100 characters in two columns, which the terminal wraps into unreadability, which a phone cannot scan,
-and which carries none of what the reviewer needs to know. The rule is that **a preview is handed over
-as one link to a published page** -- carrying, per market, a QR code and the concretely changed pages,
-plus what the gates already proved and the one question being asked. The existing requirement is
-untouched (the changed pages, per market, unasked) and so is the safety rule it serves: no PR is opened
-before the preview is approved. What changes is only the carrier. The whole rule, why a QR per market
-rather than one, and the one constraint that makes a QR fail silently, are in
-[`PREVIEW-HANDOVER-portable.md`](PREVIEW-HANDOVER-portable.md).
+Where a change owes a preview, the handover is a **pair per market**: the preview URL, and the
+**control** -- the same page on the live theme, so the reader sees the difference instead of recalling
+it. A preview alone shows what a page will look like, never what changed, and the half it leaves out is
+exactly the judgement it was pushed for. It costs nothing to add: the changed page has already been
+resolved per market to build the preview list. The one thing that has to be written down is **what the
+control URL is** -- it names the **live theme id** (`Get-ShopifyLiveThemeId`, which the repo already
+answers for the live-theme guard), and not the bare URL with the parameter dropped. `preview_theme_id`
+sets a cookie, so after a preview has been opened the bare URL keeps serving the preview theme: the
+control tab silently agrees with the preview, and the reviewer concludes nothing changed. Measured, with
+the two neighbouring wrong answers, in [`PREVIEW-portable.md`](PREVIEW-portable.md).
+
+**And the pair is handed over as ONE LINK to a published page, never as a table of URLs** (inbound
+[#1873](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1873), the same day and the same
+handover as the rule above). Pairing the URLs doubles them, and five markets by two variants is ten
+URLs of 70 to 100 characters -- which a terminal wraps until the columns saying *which market, preview
+or control* are gone, which cannot even be selected to copy, and which a phone cannot scan at all,
+though a phone is where storefront work is judged. So the page carries one card per market: a QR code
+to the preview, the pair as text beneath it, and above and below them what a URL cannot say -- how to
+see the change, what the gates already proved, and the one question being asked. The rule is carried at
+the print site too, generically, so it does not lose to `push-preview`'s own printed list. The page is
+also where this chapter states what it deliberately does **not** decide: which changes owe a preview at
+all, and when the PR may open, both still the consumer's and `dkj-policy`'s.
 
 ## What is in this folder
 
@@ -149,7 +158,7 @@ rather than one, and the one constraint that makes a QR fail silently, are in
 |---|---|
 | [`WORKFLOW-portable.md`](WORKFLOW-portable.md) | chapter one in prose -- ticket handling, read alongside your repo's own Asana config |
 | [`SYNC-LOG-portable.md`](SYNC-LOG-portable.md) | chapter two in prose -- what a `sync/` branch owes, where the record lands, and what it stays out of |
-| [`PREVIEW-HANDOVER-portable.md`](PREVIEW-HANDOVER-portable.md) | chapter three in prose -- what a reviewer is handed when a preview is ready, and why it is one link rather than a list |
+| [`PREVIEW-portable.md`](PREVIEW-portable.md) | chapter three in prose -- what a preview handover contains, why the control URL names the live theme id, and why the whole pair travels as one link rather than a table |
 | [`skills/`](skills/) | the skills a specialist invokes |
 | [`templates/`](templates/) | the CI mechanism to **copy** into each repo's `.github/` -- GitHub only runs workflows from a repo's own `.github/`, so what ships here is the reference to copy and diff against, the same pattern as `dkj-policy/templates/pull_request_template.md` |
 
@@ -169,8 +178,8 @@ The hooks and blueprint a workflow carries "only where it needs them" -- this on
 
 ## What it expects from your repo -- the seam
 
-Two of the three chapters answer themselves out of your repo-owned `scripts/repo-config.ps1` -- the
-same file `dkj-policy` already dot-sources. The third, the preview handover, asks for nothing.
+Both chapters answer themselves out of your repo-owned `scripts/repo-config.ps1` -- the same file
+`dkj-policy` already dot-sources.
 
 **Chapter two needs exactly one function**, and it is the switch that turns the whole chapter on:
 
@@ -179,10 +188,6 @@ same file `dkj-policy` already dot-sources. The third, the preview handover, ask
   Shopify consumer gets. The machinery is `dkj-subagents-shopify`'s, so it is already present; this answer is
   what asks it to run. `adopt-shopify-floor` lists it among the optional Shopify seams it writes into
   that file as commented guidance.
-
-**Chapter three needs nothing at all** -- no function, no file, no CI. It is a writing rule and it is in
-force from the moment the plugin is enabled. Stated here because the other two chapters both open with
-a configuration step, so its absence reads as an omission unless it is named.
 
 **Chapter one needs the Asana answers**, a set of functions in that same file. The `report-issue`
 skill needs to know which workspace and project a mirrored task lands in, and the CI mechanism needs
@@ -238,8 +243,7 @@ it needs no workspace of its own.
 
 An ordinary plugin change: enable `dkj-policy-bwj` in `.claude/settings.json` alongside `dkj-subagents-alpha`
 and `dkj-policy`, then run [`adopt-dkj-policy-bwj`](skills/adopt-dkj-policy-bwj/SKILL.md) once for
-chapter one, and answer `Get-ShopifySyncLogPath` for chapter two. **Chapter three needs neither** -- it
-is in force as soon as the plugin is enabled.
+chapter one, and answer `Get-ShopifySyncLogPath` for chapter two.
 
 **Chapter two needs no skill of its own** -- its one adopt step, scaffolding `dkj-policy-bwj/SYNC-LOG.md`
 with its masthead, rides along inside `adopt-dkj-policy-bwj`'s run rather than getting a second skill for a

@@ -528,32 +528,10 @@ function Write-RunnerAdoptionFinding {
     Write-Info "this consumer names the workflow plugin in $ManifestName but $state$partial -- so none of the runners 'adopt-dkj-policy' places is running there: the branch-entry gate (part 1) fires on none of its pull requests, and the fold and the resolves verification (part 3) do not survive a merge no session observes. That may be deliberate -- both parts are optional and separate from enabling the plugin, and nothing here can tell a decision from an omission. If it is deliberate, say so in $ManifestName's 'notes'; if it is not, run the 'adopt-dkj-policy' skill in that repo. Only a checkout step naming this repository counts as a runner here, so this says nothing recognisable reaches into this tree rather than that nothing is there.$suffix"
 }
 
-function Test-GitHubOwnerNameSlug {
-    <#
-        Is $Slug ('owner/name') held to GitHub's own shape -- an owner is alphanumeric with hyphens, a
-        name adds '.' and '_' -- rather than merely escaped? Factored out of Get-RemoteConsumerWorkflow
-        (#1808), which already applied exactly this guard before a manifest's 'repo' field could become
-        an API call, so that check 1b's arm 2 and arm 3 (#1821, Sebastian's finding) can hold the SAME
-        field to the SAME bound before composing it into a copy-pasteable 'git remote set-url' command --
-        one small helper rather than a second, silently drifting copy of the regexes.
+# Test-GitHubOwnerNameSlug moved to scripts/lib/check-report-lib.ps1 (#1869): a third caller outside
+# this file -- check-consumer-siblings.ps1 -- turns the same manifest 'repo' field into the same kind
+# of API call, which is the case its own docstring already made against a second copy of the regexes.
 
-        Returns @{ Ok; Reason } -- Reason is empty on success and is the caller's own failure sentence
-        otherwise (the two distinct reasons Get-RemoteConsumerWorkflow already printed: no slash at all,
-        or a slash with characters GitHub's own naming rules do not allow), so every existing call site
-        keeps the exact wording it always had.
-    #>
-    param([Parameter(Mandatory = $true)][string]$Slug)
-    $slash = $Slug.IndexOf('/')
-    if ($slash -le 0 -or $slash -eq $Slug.Length - 1) {
-        return @{ Ok = $false; Reason = "not an 'owner/name' slug" }
-    }
-    $owner = $Slug.Substring(0, $slash)
-    $name  = $Slug.Substring($slash + 1)
-    if ($owner -notmatch '^[A-Za-z0-9][A-Za-z0-9-]*$' -or $name -notmatch '^[A-Za-z0-9][A-Za-z0-9._-]*$') {
-        return @{ Ok = $false; Reason = 'not a valid GitHub owner/name slug -- rejected before it became an API call' }
-    }
-    return @{ Ok = $true; Reason = '' }
-}
 
 function Get-RemoteConsumerWorkflow {
     <#

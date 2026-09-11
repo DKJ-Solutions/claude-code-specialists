@@ -57,19 +57,19 @@ Assert-True (Test-Path -LiteralPath $manifestPath) 'plugin.json is present'
 $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
 Assert-Equal 'dkj-policy-bwj' $manifest.name 'plugin.json name is dkj-policy-bwj'
 
-foreach ($rel in @('README.md', 'WORKFLOW-portable.md', 'SYNC-LOG-portable.md',
-                   'PREVIEW-HANDOVER-portable.md',
+foreach ($rel in @('README.md', 'WORKFLOW-portable.md', 'SYNC-LOG-portable.md', 'PREVIEW-portable.md',
                    'skills\report-issue\SKILL.md', 'skills\adopt-dkj-policy-bwj\SKILL.md',
                    'templates\asana-mirror.yml', 'templates\asana-mirror.ps1')) {
     Assert-True (Test-Path -LiteralPath (Join-Path $PluginRoot $rel)) "ships $rel"
 }
 
 # EVERY CHAPTER PAGE IS LINKED FROM THE README, and the README's own count agrees with how many there
-# are. The count is stated in five places across three files and each was edited by hand when chapter
-# two arrived (#1435, 'README overview tables say bwj-codex has one rule; it now has two chapters') and
-# again when chapter three did (#1873) -- so what is pinned is that the plugin's own README cannot
-# disagree with its own folder. The overviews outside the plugin are prose and stay the dead-link
-# gate's business.
+# are. The count is stated in five places across four files, each edited by hand -- and it has now gone
+# wrong twice: on #1435 ('README overview tables say bwj-codex has one rule; it now has two chapters'),
+# and again when chapter three arrived as TWO pages from two same-day reports (#1874 and #1873) that
+# did not know about each other, one of which had to be folded into the other. What is pinned is that
+# the plugin's own README cannot disagree with its own folder; the overviews outside the plugin are
+# prose and stay the dead-link gate's business.
 $readmeTxt   = Get-Content -LiteralPath (Join-Path $PluginRoot 'README.md') -Raw
 $chapterDocs = @(Get-ChildItem -LiteralPath $PluginRoot -Filter '*-portable.md' -File)
 Assert-Equal 3 $chapterDocs.Count 'the plugin ships three chapter pages'
@@ -77,8 +77,8 @@ foreach ($doc in $chapterDocs) {
     Assert-True ($readmeTxt -match [regex]::Escape("($($doc.Name))")) `
         "README links $($doc.Name) -- a chapter page nothing links is a chapter nobody finds"
 }
-# The word, not the digit: the README says 'three chapters' in prose and a stale 'two' there is exactly
-# the drift #1435 was filed over.
+# The word, not the digit: the README says 'three chapters' in prose, and a stale count there is
+# exactly the drift #1435 was filed over.
 $countWord = @{ 1 = 'one'; 2 = 'two'; 3 = 'three'; 4 = 'four'; 5 = 'five' }[$chapterDocs.Count]
 Assert-True ($readmeTxt -match "(?i)\bIt has $countWord chapters\b") `
     "README states '$countWord chapters', matching the $($chapterDocs.Count) pages it ships"
@@ -106,8 +106,8 @@ Assert-Equal $alphaManifest.version $manifest.version 'version is in lockstep wi
 
 # BOTH DESCRIPTIONS STATE THE SAME CHAPTER COUNT as the folder ships ($countWord, from section 1).
 # plugin.json's and marketplace.json's descriptions are two hand-written copies of one blurb, and they
-# drifted on exactly the branch that added chapter three: the marketplace entry was updated while the
-# plugin's own manifest still said two. Only the COUNT is pinned, never the whole text -- the two are
+# drifted on the branch that added chapter three: the marketplace entry was updated while the plugin's
+# own manifest still said two. Only the COUNT is pinned, never the whole text -- the two are
 # deliberately worded for different readers (the installed plugin's own card, and the catalogue row),
 # so a byte compare would be a rule nobody wants.
 foreach ($blurb in @(

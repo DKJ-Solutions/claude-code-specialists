@@ -1,6 +1,7 @@
 {
   "repo": "BWJ-ecommerce/xoxowildhearts",
   "visibility": "private",
+  "siblingGroup": "bwj-store",
   "localCheckout": [
     "../../bwjecommerce/xoxowildhearts",
     "../../GitHub/bwjecommerce/xoxowildhearts",

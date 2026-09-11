@@ -50,9 +50,10 @@ without that constraint produces a page of ten invisible boxes and no error.
 
 ### CREATE
 
-- [x] `PREVIEW-HANDOVER-portable.md` -- chapter three of `dkj-policy-bwj`: one link to a published
-      page, what that page carries per market, and why a QR rather than a URL
-- [x] The plugin `README.md` -- two chapters become three, in all five places it says so
+- [x] The carrier half of chapter three -- folded into `PREVIEW-portable.md`, which landed from #1874
+      mid-branch: one link to a published page, what each market card carries, and why a QR rather than
+      a URL. This branch's own `PREVIEW-HANDOVER-portable.md` is deleted -- see the collision note below
+- [x] The plugin `README.md` -- the chapter-three rows and paragraph now state both halves, not one
 - [x] The four overviews outside the plugin that state the chapter count: the root `README.md`,
       `plugins/dkj-policy/README.md`, `.claude-plugin/marketplace.json` (both descriptions) and the
       plugin's own `plugin.json`, which the copy edit caught still saying two
@@ -67,6 +68,28 @@ without that constraint produces a page of ten invisible boxes and no error.
 - [x] `dkj-policy-bwj.tests.ps1` asserts both portable pages ship and the chapter count is stated
 - [x] The lint gate and all suites green
 
+
+
+#### The collision, and why chapter three is ONE page
+
+While this branch was building, [#1874](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1874)
+landed on the trunk with a chapter three of its own -- `PREVIEW-portable.md`, from a session working the
+**same day on the same handover**. Both reports came from one exchange with Dave: #1874 carried what the
+handover must *contain* (the control variant beside the preview), #1873 what must *carry* it (one link
+to a published page, never a table). Neither knew about the other, and both pages opened by declaring
+themselves chapter three.
+
+**Two pages was not an option, and the reason is a contradiction rather than tidiness.** #1874's page
+prescribes a markdown table of preview and control URLs as the shape of the handover, and in its very
+next paragraph records Dave saying a terminal table could not even be selected. That is #1873's finding
+arriving one report too early to be acted on. Kept side by side, the plugin would ship one chapter
+telling a session to build the table and another forbidding it.
+
+So the page that was already merged keeps its name and its measurements, and this branch folds its own
+into it: the rule is stated in two halves, the carrier argument sits beside the control-variant
+argument, and the shape section is rewritten from a terminal table to the page's own cards -- each
+carrying the QR for the preview and the pair as text beneath it. `PREVIEW-HANDOVER-portable.md`, this
+branch's own page, is deleted rather than shipped.
 
 #### What the review pass changed
 
@@ -86,36 +109,44 @@ the deliverable rather than only confirming it, so both are recorded here:
 
 ### DEPLOY: feat/1873-preview-handover-rule
 
-`dkj-policy-bwj` gains a third chapter, `PREVIEW-HANDOVER-portable.md`: **a Shopify preview is handed
-over as one link to a published page, never as a table of URLs.** The page carries, per market, a QR
-code and the concretely changed pages, plus what the gates already proved and the one question the
-reviewer is being asked. The existing requirement is untouched -- the changed pages, per market,
-unasked -- and so is the rule it serves: no PR opens before the preview is approved. What changes is
-the carrier.
+`dkj-policy-bwj`'s chapter three gains its second half: **the preview handover is one link to a
+published page, never a table of URLs.** The page carries one card per market -- a QR code to the
+preview, the preview and live-control pair as text beneath it -- plus what a URL cannot say: how to see
+the change, what the gates already proved, and the one question being asked. Nothing about which
+changes owe a preview, or about no PR opening before one is approved, changes.
 
-The rule is carried where the failure happens, not only where it is stated. `push-preview` printed a
-bare list of URLs and its own page called that list "the preview URL(s) to hand over", so a policy page
-nothing loads at push time would have lost to it every time. `Get-PreviewHandoverNote` in
-`preview-theme.ps1` now prints a closing note whenever more than one URL is emitted -- a list is raw
-material, not a handover -- and the `push-preview` page says the same in prose. Both stay **generic**,
-naming no repo: what is true everywhere is that a wrapped column of 90-character URLs is not a handover
-and the reviewer is on a phone; what the handover *is* stays BWJ's house rule. One URL prints nothing,
-because a single line in a terminal genuinely is a handover.
+**It lands in `PREVIEW-portable.md` rather than beside it.** That page arrived on the trunk from
+[#1874](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1874) while this branch was
+building -- the same day, the same handover, the other half of one complaint -- and it prescribed a
+markdown table of URLs while recording, a paragraph later, that a terminal table could not even be
+selected. Two chapter threes would have shipped a plugin that tells a session to build the table and
+forbids it. So the rule is now stated in two halves on one page, and this branch's own page is deleted.
 
-One thing the report left implicit is stated outright, because without it the rule is unfollowable: a
-published Artifact's CSP permits external scripts from a short list of CDNs and blocks images from
-every host, so a QR pulled from a QR-image API renders as a blank square and says nothing. The page
-names the two shapes that work.
+The carrier half is carried where the failure happens, not only where it is stated. `push-preview`
+printed a bare list and its own page called that list "the preview URL(s) to hand over", so a policy
+page nothing loads at push time would have lost to it every time. `Get-PreviewHandoverNote` in
+`preview-theme.ps1` now prints a closing note whenever more than one URL is emitted; the `push-preview`
+page says the same in prose. Both stay generic, naming no repo: what is true everywhere is that a
+wrapped column of 90-character URLs is not a handover and the reviewer is on a phone -- what the
+handover IS stays BWJ's house rule. One URL prints nothing, because a single line in a terminal
+genuinely is a handover.
 
-**Score:** 2
+Two things neither report stated are written down, because without them the rule is unfollowable: a
+published Artifact's CSP blocks images from every host, so a QR pulled from a QR-image API renders as a
+blank square and says nothing; and the preview URL is what grants access to an unpublished theme, so it
+must never be round-tripped to a third-party generator, and the handover link is as sensitive as the
+URLs on it.
+
+**Score:** 3
 
 #### What makes this deploy extra special
 
 Both BWJ store repos stop handing their reviewer something they cannot use. The measured handover was
 ten URLs of 70 to 100 characters in a two-column table: the terminal wrapped it until the columns
-saying *which market, which page* were gone, the reviewer was on the phone the change only existed on,
-and everything about what was proven and what was being asked stayed in the transcript. A QR per market
-is the difference between reviewing the change and retyping a query string ten times.
+saying *which market, which page* were gone, it could not be selected to copy, the reviewer was on the
+phone the change only existed on, and everything about what was proven and what was being asked stayed
+in the transcript. A QR per market is the difference between reviewing the change and retyping a query
+string ten times -- twenty, now that the control variant doubles the pairs.
 
 Every other Shopify consumer gets the generic half -- the note under a multi-URL list -- and nothing
 else changes for them: no seam to answer, no file to scaffold, and a single-market repo sees no new
