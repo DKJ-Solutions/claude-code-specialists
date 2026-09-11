@@ -366,6 +366,41 @@ $script:ContractRecords = @(
        Adopt = 'decide'; AdoptWhy = "it states WHO this repo publishes to, which is a fact about the organisation around the repo rather than a way of working. Copying the source's 2 tells a webshop that its product buyers read release notes; copying a 1 tells a service that its subscribers do not. Both are wrong in the direction nobody notices, because either value is valid and neither errors";
        Optional = $true; Default = 'every tier the model has (0, 1 and 2) -- unchanged from before the knob existed, so a repo that never answers keeps asking every entry about both audiences';
        Returns = "1 or 2: the one audience tier this repo's entries are asked about, on top of tier 0 which every repo asks unconditionally. 1 is management and the employer/commissioner (a repo delivering work, or selling a product whose buyers never read a note); 2 is the subscriber of a service. It decides which sections new-branch scaffolds -- the two named ones rather than numbered sub-headings -- and which ones open-pr and cut-release require -- NOT which tier numbers are valid to READ: a tier-1 repo must still parse the tier-2 entries already in its own history, and that is Get-EntryTierMax's job, which stays at 2" },
+    # THE REACH LABEL'S NAME (#1870, Dave September 11, 2026). THE AXIS ITSELF IS NOT CONFIGURABLE and is
+    # deliberately not a seam: it is the tier model read on an ISSUE instead of on an entry, defined in
+    # RELEASES-portable.md, and a repo that could switch it off would be answering a scale it still has to
+    # score on every changelog entry it writes. What a repo owns is the STRING GitHub stores, because a
+    # label is a row in one tracker's settings and colleagues may know the axis by another word.
+    #
+    # ADOPT IS 'copy' AND THE RECORD DIRECTLY ABOVE IS 'decide', which is the cleanest illustration of why
+    # those are two axes. Get-ReleaseAudienceTier states WHAT THIS REPO IS -- who it publishes to -- and
+    # copying the source's answer asserts something false about the consumer. This one states the shared
+    # WAY OF WORKING: the family calls the axis 'minor', named after what the landing does to the release
+    # rather than after a tier number, which is the one name true in a tier-1 and a tier-2 repo alike.
+    # Writing it asserts nothing about the consuming repo at all.
+    #
+    # OPTIONAL, AND THE DEFAULT IS THE ANSWER MOST REPOS WANT, so a consumer that never writes this
+    # function is already correct -- the same shape as every other Optional record here.
+    #
+    # WHY THIS AXIS AND NOT THE PRIORITY ONE #1686 KEPT REPO-LOCAL, stated carefully because the obvious
+    # version of the argument is wrong and was caught being made on this record's own branch. #1686's
+    # ground was that nothing in the workflow reads a priority. The tempting reply -- "but the reach
+    # scale IS read" -- does not survive against the LABEL: no gate, no script and no runner reads
+    # 'minor' either, which is what the paragraph below says in as many words. The difference that does
+    # hold is one level up: a prio AXIS exists nowhere in this workflow, while the reach axis is already
+    # every consumer's -- they score it on every changelog entry, and cut-release refuses a minor no
+    # tier-1-or-higher entry earned. The label adds no axis; it reads one they already answer, a step
+    # earlier. #1540's lesson is satisfied separately, by the Default above: an unanswered consumer is
+    # correct rather than gapped.
+    #
+    # NO SCRIPT READS IT, A SKILL DOES, and that is not a reason to leave it a literal: `gh issue create`
+    # fails outright on a label the repo does not have, so a typed literal in a repo that renamed its
+    # label gets you an error instead of an issue. It was four literals until #1841, two of them pointing
+    # at a label the repo no longer had.
+    @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-ReachLabel'; Scripts = @('report-issue skill', 'adopt-dkj-policy skill');
+       Adopt = 'copy'; AdoptWhy = "it states the shared way of working -- this family names the reach axis after what the landing does to the release, and that name is true in a tier-1 and a tier-2 repo alike. Adopting it asserts nothing about the consuming repo; a repo whose colleagues know the axis by another word renames the label and answers this with that word instead";
+       Optional = $true; Default = "'minor' -- the name this workflow prescribes, so a repo that has never answered this is already right";
+       Returns = "one string: the name GitHub stores for the reach label, which an issue carries when its landing will be written at tier 1 or 2 and omits at tier 0. NOT the axis -- that is the tier model in RELEASES-portable.md, is read on every changelog entry, and is not configurable -- only the label's spelling in this repo's tracker" },
     # AND WHERE THAT DOCUMENT GOES (inbound #616). Declared because the knob above was UNANSWERABLE
     # without it for a repo whose hand-written notes live somewhere else: naming the bumps would point
     # the cut at a directory that does not exist there, so the only safe value was @() -- the tier

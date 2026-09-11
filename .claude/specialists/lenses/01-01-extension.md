@@ -91,6 +91,11 @@ product: agent defs, manuals, docs, and tooling.
   [#1685](https://github.com/DKJ-Solutions/claude-code-specialists/issues/1685)). The four rungs, the
   relabel command, and why this is a **separate axis** from the labels that classify a *pull request*
   are in [Derek #05](05-05-extension.md#issue-labels--every-issue-carries-a-priority).
+- **And it carries `minor` when its landing will be written at tier 1 or 2** — the reach label, which is
+  the tier model read on an issue instead of on a changelog entry, prescribed for every repo running this
+  workflow ([#1870](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1870), Dave,
+  September 11, 2026), and a **second axis** independent of priority. Detail in
+  [Derek #05](05-05-extension.md#the-reach-label--minor-and-it-is-a-second-axis-not-a-fifth-rung).
 
 ### The gatekeepers, as implemented here
 

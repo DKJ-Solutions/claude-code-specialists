@@ -662,6 +662,50 @@ is the half of #1685 that had a deadline: a taxonomy applied only to new issues 
 two, and the older half is where the backlog actually is. Two came out at `prio-4` (#1678, #1679), three
 at `prio-3` (#1685 itself among them), four at `prio-2` and one at `prio-1`.
 
+### The reach label — `minor`, and it is a second axis, not a fifth rung
+
+**`minor` is the reach label, and it answers a different question from `prio-N`.** Priority says *when
+somebody should do this*; reach says *who will notice once it lands* — and the two are independent, so an
+issue may carry both, either, or neither. A `prio-4` tier-0 defect is ordinary here (a broken gate nobody
+outside this repo sees), and so is a `prio-1` issue carrying `minor` (a cosmetic change a consumer will
+nonetheless read about in a release note).
+
+| | what it says | who sets it |
+|---|---|---|
+| `prio-1` … `prio-4` | when this should be picked up | whoever files, by judgement |
+| `minor` | the landing will be written at tier 1 or 2, so the release carrying it is a minor | whoever files, from the same scale the entry will be scored on |
+
+**It is not this repo's own convention** — it is the tier model read on an issue instead of on a changelog
+entry, prescribed for every repo running this workflow
+([#1870](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1870), Dave, September 11, 2026), and
+defined in [`RELEASES-portable.md`](../../../plugins/dkj-policy/RELEASES-portable.md#the-same-scale-on-an-issue--the-reach-label).
+**Why this and not the prio axis, stated carefully, because the obvious version of the argument is
+wrong.** [#1686](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1686) half 2 kept the prio
+axis repo-local on the ground that *nothing in the workflow reads a priority*. The tempting reply is
+*"but the reach scale IS read"* — and held against the LABEL, that reply does not survive: no gate, no
+script and no runner reads `minor` either. Two skills consult it, which is the same enforcement class as
+zero scripts consulting `prio-`, not a stronger one. Found by the conclusion red-team on the branch that
+wrote the rule, against that branch's own contract comment, which says in as many words that no script
+reads the seam.
+
+**The difference that does hold is one level up: the AXIS, not the label.** A prio axis exists nowhere in
+this workflow, so making it portable would have introduced a scale a consumer had never been asked about.
+The reach axis is already theirs — every changelog entry they write scores it, and `cut-release.ps1`
+refuses a minor that no tier-1-or-higher entry earned. The label adds no axis; it reads one the consumer
+already answers, one step earlier. That is a claim about what the repo already carries rather than about
+what enforces it, and it is the only version of this argument that is true.
+
+**Absence is the answer, not a missing field.** Tier 0 — only this repo's own developers notice — carries
+no label, and doubt resolves there. A filter that matches everything filters nothing, so the point of the
+label is that `is:open label:minor` is a short list somebody can actually work.
+
+**This repo's label reads the tier-2 wording**, because `Get-ReleaseAudienceTier = 2` here: *"Reaches
+beyond tier 0: subscribers of this service notice it."* A store repo answering tier 1 carries the same
+name with the management wording. The name is deliberately the same in both — it is named after what the
+landing does to the release, which is the one thing true at either audience tier — and `Get-ReachLabel`
+states the string for a repo whose colleagues know the axis by another word. This repo does not answer it
+and does not need to: `minor` is the default.
+
 ### Tooling & account
 
 - **GitHub CLI (`gh`)** is used for PRs. This repo lives under the **`DKJ-Solutions`** org and is

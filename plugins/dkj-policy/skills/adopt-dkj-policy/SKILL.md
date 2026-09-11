@@ -1,20 +1,21 @@
 ---
 name: adopt-dkj-policy
-description: Adopt the dkj-policy workflow in a consuming repo, in three independent parts that can run in any order or alone. Part 1 scaffolds the workflow's own root folder -- dkj-policy/ -- the folder docs (README and CONTRIBUTING), the releases root with this repo's release answers, the branch-entry CI gate, and the PR template open-pr fills in; use this right after installing the plugin, or when the script-contract session check reports the folder missing, since an install alone writes nothing into the repo. Part 2 adopts the source repo's workflow configuration from the shipped blueprint -- placing the values that state the shared way of working into this repo's own seam libs, and proposing the rest for a person to answer; use this after specialists-init has laid down scripts/repo-config.ps1 and scripts/lib/branch-info.ps1, or whenever the script-contract check reports functions this repo has never configured. Part 3 builds the CI floor -- it places the two runners that keep the fold and the resolves verification alive across a merge the shipping session never observes (a merge queue, or the GitHub UI merge button), and reports whether a required status check exists at all, which is the certificate ship-pr dates its staleness guard from; use it after installing the plugin, when ship-pr says the staleness guard is off because no required check is known, or when a merge landed and nothing folded. A merge queue is optional and is not this workflow policy: most repos cannot have one, so a missing queue is reported as the ordinary state rather than as a gap. All three parts are strictly additive and dry-run by default; none overwrites anything.
+description: Adopt the dkj-policy workflow in a consuming repo, in four independent parts that can run in any order or alone. Part 1 scaffolds the workflow's own root folder -- dkj-policy/ -- the folder docs (README and CONTRIBUTING), the releases root with this repo's release answers, the branch-entry CI gate, and the PR template open-pr fills in; use this right after installing the plugin, or when the script-contract session check reports the folder missing, since an install alone writes nothing into the repo. Part 2 adopts the source repo's workflow configuration from the shipped blueprint -- placing the values that state the shared way of working into this repo's own seam libs, and proposing the rest for a person to answer; use this after specialists-init has laid down scripts/repo-config.ps1 and scripts/lib/branch-info.ps1, or whenever the script-contract check reports functions this repo has never configured. Part 3 builds the CI floor -- it places the two runners that keep the fold and the resolves verification alive across a merge the shipping session never observes (a merge queue, or the GitHub UI merge button), and reports whether a required status check exists at all, which is the certificate ship-pr dates its staleness guard from; use it after installing the plugin, when ship-pr says the staleness guard is off because no required check is known, or when a merge landed and nothing folded. A merge queue is optional and is not this workflow policy: most repos cannot have one, so a missing queue is reported as the ordinary state rather than as a gap. Part 4 puts the one issue label this workflow prescribes on the tracker -- the reach label, minor by default, which is the tier model read on an issue instead of on a changelog entry; use it after installing the plugin, or when a filing fails because the label does not exist. Parts 1 to 3 are strictly additive and dry-run by default; none overwrites anything, and part 4 is a person's gh call rather than a script.
 ---
 
 # adopt-dkj-policy -- scaffold the folder, place the config seams, build the CI floor
 
 An install writes nothing into your repo: it clones the plugin into your cache, and that is all. This
-command is the three things that actually place `dkj-policy` on your side, and they are independent of
+command is the four things that actually place `dkj-policy` on your side, and they are independent of
 each other -- run them in any order, or run only the one you need:
 
 - **Part 1** creates the workflow's own root folder and its CI gate.
 - **Part 2** places or proposes the answers to the repo-owned config seam the shared scripts read.
 - **Part 3** builds the CI floor: the two runners that survive a merge your session never sees, and
   whether a required check exists for the staleness guard to read. A merge queue is optional here.
+- **Part 4** puts the one issue label this workflow prescribes on your tracker.
 
-No part depends on another having run. All three are dry-run by default and never overwrite a file
+No part depends on another having run. Parts 1 to 3 are dry-run by default and never overwrite a file
 that already exists. Part 1 makes exactly one write **into** an existing file -- it appends the folder
 README's marked UPDATE section when that page does not carry it -- and it replaces nothing; see its
 rules below.
@@ -506,3 +507,60 @@ because that is a live defect: entries are being stranded, or merges are about t
 
 `ship-pr` tells you the same thing from the other side. Under a queue with no fold runner in your tree, its
 closing lines say so and print the fold command, instead of promising a fold that is not coming.
+
+---
+
+## Part 4 -- the reach label on your tracker
+
+[`CONTRIBUTING-portable.md`](../../CONTRIBUTING-portable.md) prescribes exactly one issue label, and this
+is the step that puts it on your tracker. It is a person's `gh` call rather than a script, for the same
+reason the rest of your labels are: a tracker's settings are not a file this plugin writes.
+
+**Why one label and no others.** The reach label is not a convention of its own -- it is
+[the tier model](../../RELEASES-portable.md#the-same-scale-on-an-issue--the-reach-label) read on an issue
+instead of on a changelog entry, and your repo already answers that scale on every entry it writes. An
+issue whose landing will be written at tier 1 or 2 carries the label; one that will be written at tier 0
+does not, and that absence is the answer rather than a missing field.
+
+**Read `Get-ReachLabel` from `scripts/repo-config.ps1` first** and check for *that* name -- `minor` where
+the repo has never answered it, which is most repos:
+
+```bash
+gh label list --repo <owner>/<repo> | grep -E '^<reach label>\b'
+gh label create "<reach label>" --repo <owner>/<repo> --color fbca04 \
+  --description "<see the two wordings below>"
+```
+
+**The description follows your `Get-ReleaseAudienceTier`, because the label names one audience and you
+have exactly one.** Tier 1 and tier 2 are two kinds of audience rather than two rungs, so a repo copying
+the other one's wording describes a reader it does not have:
+
+| your audience tier | the description to use |
+|---|---|
+| **1** (management, the employer or commissioner) | `Reaches the business: management and the commissioner notice it. Sits on top of tier 0.` |
+| **2** (subscribers of a service) | `Reaches beyond tier 0: subscribers of this service notice it. Sits on top of tier 0.` |
+
+GitHub caps a label description at **100 characters**, so keep any wording of your own inside that --
+`gh label create` refuses the whole call with `HTTP 422` over it, and the message names the length rather
+than the label.
+
+**A missing reach label is two different situations, and this step must not assume the harmless one.**
+It can be missing because the repo never had it -- create it. It can also be missing because the repo
+**renamed** it and has not answered the seam, and creating it then leaves two labels for one axis, one of
+them empty, with every existing issue on the other. Nothing reports that, because the run is doing exactly
+what it was written to do. So **before creating it, read the whole label list** (`gh label list --repo
+<owner>/<repo>`) and look for the axis under another name: a label that carries issues and describes reach.
+Where you find one, the answer is `Get-ReachLabel`, not a second label.
+
+**A repo that already runs this axis under an older name needs no rename.** The name `tier-1` was this
+workflow's default until September 11, 2026 ([#1870](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1870));
+a repo still carrying it either renames the label on the tracker -- GitHub keeps it on every issue that
+has it -- or answers `Get-ReachLabel` with `tier-1` and changes nothing. Both are correct, and the second
+costs one function. Do not leave it at neither: the default is read at the moment of a filing, so a repo
+whose label and seam disagree gets an `HTTP 422` from `gh issue create` instead of an issue.
+
+### Afterwards
+
+Nothing else reads this label -- no gate refuses on it and no script writes it. What it buys is the
+worklist: `is:open label:<reach label>` is every open issue whose landing will be visible past this
+repo's own developers.
