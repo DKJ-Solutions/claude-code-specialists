@@ -43,7 +43,45 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**7 / 14 minor entries** <!-- pending-tally -->
+**8 / 15 minor entries** <!-- pending-tally -->
+
+### DEPLOY: docs/1851-two-propagation-channels · 20260911-123849
+
+`CLAUDE.md`'s repo slot named one way a change reaches a consumer -- the plugin payload, gated by a
+release and a version bump, landing in a session after `plugin update`. There are two. The three
+runners `adopt-dkj-policy` scaffolds check this repository out at `ref: main` and run a path into
+it, so a change to `check-branch-entry.ps1`, `check-unfolded-entry.ps1`, `fold-changelog-entry.ps1`
+or `verify-resolved-issues.ps1` is live in every adopted consumer's next CI run: no tag, no bump, no
+refresh, no restart.
+
+Strictly the old sentence was never false -- CI is not a session. What made it worth repairing is
+that the paragraph reads as the whole propagation model, and it is the document every session loads,
+so a reader reasoning from it concludes that a shared gate script cannot reach a consumer before a
+cut. That is the opposite of what happens, and the layer it was silent about is the one that can
+change a consumer's required check with nobody bumping anything.
+
+Nothing about the runners changes. The `ref: main` pin is argued by name in `adopt-dkj-policy`'s
+skill page and #1805 already sharpened that argument; the addition points at it rather than
+restating it. What is new is the writing rule: name the two channels together or name neither.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+A consumer reading this repo's `CLAUDE.md` as the model for their own now sees that adopting these
+runners means tracking this trunk -- which is the one thing about the arrangement they cannot learn
+from their side, and the reason a tag they own the bump on is offered as a trade in the skill page.
+Nothing they run changes.
+
+**Score:** 1
+
+#### Pull Request
+
+CLAUDE.md names the consumers' CI second checkout as the second propagation channel
+
+[PR #1856](https://github.com/DKJ-Solutions/dkj-claude-plugins/pull/1856)
+
+---
 
 ### DEPLOY: fix/1850-runner-adoption-visible · 20260911-123203
 
