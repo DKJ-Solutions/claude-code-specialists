@@ -60,11 +60,18 @@ version check.
 
 #### The blast radius, measured rather than assumed
 
-Every other bounded caller in this tree already reads `TimedOut` -- `ship-pr.ps1` carries a comment
-calling its own read LOAD-BEARING for precisely this reason, and `check-connectors.ps1` reads
-`ShortRead` beside it. This hook was the one bounded caller reading neither.
+The vulnerable class is narrower than "bounded", and saying so precisely is what keeps the next reader
+from auditing sites that are fine. A caller is exposed when it decides a VERDICT from the capture's
+CONTENT. Most bounded sites here do not: `Get-TrunkGap` in `entry-scaffold-lib.ps1` judges from
+`$fetch.ExitCode` and relays `Output` as progress for a human, and `park-cycle.ps1`'s fetch is the same
+shape -- a timeout cannot mislead either. Of the callers that do read the content, `ship-pr.ps1` calls
+its own `TimedOut` read LOAD-BEARING for exactly this reason and `check-connectors.ps1` reads
+`ShortRead` beside it. This hook was the one reading neither.
 
-- [x] Enumerate the bounded call sites and which of the two fields each one reads.
+- [x] Enumerate the bounded call sites and which of the two fields each one reads -- and correct this
+      section, which first claimed every other bounded caller reads `TimedOut`. It is true of the ones
+      that judge from content and false of the tree, which is a claim that would have sent somebody
+      auditing `Get-TrunkGap` for a defect it does not have.
 
 ### CREATE
 
@@ -102,10 +109,11 @@ for a check that did not finish: the `[UNREGISTERED]` hazard the hook's own word
 arriving through the one field it was not reading. A capture truncated by the kill can also end after a
 `[SUMMARY]` and before an `[ERROR]`, which reads as "up to date" about a checkout that is behind.
 
-The hook now reads `TimedOut` and `ShortRead` -- as every other bounded caller in this repo already
-does -- and degrades to its honest one-line verdict instead of parsing a document the engine never
-finished writing. `Stop-NativeProcessTree`'s docstring, which had told callers a failed kill costs
-nothing but a stray process, now says what it actually costs and where the answer is.
+The hook now reads `TimedOut` and `ShortRead` -- as the other bounded callers that judge from a
+capture's content already do -- and degrades to its honest one-line verdict instead of parsing a
+document the engine never finished writing. `Stop-NativeProcessTree`'s docstring, which had told
+callers a failed kill costs nothing but a stray process, now says what it actually costs and where the
+answer is.
 
 It surfaced as an intermittent red suite (#1852, CI run 34596638888) whose own comment said it could
 not fail under load. That comment was arguing from the bound, which is load-proof, rather than from the
