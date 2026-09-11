@@ -51,6 +51,46 @@ specialist begins, and again before a phase is called done.
 specialists must never require one to exist. That is why this is conditional prose rather than a step
 of the ritual — the ritual travels to every repo, a method travels only to the repos that chose it.
 
+## Why step 6 prints itself — and why not to repair it in prose again
+
+**Read this before sharpening the close-out passage in the persona.** That passage is deliberately
+short now, and its shortness is the conclusion of everything below rather than an oversight.
+
+Step 6 was the only step of the fixed ritual with no mechanism behind it, and it is the step that runs
+**last**, when the session is longest and the rule is furthest back in context. It was repaired in
+prose four times and lost four times:
+
+| when | the repair | form |
+|---|---|---|
+| August 24, 2026 (#849) | the three permitted shapes — A done, B one decision, C parked | prose |
+| August 27, 2026 | "THE CLOSE-OUT IS A RECEIPT, NOT THE REPORT" | prose |
+| September 4, 2026 (#1402) | the filing line bounded — a number and at most a short clause | prose |
+| September 4, 2026 (#1408) | the order — duplication filters first, then a ceiling of two or three lines | prose |
+
+All four were live, in context, and byte-identical between the marketplace clone and the install cache
+on the session that broke two of them at once with a ~25-line close-out carrying two tables. #1402 had
+already named the diagnosis a week earlier — *"this is not a missing rule. It is a rule that keeps
+losing"* — and [#1884](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1884) added the only
+new information there was: a fourth sharpening had now been tried. **That is evidence about the repair
+strategy, not about the wording.**
+
+**So the fifth repair is not a fifth paragraph.** The five scripts that end a work chain — `ship-pr`,
+`open-pr`, `park-branch`, `fold-changelog-entry` and `cut-release` — print the shape themselves, at the
+one moment it is free: immediately before a close-out is composed. The precedent is the claim step,
+stated in the persona 250 lines below the close-out rule and acted on there and not here: *a rule
+enforced by nothing but memory is one that gets skipped*.
+
+**The alternative that was weighed and not built** was a `Stop` hook measuring the finished close-out
+and reporting its length. It is more thorough and it fails on its own terms twice: it has to parse a
+transcript shape that differs across the harness versions consumers run, and what it produces is a
+second report to read — which is the complaint itself.
+
+**Two consequences worth knowing before changing any of it.** One chain prints **one** receipt: a
+conductor that spawns another chain-ending script suppresses the child's copy through the environment,
+because a flag forwarded by hand at each nesting site would be exactly the memory-enforced rule this
+mechanism exists to retire. And the reminder obeys its own ceiling in the base case — a reminder about
+brevity that runs long teaches the opposite of what it says.
+
 ## Delegating parallel work — fresh agents, no forks
 
 When Chris (or an executing specialist) fans a job out across multiple subagents in parallel, the

@@ -299,6 +299,13 @@ if ($absent.Count -gt 0) {
 # in none of them" is the sentence #294 was filed about.
 . (Join-Path $PSScriptRoot '..\lib\check-report-lib.ps1')
 
+# THE CLOSE-OUT RECEIPT SHAPE (issue #1884) -- see closeout-lib.ps1
+# for why step 6 of the ritual got a mechanism after losing four times in prose. Guarded on
+# git-porcelain-lib's grounds: a consumer whose mirror predates this lib must not crash on load, and
+# the call site tests for the function rather than assuming the dot-source took.
+$cutCloseoutLib = Join-Path $PSScriptRoot '..\lib\closeout-lib.ps1'
+if (Test-Path -LiteralPath $cutCloseoutLib -PathType Leaf) { . $cutCloseoutLib }
+
 # --- The repo's own answers, read once (#417) -----------------------------------------------------
 # Every one of these is OPTIONAL in the script contract, and every fallback is what this script did
 # before it was shared -- so a consumer that defines none of them gets the unchanged behaviour.
@@ -1237,6 +1244,14 @@ function Write-FollowUpSteps {
     # is an edit rather than a command. new-internal-note.ps1 is still shipped and still works for a repo
     # running the two-document flow; nothing here calls it.
     Write-SelfConsumptionReminder
+
+    # THE RECEIPT SHAPE (issue #1884), placed INSIDE this function rather than after its two call
+    # sites, so the early-exit path and the full cut are covered by one edit and cannot drift apart.
+    # It sits above the hand-written-document block deliberately: that block is a genuine next STEP,
+    # and a reminder about the close-out must not read as the last item on a to-do list.
+    if (Test-FunctionDefined 'Write-CloseOutReceipt') {
+        Write-CloseOutReceipt -Cite "the release notes for $tagName"
+    }
 
     if (-not $cutNote) { return }
     Write-Host ""

@@ -265,6 +265,13 @@ if ($repo -match 'VUL-IN') {
 # agree on, so it is the one read through the shared definition rather than a fourth private idiom.
 . (Join-Path $PSScriptRoot '..\lib\seam-lib.ps1')
 
+# THE CLOSE-OUT RECEIPT SHAPE (issue #1884), printed as this run's last line -- see closeout-lib.ps1
+# for why step 6 of the ritual got a mechanism after losing four times in prose. Guarded on
+# git-porcelain-lib's grounds: a consumer whose mirror predates this lib must not crash on load, and
+# the call site tests for the function rather than assuming the dot-source took.
+$foldCloseoutLib = Join-Path $PSScriptRoot '..\lib\closeout-lib.ps1'
+if (Test-Path -LiteralPath $foldCloseoutLib -PathType Leaf) { . $foldCloseoutLib }
+
 # BOM-less UTF8 -- Set-Content -Encoding UTF8 always adds a BOM in Windows PowerShell 5.1,
 # and the rest of the repo (CHANGELOG.md etc.) has no BOM.
 $Utf8NoBom = New-Object System.Text.UTF8Encoding $false
@@ -1331,5 +1338,23 @@ if ($Commit) {
 if ($refused.Count -gt 0) {
     $what = if ($refused.Count -eq 1) { 'entry was' } else { 'entries were' }
     Write-Host "$($refused.Count) $what refused as a duplicate and NOT folded: $($refused -join ', ')" -ForegroundColor Red
+    # BOTH ARMS CARRY THE RECEIPT (issue #1884), and this is the arm that needs it more: a refusal is
+    # close-out shape C -- a blocker, already parked -- which is the shape most often written as prose
+    # because the session has something to explain. The explanation belongs in the issue it files.
+    if (Test-FunctionDefined 'Write-CloseOutReceipt') {
+        Write-CloseOutReceipt -Cite 'the refused entry, by name above'
+    }
     exit 1
+}
+
+# THE SUCCESS ARM'S LAST LINE. A standalone fold is a chain ending in its own right.
+#
+# AND ship-pr.ps1 DOES INVOKE THIS SCRIPT -- as a child process, `& powershell -File
+# fold-changelog-entry.ps1`. This comment claimed the opposite when it was written, on a grep that had
+# been truncated by `head`, and the code review on this branch caught what that cost: an ordinary ship
+# printed the receipt three times, twice of them mid-chain. The double-print is prevented by the
+# conductor declaring the chain (Push-CloseOutSuppression in ship-pr), which this run inherits through
+# the environment -- not by the two never meeting, which they always did.
+if (Test-FunctionDefined 'Write-CloseOutReceipt') {
+    Write-CloseOutReceipt -Cite 'CHANGELOG.md'
 }

@@ -439,6 +439,13 @@ $info = Get-BranchInfo -Branch $branch
 # optional Get-ChangelogPath in its own repo-config.ps1, which is already loaded.
 . (Join-Path $PSScriptRoot '..\lib\seam-lib.ps1')
 
+# THE CLOSE-OUT RECEIPT SHAPE (issue #1884), printed as this run's last line -- see closeout-lib.ps1
+# for why step 6 of the ritual got a mechanism after losing four times in prose. Guarded on
+# git-porcelain-lib's grounds: a consumer whose mirror predates this lib must not crash on load, and
+# the call site tests for the function rather than assuming the dot-source took.
+$openCloseoutLib = Join-Path $PSScriptRoot '..\lib\closeout-lib.ps1'
+if (Test-Path -LiteralPath $openCloseoutLib -PathType Leaf) { . $openCloseoutLib }
+
 # THE ENTRY LIVES IN branch/ SINCE THE SPLIT (Dave, August 6, 2026), with the root <SafeName>.md still
 # accepted as the fallback. Both exist in the wild simultaneously: a branch created before the split
 # carries the root form, and consumers receive these scripts through a plugin update rather than by
@@ -1818,6 +1825,11 @@ if ($existingPr) {
     } else {
         Write-Host "Title left as it is; retitle with 'gh pr edit' if you want it changed." -ForegroundColor DarkGray
     }
+    # THE RECEIPT SHAPE, LAST (issue #1884). This ending is the "branch waits for Dave" one -- the PR
+    # is open and nothing merges -- which is close-out shape A or B and exactly where a report grows.
+    if (Test-FunctionDefined 'Write-CloseOutReceipt') {
+        Write-CloseOutReceipt -Cite "PR #$($existingPr.number)" -Bypass (Get-GateBypassNote -SkipLint:$SkipLint -SkipTests:$SkipTests)
+    }
     exit 0
 }
 
@@ -1996,3 +2008,14 @@ try {
 # SAID TWICE (issue #1559): the machine-local note from before the gates is off-screen by now.
 if ($machineLocalNote) { Write-Warning $machineLocalNote }
 Write-Host "PR created for '$branch'." -ForegroundColor Green
+
+# THE RECEIPT SHAPE, LAST (issue #1884) -- see closeout-lib.ps1. A PR opened and not yet shipped is a
+# close-out as much as a merged one is, and it is the ending a branch under one of the two "wait for
+# Dave" exceptions stops at, so it must not be reachable only through ship-pr.
+if (Test-FunctionDefined 'Write-CloseOutReceipt') {
+    # NO BRANCH NAME IN THE CITATION, deliberately. The line above prints one and this file has never
+    # routed a ref through Get-DisplayRef, so adding one here would be a 33rd site of #1623's class in
+    # a run that has no need of it: what the receipt has to point at is the pull request, which the
+    # create above has just printed the URL of.
+    Write-CloseOutReceipt -Cite 'the pull request just opened' -Bypass (Get-GateBypassNote -SkipLint:$SkipLint -SkipTests:$SkipTests)
+}
