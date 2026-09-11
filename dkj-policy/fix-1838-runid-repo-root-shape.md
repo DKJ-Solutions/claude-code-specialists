@@ -36,19 +36,42 @@
 
 ### PLAN
 
+Both parameters of `record-suite-durations.ps1` are positional, so under `powershell -NoProfile -File`
+a space-separated `-RunId` list binds its second id to `-RepoRoot`, which then fails as a missing path
+-- an error that names neither `-RunId` nor the comma form the script actually expects (#1838). Fix at
+the point of the mistake: document the comma form and refuse the run-id-shaped `-RepoRoot` by name.
+
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [x] Add a `.PARAMETER RunId` note stating the comma-separated form for `-File` callers.
+- [x] Guard `-RepoRoot` against a run-id shape (`^\d{6,}$`) and throw naming the comma form with the
+      caller's own values.
 
 ### TEST
 
+- [x] Reproduced the issue's exact repro (`-RunId 34583187104 34583740147 -DryRun`) -- now throws
+      naming `-RunId` and the comma form, instead of a bare "Cannot find path" from `Resolve-Path`.
+- [x] Verified the comma form (`-RunId "34583187104,34583740147" -DryRun`) is unaffected by the new
+      guard and proceeds into the script's existing logic.
+- [x] Parsed the file with `[System.Management.Automation.Language.Parser]::ParseFile` -- no syntax
+      errors.
+- [~] No dedicated Pester suite added -- no maintenance script in `scripts/maintenance/` carries one
+      today, and this is a docstring + a guard clause on an already-manual tool.
+
 ### DEPLOY: fix/1838-runid-repo-root-shape
 
-**Score:**
+`record-suite-durations.ps1` now refuses a run-id-shaped `-RepoRoot` by name instead of failing deep
+inside `Resolve-Path` with no mention of `-RunId`, and its docstring states the comma-separated form
+the script actually expects for several run ids under `-File`.
+
+**Score:** 1 -- a docstring clarification and an error-message fix on a script only a session invokes
+by hand; it prevents a failure that costs a minute of re-diagnosis, nothing more.
 
 #### What makes this deploy extra special
 
-**Score:**
+N/A -- an internal maintenance-script fix, not visible to a subscriber of any service this repo ships.
+
+**Score:** N/A
 
 #### Pull Request
 
