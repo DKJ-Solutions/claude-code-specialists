@@ -1,7 +1,7 @@
 <#
 .SYNOPSIS
-    The close-out receipt shape, printed at the moment a work chain ends -- so the rule is in front
-    of the session that is about to write one, instead of 300 lines back in a persona body.
+    The close-out receipt shape, printed at the moment a work chain ends -- so the rule is in front of
+    the session that is about to write one, instead of 300 lines back in a persona body.
 
 .DESCRIPTION
     Dot-source this file:
@@ -37,17 +37,34 @@
     that has ALREADY been written, where this lands before one is composed. A reminder that arrives
     after the failure is a second report to read, which is the thing being complained about.
 
-    SO THE PLACEMENT IS THE WHOLE MECHANISM: the last line of a chain-ending script is typically the
-    last thing in context when the close-out is composed. Nothing here refuses anything, nothing
-    fails a run, and nothing is measured -- it costs three lines of DarkGray at the one moment they
-    are free.
+    SO THE PLACEMENT IS THE WHOLE MECHANISM: the run's closing lines are typically the last thing in
+    context when the close-out is composed. In four of the five callers this is literally the last
+    statement; in cut-release.ps1 it sits just above the hand-written-note reminder, deliberately, so
+    a reminder about the close-out is not read as the last item on a to-do list. Nothing here refuses
+    anything, nothing fails a run, and nothing is measured -- it costs three lines of DarkGray at the
+    one moment they are free.
 
-    IT OBEYS ITS OWN CEILING, deliberately. A reminder about brevity that runs ten lines teaches the
-    opposite of what it says, and would be the fifth prose repair wearing a script's clothes.
+    IT OBEYS ITS OWN CEILING IN THE BASE CASE, deliberately. A reminder about brevity that runs ten
+    lines teaches the opposite of what it says, and would be the fifth prose repair wearing a
+    script's clothes. The bypass clause is the one place it runs to a fourth line, because that fact
+    has nowhere else to live -- see Write-CloseOutReceipt's -Bypass.
 
     No Set-StrictMode here: dot-sourcing would change the strict mode of the calling script.
     Pure ASCII (repo convention for .ps1).
 #>
+
+# ONE CHAIN, ONE RECEIPT -- and the suppression travels in the ENVIRONMENT rather than in a parameter
+# (issue #1884, found by the code review on the branch that built this). ship-pr.ps1 is a conductor: it
+# spawns open-pr.ps1 and fold-changelog-entry.ps1 as CHILD PROCESSES, each of which reaches its own
+# chain ending and printed its own receipt -- so an ordinary successful ship printed the reminder three
+# times, twice of them mid-chain, before CI had even started.
+#
+# WHY NOT A -Quiet SWITCH FORWARDED AT EACH CALL. That is the same class of rule this whole file exists
+# to retire: it works only while every future nesting site remembers to forward it, and a rule enforced
+# by nothing but memory is one that gets skipped. A child process inherits its parent's environment for
+# free, so a conductor declares itself ONCE and every descendant is covered -- including ones nobody has
+# written yet. The parameter is kept for a caller that wants to suppress its own single call.
+$script:CloseOutSuppressVar = 'DKJ_CLOSEOUT_SUPPRESS'
 
 function Write-CloseOutReceipt {
     <#
@@ -55,8 +72,8 @@ function Write-CloseOutReceipt {
         Print the three-part close-out shape, with the citation this run already knows.
 
     .DESCRIPTION
-        Called as the LAST statement of a chain-ending script. Prints nothing that a reader has to
-        act on -- it is a reminder, not a check -- and never touches an exit code.
+        Called at the end of a chain-ending script. Prints nothing that a reader has to act on -- it
+        is a reminder, not a check -- and never touches an exit code.
 
     .PARAMETER Cite
         Where the detail already lives, in the form a receipt would carry it: 'PR #1885', 'issue
@@ -73,10 +90,11 @@ function Write-CloseOutReceipt {
         to let the requester learn it later, and with nowhere else to put it. The honest home is the
         PR body, with the receipt carrying a clause. The SCRIPT knows this fact and the persona
         cannot, which is exactly the kind of thing a mechanism should be carrying rather than prose.
+        Build it with Get-GateBypassNote rather than by hand.
 
     .PARAMETER Quiet
-        Print nothing. For a caller that is itself being driven by another script in the same chain,
-        so the shape is printed once per chain rather than once per script.
+        Print nothing. For one call a caller wants silenced; a whole nested chain is covered by
+        Push-CloseOutSuppression instead.
     #>
     [CmdletBinding()]
     param(
@@ -86,6 +104,10 @@ function Write-CloseOutReceipt {
     )
 
     if ($Quiet) { return }
+    # THE CONDUCTOR HAS ALREADY CLAIMED THIS CHAIN'S RECEIPT, so this run is a link in the middle of
+    # one and says nothing. Read from the environment, so it holds across the process boundary that
+    # created the problem in the first place.
+    if (-not [string]::IsNullOrEmpty([Environment]::GetEnvironmentVariable($script:CloseOutSuppressVar))) { return }
 
     # THE MIDDLE PART IS THE ONE THAT DRIFTS, so it is the one that gets the caller's own answer.
     $where = if ([string]::IsNullOrWhiteSpace($Cite)) { 'where to read it' } else { "where to read it ($($Cite.Trim()))" }
@@ -101,4 +123,66 @@ function Write-CloseOutReceipt {
     if (-not [string]::IsNullOrWhiteSpace($Bypass)) {
         Write-Host "  This run skipped $($Bypass.Trim()): a deliberate gate bypass belongs in the PR body, with a clause in the receipt." -ForegroundColor DarkGray
     }
+}
+
+function Get-GateBypassNote {
+    <#
+    .SYNOPSIS
+        The switches this run was told to skip, in the words the operator typed -- '' when none.
+
+    .DESCRIPTION
+        ONE COPY, because there were three (the code review on #1884's branch). ship-pr.ps1 had a
+        private helper and open-pr.ps1 had the same three lines inline at both of its endings, all of
+        them collecting the SAME two switch names for the SAME sentence. Three independent copies of
+        one string-building rule is the drift shape this repo has scar tissue from, and the fix is
+        the ordinary one: the lib that owns the sentence owns the phrase that goes in it.
+
+        TAKEN AS EXPLICIT BOOLEANS rather than read out of the caller's scope. A function CAN see a
+        script-scope $SkipTests by dynamic scoping, and doing that would make this silently
+        caller-dependent -- correct in the two scripts that happen to name their switches that way,
+        and quietly wrong in the next one that does not.
+    #>
+    [CmdletBinding()]
+    param(
+        [bool]$SkipLint = $false,
+        [bool]$SkipTests = $false
+    )
+
+    $skipped = @()
+    if ($SkipLint)  { $skipped += '-SkipLint' }
+    if ($SkipTests) { $skipped += '-SkipTests' }
+    if ($skipped.Count -eq 0) { return '' }
+    return ($skipped -join ' and ')
+}
+
+function Push-CloseOutSuppression {
+    <#
+    .SYNOPSIS
+        Declare this process the conductor of the chain: descendants print no receipt.
+
+    .DESCRIPTION
+        Set before spawning a child that is itself a chain-ending script, and cleared with
+        Pop-CloseOutSuppression once it returns. The conductor prints the one receipt at its own
+        ending, which is the only place in the chain where "the session can be cleared" is a fact
+        rather than a guess.
+    #>
+    [CmdletBinding()]
+    param()
+    [Environment]::SetEnvironmentVariable($script:CloseOutSuppressVar, '1')
+}
+
+function Pop-CloseOutSuppression {
+    <#
+    .SYNOPSIS
+        Undo Push-CloseOutSuppression, so this process's own receipt still prints.
+
+    .DESCRIPTION
+        UNCONDITIONAL, not a restore of a saved value. A conductor that was ITSELF spawned under
+        suppression is a case that does not arise -- nothing in this workflow nests three deep -- and
+        if it ever did, the safe failure is one receipt too many rather than a chain that prints
+        none, which is the state #1884 was filed about.
+    #>
+    [CmdletBinding()]
+    param()
+    [Environment]::SetEnvironmentVariable($script:CloseOutSuppressVar, $null)
 }

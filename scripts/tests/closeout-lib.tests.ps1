@@ -115,9 +115,40 @@ Assert-True ($skippedBody -match 'PR body')            '...and sends it to the P
 Assert-True (((Get-ReceiptLines @{ Bypass = '   ' }) -join "`n") -notmatch 'skipped') 'whitespace is not a bypass'
 
 Write-Host ''
-Write-Host '-Quiet prints nothing' -ForegroundColor Cyan
+Write-Host 'Get-GateBypassNote -- one copy of the phrase, three call sites' -ForegroundColor Cyan
+
+Assert-Equal ''                       (Get-GateBypassNote)                                     'nothing skipped: the empty string, so the clause stays silent'
+Assert-Equal '-SkipLint'              (Get-GateBypassNote -SkipLint:$true)                     'lint only'
+Assert-Equal '-SkipTests'             (Get-GateBypassNote -SkipTests:$true)                    'tests only'
+Assert-Equal '-SkipLint and -SkipTests' (Get-GateBypassNote -SkipLint:$true -SkipTests:$true)  'both, joined in the words the operator typed'
+
+# EXPLICIT BOOLEANS, not a read of the caller's scope. A $SkipTests defined here must NOT leak in --
+# that would make the helper silently caller-dependent, correct only in scripts that happen to name
+# their switches this way.
+$SkipTests = $true
+Assert-Equal '' (Get-GateBypassNote) "a caller's own `$SkipTests does not leak into the helper"
+Remove-Variable SkipTests
+
+Write-Host ''
+Write-Host 'One chain, one receipt -- the suppression a conductor sets' -ForegroundColor Cyan
 
 Assert-Equal 0 (Get-ReceiptLines @{ Cite = 'PR #1'; Quiet = $true }).Count '-Quiet suppresses every line'
+
+# THE FAILURE THIS PREVENTS, measured by the code review on this branch: ship-pr.ps1 spawns open-pr.ps1
+# and fold-changelog-entry.ps1 as CHILD PROCESSES, each of which reaches its own chain ending. Before
+# the suppression an ordinary successful ship printed the reminder three times, twice of them mid-chain
+# -- once before CI had even started.
+Push-CloseOutSuppression
+Assert-Equal '1' ([Environment]::GetEnvironmentVariable('DKJ_CLOSEOUT_SUPPRESS')) 'the conductor declares itself in the ENVIRONMENT, which a child process inherits'
+Assert-Equal 0 (Get-ReceiptLines @{ Cite = 'PR #1' }).Count '...and a run under it prints nothing at all'
+Pop-CloseOutSuppression
+Assert-True ([string]::IsNullOrEmpty([Environment]::GetEnvironmentVariable('DKJ_CLOSEOUT_SUPPRESS'))) 'popping clears it'
+Assert-Equal 3 @((Get-ReceiptLines @{ Cite = 'PR #1' }) | Where-Object { $_.Trim() -ne '' }).Count "...so the conductor's own receipt still prints"
+
+# UNCONDITIONAL POP, asserted because the docstring commits to it: a double push still clears in one
+# pop, and the safe failure is one receipt too many rather than a chain that prints none.
+Push-CloseOutSuppression; Push-CloseOutSuppression; Pop-CloseOutSuppression
+Assert-Equal 3 @((Get-ReceiptLines @{ Cite = 'PR #1' }) | Where-Object { $_.Trim() -ne '' }).Count 'a second push does not need a second pop'
 
 Write-Host ''
 Write-Host 'The callers actually reach it -- the structural half' -ForegroundColor Cyan
@@ -146,26 +177,41 @@ foreach ($c in $callers) {
     Assert-True ($text -notmatch 'Get-Command Write-CloseOutReceipt') "...and does not reintroduce the PATH-scanning probe"
 }
 
-# SHIP-PR AND OPEN-PR EACH HAVE TWO ENDINGS, and each ending closes out. ship-pr's queue arm exits
-# before the foot of the file; open-pr's already-open arm does the same. A single call in either would
-# leave one real ending silent, which is the failure this suite is for.
-foreach ($two in @('scripts\release\ship-pr.ps1', 'scripts\release\open-pr.ps1')) {
+# THREE SCRIPTS HAVE TWO ENDINGS EACH, and every ending closes out. ship-pr's queue arm exits before
+# the foot of the file, open-pr's already-open arm does the same, and fold-changelog-entry refuses on
+# one arm and succeeds on the other. A single call in any of them would leave one real ending silent,
+# which is the failure this suite is for. fold was missing from this list when the suite was first
+# written -- caught by the code review, which is the reason the list is spelled out rather than derived.
+foreach ($two in @('scripts\release\ship-pr.ps1', 'scripts\release\open-pr.ps1', 'scripts\release\fold-changelog-entry.ps1')) {
     $n = ([regex]::Matches((Get-Content -LiteralPath (Join-Path $RepoRoot $two) -Raw), 'Write-CloseOutReceipt -Cite')).Count
     Assert-Equal 2 $n "$(Split-Path -Leaf $two) calls it from BOTH of its endings"
 }
 
-# THE BYPASS IS READ FROM THE RUN, not typed. ship-pr's helper is what carries #1884's second finding
-# into the two scripts that own the switches, so it is asserted rather than left to the call site.
-$shipText = Get-Content -LiteralPath (Join-Path $RepoRoot 'scripts\release\ship-pr.ps1') -Raw
-Assert-True ($shipText -match 'function Get-ShipBypassNote') 'ship-pr derives the bypass note from its own switches'
-$shipLines = $shipText -split "`n"
-$defAt = ($shipLines | Select-String -Pattern '^function Get-ShipBypassNote' | Select-Object -First 1).LineNumber
-$useAt = ($shipLines | Select-String -Pattern 'Get-ShipBypassNote\)'         | Select-Object -First 1).LineNumber
-Assert-True ($defAt -lt $useAt) '...and defines it ABOVE its first call (a script runs top to bottom)'
+# THE BYPASS PHRASE IS BUILT IN ONE PLACE. It was written three times -- a private helper in ship-pr and
+# the same three lines inline at both of open-pr's endings -- which the code review flagged as the
+# ordinary drift shape. Asserted in both directions so a re-inlining goes red.
+foreach ($owner in @('scripts\release\ship-pr.ps1', 'scripts\release\open-pr.ps1')) {
+    $name = Split-Path -Leaf $owner
+    $text = Get-Content -LiteralPath (Join-Path $RepoRoot $owner) -Raw
+    Assert-True ($text -match 'Get-GateBypassNote -SkipLint:\$SkipLint -SkipTests:\$SkipTests') "$name builds the bypass note through the shared helper"
+    Assert-True ($text -notmatch "(skipped|openSkipped) \+= '-SkipTests'") "$name no longer carries its own copy of the phrase (forwarding the switch to a child is not that)"
+}
 
-$openText = Get-Content -LiteralPath (Join-Path $RepoRoot 'scripts\release\open-pr.ps1') -Raw
-Assert-True ($openText -match "openSkipped \+= '-SkipTests'") 'open-pr reads -SkipTests into its bypass note'
-Assert-True ($openText -match "openSkipped \+= '-SkipLint'")  'open-pr reads -SkipLint into its bypass note'
+# ONE CHAIN, ONE RECEIPT -- the structural half of the double-print repair. ship-pr is the only
+# conductor: it is the one script that spawns another chain-ending script, and it does so twice.
+$shipText = Get-Content -LiteralPath (Join-Path $RepoRoot 'scripts\release\ship-pr.ps1') -Raw
+Assert-Equal 2 ([regex]::Matches($shipText, 'Push-CloseOutSuppression \}')).Count 'ship-pr suppresses the receipt around BOTH of its child spawns'
+Assert-Equal 2 ([regex]::Matches($shipText, '\{ Pop-CloseOutSuppression \}')).Count '...and pops it again after each'
+Assert-True  ($shipText -match 'finally \{ if \(Test-FunctionDefined ''Pop-CloseOutSuppression''\)') 'the pop is in a finally, so a failing child cannot leave the chain muted'
+
+# AND NOBODY ELSE SPAWNS ONE, which is what makes ship-pr the only conductor. Asserted so that a future
+# nesting site has to come past this line -- the environment covers it automatically, but the claim in
+# the comments above ("ship-pr is the only conductor") would quietly stop being true.
+foreach ($other in @('scripts\release\open-pr.ps1', 'scripts\release\fold-changelog-entry.ps1', 'scripts\release\cut-release.ps1', 'scripts\task\park-branch.ps1')) {
+    $text = Get-Content -LiteralPath (Join-Path $RepoRoot $other) -Raw
+    $spawns = ([regex]::Matches($text, "Join-Path \`$PSScriptRoot '(open-pr|ship-pr|fold-changelog-entry|cut-release|park-branch)\.ps1'")).Count
+    Assert-Equal 0 $spawns "$(Split-Path -Leaf $other) spawns no other chain-ending script"
+}
 
 Write-Host ''
 Write-Host 'The lib is ASCII and mirrored' -ForegroundColor Cyan

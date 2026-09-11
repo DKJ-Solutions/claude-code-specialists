@@ -385,18 +385,6 @@ if (-not (Test-Path -LiteralPath $configPath)) {
 $shipCloseoutLib = Join-Path $PSScriptRoot '..\lib\closeout-lib.ps1'
 if (Test-Path -LiteralPath $shipCloseoutLib -PathType Leaf) { . $shipCloseoutLib }
 
-# WHAT THIS RUN WAS TOLD TO SKIP, in the words the operator typed (issue #1884). The close-out's three
-# permitted shapes have no home for "I deviated from a gate", so a session that bypassed one discloses
-# it in the reply -- correctly refusing to let the requester learn it later, and with nowhere else to
-# put it. The script knows the fact and the persona cannot, so the reminder carries it to the PR body.
-function Get-ShipBypassNote {
-    $skipped = @()
-    if ($SkipLint)  { $skipped += '-SkipLint' }
-    if ($SkipTests) { $skipped += '-SkipTests' }
-    if ($skipped.Count -eq 0) { return '' }
-    return ($skipped -join ' and ')
-}
-
 $repo = Get-RepoName
 
 # The merge method is repo POLICY, not script logic (issue #411): this workshop merges, another repo
@@ -688,7 +676,11 @@ if ($RefreshBody) { $openArgs += '-RefreshBody' }
 if ($Resolves) { $openArgs += @('-Resolves', $Resolves) }
 if ($NoResolves) { $openArgs += '-NoResolves' }
 Write-Host "ship-pr: opening the PR..." -ForegroundColor Cyan
-& powershell @openArgs
+# ONE CHAIN, ONE RECEIPT (issue #1884). open-pr.ps1 is a chain ENDING when somebody runs it, and a link
+# in the middle when this script runs it -- so the conductor claims the receipt and the child says
+# nothing. Without this an ordinary ship printed the reminder here, before CI had even started.
+if (Test-FunctionDefined 'Push-CloseOutSuppression') { Push-CloseOutSuppression }
+try { & powershell @openArgs } finally { if (Test-FunctionDefined 'Pop-CloseOutSuppression') { Pop-CloseOutSuppression } }
 if ($LASTEXITCODE -ne 0) { Write-Error "open-pr failed -- ship-pr stops (nothing merged)."; exit 1 }
 
 if ($NoMerge) {
@@ -2453,7 +2445,7 @@ if ($queueActive) {
     # merged one below: a queue ship closes out too, and its receipt is the harder of the two to keep
     # short, because the run has just printed a page about what the queue will do next.
     if (Test-FunctionDefined 'Write-CloseOutReceipt') {
-        Write-CloseOutReceipt -Cite "PR #$pr" -Bypass (Get-ShipBypassNote)
+        Write-CloseOutReceipt -Cite "PR #$pr" -Bypass (Get-GateBypassNote -SkipLint:$SkipLint -SkipTests:$SkipTests)
     }
     exit 0
 }
@@ -2767,7 +2759,9 @@ $foldArgs = @(
     '-File', (Join-Path $PSScriptRoot 'fold-changelog-entry.ps1'),
     '-Branch', $branch, '-Push')
 if ($foldTree) { $foldArgs += @('-RepoRoot', $foldTree) }
-& powershell @foldArgs
+# ONE CHAIN, ONE RECEIPT (issue #1884) -- the same reason as the open-pr spawn above.
+if (Test-FunctionDefined 'Push-CloseOutSuppression') { Push-CloseOutSuppression }
+try { & powershell @foldArgs } finally { if (Test-FunctionDefined 'Pop-CloseOutSuppression') { Pop-CloseOutSuppression } }
 $foldExit = $LASTEXITCODE
 
 # AND IT COMES DOWN WHETHER THE FOLD SUCCEEDED OR NOT, before the exit code is judged -- the last of the
@@ -3077,5 +3071,5 @@ if (-not $watchNarrowed) {
 # block above is conditional, so anything placed inside it would be absent from exactly the quiet,
 # everything-green ship that is most likely to be closed out from memory.
 if (Test-FunctionDefined 'Write-CloseOutReceipt') {
-    Write-CloseOutReceipt -Cite "PR #$pr" -Bypass (Get-ShipBypassNote)
+    Write-CloseOutReceipt -Cite "PR #$pr" -Bypass (Get-GateBypassNote -SkipLint:$SkipLint -SkipTests:$SkipTests)
 }

@@ -1347,8 +1347,14 @@ if ($refused.Count -gt 0) {
     exit 1
 }
 
-# THE SUCCESS ARM'S LAST LINE. A standalone fold is a chain ending in its own right -- ship-pr folds
-# in-process and never invokes this script, so the two can never double-print.
+# THE SUCCESS ARM'S LAST LINE. A standalone fold is a chain ending in its own right.
+#
+# AND ship-pr.ps1 DOES INVOKE THIS SCRIPT -- as a child process, `& powershell -File
+# fold-changelog-entry.ps1`. This comment claimed the opposite when it was written, on a grep that had
+# been truncated by `head`, and the code review on this branch caught what that cost: an ordinary ship
+# printed the receipt three times, twice of them mid-chain. The double-print is prevented by the
+# conductor declaring the chain (Push-CloseOutSuppression in ship-pr), which this run inherits through
+# the environment -- not by the two never meeting, which they always did.
 if (Test-FunctionDefined 'Write-CloseOutReceipt') {
     Write-CloseOutReceipt -Cite 'CHANGELOG.md'
 }

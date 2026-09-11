@@ -1827,11 +1827,8 @@ if ($existingPr) {
     }
     # THE RECEIPT SHAPE, LAST (issue #1884). This ending is the "branch waits for Dave" one -- the PR
     # is open and nothing merges -- which is close-out shape A or B and exactly where a report grows.
-    $openSkipped = @()
-    if ($SkipLint)  { $openSkipped += '-SkipLint' }
-    if ($SkipTests) { $openSkipped += '-SkipTests' }
     if (Test-FunctionDefined 'Write-CloseOutReceipt') {
-        Write-CloseOutReceipt -Cite "PR #$($existingPr.number)" -Bypass ($openSkipped -join ' and ')
+        Write-CloseOutReceipt -Cite "PR #$($existingPr.number)" -Bypass (Get-GateBypassNote -SkipLint:$SkipLint -SkipTests:$SkipTests)
     }
     exit 0
 }
@@ -2015,13 +2012,10 @@ Write-Host "PR created for '$branch'." -ForegroundColor Green
 # THE RECEIPT SHAPE, LAST (issue #1884) -- see closeout-lib.ps1. A PR opened and not yet shipped is a
 # close-out as much as a merged one is, and it is the ending a branch under one of the two "wait for
 # Dave" exceptions stops at, so it must not be reachable only through ship-pr.
-$openSkipped = @()
-if ($SkipLint)  { $openSkipped += '-SkipLint' }
-if ($SkipTests) { $openSkipped += '-SkipTests' }
 if (Test-FunctionDefined 'Write-CloseOutReceipt') {
     # NO BRANCH NAME IN THE CITATION, deliberately. The line above prints one and this file has never
     # routed a ref through Get-DisplayRef, so adding one here would be a 33rd site of #1623's class in
     # a run that has no need of it: what the receipt has to point at is the pull request, which the
     # create above has just printed the URL of.
-    Write-CloseOutReceipt -Cite 'the pull request just opened' -Bypass ($openSkipped -join ' and ')
+    Write-CloseOutReceipt -Cite 'the pull request just opened' -Bypass (Get-GateBypassNote -SkipLint:$SkipLint -SkipTests:$SkipTests)
 }

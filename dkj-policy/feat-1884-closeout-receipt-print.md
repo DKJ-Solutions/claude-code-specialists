@@ -89,22 +89,55 @@ before a close-out is composed, which is the only moment at which a reminder is 
 
 ### TEST
 
-- [x] `scripts/tests/closeout-lib.tests.ps1` -- 49 asserts, green. The structural half is the point:
+- [x] `scripts/tests/closeout-lib.tests.ps1` -- 72 asserts, green. The structural half is the point:
       each of the five callers is held to dot-sourcing the lib, guarding that dot-source, calling the
-      function and guarding the call, and the two scripts with two endings are held to calling it from
-      both. A mechanism that is defined but not called is the fifth prose repair with extra steps.
+      function and guarding the call; the three scripts with two endings are held to calling it from
+      both; and ship-pr is held to suppressing and restoring around each child spawn. A mechanism that
+      is defined but not called is the fifth prose repair with extra steps.
 - [x] Output asserted on its three **parts** and its line count, never on its wording -- the wording
       will be sharpened, and what must not drift is that a part has quietly gone missing.
-- [x] All seven touched scripts parse; the full lint + test gate is green.
+- [x] All touched scripts parse; the full lint gate and the whole suite pool are green.
+
+#### What the review chain found, and what it cost
+
+Three reviewers ran in parallel on the diff, and two found real defects:
+
+- **Victor (code)** found the one that mattered: `ship-pr.ps1` spawns `open-pr.ps1` and
+  `fold-changelog-entry.ps1` as **child processes**, so an ordinary successful ship printed the
+  reminder **three times** -- twice of them mid-chain, once before CI had even started. A comment this
+  branch had written into `fold-changelog-entry.ps1` asserted the opposite ("ship-pr folds in-process
+  and never invokes this script"). That claim came from a `grep` piped through `head`, where hits in
+  another file filled the window -- the capped-window failure this repo's own `triage-inbound` skill
+  records, arriving in a verification of my own work rather than in an inbound report. He also found
+  the bypass phrase written three times and a stale assert count in this document.
+- **Edith (language)** found that "printed as this run's last line" is false for `cut-release.ps1`,
+  whose own call-site comment says so eleven lines below the boilerplate that claimed it, plus a
+  subject-verb disagreement and a number-format inconsistency in the persona.
+- **Nolan (cost)** measured the persona edit at ~317 always-on tokens per turn, per session, in every
+  repo enabling the plugin, and showed that the larger paragraph restated the lib's own docstring. The
+  history moved to `manuals/01-01-manual.md` -- read on demand -- and the persona kept the one clause
+  that does the work: the shape prints itself, so do not sharpen this passage again.
+
+- [x] The double-print is fixed structurally: the conductor declares the chain in the **environment**,
+      which a child process inherits. A `-Quiet` switch forwarded by hand at each spawn was rejected on
+      this branch's own terms -- it would be enforced by nothing but memory at every future nesting
+      site, which is the failure mode the whole change exists to retire.
+- [~] `scripts/maintenance/record-suite-durations.ps1` deliberately **not** run. It reads CI runs, so it
+      can only record this suite after the merge, and the gate's own code says an unknown suite is
+      charged the maximum on purpose -- "the one position a suite of unknown cost must never take". That
+      is the design working, not a defect, and every new suite lands this way.
 
 ### DEPLOY: feat/1884-closeout-receipt-print
 
 Chris's close-out now has a mechanism instead of only a rule. The five scripts that end a work chain --
 `ship-pr`, `open-pr`, `park-branch`, `fold-changelog-entry` and `cut-release` -- print the receipt shape
-as their last line: what happened, where to read it, whether the session can be cleared, in two or three
-lines, with anything longer rehoused rather than cut. Where the run was told to skip a gate it says so
-too, and sends that disclosure to the pull request body, which is the one part of a close-out that had
-no home at all.
+where the run ends: what happened, where to read it, whether the session can be cleared, in two or three
+lines, with anything longer rehoused rather than cut. In four of the five that is literally the last
+line; in `cut-release` it sits just above the hand-written-note reminder, so a note about the close-out
+is not read as the last item on a to-do list. One chain prints one receipt -- `ship-pr` spawns two of
+the others as child processes, and it claims the chain's receipt so they stay quiet. Where the run was
+told to skip a gate it says so too, and sends that disclosure to the pull request body, which is the one
+part of a close-out that had no home at all.
 
 This is the fifth repair to step 6 and the first that is not prose. The other four -- the three
 permitted shapes, the receipt rule, the bounded filing line and the ceiling -- were all live, all in

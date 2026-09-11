@@ -771,7 +771,7 @@ function Get-SharedScriptPairs {
             # strings and prints), so no contract row follows.
             Name    = 'closeout-lib'
             Source  = 'scripts\lib\closeout-lib.ps1'
-            Plugin = 'dkj-policy'
+            Plugin  = 'dkj-policy'
             LibOnly = $true
         },
         @{

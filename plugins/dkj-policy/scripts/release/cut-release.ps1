@@ -299,7 +299,7 @@ if ($absent.Count -gt 0) {
 # in none of them" is the sentence #294 was filed about.
 . (Join-Path $PSScriptRoot '..\lib\check-report-lib.ps1')
 
-# THE CLOSE-OUT RECEIPT SHAPE (issue #1884), printed as this run's last line -- see closeout-lib.ps1
+# THE CLOSE-OUT RECEIPT SHAPE (issue #1884) -- see closeout-lib.ps1
 # for why step 6 of the ritual got a mechanism after losing four times in prose. Guarded on
 # git-porcelain-lib's grounds: a consumer whose mirror predates this lib must not crash on load, and
 # the call site tests for the function rather than assuming the dot-source took.
