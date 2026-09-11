@@ -306,6 +306,18 @@
          reachable by 'claude plugin validate', which is why that CLI is not delegated to. A plugin
          with NO key is held to the convention instead: a def outside agents/ is declared by nothing.
          A nested plugin root's files are its own, not its parent's.
+     39. a depth-sensitive $PSScriptRoot resolution in a mirrored script, against the suite that runs
+         the mirror. Check 8 holds the two copies byte-identical, which proves they are the same TEXT
+         and says nothing about behaviour -- and they sit at different depths, so a resolution
+         ascending TWO levels reaches the repo root from the source copy and the plugin root from the
+         mirror. Identical characters, different folder, nothing to diff. Such a pair must declare
+         MirrorRun (the suite that executes its mirror) or MirrorRunExempt (why none does), and a
+         declared suite must exist and name the mirror, so the declaration cannot be fiction. One hop
+         is deliberately not asked about: '..\lib\...' is the same folder relative to the file in both
+         copies, and flagging it would bury the crossings under the thirty-odd that cannot differ
+         (measured #1857: 3 of 34 entry points, all three already correct, and the single suite that
+         ran a mirror at all covered none of them). Whether the run ASSERTS anything is the suite's
+         job, the same line check 18 draws between this gate and a skill page.
     <!-- /checks:list -->
 
     Exit code: 0 = no errors. 1 = at least one error (usable as a gate in open-pr.ps1).
@@ -4606,6 +4618,97 @@ Write-Coverage -Category 'agents-key' -Checked $akPlugins `
     } else {
         "published plugin(s) read, $akDeclared 'agents' entry(s) held to the shape the installer accepts -- an EXISTING .md FILE inside the plugin root, never a directory and never a glob -- and every *-agent.md each plugin ships held to the list that has to name it: $akFindings finding(s). BOTH DIRECTIONS, because they fail differently: a bad element makes the installer refuse the whole plugin (#1764 -- four of six uninstallable for a release), while a def the list omits installs fine and simply never loads. Checks 1 and 2 are the siblings and cannot serve this: they read the same manifests for the marketplace's view and for valid JSON with a name, and neither has an opinion about a field's accepted shape, which is why this gate reported 0 error(s) over manifests 'claude plugin validate' refuses outright. Not delegated to that CLI either: it is the authority this shape was measured against, but it is silent on the omitted def and would put a CLI on this gate's path in CI and in every consumer"
     })
+# --- 39. a depth-sensitive $PSScriptRoot resolution, against the suite that runs the mirror ----------
+# CHECK 8 PROVES THE TWO COPIES ARE THE SAME TEXT AND CANNOT PROVE THEY BEHAVE THE SAME (issue #1857).
+# A shared script exists twice -- scripts\<area>\<name>.ps1 and <plugin>\scripts\<area>\<name>.ps1 --
+# and byte-equality is exactly what makes the difference invisible: the characters are identical, and
+# the two files sit at different depths, so a $PSScriptRoot resolution that ascends TWO levels reaches
+# the repo root from the source copy and the PLUGIN root from the mirror. Same line, different folder,
+# nothing to diff.
+#
+# WHY THAT IS WORTH A GATE RATHER THAN A NOTE. The mirror is the copy a consumer runs -- the source
+# copy exists for this repo and for its suites. So the candidate that fires in every released install
+# is precisely the one no test executes, and the failure mode is a path that silently resolves
+# somewhere plausible rather than an error anybody sees. It was verified by hand when #1843 introduced
+# such a resolution, and hand verification is what this repo keeps replacing with gates.
+#
+# WHAT IS ASKED, AND WHAT IS NOT. This check refuses an UNDECLARED depth-crossing resolution: the pair
+# must name the suite that runs its mirror (MirrorRun) or say why it does not (MirrorRunExempt), and
+# the named suite must exist and name the mirror, so a declaration cannot be fiction. It does not try
+# to prove from here that the suite ASSERTS anything -- that is the suite's job and it is where the
+# proof belongs, the same division check 18 already draws between this gate and a skill page. What the
+# gate is for is the script nobody has thought about yet.
+#
+# ONE HOP IS NOT ASKED ABOUT, deliberately. '..\lib\...' reaches <x>\scripts\ in both copies, which is
+# the same folder relative to the file either way -- so the overwhelming majority of resolutions in
+# the tree are depth-invariant by construction and a check that flagged them would be noise. Measured
+# when this was written: 3 of 34 entry points cross the boundary, and all three were already correct.
+#
+# THE THIRD ONE ARRIVED WHILE THIS CHECK WAS BEING BUILT, which is the best argument for it there is.
+# The branch measured two; adopt-workflow-folder's PR-template reference merged to main in between and
+# this gate caught it on its first CI run, because CI tests the merge and the branch's own working copy
+# could not see it. A count taken from a branch base is a snapshot, and this one went stale inside a
+# day -- so the live figures are in the coverage line below and this number is dated on purpose.
+$msPairs = @($sharedPairs)
+$msChecked = 0
+$msCrossing = 0
+$msDeclared = 0
+$msFindings = 0
+$msTestsDir = Join-Path $RepoRoot 'scripts\tests'
+foreach ($pair in $msPairs) {
+    if (-not (Test-Path -LiteralPath $pair.SourcePath -PathType Leaf)) { continue }
+    $msChecked++
+    $msHits = @(Get-DepthSensitiveResolutions -Path $pair.SourcePath)
+    if ($msHits.Count -gt 0) { $msCrossing++ }
+
+    if ($pair.MirrorRun -and $pair.MirrorRunExempt) {
+        $msFindings++
+        Add-Error ("[mirror-depth] shared-scripts registry: '$($pair.Name)' declares BOTH MirrorRun and" +
+            " MirrorRunExempt. They are opposite answers -- one says a suite runs the mirror, the other" +
+            " says none does and why -- so a pair carrying both leaves no reader able to say which is" +
+            " true. Keep one.")
+        continue
+    }
+
+    if ($msHits.Count -gt 0 -and -not $pair.MirrorRun -and -not $pair.MirrorRunExempt) {
+        $msFindings++
+        $msShown = ($msHits | Select-Object -First 2) -join ' | '
+        Add-Error ("[mirror-depth] $($pair.SourceRel) resolves a path off `$PSScriptRoot that ascends two" +
+            " or more levels, so it means the repo root in this copy and the plugin root in" +
+            " $($pair.MirrorRel) -- and check 8 cannot see the difference, because the two files are" +
+            " byte-identical. Found: $msShown. Declare MirrorRun = '<suite>.tests.ps1' in the" +
+            " shared-scripts registry (scripts\lib\shared-scripts-lib.ps1), naming a suite that EXECUTES" +
+            " the mirror from its own directory the way git-identity-gate.tests.ps1 does -- or" +
+            " MirrorRunExempt = '<reason>' if that resolution genuinely cannot differ.")
+        continue
+    }
+
+    if (-not $pair.MirrorRun) { continue }
+    $msDeclared++
+    $msSuite = Join-Path $msTestsDir $pair.MirrorRun
+    if (-not (Test-Path -LiteralPath $msSuite -PathType Leaf)) {
+        $msFindings++
+        Add-Error ("[mirror-depth] shared-scripts registry: '$($pair.Name)' declares MirrorRun =" +
+            " '$($pair.MirrorRun)', and no such suite exists under scripts\tests\. A declaration that" +
+            " names nothing is worse than none, because it reads as proof.")
+        continue
+    }
+    $msText = [System.IO.File]::ReadAllText($msSuite, [System.Text.Encoding]::UTF8)
+    if (-not ($msText.Contains($pair.MirrorRel) -or $msText.Contains($pair.MirrorRel.Replace('\', '/')))) {
+        $msFindings++
+        Add-Error ("[mirror-depth] scripts\tests\$($pair.MirrorRun) is declared as the suite that runs" +
+            " '$($pair.Name)'s mirror, and it never names $($pair.MirrorRel). Either it does not run the" +
+            " mirror at all, or it reaches it by a path this check cannot follow -- both of which make" +
+            " the declaration unverifiable from here.")
+    }
+}
+Write-Coverage -Category 'mirror-depth' -Checked $msChecked `
+    -Note $(if ($msChecked -eq 0) {
+        'the source/mirror pair list is empty, so no script was scanned -- read this as a broken gate rather than a clean one, the way check 8 reads its own empty set'
+    } else {
+        "shared script(s) scanned for a `$PSScriptRoot resolution ascending two or more levels -- the ONE class where a byte-identical mirror can behave differently, because the two copies sit at different depths: $msCrossing crossing, $msDeclared with a declared suite, $msFindings finding(s). One hop is not asked about and that is the point: '..\lib\...' is the same folder relative to the file in both copies, so asking about it would bury the crossings above under the thirty-odd that cannot. What this proves is that no such resolution is UNDECLARED, and what it deliberately leaves to the suite is whether the run asserts anything -- the same line check 18 draws between this gate and a skill page"
+    })
+
 # --- Report ---------------------------------------------------------------------------------------------
 if ($errors.Count -eq 0) {
     Write-Host "  No findings." -ForegroundColor Green

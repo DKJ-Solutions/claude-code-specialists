@@ -97,7 +97,9 @@ function Add-FixturePlugin {
 function Invoke-Report {
     # The user layer is redirected for the child process, so the fixture's own settings.json is the only
     # thing that enables anything and the cache probe finds nothing to answer with.
-    param([Parameter(Mandatory = $true)][string]$Dir)
+    # -ScriptPath so the same scenario can be driven through the plugin mirror as well as the root
+    # copy (#1857). It defaults to the root copy, so every existing call is unchanged.
+    param([Parameter(Mandatory = $true)][string]$Dir, [string]$ScriptPath = $Script)
     $fakeHome = New-Tree -Label 'home'
     $prevProfile = $env:USERPROFILE
     $prevProject = $env:CLAUDE_PROJECT_DIR
@@ -106,7 +108,7 @@ function Invoke-Report {
         $ErrorActionPreference = 'Continue'
         $env:USERPROFILE = $fakeHome
         $env:CLAUDE_PROJECT_DIR = ''
-        $out = & powershell -NoProfile -ExecutionPolicy Bypass -File $Script -RootOverride $Dir 2>&1
+        $out = & powershell -NoProfile -ExecutionPolicy Bypass -File $ScriptPath -RootOverride $Dir 2>&1
     } finally {
         $ErrorActionPreference = $prevEap
         $env:USERPROFILE = $prevProfile
@@ -227,6 +229,30 @@ try {
     $skillText = [System.IO.File]::ReadAllText($Skill)
     Assert-True ($skillText -match 'scripts/task/check-policy-drift\.ps1') 'the skill page runs the script this suite tests'
     Assert-True ($skillText -match 'CLAUDE_PLUGIN_ROOT') 'and reaches it through ${CLAUDE_PLUGIN_ROOT}, which is what a consumer has'
+
+    # --- The mirror RUNS, not just matches (issue #1857) -------------------------------------------
+    # The registration block above proves the two copies are byte-identical, which is precisely what
+    # makes the remaining difference invisible: step 4a resolves the sibling plugin folders with
+    # Split-Path (Split-Path $PSScriptRoot -Parent) -Parent, two levels up -- the repo root from the
+    # root copy and the PLUGIN root from the mirror. Identical text, different folder, nothing to
+    # diff, and the mirror is the copy a consumer actually runs.
+    #
+    # THE SCENARIO IS RE-USED RATHER THAN REBUILT, on purpose: the question is not whether the mirror
+    # can report, it is whether it reports THE SAME THING from a different depth. So it is handed the
+    # fixture the root copy was just measured on, and its answer is held to that answer.
+    Write-Host ''
+    Write-Host 'The plugin mirror'
+
+    $rSource = Invoke-Report -Dir $source
+    $rMirror = Invoke-Report -Dir $source -ScriptPath $Mirror
+    Assert-True ($rMirror.Code -eq $rSource.Code) `
+        'the mirror exits the same as the root copy on the same tree'
+    Assert-True ($rMirror.Out -match 'RANK 1' -and $rMirror.Out -match 'RANK 2' -and $rMirror.Out -match 'RANK 3') `
+        'the mirror prints all three ranks, so its own $PSScriptRoot-relative dot-sources resolved from the plugin tree'
+    $mPrime = $rMirror.Out.IndexOf('dkj-policy', [System.StringComparison]::Ordinal)
+    $mCompanion = $rMirror.Out.IndexOf('dkj-policy-bwj', [System.StringComparison]::Ordinal)
+    Assert-True ($mPrime -ge 0 -and $mCompanion -gt $mPrime) `
+        'the mirror locates both plugins and keeps the rank-1 order -- step 4a resolved from its own depth'
 }
 finally {
     foreach ($t in $script:trees) {
