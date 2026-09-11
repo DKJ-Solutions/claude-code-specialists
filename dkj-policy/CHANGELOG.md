@@ -43,7 +43,52 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**9 / 24 minor entries** <!-- pending-tally -->
+**9 / 25 minor entries** <!-- pending-tally -->
+
+### DEPLOY: docs/1874-preview-control-variant · 20260911-185450
+
+`dkj-policy-bwj` gains a third chapter, [`PREVIEW-portable.md`](../plugins/dkj-policy/dkj-policy-bwj/PREVIEW-portable.md):
+**a preview handover is a pair per market -- the preview, and the live control variant.**
+
+A preview alone shows what a page will look like; it never shows what *changed*. The reader supplies the
+other half from memory while looking at something else, which is the exact judgement the preview was
+pushed for. The rule comes from a five-market handover in `smartwatchbanden` that was complete by the
+letter of the rule then in force and still left that half undone.
+
+**The part that had to be measured is what the control URL is.** It names the **live theme id**, and not
+the same URL with the parameter dropped -- `preview_theme_id` sets a cookie, so once a market's preview
+has been opened the bare URL keeps serving the preview theme. The control tab then agrees with the preview
+and the reviewer concludes nothing changed: a false negative that looks like a clean result. Measured on a
+live store, with both neighbouring wrong answers recorded on the page -- including `preview_theme_id=0`,
+which renders the "missing one of these required files" error rather than resetting anything, and reads
+like a broken preview theme.
+
+The live id needs no seam of its own: `Get-ShopifyLiveThemeId` already states it for
+`dkj-subagents-shopify`'s live-theme guard, and the page points there rather than at a pasted number.
+Nothing here decides which changes owe a preview, or when a PR may open -- both stay the consumer's and
+`dkj-policy`'s, unchanged. No new seam, no adopt step, no CI.
+
+The ships-assert in `dkj-policy-bwj.tests.ps1` now covers the portable pages it had never guarded --
+the new one and `SYNC-LOG-portable.md` beside it.
+
+Resolves [#1874](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1874).
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+N/A -- a workflow plugin's house rule for two store repos. It changes what one colleague hands another
+before a merge; no subscriber of any service reaches it.
+
+#### Pull Request
+
+A preview handover owes the control variant, not only the preview
+
+Plugins: dkj-policy-bwj
+
+[PR #1877](https://github.com/DKJ-Solutions/dkj-claude-plugins/pull/1877)
+
+---
 
 ### DEPLOY: fix/1867-git-author-identity-probe · 20260911-181859
 
