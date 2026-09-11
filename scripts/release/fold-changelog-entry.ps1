@@ -683,8 +683,7 @@ foreach ($file in $entryFiles) {
     $entryContent = if ($split.Found) { $split.Entry } else { $fileContent }
     $changelogContent = Get-Content -Path $changelogPath -Raw -Encoding UTF8
 
-    $usesCRLF = $changelogContent.Contains("`r`n")
-    $nl = if ($usesCRLF) { "`r`n" } else { "`n" }
+    $nl = Get-DocumentNewline -Content $changelogContent
     $entryContent = ($entryContent -replace "`r`n", "`n") -replace "`n", $nl
 
     # THE GUIDANCE COMMENTS ARE STRIPPED HERE, AND THIS IS THE ONLY PLACE THAT DOES IT. Every field in the

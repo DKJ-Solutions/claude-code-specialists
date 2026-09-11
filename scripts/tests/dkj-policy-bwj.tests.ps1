@@ -568,6 +568,55 @@ Assert-Equal '{"data":{"task":"1216905543348385"}}' $move.Body 'and the body car
 Assert-Throws { New-AsanaSectionMoveRequest -Gid 'abc' -SectionGid '123' } 'a non-numeric task GID is refused'
 Assert-Throws { New-AsanaSectionMoveRequest -Gid '123' -SectionGid 'x/y' } 'and so is a non-numeric section GID'
 
+# --- the reach label is a seam, not a literal (issue #1841) ---------------------------------------
+Write-Host "`n-- the reach label --" -ForegroundColor Cyan
+
+# A consumer may rename the GitHub label that carries the reach axis -- smartwatchbanden renamed
+# 'tier-1' to 'minor' on September 11, 2026 -- so every place this plugin TYPES a label name reads
+# Get-ReachLabel instead. The axis itself is still explained under the name 'tier-1' in the prose, and
+# that is deliberate: what is repo-specific is the string GitHub stores, not the model. So these
+# asserts are aimed at the COMMANDS and nothing else, which is why they match on the flag as well as
+# on the name rather than on 'tier-1' anywhere in the file.
+$reachDocs = @{
+    'skills\report-issue\SKILL.md'        = 'report-issue'
+    'skills\adopt-dkj-policy-bwj\SKILL.md' = 'adopt-dkj-policy-bwj'
+    'WORKFLOW-portable.md'                 = 'WORKFLOW-portable'
+    'README.md'                            = 'README'
+}
+# ONE PATTERN PER SHAPE THE BRANCH ACTUALLY REPAIRED, and the fourth is the reason to say that out
+# loud: the label-EXISTENCE check (gh label list | grep -E '^(tier-1|documentation)\b') is neither a
+# --label flag nor a create nor a search query, so the first three leave the exact line #1841 was filed
+# over unguarded. A guard that covers three of the four sites reads as covering all of them.
+$reachLiterals = @(
+    @{ Pattern = '--(?:add-|remove-)?label\s+["'']?tier-1\b'; What = "writes no '--label tier-1'" }
+    @{ Pattern = 'gh\s+label\s+create\s+["'']?tier-1\b';      What = "creates no label named 'tier-1' outright" }
+    @{ Pattern = 'label:tier-1\b';                            What = "writes no 'label:tier-1' search query" }
+    @{ Pattern = '\^\((?:[^)\r\n]*\|)?tier-1[|)]';            What = "greps the label list for no literal 'tier-1'" }
+)
+foreach ($rel in $reachDocs.Keys) {
+    $txt = Get-Content -LiteralPath (Join-Path $PluginRoot $rel) -Raw
+    foreach ($lit in $reachLiterals) {
+        Assert-True (-not [regex]::IsMatch($txt, $lit.Pattern)) `
+            "$($reachDocs[$rel]) $($lit.What) -- the name comes from Get-ReachLabel"
+    }
+}
+
+# And the seam has to be documented where a consumer looks for it, or the asserts above only prove the
+# literal is gone rather than that anything replaced it. Same set as above, read from the same
+# hashtable: two hand-kept lists would drift the moment a document joins or leaves one of them.
+foreach ($rel in $reachDocs.Keys) {
+    $txt = Get-Content -LiteralPath (Join-Path $PluginRoot $rel) -Raw
+    Assert-True ($txt -match 'Get-ReachLabel') "$($reachDocs[$rel]) names the Get-ReachLabel seam"
+}
+
+# The default is stated, and it is the name every existing consumer already carries -- an arrival that
+# changed the default would silently relabel every one of them. The subject is the VALUE and not the
+# snippet's formatting: an optional 'return', either quote style and a trailing ';' are all the same
+# answer, and pinning the assert to one spelling would fail on a reflow that changed nothing.
+$adoptTxt = Get-Content -LiteralPath (Join-Path $PluginRoot 'skills\adopt-dkj-policy-bwj\SKILL.md') -Raw
+Assert-True ([regex]::IsMatch($adoptTxt, 'function\s+Get-ReachLabel\s*\{\s*(?:return\s+)?(["''])tier-1\1\s*;?\s*\}')) `
+    'the proposed seam defaults to tier-1, so an unanswered repo is unchanged'
+
 # --- done ---------------------------------------------------------------------------------------
 Write-Host ""
 if ($script:fail -gt 0) {

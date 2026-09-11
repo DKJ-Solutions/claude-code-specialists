@@ -43,7 +43,87 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**6 / 10 minor entries** <!-- pending-tally -->
+**7 / 12 minor entries** <!-- pending-tally -->
+
+### DEPLOY: feat/1832-shared-document-newline · 20260911-120331
+
+`Get-DocumentNewline` is now the one place this workflow reads a document's own newline style, in
+`scripts/lib/document-newline-lib.ps1`. It was hand-typed at nine call sites across six files -- six
+carrying the one-liner verbatim and three spelling the same answer over two statements, which is why a
+grep for the one-liner undercounted it. Nothing about the answer changed: every caller reads the same
+whole-file question it read before, and the six files' behaviour is identical.
+
+What the absence cost is inbound #1829, one merge earlier: `adopt-workflow-folder.ps1` composed its one
+rewritten block with a hardcoded LF while comparing it against a page read byte-exact, so the verdict
+read `drifted` on every CRLF checkout. Four scripts in this tree already knew the answer to that exact
+question; the fifth did not, and nothing connected them. A named helper is what the sixth one finds.
+
+Inside this repo the gain is the guard rather than the tidy-up. The suite carries a tree-wide AST gate,
+so a tenth hand-typed reading cannot land quietly -- and it pins the whole-file limit that #1829
+accepted deliberately, which was previously a comment beside one of the nine sites and is now the
+banner of the answer itself. That matters because the limit is the kind of thing a later reader
+"improves" in one caller, and a local answer in one file would break the argument the other eight rest
+on. A second thing surfaced on the way, from the gate built for exactly it: giving
+`entry-scaffold-lib.ps1` a second unconditional leaf means every fixture that hand-copies its
+dependencies owes the new file, so `fixture-lib-deps.tests.ps1` went red and eight fixtures were
+repaired on `ref-print-lib`'s own #1650 precedent.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+Nothing a consumer runs behaves differently -- the mirror carries one more dot-sourced lib and every
+command gives the same answers it gave before -- so the reach here is genuinely nil rather than small.
+Worth saying because the change is adjacent to a v5.0.0 consumer-facing repair and could be mistaken for
+part of it: #1829 fixed the drifting verdict, and this one only makes sure the next document-editing
+script cannot reintroduce it.
+
+**Score:** N/A
+
+#### Pull Request
+
+one helper for reading a document's own newline style
+
+Plugins: dkj-policy
+
+[PR #1840](https://github.com/DKJ-Solutions/dkj-claude-plugins/pull/1840)
+
+---
+
+### DEPLOY: fix/1841-reach-label-seam · 20260911-115239
+
+`dkj-policy-bwj` no longer writes the reach label's name as a literal. The string GitHub stores comes
+from `Get-ReachLabel` in the consumer's own `scripts/repo-config.ps1`, defaulting to `tier-1`, so
+every existing consumer is unchanged and silent; the reach axis itself keeps its own name in the prose
+that explains it, because what a consumer renames is a row in their label settings, not the model. The
+filing command, the decision table, both after-the-fact `gh issue edit` lines, the worklist query and
+`adopt-dkj-policy-bwj`'s existence check and `gh label create` all read the seam. Step 4 also stops
+before creating: a missing reach label means either that the repo never had one or that it renamed it,
+and only the first is safe to add -- creating it in the second case leaves two labels for one axis,
+one of them empty, with nothing reporting it. A guard in `dkj-policy-bwj.tests.ps1` refuses the
+literal in the command shapes if it is ever written back.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+`BWJ-Development/smartwatchbanden` renamed its reach label to `minor` on September 11, 2026 and
+`report-issue` has been failing outright there since -- `gh issue create` errors on a label the repo
+does not have. Answering `Get-ReachLabel` with `'minor'` is the whole fix on their side, and the next
+`adopt-dkj-policy-bwj` run no longer quietly re-creates `tier-1` beside the label their issues are
+actually on.
+
+**Score:** 4
+
+#### Pull Request
+
+A seam for the reach label's name, so a consumer that renames it keeps report-issue working
+
+Plugins: dkj-policy-bwj
+
+[PR #1845](https://github.com/DKJ-Solutions/dkj-claude-plugins/pull/1845)
+
+---
 
 ### DEPLOY: fix/1838-runid-repo-root-shape · 20260911-100046
 

@@ -67,7 +67,7 @@ issues across the two -- and that state holds only if every filing from here on 
 | field | what it carries | how |
 |---|---|---|
 | **issue type** | Bug / Feature / Task | `--type Bug` -- a defect in behaviour that already exists is **Bug**, a capability the store does not have yet is **Feature**, and **Task** is everything else, which is most of it |
-| **`tier-1` label** | how far the issue reaches | `--label tier-1`, and only where it reaches the audience tier. Absence is the answer for tier 0 and is not a missing field |
+| **the reach label** | how far the issue reaches | one `--label`, and only where it reaches the audience tier. Absence is the answer for tier 0 and is not a missing field. Its **name** is `Get-ReachLabel`'s, default `tier-1` -- see below |
 | **`documentation` label** | the one content distinction the type system cannot express here | `--label documentation` on a doc finding, on top of whatever type it has |
 
 **The type is set directly, not derived from a label.** `bug` and `enhancement` were deleted from both
@@ -82,17 +82,28 @@ would have buried them in a 91-issue `Task` pile -- that is not *covered by the 
 `Documentation` type was considered and not taken: issue types are **org-wide**, so adding one would put
 it in every BWJ repo, which is a wider decision than these two.
 
-#### The `tier-1` label -- the reach axis, carried onto issues
+#### The reach label -- the reach axis, carried onto issues
 
 The label is the
 [tier model](https://github.com/DKJ-Solutions/dkj-claude-plugins/blob/main/plugins/dkj-policy/RELEASES-portable.md#the-tier-model)
 applied to an issue instead of a changelog entry. Both BWJ repos answer `Get-ReleaseAudienceTier = 1`, so:
 
-- **`tier-1` present** -- management and the commissioner notice it.
-- **`tier-1` absent** -- tier 0: only this repo's developers notice.
+- **the reach label present** -- management and the commissioner notice it.
+- **the reach label absent** -- tier 0: only this repo's developers notice.
 
 Tier 2 does not exist in these repos, so one label carries the whole axis and
-`is:open label:tier-1` is the business-facing worklist.
+`is:open label:<reach label>` is the business-facing worklist.
+
+**The axis is named `tier-1` on this page and the string GitHub stores is not necessarily that**, which
+is a distinction worth keeping straight rather than collapsing. The model is portable and its name is
+how everything here explains it; the label is a row in one repo's settings, which that repo may rename
+for its own colleagues without consulting a plugin. `smartwatchbanden` did exactly that on
+September 11, 2026, and until then the name was written as a literal in four places -- two of which
+then pointed at a label the repo no longer had
+([#1841](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1841)). So **`Get-ReachLabel` in
+your own `scripts/repo-config.ps1` states the string**, defaulting to `tier-1`, and every command that
+types a label reads it; the paragraphs below keep explaining the axis as `tier-1`, because the axis did
+not change.
 
 **The model transfers; the mechanism does not.** A changelog entry is a form with a field per reader, and
 every tier is scored on it -- tier 0 included, because an unanswered field reads as an omission rather
@@ -114,7 +125,7 @@ script no customer will ever load, whose breakage stops a release the business i
 
 **Doubt resolves to tier 0** -- no label (Dave, September 1, 2026, on three borderline cases in the
 backfill). The point of the label is a short list somebody can work, and a tier-1 issue is cheap to add
-later with `gh issue edit <n> --repo <owner>/<repo> --add-label tier-1`.
+later with `gh issue edit <n> --repo <owner>/<repo> --add-label <reach label>`.
 
 ### 2. Then Asana -- a translation, not a copy
 

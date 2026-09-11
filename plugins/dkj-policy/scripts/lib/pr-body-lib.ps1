@@ -32,6 +32,11 @@
 # resolves in the plugin mirror as well as here.
 . (Join-Path $PSScriptRoot 'command-probe-lib.ps1')
 
+# Get-DocumentNewline (issue #1832): the newline style of the body being edited, read off the body rather
+# than hand-typed here. $PSScriptRoot-relative for the same reason as the line above -- it resolves in the
+# plugin mirror as well as here.
+. (Join-Path $PSScriptRoot 'document-newline-lib.ps1')
+
 function Get-EntryDescription {
     <#
     .SYNOPSIS
@@ -501,7 +506,7 @@ function Update-PrBodySection {
     # own suite before it shipped.
     if (-not $Content -or -not $Content.Trim()) { return $Body }
 
-    $nl = if ($Body.Contains("`r`n")) { "`r`n" } else { "`n" }
+    $nl = Get-DocumentNewline -Content $Body
     $lines = $Body -split "\r?\n"
 
     # THE LEADING SECTION has no heading line and therefore no level. $start stays at -1, which the

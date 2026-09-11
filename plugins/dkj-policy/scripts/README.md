@@ -125,6 +125,7 @@ an absent link is a fact rather than an oversight.
 | `lib/claim-issue-lib.ps1` | the two decisions `claim-issue.ps1` makes: which account this checkout claims under, and whether the issue in front of it may be claimed at all | none — dot-sourced lib |
 | `lib/ref-print-lib.ps1` | `Get-PasteableRef` — may this branch name go into a printed command a reader will run verbatim? Returns the placeholder and the explaining line when it may not, because git accepts shell metacharacters in a ref and no quoting closes that | none — dot-sourced lib |
 | `lib/command-probe-lib.ps1` | `Test-FunctionDefined` — is a function of this name defined? Reads the function table directly, where `Get-Command` parses the name as a wildcard pattern and pays a full `PATH` scan on every miss — and a miss is the normal case for an optional seam | none — dot-sourced lib |
+| `lib/document-newline-lib.ps1` | `Get-DocumentNewline` — the newline style a document is already written in, read off the document rather than assumed, so a block composed for it neither reads as drifted on a CRLF checkout nor leaves the page mixed. One definition for a reading that was hand-typed at nine sites (issue #1832); its banner carries the whole-file limit of it | none — dot-sourced lib |
 <!-- /shared-scripts:mirror -->
 
 ## How the mirror works

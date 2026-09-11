@@ -2,7 +2,7 @@
 name: report-issue
 description: >-
   File a discovered issue the BWJ way -- GitHub first (the source of truth, classified at creation with
-  its issue type and the `tier-1` reach label), then a colleague-facing Asana task, cross-linked both
+  its issue type and the reach label), then a colleague-facing Asana task, cross-linked both
   ways. Use this in a BWJ store repo -- smartwatchbanden or xoxowildhearts, whichever org -- whenever a real
   finding needs tracking: a bug, a broken customer-facing behaviour, a stale doc, a decision that is
   not yours to make. The Asana card lands in the board's `Filed` section -- tracked on GitHub now --
@@ -32,6 +32,13 @@ colleague-facing translation is a judgement call, not a transform. The full rule
 - Read `Get-AsanaIssueFieldGid` and `Get-AsanaTypeFieldGid` from the same file. Both are optional and
   default to `$null` -- a board carrying neither the `Github Issue` nor the `Github Type` custom
   field leaves them unset, and step 2 skips whichever one is missing.
+- Read **`Get-ReachLabel`** from the same file -- **the name GitHub stores for the reach label**, which
+  every command below writes rather than a literal. Optional, and `tier-1` is the default, so a repo
+  that has never answered it behaves exactly as this page did before the seam existed. Where it is
+  answered, that answer is the name -- and reading it is not optional politeness: `gh issue create`
+  **fails outright** on a label the repo does not have, so typing the default in a repo that renamed
+  its label gets you an error instead of an issue
+  ([#1841](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1841)).
 - Confirm the Asana MCP tools are available in this session. If they are not, you still do step 1 and
   then stop with a clear note -- never skip the GitHub issue.
 
@@ -44,13 +51,13 @@ never left for a later pass:
 
 ```bash
 gh issue create --repo <owner>/<repo> --title "<precise technical title>" --body "<full detail>" \
-  --type <Task|Bug|Feature> [--label tier-1] [--label documentation]
+  --type <Task|Bug|Feature> [--label "<reach label>"] [--label documentation]
 ```
 
 | what to set | how to decide it |
 |---|---|
 | `--type` | **Bug** for a defect in behaviour that already exists, **Feature** for a capability the store does not have yet, **Task** for everything else -- which is most of it, doc findings included. Always one of the three; both BWJ orgs have exactly these and no others (measured September 7, 2026 -- `gh api orgs/<org>/issue-types` returns Task, Bug, Feature in `BWJ-ecommerce` and in `BWJ-Development` alike) |
-| `--label tier-1` | **only** where management or the commissioner would notice it. The test is whether that reader notices the **defect**, not whether the file renders to them: a customer-facing template with a developer-only defect is tier 0, and a build script whose breakage stops a release the business is waiting on is not. **In doubt, leave it off** |
+| the reach label (`Get-ReachLabel`, default `tier-1`) | **only** where management or the commissioner would notice it. The test is whether that reader notices the **defect**, not whether the file renders to them: a customer-facing template with a developer-only defect is tier 0, and a build script whose breakage stops a release the business is waiting on is not. **In doubt, leave it off** |
 | `--label documentation` | on a doc finding, on top of its type -- the one content distinction the three types cannot express here |
 
 **Do not add `bug` or `enhancement`.** Both labels were deleted from both repos on September 1, 2026
@@ -65,7 +72,7 @@ fields are set afterwards:
 
 ```bash
 gh api --method PATCH repos/<owner>/<repo>/issues/<n> -f type=Bug
-gh issue edit <n> --repo <owner>/<repo> --add-label tier-1
+gh issue edit <n> --repo <owner>/<repo> --add-label "<reach label>"
 ```
 
 ## Step 2 -- the Asana task (a translation, not a copy)
@@ -172,4 +179,4 @@ undone on the next sweep while the label stays.
 reach question is answerable from the finding itself, and the whole backfill of 135 issues was
 classified from the issue text alone. Naming the call here is what makes it correctable: it puts the
 answer in front of the person who knows the store, at no extra turn, beside the one line that changes
-it (`gh issue edit <n> --repo <owner>/<repo> --add-label tier-1`, or `--remove-label`).
+it (`gh issue edit <n> --repo <owner>/<repo> --add-label "<reach label>"`, or `--remove-label`).
