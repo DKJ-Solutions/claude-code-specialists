@@ -36,7 +36,7 @@
 
 ### PLAN
 
-Give dkj-policy a shared, print-only adopter for the canonical prio-1..prio-4 triage labels: a new Get-TriageLabels seam (Adopt=copy) in scripts/repo-config.ps1, a new contract record, and scripts/task/adopt-triage-labels.ps1 (mirrored into the plugin), which composes paste-ready gh label create commands for whatever this repo tracker is missing and never runs them. Split from #1843, issue #1895.
+Give dkj-policy a shared, print-only adopter for the canonical prio-1..prio-4 triage labels: a new Get-TriageLabels seam (Adopt=copy) in scripts/repo-config.ps1, a new contract record, and scripts/task/adopt-triage-labels.ps1 (mirrored into the plugin), which composes paste-ready gh label create commands for whatever this repo's tracker is missing and never runs them. Split from #1843, issue #1895.
 
 ### CREATE
 
@@ -66,6 +66,15 @@ Give dkj-policy a shared, print-only adopter for the canonical prio-1..prio-4 tr
       person-invoked shared script carries it, exemptions are hook-only, and this script is neither --
       the header now distinguishes it clearly from the separate, content-specific
       `Test-IsWorkflowSourceRepo` refusal it correctly still does not need.
+- [x] Review round (Victor, Edith, Sebastian, parallel on the diff). Sebastian's finding was real and
+      blocking: the composed `gh label create` line quoted Name/Color/Description in bare `'...'`
+      with no escaping, and `Get-TriageLabels` is `Adopt = 'copy'` and Optional -- free to be answered
+      with a consumer's own free text, which test 6 already proved fully replaces the built-in four.
+      An unescaped apostrophe ("won't wait", "team's convention") would close the quoting early the
+      moment a person pasted the printed line, spilling the rest as separate shell tokens. Fixed with
+      `Format-SingleQuotedArg` (doubles an embedded `'`, PowerShell's own escape for it) applied at the
+      one composition site, plus test 6b exercising exactly that. Edith's finding was a missing
+      possessive in the PLAN text above ("this repo tracker" -> "this repo's tracker"), fixed.
 
 ### TEST
 

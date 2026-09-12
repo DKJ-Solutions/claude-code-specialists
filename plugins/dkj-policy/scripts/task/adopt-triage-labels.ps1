@@ -177,6 +177,33 @@ if ($LabelJsonOverride) {
     if ($labelRead.ExitCode -eq 0) { $labelJson = $labelRead.Output -join "`n" }
 }
 
+function Format-SingleQuotedArg {
+    <#
+        Escapes $Value for a paste-ready PowerShell single-quoted argument, by doubling any embedded
+        single quote -- the exact escape PowerShell itself reads back as one literal quote inside a
+        '...' string.
+
+        WHY THIS EXISTS AT ALL (security review finding on issue #1895's own PR). The four BUILT-IN
+        canonical labels happen to carry no apostrophe, which is why this bug shipped unnoticed through
+        this script's own first test pass: nothing exercised it. But Get-TriageLabels is
+        Adopt = 'copy' and Optional, which means a consumer is free to answer the seam with their own
+        Name/Color/Description -- arbitrary free text, and test 6 in adopt-triage-labels.tests.ps1
+        already proves the seam fully replaces the built-in set. A Description containing an ordinary
+        apostrophe ("won't wait", "team's convention") would close the surrounding '...' early in the
+        composed `gh label create` line, and the rest of that line would spill out as separate,
+        unintended shell tokens the moment a person pastes it -- which is the entire point of this
+        script: it never runs the command itself, so the printed line IS the product, and it has to be
+        safe to paste unmodified.
+
+        NOT NEEDED ON THE '[ok]'/'[missing]' DISPLAY LINES, deliberately: those are prose read by a
+        person, never composed into something a shell parses, so escaping there would only make an
+        apostrophe read oddly for no safety gained. This function is called at exactly the one site
+        that builds a command line.
+    #>
+    param([string]$Value)
+    return ($Value -replace "'", "''")
+}
+
 # Get-LabelNames only reads the 'name' field of each record and ignores the rest -- exactly what this
 # script needs, since colour/description drift on an EXISTING label is out of scope (see the header).
 #
@@ -216,7 +243,14 @@ foreach ($label in $triageLabels) {
     $missing++
     $repoArg = if ($repoSlug) { " --repo $repoSlug" } else { '' }
     Write-Host "  [missing] '$($label.Name)' -- $($label.Description)" -ForegroundColor Yellow
-    Write-Host "            gh label create '$($label.Name)' --color '$($label.Color)' --description '$($label.Description)'$repoArg" -ForegroundColor Yellow
+    # ESCAPED HERE, AND ONLY HERE (see Format-SingleQuotedArg's own docstring): this is the one line
+    # that composes an actual command a person pastes, and Name/Color/Description all come from
+    # $triageLabels -- the built-in four today, but a consumer's own free-text Get-TriageLabels answer
+    # tomorrow, which test 6 in adopt-triage-labels.tests.ps1 proves fully replaces them.
+    $qName = Format-SingleQuotedArg -Value $label.Name
+    $qColor = Format-SingleQuotedArg -Value $label.Color
+    $qDescription = Format-SingleQuotedArg -Value $label.Description
+    Write-Host "            gh label create '$qName' --color '$qColor' --description '$qDescription'$repoArg" -ForegroundColor Yellow
 }
 
 Write-Host ''

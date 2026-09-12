@@ -219,6 +219,38 @@ try {
         Assert-True ($r.Out -notlike "*'$name'*") "custom seam: the built-in canonical '$name' is NOT reported -- the seam fully replaced it"
     }
 
+    # --- 6b. A seam value carrying an APOSTROPHE composes a still-pasteable command (security review, --
+    #         issue #1895's own PR). The four built-in canonical labels happen to carry none, which is
+    #         exactly why this had zero coverage until now: Get-TriageLabels is Adopt='copy' and
+    #         Optional, so a consumer is free to answer it with their own free text, and test 6 above
+    #         already proves the seam fully replaces the built-in set. An unescaped apostrophe in
+    #         Name, Color or Description would close the surrounding '...' early in the composed
+    #         `gh label create` line, and everything after it would spill out as separate shell tokens
+    #         the moment a person pastes it -- which is the whole point of a script that never runs the
+    #         command itself: the printed line IS the product.
+    Write-Host '-- 6b. a seam value carrying an apostrophe still composes a pasteable command --' -ForegroundColor Cyan
+    # Concrete examples named in the review: "won't wait" and "team's convention" -- one label's Name
+    # carries an apostrophe, the other's Description carries two.
+    $quoteBody = "@([pscustomobject]@{ Name = 'team''s-label'; Color = 'ABCDEF'; Description = 'plain' }, [pscustomobject]@{ Name = 'prio-y'; Color = '123456'; Description = 'it won''t wait, and it''s the team''s convention' })"
+    $dir = New-FixtureConsumer -Label 'quoteseam' -CustomTriageLabelsBody $quoteBody
+    $r = Invoke-Adopt -Dir $dir -LabelJsonPath $fNone
+    Assert-Equal 0 $r.Code 'apostrophe seam: exit-code 0'
+    # PowerShell's own escape for a literal quote inside a '...' string is doubling it, so the composed
+    # line must read '' wherever the source value carried a bare '.
+    Assert-True ($r.Flat -like "*gh label create 'team''s-label' --color 'ABCDEF' --description 'plain' --repo fixture-org/fixture-repo*") `
+        'apostrophe seam: an apostrophe in NAME is escaped in the composed command'
+    Assert-True ($r.Flat -like "*gh label create 'prio-y' --color '123456' --description 'it won''t wait, and it''s the team''s convention' --repo fixture-org/fixture-repo*") `
+        'apostrophe seam: every apostrophe in DESCRIPTION is escaped, not just the first'
+    # The '[missing]'/'[ok]' PROSE lines are read by a person and composed into nothing a shell parses,
+    # so they are deliberately NOT escaped (see Format-SingleQuotedArg's own docstring) -- asserted here
+    # so a future "fix" that escapes them too is a deliberate choice rather than an accident.
+    # ONE apostrophe here, not doubled: this is a double-quoted PowerShell string literal in THIS test
+    # file, where a bare ' needs no escape at all -- unlike the doubled '' asserted above, which is the
+    # composed command's escape of the SAME raw value. Doubling it here by mistake would assert that the
+    # prose line escapes too, which it must not (see Format-SingleQuotedArg's own docstring).
+    Assert-True ($r.Out -like "*[missing]*'team's-label'*") `
+        'apostrophe seam: the prose [missing] line still carries the RAW apostrophe, unescaped -- it is not a shell argument'
+
     # --- 7. Mirror byte-identity (drift is also covered generically by shared-scripts.tests.ps1; --
     #        asserted here too so whoever edits either copy finds the guard beside the script it touched)
     Write-Host '-- 7. the plugin mirror is LF-identical to the source --' -ForegroundColor Cyan
