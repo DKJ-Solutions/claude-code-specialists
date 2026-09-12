@@ -130,11 +130,24 @@ function Test-GitCanCommit {
             GIT_AUTHOR_EMAIL are in the environment -> git commits fine, so there is nothing to say.
 
         `git var GIT_AUTHOR_IDENT` collapses both into the question actually being asked. It applies
-        git's own resolution order -- environment, then local, global and system config, then the
-        auto-guess from username@hostname -- and exits 128 with "Author identity unknown" exactly when
-        a commit would. Measured September 11, 2026 on DAVE-KOK-BWJ: exit 0 with the ident on a healthy
-        checkout, exit 128 under GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1, and a `git commit`
-        in that same state refused with the identical message.
+        git's own resolution order -- environment, then local, global and system config, then an
+        auto-detection that is NOT only the username@hostname guess -- and exits 128 with "Author
+        identity unknown" exactly when a commit would. Measured September 11, 2026 on DAVE-KOK-BWJ:
+        exit 0 with the ident on a healthy checkout, and a `git commit` refused with the identical
+        message in the state the probe exits 128 on.
+
+        THE SUPPRESSION HALF OF THAT MEASUREMENT WAS WRONG, and it is corrected here rather than
+        deleted because it is the trap (#1888). It read "exit 128 under GIT_CONFIG_GLOBAL=/dev/null
+        GIT_CONFIG_NOSYSTEM=1", and on that same machine, re-measured September 12, 2026 on git
+        2.55.0.windows.5, that state exits 0: config genuinely has nothing
+        (`git config --show-origin --get user.email` exits 1) and Git for Windows still names an
+        author, because its last source is the OS account rather than a config file, and what it
+        produces is a real display name and a real address instead of the username@hostname guess git
+        then refuses. Emptying every config scope therefore does NOT produce a checkout that cannot
+        commit; `user.useConfigOnly = true` in a readable config file is what disables the fallback.
+        This function is unaffected either way -- it reads whatever git resolves -- but anything
+        trying to CONSTRUCT the refusing state needs that key, and new-branch.tests.ps1's fixture is
+        where it is constructed.
 
         NO NETWORK, like everything else in this lib: git reads config files and the environment. That
         property is load-bearing -- this is a third local process launch at every session start, on top

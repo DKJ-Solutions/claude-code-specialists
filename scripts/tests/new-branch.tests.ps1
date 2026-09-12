@@ -1859,24 +1859,43 @@ exit 1
     # refusal that left half a branch behind would be strictly worse than the exit 128 it replaces.
     Write-Host "new-branch.ps1 -- a checkout that cannot commit is REFUSED (inbound #1867)" -ForegroundColor Cyan
     # THE FIXTURE'S IDENTITY IS REMOVED IN ALL THREE PLACES GIT READS, not just the local config that
-    # New-Fixture wrote: git falls back to global, then system, then an auto-guess from
-    # username@hostname -- and on a developer machine the global config alone would keep the probe
-    # green and assert nothing. GIT_CONFIG_GLOBAL / GIT_CONFIG_NOSYSTEM are git's own documented way to
-    # suppress the outer two, and they are inherited by the child process Invoke-NewBranch starts.
-    # GIT_AUTHOR_* / GIT_COMMITTER_* are cleared too, because the environment outranks all of it and a
-    # runner that exports them (some CI images do) would otherwise make this case silently vacuous.
+    # New-Fixture wrote: git falls back to global, then system -- and on a developer machine the global
+    # config alone would keep the probe green and assert nothing. GIT_AUTHOR_* / GIT_COMMITTER_* are
+    # cleared too, because the environment outranks all of it and a runner that exports them (some CI
+    # images do) would otherwise make this case silently vacuous.
+    #
+    # AND EMPTYING ALL FOUR IS STILL NOT ENOUGH, which is what #1888 measured and what the block below
+    # this fixture's creation is about: git's LAST source is not a config file at all.
     $fixIdent = New-Fixture -Label 'y'
     Invoke-FixtureGitIn $fixIdent config --unset user.name
     Invoke-FixtureGitIn $fixIdent config --unset user.email
     $identEnvNames = @('GIT_CONFIG_GLOBAL', 'GIT_CONFIG_NOSYSTEM', 'GIT_AUTHOR_NAME', 'GIT_AUTHOR_EMAIL', 'GIT_COMMITTER_NAME', 'GIT_COMMITTER_EMAIL')
     $identEnvPrev = @{}
     foreach ($n in $identEnvNames) { $identEnvPrev[$n] = (Get-Item "Env:\$n" -ErrorAction SilentlyContinue).Value }
+    # AN EMPTY GLOBAL CONFIG IS NOT ENOUGH, AND THAT IS THE WHOLE POINT OF THIS FILE (#1888). Emptying
+    # the three config scopes leaves git with nothing to read AND STILL NAMING AN AUTHOR: Git for
+    # Windows falls back to the OS account, and that fallback produces a real display name and a real
+    # address rather than the username@hostname guess git then refuses -- so it exits 0 and every
+    # assert below measures a checkout that can commit perfectly well. Measured on DAVE-KOK-BWJ,
+    # git 2.55.0.windows.5: with local unset, GIT_CONFIG_NOSYSTEM=1 and GIT_CONFIG_GLOBAL pointed at
+    # nothing, `git config --show-origin --get user.email` exits 1 (no config source has it) while
+    # `git var GIT_AUTHOR_IDENT` exits 0 with a usable ident. `EMAIL` and the GIT_AUTHOR_*/GIT_COMMITTER_*
+    # vars are empty, and substituting a genuinely empty FILE for the unreadable path changes nothing:
+    # this is not a leak to be plugged but a fallback to be switched off.
+    #
+    # `user.useConfigOnly = true` is that switch, and it needs a real file to live in -- which is why
+    # GIT_CONFIG_GLOBAL points at one written here instead of at NUL. The file is a SIBLING of the
+    # fixture rather than a file inside it: this repo is the one new-branch.ps1 reads `git status` on,
+    # and an untracked config file in its root would put a second subject into every assert.
+    $identGlobalCfg = "$fixIdent.gitconfig"
+    [System.IO.File]::WriteAllText($identGlobalCfg, "[user]`n`tuseConfigOnly = true`n", (New-Object System.Text.UTF8Encoding $false))
+    $script:fixtures += $identGlobalCfg
     try {
         foreach ($n in $identEnvNames) { Remove-Item "Env:\$n" -ErrorAction SilentlyContinue }
-        # NUL, not /dev/null: this suite runs on Windows, where /dev/null is an ordinary relative path
-        # and git would read it as an empty config rather than failing to find one. Either spelling
-        # happens to produce "no global config" here, but only one of them says so honestly.
-        $env:GIT_CONFIG_GLOBAL = 'NUL'
+        # GIT_CONFIG_GLOBAL / GIT_CONFIG_NOSYSTEM remain git's own documented way to suppress the outer
+        # two config scopes, and they are inherited by the child process Invoke-NewBranch starts; the
+        # file they now point at carries the one key that stops git guessing past them.
+        $env:GIT_CONFIG_GLOBAL = $identGlobalCfg
         $env:GIT_CONFIG_NOSYSTEM = '1'
 
         # FIXTURE SANITY FIRST, because every assert below is vacuous if the identity is still readable
