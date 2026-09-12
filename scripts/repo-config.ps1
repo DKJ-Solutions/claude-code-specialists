@@ -1183,3 +1183,65 @@ function Get-ExpectedRepoSettings {
        nothing is watched. #>
     return $script:ExpectedRepoSettings
 }
+
+# --- The triage-priority labels every dkj-policy consumer is invited to share (issue #1895) ---------
+#
+# THE GAP. `.claude/specialists/lenses/01-01-extension.md` already prescribes a priority label on
+# every issue filed HERE -- 'prio-1' (lowest) through 'prio-4' (highest) -- but until now that scale
+# was prose in one family's page and `dkj-policy` itself knew none of it. #1895 (split from #1843)
+# asked three questions, and Dave answered all three on September 12, 2026:
+#
+#   1. Apply or print?  PRINT. adopt-triage-labels.ps1 composes the exact `gh label create` a person
+#      would type and stops, on the same reasoning Get-MissingLabelNote already applies to a PR
+#      label: creating a label is a GitHub-side write, and a script that quietly created or
+#      substituted one would break any repo that later gates on it.
+#   2. Is there a shared set at all?  YES, one set -- not a per-consumer table.
+#   3. Where is it declared?  HERE, in its own seam -- not in branch-info.ps1 (see AdoptWhy below).
+#
+# 'copy', NOT 'decide', AND THE REASONING IS Get-ReachLabel's, ONE AXIS OVER (issue #1870), NOT
+# Get-BranchInfo's. A 'decide' value states WHAT THE REPO IS -- Get-BranchInfo's three prefixes exist
+# because THIS repo lands a release directly on its trunk, and copying that table into a consumer with
+# a different policy would impose it on them. 'prio-1' through 'prio-4' assert nothing about the
+# adopting repo at all: they are four rungs of urgency, and the rungs mean the same thing in every
+# repo that adopts them -- the shared WAY OF WORKING Get-ReachLabel's own AdoptWhy already argues for
+# the neighbouring axis. Refusing to share them would leave every dkj-policy consumer to reinvent four
+# names and four colours on their own, which is the exact "prose in one family's page" #1895 was filed
+# about.
+#
+# NOT THE SAME QUESTION AS #1686, AND NOT A REVERSAL OF IT. #1686 (closed September 9, 2026) kept this
+# repo's `prio-*` rungs and the BWJ tracker's own reach BUCKETS deliberately disjoint, in both
+# directions, so a session crossing families gets a refused label rather than one that quietly means
+# something else there. This seam does not touch dkj-policy-bwj's buckets or Get-ReachLabel's reach
+# axis at all -- it only offers the priority axis to an ORDINARY dkj-policy consumer, one with no BWJ
+# board of its own, which is a question #1686 never asked.
+#
+# THE VALUES ARE THIS REPO'S OWN LIVE LABELS, read back from `gh label list` rather than invented for
+# this function -- this repo already runs the convention its own orchestrator prescribes, so its
+# answer IS the canonical one instead of a guess at what it should be. adopt-triage-labels.ps1 carries
+# the same four values as its own built-in fallback, for a consumer that has not yet adopted this seam
+# -- see that script's header for why the two copies must stay byte-identical, the same duality
+# Get-EntryFallbackType's 'Chore' already has with entry-scaffold-lib.ps1.
+#
+# NO SCRIPT IN THIS WORKFLOW READS THIS EITHER, same as the priority axis has never been read by
+# anything here (see Get-ReachLabel's own AdoptWhy for why that is not disqualifying): `gh issue
+# create` fails outright on a label the repo does not have, so the four records below exist to be
+# composed into a paste-ready `gh label create` line by adopt-triage-labels.ps1 rather than typed by
+# hand into four separate terminals with four separate chances to mistype a hex colour.
+$script:TriageLabels = @(
+    [pscustomobject]@{ Name = 'prio-1'; Color = '006B75'; Description = 'Priority 1 of 4 (lowest) -- nobody is waiting for it' }
+    [pscustomobject]@{ Name = 'prio-2'; Color = 'FBCA04'; Description = 'Priority 2 of 4 -- worth doing, no pressure' }
+    [pscustomobject]@{ Name = 'prio-3'; Color = 'D93F0B'; Description = 'Priority 3 of 4 -- do this before the ordinary backlog' }
+    [pscustomobject]@{ Name = 'prio-4'; Color = 'B60205'; Description = 'Priority 4 of 4 (highest) -- takes precedence over other work' }
+)
+
+function Get-TriageLabels {
+    <# The four canonical triage-priority labels this workflow's consumers are invited to share --
+       'prio-1' (lowest) through 'prio-4' (highest) -- as an array of objects with Name, Color and
+       Description (the exact fields a `gh label create` call needs). Read by
+       adopt-triage-labels.ps1, which composes and prints the create command for whichever of the
+       four this repo's tracker is missing; it never creates a label itself. Optional in the script
+       contract -- a consumer that has not answered this seam gets the same four values from that
+       script's own built-in fallback, so an unanswered repo is already told the canonical set rather
+       than a degraded one. #>
+    return @($script:TriageLabels)
+}
