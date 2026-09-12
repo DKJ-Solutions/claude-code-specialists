@@ -43,7 +43,64 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**1 / 1 minor entry** <!-- pending-tally -->
+**2 / 2 minor entries** <!-- pending-tally -->
+
+### DEPLOY: feat/1895-triage-label-adopter · 20260912-141115
+
+`dkj-policy` shipped no machinery for the triage-priority label set this repo's own orchestrator
+already prescribes on every issue (`prio-1`..`prio-4`) -- the scale existed only as prose in
+`.claude/specialists/lenses/01-01-extension.md`, so any other dkj-policy consumer adopting the
+convention had to retype four names and four colours by hand, with no gate to catch a typo before
+`gh label create` refused it. `Get-MissingLabelNote` already established the precedent for this class
+of problem on a PR label (compose the exact `gh label create` and stop, never substitute, never drop),
+and `Get-ReachLabel` already established the precedent for sharing a label's SPELLING as a `copy`
+seam across dkj-policy consumers. This closes the gap between the two for the priority axis: a new
+`Get-TriageLabels` seam states the canonical four (`Adopt = 'copy'`, since the rungs are a shared
+convention rather than a fact about the adopting repo -- unlike `Get-BranchInfo`, which is `decide`),
+and a new print-only script, `adopt-triage-labels.ps1`, reads a repo's `gh label list` and prints a
+paste-ready create command for whatever it is missing -- never creating one itself. Split from #1843
+per its own red-team review; the three open questions it left (apply-or-print, is there a shared set,
+where does it live) are answered by this branch: print, yes one set, and in its own seam rather than in
+`branch-info.ps1`. This does not touch `#1686`'s BWJ-versus-source disjointness, or `#1841`/`#1870`'s
+reach-label machinery -- it is the neighbouring axis, for ordinary dkj-policy consumers only.
+
+**Score:** 2
+
+#### What makes this deploy extra special
+
+A dkj-policy consumer that has adopted the shared triage convention (or wants to) now has a single
+command that tells them exactly which of the four canonical labels their tracker is missing and hands
+them the paste-ready fix -- one command instead of four hand-typed ones, and no risk of a typo'd hex
+colour or a `gh label create` failing after the fact. It never writes anything on its own.
+
+**Score:** 2
+
+#### Pull Request
+
+Print-only adopter for the shared triage-priority labels
+
+Resolves #1895.
+
+`dkj-policy` prescribes the four `prio-1`..`prio-4` labels on every issue this repo files, but shipped
+no machinery for a consumer to adopt them -- the scale was prose in one family's page, and creating a
+label is a GitHub-side write nothing here should do silently. This gives the axis its own `copy` seam
+(`Get-TriageLabels`, next to `Get-ReachLabel`) and a print-only adopter script,
+`adopt-triage-labels.ps1`, that composes a paste-ready `gh label create` for whatever a repo's tracker
+is missing and never runs it -- the same compose-and-stop shape `Get-MissingLabelNote` already
+established for a PR label. Mirrored into the plugin, wired into the script contract and the
+shared-scripts registry, with a new dedicated test suite plus additions to `repo-config.tests.ps1` and
+`script-contract.tests.ps1`. Lint and the full test suite are green.
+
+Not in scope, per the issue: `Get-BranchInfo`, the BWJ reach labels/buckets (#1686, #1841, #1870), any
+colour/description drift detection on an existing label, and a new skill page or a fifth "Part" of
+`adopt-dkj-policy` (documented instead via `plugins/dkj-policy/scripts/README.md` and one sentence in
+`CONTRIBUTING-portable.md`).
+
+Plugins: dkj-policy
+
+[PR #1899](https://github.com/DKJ-Solutions/dkj-claude-plugins/pull/1899)
+
+---
 
 ### DEPLOY: fix/1897-reupload-stale-attachment · 20260912-123206
 
