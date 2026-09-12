@@ -971,6 +971,36 @@ function Get-SharedScriptPairs {
             MeasureArgs = @()
         },
         @{
+            # The triage-priority label adopter (issue #1895, split from #1843). Print-only, the same
+            # shape Get-MissingLabelNote already established for a PR label: composes a paste-ready
+            # `gh label create` for whichever of the four canonical 'prio-*' labels this repo's tracker
+            # is missing, and never runs it. Shared for the same reason every entry here is -- the
+            # alternative is each consumer retyping four names and four colours out of a page instead
+            # of a seam.
+            #
+            # NO SKILL, DELIBERATELY, AND FOR A DIFFERENT REASON THAN check-unfolded-entry's ABOVE. That
+            # one has no skill because both its callers are automatic and nobody invokes it as a
+            # procedure; this one genuinely is a procedure a person runs, but #1895 scoped OUT both of
+            # its obvious homes -- a new "Part 5" of the already-four-part adopt-dkj-policy skill, and a
+            # skill page of its own -- as bigger than the issue asked for. Documented instead by its own
+            # .SYNOPSIS run line, the shared-scripts table row below, and one sentence in
+            # CONTRIBUTING-portable.md. A future issue that outgrows this may still give it one.
+            #
+            # NOT REFUSED IN THE WORKFLOW'S SOURCE REPO, unlike adopt-merge-queue and
+            # adopt-workflow-folder above: those write local files that would collide with the hand-kept
+            # originals they are derived from. This script writes nothing at all -- it only reads
+            # `gh label list` and prints -- so running it here checks this repo against its own
+            # canonical answer instead of conflicting with anything.
+            Name   = 'adopt-triage-labels'
+            Source = 'scripts\task\adopt-triage-labels.ps1'
+            Plugin = 'dkj-policy'
+            # Skill = '', so the parameter check (check 18) never runs for this entry -- there is no
+            # skill page to hold -LabelJsonOverride against. See the comment above for why.
+            Skill  = ''
+            # Timeable with no arguments: it only reads and prints, never writes.
+            MeasureArgs = @()
+        },
+        @{
             # Issue #417, phase 1. Two repos ran two independently evolved files of this name, and the
             # owner's goal is one release workflow rather than two that resemble each other. The audit
             # that produced the issue named three divergences; reading both files found six, and the
