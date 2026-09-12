@@ -43,7 +43,64 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**2 / 2 minor entries** <!-- pending-tally -->
+**3 / 3 minor entries** <!-- pending-tally -->
+
+### DEPLOY: docs/1896-tier2-subscriber-reader · 20260912-210218
+
+The tier model now says **whose** service. *Subscriber of a service* names a role, and a role does not say
+which party fills it -- so in a repo whose subscribers are themselves businesses the phrase reads two ways,
+and the wrong reading is the more vivid one, because that party is a real customer somebody can picture.
+The rule added is **one hop and no further**: the tier-2 reader is whoever takes what this repo ships, and
+that party's own customers are one hop further out and are never this reader.
+
+It is written in two places and deliberately not in the other twenty. `RELEASES-portable.md` carries the
+rule and the measurement, because that is where the tier model is defined. The guidance block in
+`entry-scaffold-lib.ps1` carries a three-line version, because that block is rendered into every
+development document and is the line an author is looking at *while* scoring -- the report named it for
+exactly that reason. Everywhere else the phrase appears it is a name for the tier, not a definition of it,
+and a name is not where this gets fixed.
+
+The guidance version is deliberately tier-agnostic, so it stays correct under a tier-1 repo's `{0}` too: a
+commissioner who resells has customers of their own, one hop past the repo just the same.
+
+**It is a continuation of the reader sentence rather than a paragraph of its own, and that is issue #928
+one clause further down.** `Remove-EntryAudienceGuidance` drops the whole paragraph carrying `{0}` in a repo
+that states no audience tier, fenced by separator lines. Written as its own paragraph -- which is how it was
+written first -- the clause survives that removal and opens with "that reader" after the clause naming that
+reader has gone: exactly the mid-sentence paragraph #928 was filed for, reappearing in the same consumers,
+and invisible here because this repo's `repo-config.ps1` states tier 2. Keeping it inside the paragraph is
+also the right answer on the merits, since a repo asked about every tier has no single "that reader" for the
+clause to qualify. Caught by rendering both states rather than by a gate, so the new assert is what makes
+the next split fail loudly: the existing #928 asserts derive the paragraph from the seam and would simply
+see a shorter one.
+
+Resolves [#1896](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1896).
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+Every consumer writes this question into every branch document they open, and answers it on every entry --
+so the ambiguity is not this repo's alone, and the repos most exposed to it are precisely those whose own
+subscribers are businesses: both BWJ store repos, and the webshop that filed #620 and gave the model its
+two-kinds-of-audience shape in the first place. They get the sharpened question the next time `new-branch`
+runs after this release, and the reasoning behind it in `RELEASES-portable.md`.
+
+Scoring this 3 rather than `N/A` is the rule being applied to its own entry. The reading it corrects would
+have reached past the consuming repos to their customers, found nobody, and written `N/A` -- which is the
+exact move that cost a required migration its place on the `v5.1.0` audience note.
+
+**Score:** 3
+
+#### Pull Request
+
+Name the tier-2 subscriber explicitly: the consuming repo, never its own customers
+
+Plugins: dkj-policy
+
+[PR #1900](https://github.com/DKJ-Solutions/dkj-claude-plugins/pull/1900)
+
+---
 
 ### DEPLOY: feat/1895-triage-label-adopter · 20260912-141115
 
