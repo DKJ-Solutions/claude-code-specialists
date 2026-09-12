@@ -43,7 +43,42 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**13 / 32 minor entries** <!-- pending-tally -->
+**13 / 33 minor entries** <!-- pending-tally -->
+
+### DEPLOY: fix/1888-no-identity-fixture · 20260912-082317
+
+The `no identity` fixture in `new-branch.tests.ps1` now pins the state it asserts, instead of assuming
+that an empty config produces it. Emptying every config scope does not stop Git for Windows naming an
+author: its last source is the OS account rather than a config file, and what it returns is a real
+display name and a real address rather than the `username@hostname` guess git then refuses -- so the
+probe exited 0, the fixture's own sanity assert went red, and the seven asserts below it measured a
+checkout that could commit perfectly well. `GIT_CONFIG_GLOBAL` now points at a real file carrying
+`user.useConfigOnly = true`, which is the switch that disables the fallback. The whole local test gate
+failed on this, so every pull request from such a machine needed `-SkipTests` to get out.
+
+`Test-GitCanCommit`'s docstring carried the same false premise, citing a measurement that does not
+reproduce on the machine it names; it is corrected rather than deleted, because the trap is worth
+keeping written down.
+
+**Score:** 4
+
+#### What makes this deploy extra special
+
+N/A -- nothing here changes what any shipped script does. The corrected docstring travels to consumers
+in the `dkj-policy` mirror, but it is a comment, and the state it describes is one a consumer's own
+developer would only meet while writing a fixture of their own.
+
+**Score:** N/A
+
+#### Pull Request
+
+Pin the no-identity fixture against Git for Windows' identity auto-detection
+
+Plugins: dkj-policy
+
+[PR #1891](https://github.com/DKJ-Solutions/dkj-claude-plugins/pull/1891)
+
+---
 
 ### DEPLOY: feat/1884-closeout-receipt-print · 20260911-221807
 
