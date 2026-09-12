@@ -115,6 +115,30 @@ So write it in two passes, and expect the second one:
   first pass could not see. It is a two-line edit on the same file, and step 4's exception carries it:
   the second pass is part of writing the release notes, not a change of its own.
 
+**AND THE SECOND PASS RE-UPLOADS THE ATTACHMENT IT JUST EDITED**
+([#1897](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1897), September 12, 2026). Step 5
+uploads the hand-written documents and *then* this pass edits one of them, so the published asset is one
+revision behind the tree **by construction** — it permanently lacks the very figure this step exists to
+capture. Measured at this repo's `v5.1.0`: the asset was 11,487 bytes against a committed document of
+12,275, caught only because somebody happened to be watching the byte count. Nothing reports it — the
+release is right on the tree, right on the tag, and wrong on the one page a reader downloads from, which
+is precisely where the argument above says a release's cost belongs.
+
+So re-copy the edited document to its unique filename and upload it over the old asset. `--clobber` is
+what makes that idempotent; without it `gh` refuses a name that already exists:
+
+```powershell
+gh release upload vX.Y.Z <vX.Y.Z-notes-for-users.md> --clobber
+```
+
+**Which document that is depends on the flow, and it is not always the consumer one.** The figure goes in
+the *organisational* section, so in the merged one-document flow it is the note under
+`Get-ReleaseNoteRoot`; in the two-document flow those sections are the ones `new-internal-note.ps1`
+writes, so there it is `releases/internal/<dir>/<X.Y.Z>.md` that goes stale and the consumer document
+that does not. Upload whichever one this pass actually edited. **The development notes are not exposed**:
+the cut generates them at step 1 and nothing between there and step 7 edits them — it is the *editing*
+that creates the exposure, not the attaching, so any document a later step edits inherits this paragraph.
+
 **Do not "solve" this by publishing the Release earlier**, which is the first thing that suggests itself. It
 would put the publish before the attachments exist, which is what step 5's ordering is for; the tail of a
 release is cheap to measure twice and expensive to publish twice. And where a document IS written, do
