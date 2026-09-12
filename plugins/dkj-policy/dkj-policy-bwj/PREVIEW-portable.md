@@ -31,6 +31,15 @@ one of them gets the machinery through a plugin update whether or not it ever re
 This page is the **policy** -- *what the person receiving a preview is handed*. That is BWJ's house
 rule for two repos, not a Shopify fact.
 
+**One piece of mechanism does sit in this plugin, and it is here because it is BWJ-shaped too.**
+[`scripts/lib/market-urls.ps1`](scripts/lib/market-urls.ps1) builds the URLs a handover is made of, and
+`Get-MarketHandoverPairs` returns exactly the pair the rule below asks for -- the preview and its live
+control, per market and per page -- so the page you publish has an input rather than a recollection.
+Which markets a store has stays that store's own `Get-StorefrontMarkets` seam answer; the builder is
+shared because both stores had written one and only the exported function names ever matched
+([#1886](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1886)). Its terminal output says in
+as many words that it is the **material** and not the handover, and points back here.
+
 ## The rule, in two halves
 
 **One: a preview handover is a PAIR per market -- the preview, and the control.** The control variant

@@ -221,11 +221,31 @@ reports after the fact and refuses nothing.
 | what | where | notes |
 |---|---|---|
 | the test harness | [`scripts/tests/test-lib.ps1`](scripts/tests/test-lib.ps1) | the assert helpers, `ConvertTo-CapturedText`, `Add-SuiteFault` and `Assert-PluginLoadedForProject` -- the superset of what the two stores each had, in English |
+| the market URL builder | [`scripts/lib/market-urls.ps1`](scripts/lib/market-urls.ps1) | the storefront and preview URLs per market -- the superset of what the two stores each had, in English. The market table itself stays a `Get-StorefrontMarkets` seam answer per store |
 
-**Adopting it** in a store repo: replace the local `scripts/tests/test-lib.ps1` with a forwarder that
-dot-sources this one out of the plugin cache, resolved through that repo's `scripts/lib/plugin-scripts.ps1`
--- the shape `prune-merged.ps1` already uses there. Keep the file name, because every suite already
-dot-sources `test-lib.ps1` from its own folder: the forwarder costs one file and no suite changes.
+**Adopting the test harness** in a store repo: replace the local `scripts/tests/test-lib.ps1` with a
+forwarder that dot-sources this one out of the plugin cache, resolved through that repo's
+`scripts/lib/plugin-scripts.ps1` -- the shape `prune-merged.ps1` already uses there. Keep the file name,
+because every suite already dot-sources `test-lib.ps1` from its own folder: the forwarder costs one file
+and no suite changes.
+
+**Adopting the market URL builder** is the same forwarder shape, and it keeps whichever file name that
+store's callers already use -- `market-domains.ps1` in one repo, `market-urls.ps1` in the other. Two
+things beside the forwarder are real work rather than a rename, and both are named in the lib's own
+header: `Get-StorefrontMarkets` has to be answered in `scripts/repo-config.ps1` first, and
+`Get-PreviewPrimeUrl` (singular) is replaced by `Get-PreviewPrimeUrls` (plural), which a caller has to
+loop over. That plural is the one place where converging two stores **changed** an answer rather than
+merging one: a preview cookie is set per domain, so a single prime URL is right for a one-domain store
+and silently primes one of five for the other -- inside the very check that exists to prove the reader
+is not looking at live.
+
+**Why the market table is the one thing that did not travel.** It is the *data*, and the split between
+mechanism here and data in each store's seam is what lets one builder serve two brands that share no
+domain at all. One store runs its markets on five separate domains; the other runs them on a single
+domain with locale path prefixes. Copying either table onto the other store produces URLs that do not
+exist -- which is also why neither repo ever found the other's copy: only the exported function names
+matched, so the sibling check could see the pair only as `ALIASED`
+([#1886](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1886), candidate 1).
 
 ## The skills
 
@@ -302,6 +322,20 @@ the project:
 project may differ per brand. The CI half reads the project from the repo variable
 `ASANA_PROJECT_GID` and its token from the secret `ASANA_PAT` -- it addresses every task by GID, so
 it needs no workspace of its own.
+
+**And the mechanism under [What this plugin owns](#what-this-plugin-owns) needs one answer of its own**,
+in that same file. It belongs to no chapter, because a chapter is policy and this is the data half of a
+shared lib:
+
+- `Get-StorefrontMarkets` -- the markets this store serves, one row per market, each carrying `Market`
+  (the label), `Domain` (the host, no scheme and no trailing slash) and `PathPrefix` (`''` for a market
+  at the domain root, otherwise `'/de'`-shaped). Order is display order and the first row is the
+  primary market. **Required** by
+  [`scripts/lib/market-urls.ps1`](scripts/lib/market-urls.ps1) and by nothing else, so a repo that
+  does not build storefront URLs leaves it out; where it is needed and missing, every function in that
+  lib refuses by name rather than inventing a table. Read it off the live storefront's public hreflang
+  set rather than from memory when a market is added or removed -- both stores' original copies
+  recorded that instruction, and it is the reason neither table had silently rotted.
 
 ## Enabling it
 
