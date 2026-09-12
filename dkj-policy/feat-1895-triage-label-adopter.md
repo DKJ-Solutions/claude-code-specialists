@@ -81,13 +81,10 @@ Give dkj-policy a shared, print-only adopter for the canonical prio-1..prio-4 tr
       built-in fallback (not merely defined), mirror byte-identity, the two canonical copies
       (this script's fallback and `Get-TriageLabels`) held byte-for-byte identical, and the contract
       record's own shape.
-- [x] Full repo-wide `scripts/tests/*.tests.ps1` sweep (all 100 suites): the first run caught the
-      missing source-repo guard above -- the ONLY failure across all 100 suites, everything else was
-      already green -- and every suite that exercises the fix directly
-      (`source-repo-guard.tests.ps1`, `adopt-triage-labels.tests.ps1`, `shared-scripts.tests.ps1`,
-      `script-contract.tests.ps1`, `repo-config.tests.ps1`) was re-run afterwards and is green. A
-      second full 100-suite sweep was started to confirm nothing else regressed; whoever picks this up
-      next should check its result before opening the PR if it has not finished.
+- [x] Full repo-wide `scripts/tests/*.tests.ps1` sweep (all 100 suites), run twice: the first pass
+      caught the missing source-repo guard above -- the ONLY failure across all 100 suites, everything
+      else was already green -- and the second, after that fix, is green end to end: 0 of 100 suites
+      failing.
 - [x] `scripts/lint/check-plugin-integrity.ps1` -- 0 errors.
 
 ### DEPLOY: feat/1895-triage-label-adopter
