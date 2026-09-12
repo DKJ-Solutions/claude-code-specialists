@@ -43,7 +43,59 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**14 / 35 minor entries** <!-- pending-tally -->
+**15 / 36 minor entries** <!-- pending-tally -->
+
+### DEPLOY: feat/1886-bwj-market-urls · 20260912-091743
+
+`dkj-policy-bwj` gains its second piece of shared mechanism: `scripts/lib/market-urls.ps1`, the
+storefront and preview URL builder both BWJ stores had written separately. It is #1886's candidate 1
+and the flagship `ALIASED` finding of the sibling check -- one capability under two filenames
+(`market-domains.ps1` against `market-urls.ps1`), sharing only the names `Get-MarketPreviewUrls` and
+`Write-MarketPreviewUrls`, which is why no grep in either repo would ever have found the other.
+
+**The design problem the report does not state is that the two stores have different storefront
+topologies.** One runs its markets on five separate domains; the other runs its locales on a single
+domain with path prefixes. So the shared table carries both axes -- `Market`, `Domain`, `PathPrefix`
+-- and each store's shape falls out of it. Copying either table onto the other store produces domains
+that do not exist, which is the reason this pair stayed apart rather than an accident of naming.
+
+**For one store this is a repair, not a move.** Everything the richer copy carried is here, and its
+absence had already cost the other store: without the `_ab=0&_fd=0&_sc=1` parameters a preview holds
+only through the cookie and is lost at the first internal link, so the reviewer is looking at **live**
+while believing they are looking at the preview -- a whole review was lost to exactly that on
+August 5, 2026, and the thinner copy still did not carry them. The git-bash mangled-path refusal and
+more-than-one-page-per-run arrive with it.
+
+**One answer changed rather than merged**, and it is the only one: `Get-PreviewPrimeUrl` becomes
+`Get-PreviewPrimeUrls`. A preview cookie is set per domain, so a single prime URL is right for a
+one-domain store and primes one of five for the other -- silently, inside the check that exists to
+prove a scripted fetch is not reading live.
+
+The market table itself stays each store's `Get-StorefrontMarkets` seam answer. Mechanism here, data
+there, which is what lets one builder serve two brands that share no domain.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+For a subscriber -- a BWJ store repo -- adoption is a forwarder plus a seam answer, and until they
+make that move nothing changes for them. So the reach is real but gated on their action, which is why
+this is a 3 and not higher: the moment a store next touches its preview handover, the builder is
+there, carrying three capabilities one of them never had. The asymmetry is worth naming rather than
+averaging away -- for one store this is a relocation of code it already had, and for the other it is
+the repair of a failure that has already cost a review.
+
+**Score:** 3
+
+#### Pull Request
+
+dkj-policy-bwj owns the market preview-URL builder
+
+Plugins: dkj-policy-bwj
+
+[PR #1894](https://github.com/DKJ-Solutions/dkj-claude-plugins/pull/1894)
+
+---
 
 ### DEPLOY: feat/1890-update-plugins · 20260912-084029
 
