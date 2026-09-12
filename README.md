@@ -833,7 +833,7 @@ function in Claude Code and in Cowork, but not in a plain Claude.ai Chat session
 `specialists-init`, `specialists-teardown`, `sync-roster`, `start-task`, `adopt-shopify-floor`,
 `cut-release`, `adopt-dkj-policy`,
 `release-notes-page`, `sync-main`, `push-preview`, `check-branch-entry`, `check-policy-drift`,
-`prune-merged`, `tidy-machine`, `plugin-versions`, `check-fanout`,
+`prune-merged`, `tidy-machine`, `plugin-versions`, `update-plugins`, `check-fanout`,
 `measure-skill`, `worktree-lane`, `report-issue`, `adopt-dkj-policy-bwj`, `orchestrator`)<!-- /skills:all -->
 remain available there.
 
@@ -918,14 +918,14 @@ typo there would quietly exclude the plugin it meant to keep and report success.
 `new-branch`, `claim-issue`, `park`, `fix-mojibake`, `specialists-init`, `specialists-teardown`,
 `sync-roster`, `start-task`, `adopt-dkj-policy`, `adopt-shopify-floor`,
 `release-notes-page`, `sync-main`, `push-preview`, `check-branch-entry`, `check-policy-drift`,
-`prune-merged`, `tidy-machine`, `plugin-versions`, `measure-skill`, `worktree-lane`, `check-fanout`) are a thin wrapper around a script — procedural
+`prune-merged`, `tidy-machine`, `plugin-versions`, `update-plugins`, `measure-skill`, `worktree-lane`, `check-fanout`) are a thin wrapper around a script — procedural
 **mechanism** (branch, claiming an issue on the tracker before the work on it starts, PR, ship, fold,
 bootstrap, teardown, roster-sync, encoding repair, reading a
 repo's own conventions, placing an add-on team's operational floor, pushing a branch to its own preview
 theme, the reading copy of the release notes, laying the repo's law-bearing documents out in rank order
 so a session can read them against each other, reaping the local branches a merge left behind, telling
 whether this checkout's installed plugin matches the marketplace clone and which command closes any
-gap, pricing what a skill costs the sessions that carry it, giving a branch its own worktree so
+gap, closing that gap in one command instead of one per plugin, pricing what a skill costs the sessions that carry it, giving a branch its own worktree so
 another one can ship, and reading the working copy on both sides of a dispatched fan-out to say whether
 a subagent discarded any of it). `cut-release`, `orchestrator`, `report-issue` and `adopt-dkj-policy-bwj`<!-- /skills:all --> are the
 deliberate exceptions: a checklist with no script of its own (see below); a skill that must not have

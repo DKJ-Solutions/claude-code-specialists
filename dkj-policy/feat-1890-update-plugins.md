@@ -36,19 +36,66 @@
 
 ### PLAN
 
+Issue #1890 split the buildable half off #1810: updating a checkout's own plugins is 1 + N commands
+(`claude plugin marketplace update <marketplace>`, then `claude plugin update <id> --scope project`
+per enabled plugin) with no `--all` and no repeatable `<plugin>` argument on the CLI. Build the
+wrapper the issue's own "Shape" section describes -- refresh, update every enabled plugin, print
+`plugin-versions`' receipt -- as a shared `dkj-policy` script + skill, scoped to this checkout plus
+the machine-wide marketplace clone. The open question the issue leaves for Dave ("how many machines
+actually work in these repos") is outside this branch's scope; nothing here depends on its answer.
+
 ### CREATE
 
-- [ ] TODO: the first step of this branch
+- [x] `scripts/task/update-plugins.ps1` -- refresh, per-plugin update (`--scope project`), receipt
+      via `plugin-versions.ps1` as a child process; continues past a per-call failure and exits
+      non-zero if anything failed; `-DryRun` prints without executing
+- [x] registered in `scripts/lib/shared-scripts-lib.ps1` and mirrored into
+      `plugins/dkj-policy/scripts/task/update-plugins.ps1`
+- [x] `plugins/dkj-policy/skills/update-plugins/SKILL.md`
+- [x] doc rows/spans updated: root `README.md` (both `skills:all` spans),
+      `plugins/dkj-policy/README.md` (`skills:plugin`), `plugins/dkj-policy/scripts/README.md`
+      (`shared-scripts:mirror`)
 
 ### TEST
 
+- [x] `scripts/tests/update-plugins.tests.ps1` -- 38 asserts, 0 failures. A `claude.cmd` shim on PATH
+      stands in for the real CLI (echoes its own arg line so a scenario can tell "the CLI ran" apart
+      from "-DryRun only printed the same words") and a fixture `.ps1` stands in for the
+      `plugin-versions.ps1` receipt via `-ReceiptScriptOverride`. Covers: the happy path (one
+      marketplace, two plugins), `-DryRun` (nothing executed, no receipt), no plugins enabled, a
+      malformed id skipped alongside valid ones, every id malformed, a failing marketplace refresh
+      (plugin updates still run), a failing plugin update (the other still runs), and two distinct
+      marketplaces refreshed in ordinal order.
+- [x] `scripts/lint/check-plugin-integrity.ps1` -- 0 errors (ran once before the doc-span updates,
+      found the 4 missing-row/span findings named above, ran again clean).
+- [x] `scripts/tests/shared-scripts.tests.ps1` -- 743 asserts, 0 failures (the new registry entry
+      does not disturb the mirror/skill-parameter machinery).
+
 ### DEPLOY: feat/1890-update-plugins
 
-**Score:**
+A checkout's own plugins now update in one command instead of 1 + N. `update-plugins` (the shared
+`dkj-policy` script + skill) refreshes the marketplace clone once, runs `claude plugin update <id>
+--scope project` for every plugin this checkout enables, then prints `plugin-versions`' own receipt --
+so the result is read off the same tool that would have reported the checkout as behind, rather than
+trusted on the update commands' own say-so. `-DryRun` prints every command without running any of
+them. Scoped on purpose to this checkout plus the machine-wide marketplace clone: every update call is
+`--scope project` against the checkout the command runs from, never a walk into another repo (`claude
+plugin install`/`update` rewrites the visited repo's `.claude/settings.json`, so a sweeping updater
+would leave uncommitted diffs in repos nobody opened). One marketplace or one plugin failing to update
+does not stop the rest -- every failure is reported and the run's own exit code is non-zero only if
+something failed.
+
+**Score:** 2 -- a convenience over typing the same commands by hand; this repo is itself a consumer of
+its own `dkj-policy` plugin, and its own maintenance sessions gain the same shortcut.
 
 #### What makes this deploy extra special
 
-**Score:**
+A consumer running `dkj-policy` gains a new skill the moment they update: closing the gap
+`plugin-versions` (or `connector-sessioncheck`'s `-Brief` line) already reports no longer means typing
+one command per enabled plugin.
+
+**Score:** 2 -- noticed the next time they update and it takes one command instead of several; nothing
+breaks and nothing is required to adopt it.
 
 #### Pull Request
 

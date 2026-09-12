@@ -175,6 +175,25 @@ function Get-SharedScriptPairs {
             MeasureArgs = @()
         },
         @{
+            # #1890's buildable half: the 1 + N commands a checkout's own plugin update always was,
+            # run as one. Shares plugin-versions.ps1's own Get-EnabledPlugins/slug-check helpers
+            # (check-report-lib) and Invoke-NativeCapture (native-capture-lib), both already
+            # plugin-carried, and runs plugin-versions.ps1 itself as its step-3 receipt -- so the
+            # payload this adds is this one file.
+            Name   = 'update-plugins'
+            Source = 'scripts\task\update-plugins.ps1'
+            Plugin = 'dkj-policy'
+            Skill  = 'update-plugins'
+            # Fixtures: a scratch repo root, a scratch ~/.claude home, and a fixture receipt script --
+            # the last one so the suite is not required to make plugin-versions.ps1's own full
+            # install-record + marketplace-clone state exist just to prove step 3 was invoked. A
+            # consumer never types any of the three.
+            SkillParamsExempt = @('RootOverride', 'UserHomeOverride', 'ReceiptScriptOverride')
+            # -DryRun: reads the enable state and prints, calls the CLI for nothing and writes
+            # nothing anywhere -- the one arg-shape worth timing without a live 'claude' on PATH.
+            MeasureArgs = @('-DryRun')
+        },
+        @{
             # THE POLICY-DRIFT REPORT. The corollary in CONTRIBUTING-portable.md's "A third rank sits
             # above both" -- a consumer document may point at a shared law or answer a seam it names,
             # never restate it -- had two narrow deliveries (check-retired-doc-name, a filename;
