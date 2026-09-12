@@ -43,4 +43,36 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**Nothing pending.** The last release took every entry. <!-- pending-tally -->
+**1 / 1 minor entry** <!-- pending-tally -->
+
+### DEPLOY: fix/1897-reupload-stale-attachment · 20260912-123206
+
+The `cut-release` checklist now says to re-upload the release attachment the timing pass edits. Step 0a
+prescribes a second timing pass *after* step 5, and step 5 is where the hand-written documents are
+attached — so the published asset was one revision behind the tree by construction and permanently
+lacked the end-to-end duration that step exists to capture. Measured at `v5.1.0`: 11,487 bytes published
+against 12,275 committed, caught only because somebody was watching the byte count. The step now carries
+the `gh release upload --clobber` line, names which document is the stale one in each flow (the consumer
+note in the merged flow, the internal note in the two-document flow), and rules the generated development
+notes out with the reason — it is the editing that creates the exposure, not the attaching.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+A consumer running this workflow publishes a Release whose attached note is missing the one figure the
+checklist told them to measure, and nothing reports it — the tree, the tag and the commit are all
+correct. They find out when somebody downloads the note and the total is not in it.
+
+**Score:** 3
+
+#### Pull Request
+
+The second timing pass re-uploads the attachment it just edited
+
+Plugins: dkj-policy
+
+[PR #1898](https://github.com/DKJ-Solutions/dkj-claude-plugins/pull/1898)
+
+---
+
