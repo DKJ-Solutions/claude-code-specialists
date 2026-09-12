@@ -43,7 +43,56 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**13 / 33 minor entries** <!-- pending-tally -->
+**13 / 34 minor entries** <!-- pending-tally -->
+
+### DEPLOY: feat/1885-shipped-adoption-gap-lane · 20260912-083142
+
+`check-consumer-siblings.ps1` gains a fifth finding class, **SHIPPED**: a comparable path that a
+plugin in this marketplace **already publishes**. That is an *adoption gap* rather than divergence,
+and it is a sentence none of the three consumer checks could form. `check-consumer-drift.ps1` compares
+agent defs and personas, `check-consumer-siblings.ps1` compares consumer to consumer, and
+`check-script-contract.ps1` asks whether a consumer exposes the seam functions the shared scripts
+call -- so a store re-implementing a shipped script read as `DRIFTED` when both did and `ONLY-IN` when
+one did, and neither verdict contained the fact that decides what to do about it.
+
+The report was upside down as a result: the **cheapest** convergence -- adopt what already exists --
+was the one nothing could see, while the expensive kind (decide an owner, move the mechanism, release,
+adopt) was the only kind surfaced.
+
+Measured on the BWJ pair the day it landed, it names **six** of 94 findings, four of which #1885
+predicted and two it did not: `scripts/task/prune-merged.ps1`, which is #1869's own load-bearing
+instance and is *still* carried locally by **both** stores, and `scripts/tests/test-lib.ps1`, which
+`dkj-policy-bwj` had begun shipping hours earlier under #1881.
+
+**It adds and never reclassifies.** A `SHIPPED` path is still reported as `ONLY-IN` or `DRIFTED`
+beside it. The match is on filename -- weak evidence, stated as such in the report, exactly as the
+`ALIASED` lane states its own -- so a wrong match costs a reader one file to open and can never delete
+a real divergence finding. The index is bounded to `.ps1` for the same reason: every plugin ships a
+`README.md`, and a basename index over all files would answer *"already shipped"* for every README in
+every consumer. `.github/workflows` templates are excluded by that same bound and deserve it
+independently -- those are **meant** to be copied verbatim, so a consumer holding one is the mechanism
+working.
+
+Still a detector. Nothing refuses; `-FailOnFinding` now counts a `SHIPPED` finding too.
+
+**Score:** 3
+
+#### What makes this deploy extra special
+
+It inverts which convergence the tooling makes visible. Every lane before it reported work that needs
+an ownership **decision** before anything can happen; this one reports work where the decision is
+already made and only the adoption is outstanding -- and it found that the instance the whole sibling
+check was built around, `prune-merged.ps1`, is one of them in both stores at once.
+
+**Score:** N/A
+
+#### Pull Request
+
+The sibling check reports an adoption gap, not just divergence
+
+[PR #1892](https://github.com/DKJ-Solutions/dkj-claude-plugins/pull/1892)
+
+---
 
 ### DEPLOY: fix/1888-no-identity-fixture · 20260912-082317
 
