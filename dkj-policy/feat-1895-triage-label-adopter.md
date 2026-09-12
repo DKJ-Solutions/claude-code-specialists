@@ -61,6 +61,11 @@ Give dkj-policy a shared, print-only adopter for the canonical prio-1..prio-4 tr
       not logic mistakes): an `-eq $triageLabels`/`-not $triageLabels` boolean-coercion trap on a
       single-element array under `Set-StrictMode`, and an `if/else`-as-expression assignment that
       silently unwraps a one-element array back to a bare object. Both fixed and explained inline.
+- [x] Wired in the source-repo guard (`Assert-OwnCopy`) the script was missing -- caught by running
+      the FULL `scripts/tests/*.tests.ps1` sweep, not by any suite scoped to this branch alone. Every
+      person-invoked shared script carries it, exemptions are hook-only, and this script is neither --
+      the header now distinguishes it clearly from the separate, content-specific
+      `Test-IsWorkflowSourceRepo` refusal it correctly still does not need.
 
 ### TEST
 
@@ -76,9 +81,13 @@ Give dkj-policy a shared, print-only adopter for the canonical prio-1..prio-4 tr
       built-in fallback (not merely defined), mirror byte-identity, the two canonical copies
       (this script's fallback and `Get-TriageLabels`) held byte-for-byte identical, and the contract
       record's own shape.
-- [x] Full suite (`scripts/tests/*.tests.ps1`) run; the ones touched (`repo-config`,
-      `script-contract`, `shared-scripts`, `config-blueprint`, `reach-label`, `adopt-triage-labels`)
-      all green, and a full repo-wide run was kicked off to confirm no other suite regressed.
+- [x] Full repo-wide `scripts/tests/*.tests.ps1` sweep (all 100 suites): the first run caught the
+      missing source-repo guard above -- the ONLY failure across all 100 suites, everything else was
+      already green -- and every suite that exercises the fix directly
+      (`source-repo-guard.tests.ps1`, `adopt-triage-labels.tests.ps1`, `shared-scripts.tests.ps1`,
+      `script-contract.tests.ps1`, `repo-config.tests.ps1`) was re-run afterwards and is green. A
+      second full 100-suite sweep was started to confirm nothing else regressed; whoever picks this up
+      next should check its result before opening the PR if it has not finished.
 - [x] `scripts/lint/check-plugin-integrity.ps1` -- 0 errors.
 
 ### DEPLOY: feat/1895-triage-label-adopter
