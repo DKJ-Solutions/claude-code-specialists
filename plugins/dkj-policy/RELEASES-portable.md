@@ -44,6 +44,28 @@ subscriber of a **service**, who decides whether to upgrade. A repo answers one 
 a product. `new-branch.ps1` then scaffolds tier 0 plus that tier alone, and `open-pr.ps1` and
 `cut-release.ps1` ask for that tier rather than every rung from 1 up.
 
+**And the service is YOUR OWN: the tier-2 reader is whoever takes what this repo ships, never whoever
+they sell to in turn** ([#1896](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1896),
+September 12, 2026). *Subscriber of a service* names a **role**, not a party, so in a repo whose
+subscribers are themselves businesses the phrase reads two ways — and the wrong reading is the more
+vivid one, because that party is a real customer somebody in the room can picture. A plugin two webshops
+run reaches **their developers**, and it is those developers who decide whether to upgrade. The shops'
+own customers are one hop further out: they subscribe to the shop, not to this repo, and nothing this
+repo releases is ever addressed to them. So the test is **one hop and no further** — name the party that
+runs the upgrade, and score against them. The rule is written for a plugin because that is where it was
+measured, and it holds for any repo whose output is consumed by another repo.
+
+**Measured on the release that produced the question, and the error is a reader swapped mid-sentence.**
+Two `v5.1.0` entries about issue labels in the same two store repos scored the same tier-2 question `N/A`
+and `4`. The `N/A` one named the right reader in its own first clause — *"this workflow's consumers are
+the BWJ store repos"* — and then justified the score with *"no customer of either store ever sees one"*,
+which is a different reader entirely. That cost a **required migration**, two `gh label edit` commands per
+store, its place on the audience note; a person carried it onto the page by hand at the rewrite step, which
+is the model failing and being covered for rather than working. **The reading is older than that release**:
+`docs/1537` and `fix/1536` in `v4.32.0` score `N/A` in the same shape, each naming in the very sentence the
+consumers who *do* receive the change. Those three are left as written — the release record is historical —
+so this paragraph is the only repair.
+
 **A repo that has stated nothing is asked about all three**, exactly as before the knob existed — an
 unstated seam means unchanged, never "switch the audience tier off". The loud channel is the script
 contract, where this is a `decide` record that `adopt-dkj-policy` (Part 2) puts to the repo rather than answering for it.
