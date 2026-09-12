@@ -121,7 +121,6 @@ $builtInTriageLabels = @(
     [pscustomobject]@{ Name = 'prio-4'; Color = 'B60205'; Description = 'Priority 4 of 4 (highest) -- takes precedence over other work' }
 )
 
-
 # @(...) WRAPS THE WHOLE if/else, NOT JUST EACH BRANCH -- the trap this repo's own manual catalogues
 # under the PowerShell traps that produce well-formed wrong output. An if-block used as an expression
 # EMITS its last value through the normal output stream, which auto-enumerates an array; assigning that
