@@ -401,6 +401,19 @@ $script:ContractRecords = @(
        Adopt = 'copy'; AdoptWhy = "it states the shared way of working -- this family names the reach axis after what the landing does to the release, and that name is true in a tier-1 and a tier-2 repo alike. Adopting it asserts nothing about the consuming repo; a repo whose colleagues know the axis by another word renames the label and answers this with that word instead";
        Optional = $true; Default = "'minor' -- the name this workflow prescribes, so a repo that has never answered this is already right";
        Returns = "one string: the name GitHub stores for the reach label, which an issue carries when its landing will be written at tier 1 or 2 and omits at tier 0. NOT the axis -- that is the tier model in RELEASES-portable.md, is read on every changelog entry, and is not configurable -- only the label's spelling in this repo's tracker" },
+    # THE NEIGHBOURING AXIS, PRIORITY RATHER THAN REACH (issue #1895, split from #1843). The reach
+    # label above is read on every changelog entry, projected one step earlier onto an issue; priority
+    # is read nowhere in this workflow at all and never has been -- #1686 (closed) already settled
+    # that this repo's own 'prio-*' rungs stay DISJOINT from the BWJ tracker's reach buckets, which is
+    # a different question from this record's. What #1895 asked is whether ORDINARY dkj-policy
+    # consumers -- repos with no BWJ board -- should share ONE spelling of the priority axis among
+    # themselves the way this repo already does with itself, and Dave's answer was yes, print-only,
+    # in this seam rather than in branch-info.ps1 (see adopt-triage-labels.ps1's own header for the
+    # apply-vs-print argument, which restates Get-MissingLabelNote's).
+    @{ Lib = 'scripts\repo-config.ps1';     Function = 'Get-TriageLabels'; Scripts = @('adopt-triage-labels');
+       Adopt = 'copy'; AdoptWhy = "the same reasoning as Get-ReachLabel above, one axis over: 'prio-1' through 'prio-4' are four rungs of urgency that mean the same thing in every repo running this workflow, so adopting them asserts nothing about the consuming repo -- unlike Get-BranchInfo, whose three prefixes ARE a fact about THIS repo (a release lands directly on its trunk here) and would impose that fact on a consumer if copied. Refusing to share the four rungs would leave every consumer reinventing four names and four colours on their own, which is the 'prose in one family's page' #1895 was filed about";
+       Optional = $true; Default = "the same four labels, built into adopt-triage-labels.ps1 as its own fallback -- a consumer who has never answered this seam is already told the canonical set rather than a degraded one";
+       Returns = "an array of objects with Name, Color and Description -- the four canonical triage-priority labels 'prio-1' (lowest) through 'prio-4' (highest), exactly the fields a 'gh label create' call needs. NOT a gate: nothing in this workflow refuses a PR or a merge over a missing triage label, unlike the reach label whose absence a consumer's own 'gh issue create' call fails on -- this seam exists only so adopt-triage-labels.ps1 has something authoritative to compose its paste-ready commands from" },
     # AND WHERE THAT DOCUMENT GOES (inbound #616). Declared because the knob above was UNANSWERABLE
     # without it for a repo whose hand-written notes live somewhere else: naming the bumps would point
     # the cut at a directory that does not exist there, so the only safe value was @() -- the tier
