@@ -274,13 +274,32 @@ different facts, and until now nothing was watching the gap between them.
 Shopify consumers diverging can be seen"* — and it had never been given the check that reads it that
 way. This is that check.
 
-Three finding classes, answering different questions:
+The finding classes, answering different questions:
 
 | class | what it means |
 |---|---|
 | `ONLY-IN` | a comparable path present in exactly one member. The `prune-merged` case. |
+| `PARTIAL` | a comparable path present in some members but not all — only reachable in a group of three or more. |
 | `DRIFTED` | a comparable path present in every member, with differing content. The 47. |
 | `ALIASED` | one capability (an exported function name) at **different paths** in two members. |
+| `SHIPPED` | a path a plugin in **this marketplace already publishes**. An adoption gap, not divergence. |
+
+**`SHIPPED` is the class that says the mechanism already has an owner**
+([#1885](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1885)). The three lanes above it are
+consumer-to-consumer, so a script both stores re-implement reads as `DRIFTED` and one that only one of them carries
+reads as `ONLY-IN` — and neither sentence contains the fact that decides what to do about it. The result
+was upside down: the **cheapest** convergence, *adopt what already exists*, was the one nothing could
+see, while the expensive kind — decide an owner, move the mechanism, release, adopt — was the only kind
+reported. Measured on the BWJ pair the day it was added, it names six, including `prune-merged.ps1`
+itself and `scripts/tests/test-lib.ps1`, which `dkj-policy-bwj` had begun shipping hours earlier.
+
+**It adds and never reclassifies, and the match is on filename.** A `SHIPPED` path is still reported as
+`ONLY-IN` or `DRIFTED` beside it, because a filename is weak evidence and a wrong match must cost a
+reader one file to open — never a real divergence finding silently dropped from the report. The index is
+bounded to `.ps1` for the same reason: every plugin ships a `README.md`, so a basename index over all
+files would answer *"already shipped"* for every README in every consumer. The opposite bound is real
+and no report closes it — a consumer that **renamed** its copy is invisible here, and `ALIASED` is the
+lane with any chance of finding it.
 
 **`ALIASED` is the class no path comparison can make, and it is why the names having drifted apart
 matters.** `market-domains.ps1` here against `market-urls.ps1` there share no path, no filename and no

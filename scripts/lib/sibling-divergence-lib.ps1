@@ -339,3 +339,96 @@ function Group-AliasedCapability {
     }
     return @($out | Sort-Object -Property @{ Expression = { @($_.Functions).Count }; Descending = $true }, Pair)
 }
+
+function Get-ShippedScriptIndex {
+    <#
+        The marketplace's own scripts, indexed by FILENAME, so a consumer's path can be asked one
+        question: does a plugin here already ship this?
+
+        Input: objects carrying Plugin and Path (repo-relative, any slash spelling). Output: a
+        hashtable of lower-cased basename -> the shipped sites with that name. The entry point
+        supplies the set; composing it is a disk read and deciding with it is not, which is the same
+        split every other function in this lib is built on.
+
+        ONLY .ps1 IS INDEXED, and that bound is load-bearing rather than tidy. Every plugin ships a
+        README.md and a SKILL.md, so a basename index over all files would answer "yes, shipped" for
+        every README in every consumer -- a false positive on the single commonest filename in any
+        repo. The .github/workflows templates are the same trap with the opposite cause: those are
+        MEANT to be copied verbatim into a consumer (asana-mirror.yml is), so a consumer holding one
+        is the mechanism working, not an adoption gap.
+
+        A NAME CAN BE SHIPPED FROM MORE THAN ONE PLACE, so the value is a list rather than one site.
+        A registered mirror and the plugin file it is mirrored to are the same script by construction,
+        and reporting either one alone would name a path the reader then has to go looking for.
+    #>
+    param([Parameter(Mandatory)][AllowEmptyCollection()][object[]]$Shipped)
+
+    $index = @{}
+    foreach ($s in @($Shipped)) {
+        if ($null -eq $s) { continue }
+        $p = ConvertTo-SiblingPath -Path ([string]$s.Path)
+        if ($p -eq '') { continue }
+        if ($p -notmatch '\.ps1$') { continue }
+
+        $base = (@($p -split '/')[-1]).ToLowerInvariant()
+        if (-not $index.ContainsKey($base)) { $index[$base] = @() }
+        if (@($index[$base] | Where-Object { $_.Path -eq $p }).Count -gt 0) { continue }
+        $index[$base] = @($index[$base]) + @([pscustomobject]@{ Plugin = [string]$s.Plugin; Path = $p })
+    }
+    return $index
+}
+
+function Find-ShippedMechanism {
+    <#
+        The adoption gap: a consumer carrying its own copy of a script the marketplace already
+        publishes. Issue #1885.
+
+        WHY NEITHER EXISTING LANE CAN SAY THIS. ONLY-IN and DRIFTED are consumer-to-consumer verdicts,
+        so both stores holding a local copy reads as DRIFTED and one holding it reads as ONLY-IN --
+        and neither sentence contains the fact that matters, which is that nobody has to own this
+        mechanism because a plugin already does. The result was that the CHEAPEST convergence, adopt
+        what exists, was the one the tooling could not see, while the expensive kind -- decide an
+        owner, move the mechanism, release, adopt -- was the only kind it surfaced.
+
+        IT ADDS, IT NEVER RECLASSIFIES, which is the ALIASED lane's precedent and here it is also the
+        safety property. The match is on filename (see below), so a SHIPPED line that is wrong must
+        cost the reader a file to open and nothing else. Were this to move a path OUT of DRIFTED, one
+        coincidental name would delete a real divergence finding from the report -- the false negative
+        this whole check exists to prevent, reintroduced by its newest lane.
+
+        PARTIAL IS INCLUDED THOUGH #1885 NAMES ONLY ONLY-IN AND DRIFTED. A path held by two members of
+        a three-member group is a local copy in exactly the same way; excluding it would put a silent
+        hole in the lane that opens the first time a group gains a third member, which is the shape
+        Compare-SiblingInventory already refuses for the same reason.
+
+        THE MATCH IS ON FILENAME AND THE REPORT SAYS SO. Two files can share a name and not a
+        capability, so this returns evidence rather than a verdict -- the reader is told what it
+        matched on, exactly as the ALIASED lane is. The opposite bound is real too and no report can
+        close it: a consumer that renamed its copy is invisible here, and it is the ALIASED pass, not
+        this one, that has any chance of finding it.
+    #>
+    param(
+        [Parameter(Mandatory)][object]$Comparison,
+        [Parameter(Mandatory)][hashtable]$Index
+    )
+
+    $carried = @()
+    foreach ($f in @($Comparison.OnlyIn))  { $carried += @([pscustomobject]@{ Path = $f.Path; Class = 'only-in'; Members = @($f.Member)  }) }
+    foreach ($f in @($Comparison.Partial)) { $carried += @([pscustomobject]@{ Path = $f.Path; Class = 'partial'; Members = @($f.Members) }) }
+    foreach ($f in @($Comparison.Drifted)) { $carried += @([pscustomobject]@{ Path = $f.Path; Class = 'drifted'; Members = @($f.Members) }) }
+
+    $out = @()
+    foreach ($f in $carried) {
+        $p = ConvertTo-SiblingPath -Path ([string]$f.Path)
+        if ($p -notmatch '\.ps1$') { continue }
+        $base = (@($p -split '/')[-1]).ToLowerInvariant()
+        if (-not $Index.ContainsKey($base)) { continue }
+        $out += @([pscustomobject]@{
+            Path    = $p
+            Class   = [string]$f.Class
+            Members = @($f.Members)
+            Shipped = @($Index[$base])
+        })
+    }
+    return @($out | Sort-Object Path)
+}
