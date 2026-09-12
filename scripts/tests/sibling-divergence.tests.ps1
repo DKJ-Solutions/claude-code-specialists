@@ -55,6 +55,11 @@ function Assert-True {
     if ($Condition) { $script:pass++; Write-Host "  [PASS] $Label" -ForegroundColor Green }
     else { $script:fail++; Write-Host "  [FAIL] $Label" -ForegroundColor Red }
 }
+function Assert-False {
+    param([bool]$Condition, [string]$Label)
+    if (-not $Condition) { $script:pass++; Write-Host "  [PASS] $Label" -ForegroundColor Green }
+    else { $script:fail++; Write-Host "  [FAIL] $Label" -ForegroundColor Red }
+}
 
 Write-Host ''
 Write-Host '== sibling-divergence-lib.ps1 ==' -ForegroundColor Cyan
@@ -257,6 +262,99 @@ Assert-True ($mixedPairs[0].Pair -like '*market-*') 'the pair with more shared n
 Assert-Equal 0 (@(Group-AliasedCapability -Aliased @()).Count) 'no aliasing yields no pairs'
 
 # ---------------------------------------------------------------------------------------------------
+# ---------------------------------------------------------------------------------------------------
+Write-Host ''
+Write-Host '-- case 11: the shipped index is bounded to .ps1, and that bound is the load-bearing part --' -ForegroundColor Cyan
+# Every plugin ships a README.md and a SKILL.md. A basename index over all files would answer "already
+# shipped" for every README in every consumer -- a false positive on the commonest filename there is,
+# on the lane whose whole value is that a reader believes it.
+
+$index = Get-ShippedScriptIndex -Shipped @(
+    [pscustomobject]@{ Plugin = 'dkj-subagents-shopify'; Path = 'plugins/dkj-subagents/dkj-subagents-shopify/scripts/task/push-preview.ps1' }
+    [pscustomobject]@{ Plugin = 'dkj-subagents-shopify'; Path = 'plugins\dkj-subagents\dkj-subagents-shopify\scripts\lib\sync-rules.ps1' }
+    [pscustomobject]@{ Plugin = 'dkj-policy';            Path = 'plugins/dkj-policy/README.md' }
+    [pscustomobject]@{ Plugin = 'dkj-policy';            Path = 'plugins/dkj-policy/skills/new-branch/SKILL.md' }
+)
+
+Assert-True  ($index.ContainsKey('push-preview.ps1')) 'a shipped .ps1 is indexed under its lower-cased basename'
+Assert-True  ($index.ContainsKey('sync-rules.ps1'))   'a backslash-spelled shipped path is indexed too'
+Assert-False ($index.ContainsKey('readme.md'))        'a shipped README.md is NOT indexed -- it would match every consumer'
+Assert-False ($index.ContainsKey('skill.md'))         'a shipped SKILL.md is NOT indexed either'
+Assert-Equal 2 (@($index.Keys).Count)                 'only the two .ps1 names are in the index'
+
+# ONE NAME, TWO SITES. A registered mirror and the plugin file it mirrors to are the same script by
+# construction, and naming only one of them sends the reader looking for the other.
+$twoSites = Get-ShippedScriptIndex -Shipped @(
+    [pscustomobject]@{ Plugin = 'dkj-policy'; Path = 'plugins/dkj-policy/scripts/task/new-branch.ps1' }
+    [pscustomobject]@{ Plugin = 'dkj-policy'; Path = 'scripts/task/new-branch.ps1' }
+)
+Assert-Equal 2 (@($twoSites['new-branch.ps1']).Count) 'one name can be shipped from two sites'
+
+# The same site twice -- a path registered AND walked -- is one site, not two.
+$dupe = Get-ShippedScriptIndex -Shipped @(
+    [pscustomobject]@{ Plugin = 'dkj-policy'; Path = 'plugins/dkj-policy/scripts/task/new-branch.ps1' }
+    [pscustomobject]@{ Plugin = 'dkj-policy'; Path = 'plugins\dkj-policy\scripts\task\new-branch.ps1' }
+)
+Assert-Equal 1 (@($dupe['new-branch.ps1']).Count) 'the same site under two slash spellings is deduplicated'
+
+Assert-Equal 0 (@((Get-ShippedScriptIndex -Shipped @()).Keys).Count) 'an empty shipped set yields an empty index'
+
+# ---------------------------------------------------------------------------------------------------
+Write-Host ''
+Write-Host '-- case 12: the adoption gap neither ONLY-IN nor DRIFTED can state --' -ForegroundColor Cyan
+# #1885's measurement, in its two real shapes. dkj-subagents-shopify ships push-preview.ps1 and
+# sync-rules.ps1; both stores carry their own push-preview (DRIFTED) and only one still carries a
+# sync-rules (ONLY-IN). Neither verdict contains the fact that decides what to do -- that the
+# mechanism already has an owner.
+
+$shopIndex = Get-ShippedScriptIndex -Shipped @(
+    [pscustomobject]@{ Plugin = 'dkj-subagents-shopify'; Path = 'plugins/dkj-subagents/dkj-subagents-shopify/scripts/task/push-preview.ps1' }
+    [pscustomobject]@{ Plugin = 'dkj-subagents-shopify'; Path = 'plugins/dkj-subagents/dkj-subagents-shopify/scripts/lib/sync-rules.ps1' }
+)
+$comparison = Compare-SiblingInventory -Inventory @{
+    'org/a' = @{
+        'scripts/task/push-preview.ps1' = 'aaa'
+        'scripts/lib/only-ours.ps1'     = 'ccc'
+    }
+    'org/b' = @{
+        'scripts/task/push-preview.ps1' = 'bbb'
+        'scripts/lib/sync-rules.ps1'    = 'ddd'
+    }
+}
+$gaps = Find-ShippedMechanism -Comparison $comparison -Index $shopIndex
+
+Assert-Equal 2 (@($gaps).Count) 'both the drifted copy and the only-in copy are reported as adoption gaps'
+Assert-Equal 'scripts/lib/sync-rules.ps1'    $gaps[0].Path  'the only-in path is reported'
+Assert-Equal 'only-in'                       $gaps[0].Class 'and it carries the class it came from'
+Assert-Equal 'org/b'                         (@($gaps[0].Members) -join ',') 'naming the single member that carries it'
+Assert-Equal 'scripts/task/push-preview.ps1' $gaps[1].Path  'the drifted path is reported'
+Assert-Equal 'drifted'                       $gaps[1].Class 'and it carries the class it came from'
+Assert-Equal 2 (@($gaps[1].Members).Count)   'naming both members that carry a copy'
+Assert-Equal 'dkj-subagents-shopify' $gaps[1].Shipped[0].Plugin 'the finding names the plugin that already owns it'
+Assert-True  ($gaps[1].Shipped[0].Path -like '*dkj-subagents-shopify*push-preview.ps1') 'and the path it ships at'
+
+# THE FINDING THIS LANE MUST NOT MAKE: a path nothing ships. scripts/lib/only-ours.ps1 is only-in and
+# stays only-in -- an index miss is silence, not a weaker claim.
+Assert-Equal 0 (@($gaps | Where-Object { $_.Path -eq 'scripts/lib/only-ours.ps1' }).Count) 'a path no plugin ships is not reported'
+
+# ADDS, NEVER RECLASSIFIES. The comparison the three older lanes print from is untouched, so a
+# coincidental filename match can cost a reader a file to open and can never delete a real finding.
+Assert-Equal 1 (@($comparison.Drifted).Count) 'the drifted finding still stands after the shipped lane ran'
+Assert-Equal 2 (@($comparison.OnlyIn).Count)  'both only-in findings still stand'
+
+# A PARTIAL IS A LOCAL COPY TOO. #1885 names only only-in and drifted, but excluding partial would put
+# a hole in the lane that opens the first time a group gains a third member.
+$threeWay = Compare-SiblingInventory -Inventory @{
+    'org/a' = @{ 'scripts/lib/sync-rules.ps1' = 'aaa' }
+    'org/b' = @{ 'scripts/lib/sync-rules.ps1' = 'bbb' }
+    'org/c' = @{ 'scripts/lib/other.ps1'      = 'ccc' }
+}
+$partialGaps = Find-ShippedMechanism -Comparison $threeWay -Index $shopIndex
+Assert-Equal 1         (@($partialGaps).Count) 'a path held by two of three members is reported'
+Assert-Equal 'partial' $partialGaps[0].Class   'and is labelled partial rather than folded into drifted'
+
+Assert-Equal 0 (@(Find-ShippedMechanism -Comparison $comparison -Index @{}).Count) 'an empty index reports nothing'
+
 Write-Host ''
 if ($script:fail -gt 0) {
     Write-Host "FAILED: $($script:pass) passed, $($script:fail) failed." -ForegroundColor Red

@@ -1,7 +1,8 @@
 <#
 .SYNOPSIS
     Report mechanisms one consumer has and its sibling does not -- the divergence between two repos
-    that are meant to run the same floor. Issue #1869.
+    that are meant to run the same floor -- and the ones a plugin here already ships, which is an
+    adoption gap rather than divergence. Issues #1869, #1885.
 
 .DESCRIPTION
     WHAT THIS ANSWERS, and it is a question nothing else here asks. check-consumer-drift.ps1 compares
@@ -40,6 +41,16 @@
     mixed vocabulary -- which would report every path in it as drifted, a false alarm indistinguishable
     from the finding this script exists to make.
 
+    THE SHIPPED LANE ANSWERS A THIRD QUESTION, and it is not consumer-to-consumer at all (#1885).
+    For every only-in, partial and drifted path it asks whether a plugin in THIS marketplace already
+    publishes a script of that name -- because if one does, the mechanism already has an owner and the
+    repair is to adopt it, not to decide who should own it. Nothing here could see that before: the
+    drift check compares agent defs and personas, this one compares two consumers, and the script
+    contract asks whether a consumer exposes the seam functions the shared scripts call. So the
+    CHEAPEST convergence was the invisible one while the expensive kind was the only kind reported.
+    The lane ADDS and never reclassifies -- the match is on filename, and a wrong one must cost a file
+    to open rather than delete a real divergence finding from the report.
+
     THE ALIAS PASS IS THE ONE THAT COSTS CONTENT, and it is bounded to the ONLY-IN set: a path present
     in every member cannot be aliased, so the files whose text has to be read are exactly the ones
     already reported as only-in, and only the .ps1 among those. Skip it with -SkipAliasCheck.
@@ -49,9 +60,9 @@
     field beyond the group label an operator types. What it prints is paths and function names, never
     file content, and the test fixtures are synthetic for the same reason.
 
-    Exit code: 0 always, unless -FailOnFinding is given, in which case 1 on any ONLY-IN, DRIFTED or
-    ALIASED finding. A group that could not be read is an [INFO] and never an error -- an absent
-    checkout or an unauthenticated gh is a fact about this machine, not about the consumers.
+    Exit code: 0 always, unless -FailOnFinding is given, in which case 1 on any ONLY-IN, DRIFTED,
+    ALIASED or SHIPPED finding. A group that could not be read is an [INFO] and never an error -- an
+    absent checkout or an unauthenticated gh is a fact about this machine, not about the consumers.
 
 .PARAMETER Group
     (Optional) Restrict the run to one sibling group by name.
@@ -93,6 +104,7 @@ $script:infos  = 0
 . (Join-Path $PSScriptRoot '..\lib\check-report-lib.ps1')
 . (Join-Path $PSScriptRoot '..\lib\native-capture-lib.ps1')
 . (Join-Path $PSScriptRoot '..\lib\sibling-divergence-lib.ps1')
+. (Join-Path $PSScriptRoot '..\lib\shared-scripts-lib.ps1')
 
 if ($ConnectorDir -eq '') { $ConnectorDir = Join-Path $RepoRoot 'connectors' }
 
@@ -247,6 +259,57 @@ function Get-OnlyInContentMap {
     return $map
 }
 
+function Get-MarketplaceShippedScript {
+    <#
+        Every .ps1 this marketplace publishes, as @{ Plugin; Path } -- the set a consumer's local copy
+        is held against for the SHIPPED lane (#1885).
+
+        TWO SOURCES, because neither alone is the answer. Get-SharedScriptPairs is the REGISTRY of
+        scripts mirrored from this workshop into a plugin, and it is authoritative about the ones it
+        names -- including one whose mirror has not been written yet. Walking each published plugin's
+        own scripts/ and hooks/ catches what a plugin ships DIRECTLY and no registry knows about, and
+        that is where the four scripts #1885 measured actually sit: push-preview.ps1, sync-main.ps1,
+        preview-theme.ps1 and sync-rules.ps1 are dkj-subagents-shopify's own, registered nowhere.
+
+        hooks/ IS WALKED ALONGSIDE scripts/. A consumer re-implementing a plugin's hook does not put
+        it in a hooks/ folder of its own -- it lands in scripts/, which is where the comparable roots
+        look. Asking only about the plugin's scripts/ would make exactly that copy invisible, and a
+        guard is the last mechanism anyone wants duplicated quietly.
+
+        IT DEGRADES TO AN EMPTY SET, NEVER THROWS. This is a detector's extra lane, and a marketplace
+        this run cannot parse must cost the SHIPPED lane and nothing else -- the consumer-to-consumer
+        comparison above it is the part that was asked for and it needs none of this.
+    #>
+    $shipped = @()
+
+    $pluginRoots = @()
+    try { $pluginRoots = @(Get-RepoPluginRoots -RepoRoot $RepoRoot) } catch { return @() }
+    if ($pluginRoots.Count -eq 0) { return @() }
+
+    try {
+        foreach ($pair in @(Get-SharedScriptPairs -RepoRoot $RepoRoot -PluginRoots $pluginRoots)) {
+            $shipped += @([pscustomobject]@{ Plugin = [string]$pair.Plugin; Path = [string]$pair.MirrorRel })
+        }
+    } catch {
+        # A registry that names a plugin the marketplace does not declare throws by design. The direct
+        # walk below is unaffected and is the larger half, so the lane reports what it can.
+        Write-Info "the shared-scripts registry could not be read ($($_.Exception.Message)) -- the SHIPPED lane covers only what the plugins ship directly."
+    }
+
+    foreach ($p in $pluginRoots) {
+        foreach ($sub in @('scripts', 'hooks')) {
+            $dir = Join-Path $p.Root $sub
+            if (-not (Test-Path -LiteralPath $dir)) { continue }
+            foreach ($f in (Get-ChildItem -LiteralPath $dir -Recurse -File -Filter '*.ps1' -ErrorAction SilentlyContinue)) {
+                $rel = $f.FullName.Substring($RepoRoot.Length).TrimStart('\', '/')
+                $shipped += @([pscustomobject]@{ Plugin = [string]$p.Name; Path = $rel })
+            }
+        }
+    }
+
+    return @($shipped)
+}
+
 # ---------------------------------------------------------------------------------------------------
 # The run
 # ---------------------------------------------------------------------------------------------------
@@ -293,6 +356,10 @@ $useGitHub = switch ($Source) {
     'disk'   { $false }
     default  { Test-GhCanAnswer }
 }
+
+# BUILT ONCE, OUTSIDE THE GROUP LOOP. What this marketplace publishes is a property of this repo, not
+# of the group being compared, and the walk touches every plugin's script tree.
+$shippedIndex = Get-ShippedScriptIndex -Shipped (Get-MarketplaceShippedScript)
 
 $findingCount = 0
 
@@ -364,6 +431,16 @@ foreach ($groupName in $groups.Keys) {
         $findingCount++
     }
 
+    # THE SHIPPED LANE (#1885). Reported AFTER the three consumer-to-consumer lanes and never instead
+    # of them: these paths are still only-in or drifted, and this line adds the fact that decides what
+    # to do about them -- adopt, rather than pick an owner and move a mechanism that already has one.
+    foreach ($f in (Find-ShippedMechanism -Comparison $result -Index $shippedIndex)) {
+        $where = (@($f.Shipped | ForEach-Object { "$($_.Plugin) ($($_.Path))" }) -join '; ')
+        Write-Info ("SHIPPED  $($f.Path) -- carried by $(@($f.Members) -join ', ') [$($f.Class)]; " +
+                    "the marketplace already ships this: $where. An ADOPTION gap, not divergence. Matched on filename.")
+        $findingCount++
+    }
+
     if ($SkipAliasCheck) {
         Write-Skip 'capability-aliasing pass skipped (-SkipAliasCheck).'
         continue
@@ -386,6 +463,7 @@ if ($findingCount -eq 0) {
     Write-Ok 'no divergence reported between declared siblings.'
 } else {
     Write-Host "  $findingCount finding(s). ONLY-IN and ALIASED are the ones that mean duplicated work; DRIFTED means two copies of one mechanism that have grown apart." -ForegroundColor Yellow
+    Write-Host '  SHIPPED is the cheap one: the marketplace already owns that mechanism, so the repair is to adopt it rather than to decide who should.' -ForegroundColor Yellow
     Write-Host '  This check reports and never prevents -- converging is a decision about ownership, not a repair this script can make.' -ForegroundColor DarkGray
 }
 
