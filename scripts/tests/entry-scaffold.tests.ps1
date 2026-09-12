@@ -2557,6 +2557,23 @@ Assert-Equal ($sg.Count - $dropped.Count - 1) $kept.Count 'exactly the paragraph
 $doubled = @(0..($kept.Count - 2) | Where-Object { (& $isSep $kept[$_]) -and (& $isSep $kept[$_ + 1]) })
 Assert-Equal 0 $doubled.Count 'and no doubled separator is left where the paragraph stood'
 
+# AND THE ONE-HOP CLAUSE IS PART OF THAT PARAGRAPH, NOT A NEIGHBOUR OF IT (#1896, September 12, 2026).
+# The asserts above derive the paragraph from the seam, so they follow the wording wherever it goes -- and
+# that is exactly why they cannot see this one: split the clause off into a paragraph of its own and the
+# seam paragraph merely gets shorter, every assert above still passes, and the split paragraph survives the
+# drop opening with 'that reader' after the clause naming that reader has gone. That is #928 verbatim, one
+# clause further down the same sentence, and it is unreachable here because repo-config states tier 2.
+# KEYED ON THE ENGLISH MARKER AND SKIPPED WHEN IT IS ABSENT, which is the same carve-out the no-seam case
+# below relies on: a consumer who translated the block replaces this phrase along with everything around it,
+# and the assert then has nothing to say. It fires only against this repo's own wording -- which is the only
+# place the split could be introduced.
+$hopIdx = @(0..($sg.Count - 1) | Where-Object { $sg[$_] -match 'One hop and no further' })
+if ($hopIdx.Count -gt 0) {
+    Assert-Equal 1 $hopIdx.Count 'the one-hop clause is stated once in the guidance'
+    Assert-True ($hopIdx[0] -ge $pStart -and $hopIdx[0] -le $pEnd) `
+        'and it sits INSIDE the audience seam paragraph, so a no-tier repo drops it with the reader it qualifies'
+}
+
 # A BLOCK CARRYING NO SEAM COMES BACK UNTOUCHED, which is what makes this safe over a consumer override: a
 # repo that replaced the wording with its own prose gets exactly its own prose back.
 $ownProse = @('> own prose', '>', '> a second paragraph')

@@ -5582,7 +5582,29 @@ $script:BranchFileDefaults = [ordered]@{
         '>',
         '> {0} That reader and nobody else -- what matters only',
         '> inside this repo belongs under the first `**Score:**`. If the change reaches that reader',
-        '> not at all, N/A is a complete answer and the common one.',
+        # ONE HOP AND NO FURTHER (#1896, September 12, 2026). '{0}' names the tier's reader as a ROLE --
+        # 'the subscriber of a service' -- and a role does not say WHICH party fills it. Where that reader is
+        # itself a business the author has two candidates in view, and the wrong one is the more vivid,
+        # because it is a real customer somebody in the room can picture. Measured on v5.1.0: two entries
+        # about issue labels in the same two store repos scored the same question N/A and 4, and the N/A one
+        # named the right reader in its own first clause before scoring against the other. It cost a required
+        # migration its place on the audience note. The rule is stated in RELEASES-portable.md; this is the
+        # line the author meets while actually scoring, which is why it is repeated here rather than linked.
+        #
+        # IT CONTINUES THE SEAM PARAGRAPH AND MUST NOT BECOME ONE OF ITS OWN -- that is issue #928 exactly,
+        # one clause further down the same sentence. Remove-EntryAudienceGuidance drops the whole PARAGRAPH
+        # carrying '{0}' in a repo that states no audience tier, fenced by separator lines. A separate
+        # paragraph here would survive that removal and open with 'that reader' after the clause naming that
+        # reader had gone -- the mid-sentence paragraph #928 was filed for, reappearing in the consumers it
+        # was fixed for and invisible here, where repo-config states tier 2. Kept inside the paragraph, it is
+        # removed with it, which is also the right answer on the merits: a repo asked about every tier has no
+        # single 'that reader' for this clause to qualify.
+        # DELIBERATELY TIER-AGNOSTIC otherwise, so it is correct under '{0}' in a tier-1 repo too: a
+        # commissioner who resells has customers of their own, one hop past this repo just the same.
+        '> not at all, N/A is a complete answer and the common one. **One hop and no further:** where that',
+        '> reader is itself a business, ITS own customers sit one hop past this repo and are never the reader',
+        '> here -- they take nothing this repo ships. Name the party that runs the upgrade, and score',
+        '> against them.',
         '>',
         '> The phase arc, the marks and the whole form: `DEVELOPMENT-portable.md`, which ships',
         '> with this workflow.'
