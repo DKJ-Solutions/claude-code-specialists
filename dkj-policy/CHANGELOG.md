@@ -43,7 +43,43 @@ replaces, so anything else written in this space is left alone.
 
 ## [Unreleased]
 
-**13 / 34 minor entries** <!-- pending-tally -->
+**14 / 35 minor entries** <!-- pending-tally -->
+
+### DEPLOY: feat/1890-update-plugins · 20260912-084029
+
+A checkout's own plugins now update in one command instead of 1 + N. `update-plugins` (the shared
+`dkj-policy` script + skill) refreshes the marketplace clone once, runs `claude plugin update <id>
+--scope project` for every plugin this checkout enables, then prints `plugin-versions`' own receipt --
+so the result is read off the same tool that would have reported the checkout as behind, rather than
+trusted on the update commands' own say-so. `-DryRun` prints every command without running any of
+them. Scoped on purpose to this checkout plus the machine-wide marketplace clone: every update call is
+`--scope project` against the checkout the command runs from, never a walk into another repo (`claude
+plugin install`/`update` rewrites the visited repo's `.claude/settings.json`, so a sweeping updater
+would leave uncommitted diffs in repos nobody opened). One marketplace or one plugin failing to update
+does not stop the rest -- every failure is reported and the run's own exit code is non-zero only if
+something failed.
+
+**Score:** 2 -- a convenience over typing the same commands by hand; this repo is itself a consumer of
+its own `dkj-policy` plugin, and its own maintenance sessions gain the same shortcut.
+
+#### What makes this deploy extra special
+
+A consumer running `dkj-policy` gains a new skill the moment they update: closing the gap
+`plugin-versions` (or `connector-sessioncheck`'s `-Brief` line) already reports no longer means typing
+one command per enabled plugin.
+
+**Score:** 2 -- noticed the next time they update and it takes one command instead of several; nothing
+breaks and nothing is required to adopt it.
+
+#### Pull Request
+
+one-command plugin update per checkout
+
+Plugins: dkj-policy
+
+[PR #1893](https://github.com/DKJ-Solutions/dkj-claude-plugins/pull/1893)
+
+---
 
 ### DEPLOY: feat/1885-shipped-adoption-gap-lane · 20260912-083142
 
