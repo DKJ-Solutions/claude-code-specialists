@@ -114,6 +114,8 @@ clause to qualify. Caught by rendering both states rather than by a gate, so the
 the next split fail loudly: the existing #928 asserts derive the paragraph from the seam and would simply
 see a shorter one.
 
+Resolves [#1896](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1896).
+
 **Score:** 3
 
 #### What makes this deploy extra special
@@ -133,7 +135,3 @@ exact move that cost a required migration its place on the `v5.1.0` audience not
 #### Pull Request
 
 Name the tier-2 subscriber explicitly: the consuming repo, never its own customers
-
-Plugins: dkj-policy
-
-Resolves [#1896](https://github.com/DKJ-Solutions/dkj-claude-plugins/issues/1896).
