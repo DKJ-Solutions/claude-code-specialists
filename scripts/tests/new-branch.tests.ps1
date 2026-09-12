@@ -1863,17 +1863,14 @@ exit 1
     # config alone would keep the probe green and assert nothing. GIT_AUTHOR_* / GIT_COMMITTER_* are
     # cleared too, because the environment outranks all of it and a runner that exports them (some CI
     # images do) would otherwise make this case silently vacuous.
-    #
-    # AND EMPTYING ALL FOUR IS STILL NOT ENOUGH, which is what #1888 measured and what the block below
-    # this fixture's creation is about: git's LAST source is not a config file at all.
     $fixIdent = New-Fixture -Label 'y'
     Invoke-FixtureGitIn $fixIdent config --unset user.name
     Invoke-FixtureGitIn $fixIdent config --unset user.email
     $identEnvNames = @('GIT_CONFIG_GLOBAL', 'GIT_CONFIG_NOSYSTEM', 'GIT_AUTHOR_NAME', 'GIT_AUTHOR_EMAIL', 'GIT_COMMITTER_NAME', 'GIT_COMMITTER_EMAIL')
     $identEnvPrev = @{}
     foreach ($n in $identEnvNames) { $identEnvPrev[$n] = (Get-Item "Env:\$n" -ErrorAction SilentlyContinue).Value }
-    # AN EMPTY GLOBAL CONFIG IS NOT ENOUGH, AND THAT IS THE WHOLE POINT OF THIS FILE (#1888). Emptying
-    # the three config scopes leaves git with nothing to read AND STILL NAMING AN AUTHOR: Git for
+    # AN EMPTY GLOBAL CONFIG IS NOT ENOUGH, AND THAT IS THE WHOLE POINT OF THIS FIXTURE (#1888).
+    # Emptying every config scope leaves git with nothing to read AND STILL NAMING AN AUTHOR: Git for
     # Windows falls back to the OS account, and that fallback produces a real display name and a real
     # address rather than the username@hostname guess git then refuses -- so it exits 0 and every
     # assert below measures a checkout that can commit perfectly well. Measured on DAVE-KOK-BWJ,
