@@ -84,7 +84,15 @@ table staying a per-store seam answer (#1886, candidate 1 of four).
 - [x] Smoke-run against the two real market tables before the suite existed -- the URLs each store's
       own copy produces today, plus the three capabilities it could not.
 - [x] Lint gate `check-plugin-integrity.ps1`: 0 errors.
-- [x] All suites via `Invoke-TestSuiteGate`, the way CI runs them: pass.
+- [x] All 98 suites via `Invoke-TestSuiteGate`, the way CI runs them. **The first run found a real
+      defect, in this branch's own suite rather than in the lib**: `command-probe-lib.tests.ps1`
+      check 5 refuses a `Get-Command` function probe under `scripts/`, which #1729 routed behind
+      `Test-FunctionDefined` -- `Get-Command <bare name>` parses the name as a wildcard pattern and
+      pays an uncached PATH scan on every miss (32.5 ms against 0.084 ms, measured there). Both sites
+      repaired: the suite dot-sources `command-probe-lib.ps1`, and the plugin lib writes the one
+      expression out inline, because reaching that helper would mean resolving a **second** plugin's
+      path from a store that can only resolve this one.
+- [x] Re-run after the repair: `bwj-market-urls` 87/0 and `command-probe-lib` 16/0.
 
 ### DEPLOY: feat/1886-bwj-market-urls
 

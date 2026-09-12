@@ -48,6 +48,11 @@ $ErrorActionPreference = 'Stop'
 
 $RepoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path
 $LibPath  = Join-Path $RepoRoot 'plugins\dkj-policy\dkj-policy-bwj\scripts\lib\market-urls.ps1'
+
+# Test-FunctionDefined, for the export cases at the foot of this file. This repo routes every function
+# probe through it rather than through Get-Command (issue #1729), and its own gate refuses the old
+# idiom under scripts/ -- which is how the first version of this suite went red.
+. (Join-Path $RepoRoot 'scripts\lib\command-probe-lib.ps1')
 $Fixture  = Join-Path ([System.IO.Path]::GetTempPath()) "bwj-market-urls-fixture-$PID-$([guid]::NewGuid().ToString('n'))"
 
 $script:pass = 0
@@ -277,7 +282,7 @@ Assert-Equal 5 (Get-MarketDomains -Markets $SWB).Count '...and both are derived 
 foreach ($fn in @('Get-MarketTable', 'Get-MarketUrls', 'Get-MarketPreviewUrls', 'Write-MarketPreviewUrls',
                   'Get-MarketDomains', 'Get-MarketPaths', 'Get-NormalizedPaths', 'Test-MangledStorefrontPath',
                   'Get-AppliedThemeId', 'Get-PreviewPrimeUrls', 'Get-MarketHandoverPairs')) {
-    Assert-True ([bool](Get-Command -Name $fn -ErrorAction SilentlyContinue)) "the superset still exports $fn"
+    Assert-True (Test-FunctionDefined -Name $fn) "the superset still exports $fn"
 }
 
 $bytes = [System.IO.File]::ReadAllBytes($LibPath)

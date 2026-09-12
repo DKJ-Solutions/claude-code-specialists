@@ -118,7 +118,15 @@ function Get-MarketTable {
 
     $rows = $Markets
     if ($null -eq $rows) {
-        if (-not (Get-Command -Name 'Get-StorefrontMarkets' -ErrorAction SilentlyContinue)) {
+        # THE SEAM PROBE IS NOT Get-Command, and the expression is inline rather than dot-sourced.
+        # `Get-Command <bare name>` routes through the command searcher's wildcard matcher and, on a
+        # MISS -- which is the common case for an optional seam -- falls through to a full PATH scan
+        # that nothing caches; the marketplace measured 32.5 ms against 0.084 ms per probe and moved
+        # every site behind Test-FunctionDefined (issue #1729). That helper lives in `dkj-policy`, and
+        # reaching it from here would mean resolving a SECOND plugin's path -- which is the one thing
+        # a store's forwarder cannot do, because the lookup that resolves a plugin is itself the file
+        # it has to keep locally. So the one expression is written out here rather than depended on.
+        if (-not [bool](@($ExecutionContext.InvokeCommand.GetCommands('Get-StorefrontMarkets', 'Function', $false)).Count)) {
             throw ("market-urls: this store has not declared its markets. Add Get-StorefrontMarkets " +
                    "to scripts/repo-config.ps1, returning one row per market with Market, Domain and " +
                    "PathPrefix -- see Get-MarketTable in the shared lib for the shape. Until it is " +
