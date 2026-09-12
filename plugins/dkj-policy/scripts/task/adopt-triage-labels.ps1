@@ -44,13 +44,19 @@
     reach axis; it only offers the priority axis to an ordinary dkj-policy consumer that has no BWJ
     board of its own.
 
-    NOT REFUSED IN THIS REPO. `adopt-merge-queue.ps1` and `adopt-workflow-folder.ps1` refuse to run in
-    the repo that publishes this workflow, because they WRITE local files that would collide with the
-    originals those scripts are derived from. This script writes nothing anywhere -- it only reads
-    `gh label list` and prints -- so running it here checks this repo against its own canonical answer
-    instead of conflicting with anything, and that is exactly what the test suite does. There is no
-    Test-IsWorkflowSourceRepo guard here; if that ever needs to change, the argument to change it is a
-    write this script gained, not one it always had.
+    TWO DIFFERENT GUARDS, AND THIS SCRIPT CARRIES ONLY ONE OF THEM. `source-repo-guard-lib.ps1`'s
+    `Assert-OwnCopy` is the UNIVERSAL one every person-invoked shared script in this family carries
+    (`source-repo-guard.tests.ps1`'s own coverage assert enforces it, with an exemption reserved for a
+    hook nobody types): it refuses a STALE, released copy of THIS script running from inside the repo
+    that maintains it, and does nothing anywhere else. This script has it, right below.
+    `Test-IsWorkflowSourceRepo`, the SEPARATE, content-specific refusal `adopt-merge-queue.ps1` and
+    `adopt-workflow-folder.ps1` carry, is different: it refuses the whole OPERATION in the source repo,
+    because those commands WRITE local files that would collide with the hand-kept originals they are
+    derived from. This script writes nothing anywhere -- it only reads `gh label list` and prints -- so
+    there is nothing for that second guard to protect, and running it here simply checks this repo
+    against its own canonical answer instead of conflicting with anything (which is exactly what the
+    test suite does). If that ever changes, the argument to add it is a write this script gained, not
+    one it always had.
 
     NO DRIFT DETECTION. A label that already exists is reported '[ok]' without comparing its colour or
     description against the canonical values -- that is a different, harder problem (a repo may have
@@ -89,6 +95,12 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+
+# THE SOURCE-REPO GUARD: refuses THIS script when it is a released copy running in the repo that
+# maintains it -- the universal one, not the content-specific Test-IsWorkflowSourceRepo (see the
+# header). Guarded dot-source, so a tree without the lib behaves as before. Why: the lib's own header.
+$guardLib = Join-Path $PSScriptRoot '..\lib\source-repo-guard-lib.ps1'
+if (Test-Path -LiteralPath $guardLib -PathType Leaf) { . $guardLib; Assert-OwnCopy -ScriptPath $PSCommandPath }
 
 # Dual-context repo root: a consumer running the plugin mirror gets it from CLAUDE_PROJECT_DIR, the
 # source's root copy falls back to the git root. Same resolution as every other mirrored script.
